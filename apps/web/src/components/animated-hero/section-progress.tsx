@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, memo } from 'react';
 
 const sections = [
   { id: 'loading', label: 'INIT' },
@@ -14,17 +14,20 @@ const sections = [
 
 export function SectionProgress() {
   const [activeSection, setActiveSection] = useState(0);
-  const [scrollProgress, setScrollProgress] = useState(0);
   const rafRef = useRef<number | null>(null);
   const lastUpdateRef = useRef(0);
 
-  // Throttled scroll handler using RAF for smooth 60fps updates
+  // Refs for direct DOM manipulation (avoid React re-renders during scroll)
+  const progressLineRef = useRef<HTMLDivElement>(null);
+  const mobileProgressRef = useRef<HTMLDivElement>(null);
+
+  // Throttled scroll handler using RAF for smooth updates
   const handleScroll = useCallback(() => {
     if (rafRef.current) return; // Skip if already scheduled
 
     rafRef.current = requestAnimationFrame(() => {
       const now = performance.now();
-      // Throttle state updates to ~30fps to reduce re-renders
+      // Throttle to ~30fps to reduce work
       if (now - lastUpdateRef.current < 33) {
         rafRef.current = null;
         return;
@@ -35,14 +38,23 @@ export function SectionProgress() {
       const docHeight = document.documentElement.scrollHeight - window.innerHeight;
       const progress = (scrollTop / docHeight) * 100;
 
-      // Only update if changed significantly (avoid micro-updates)
-      setScrollProgress((prev) => Math.abs(prev - progress) > 0.5 ? progress : prev);
+      // Direct DOM manipulation for progress bars (no React re-render)
+      if (mobileProgressRef.current) {
+        mobileProgressRef.current.style.width = `${progress}%`;
+      }
 
       // Calculate active section based on scroll position
       const sectionIndex = Math.min(
         Math.floor((scrollTop / docHeight) * sections.length),
         sections.length - 1
       );
+
+      // Update progress line directly
+      if (progressLineRef.current) {
+        progressLineRef.current.style.height = `${(sectionIndex / (sections.length - 1)) * 100}%`;
+      }
+
+      // Only trigger React re-render when section actually changes
       setActiveSection((prev) => prev !== sectionIndex ? sectionIndex : prev);
 
       rafRef.current = null;
@@ -107,8 +119,9 @@ export function SectionProgress() {
         <div className="absolute top-0 left-1.5 w-[1px] h-full -z-10">
           <div className="w-full h-full bg-[var(--border)]" />
           <div
-            className="absolute top-0 w-full bg-[var(--accent)] transition-all duration-300"
-            style={{ height: `${(activeSection / (sections.length - 1)) * 100}%` }}
+            ref={progressLineRef}
+            className="absolute top-0 w-full bg-[var(--accent)] will-change-[height]"
+            style={{ height: `${(activeSection / (sections.length - 1)) * 100}%`, transition: 'none' }}
           />
         </div>
       </div>
@@ -117,8 +130,9 @@ export function SectionProgress() {
       <div className="fixed top-0 left-0 right-0 z-50 lg:hidden">
         <div className="h-1 bg-[var(--border)]">
           <div
-            className="h-full bg-[var(--accent)] transition-all duration-150"
-            style={{ width: `${scrollProgress}%` }}
+            ref={mobileProgressRef}
+            className="h-full bg-[var(--accent)] will-change-[width]"
+            style={{ width: '0%', transition: 'none' }}
           />
         </div>
       </div>

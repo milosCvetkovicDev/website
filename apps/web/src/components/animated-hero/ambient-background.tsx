@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 // Floating code particles that drift across the screen
-// Performance optimized: throttled to 30fps, uses filter instead of splice
+// Performance optimized: throttled to 30fps, pauses when off-screen, uses filter instead of splice
 export function AmbientBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isVisibleRef = useRef(true);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -25,6 +26,15 @@ export function AmbientBackground() {
     let lastTime = 0;
     const targetFPS = 30; // Throttle to 30fps for performance
     const frameInterval = 1000 / targetFPS;
+
+    // Pause animation when canvas is not visible (performance optimization)
+    const observer = new IntersectionObserver(
+      (entries) => {
+        isVisibleRef.current = entries[0]?.isIntersecting ?? false;
+      },
+      { threshold: 0 }
+    );
+    observer.observe(canvas);
 
     let particles: Particle[] = [];
     const codeSnippets = [
@@ -71,6 +81,9 @@ export function AmbientBackground() {
     const animate = (currentTime: number) => {
       animationId = requestAnimationFrame(animate);
 
+      // Skip rendering when canvas is not visible (huge performance win)
+      if (!isVisibleRef.current) return;
+
       // Throttle to target FPS
       const deltaTime = currentTime - lastTime;
       if (deltaTime < frameInterval) return;
@@ -111,6 +124,7 @@ export function AmbientBackground() {
       window.removeEventListener('resize', debouncedResize);
       clearTimeout(resizeTimeout);
       cancelAnimationFrame(animationId);
+      observer.disconnect();
     };
   }, []);
 

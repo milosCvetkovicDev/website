@@ -1,15 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense, memo } from 'react';
 import { LoadingScreen } from './loading-screen';
-import { DiscoveryPhase } from './discovery-phase';
-import { StrategyPhase } from './strategy-phase';
-import { ExecutionPhase } from './execution-phase';
-import { GauntletPhase } from './gauntlet-phase';
-import { LoopPhase } from './loop-phase';
-import { GameComplete } from './game-complete';
-import { AmbientBackground, GridBackground, ScanLines } from './ambient-background';
+import { GridBackground, ScanLines } from './ambient-background';
 import { SectionProgress } from './section-progress';
+
+// Lazy load heavy components that are below the fold
+const DiscoveryPhase = lazy(() => import('./discovery-phase').then(m => ({ default: m.DiscoveryPhase })));
+const StrategyPhase = lazy(() => import('./strategy-phase').then(m => ({ default: m.StrategyPhase })));
+const ExecutionPhase = lazy(() => import('./execution-phase').then(m => ({ default: m.ExecutionPhase })));
+const GauntletPhase = lazy(() => import('./gauntlet-phase').then(m => ({ default: m.GauntletPhase })));
+const LoopPhase = lazy(() => import('./loop-phase').then(m => ({ default: m.LoopPhase })));
+const GameComplete = lazy(() => import('./game-complete').then(m => ({ default: m.GameComplete })));
+const AmbientBackground = lazy(() => import('./ambient-background').then(m => ({ default: m.AmbientBackground })));
+
+// Memoize static background components
+const MemoizedGridBackground = memo(GridBackground);
+const MemoizedScanLines = memo(ScanLines);
+const MemoizedSectionProgress = memo(SectionProgress);
+
+// Minimal loading placeholder for lazy sections
+function SectionPlaceholder() {
+  return <div className="min-h-screen" />;
+}
 
 export function AnimatedHero() {
   const [mounted, setMounted] = useState(false);
@@ -32,46 +45,50 @@ export function AnimatedHero() {
 
   return (
     <div className="relative">
-      {/* Ambient Effects Layer */}
-      <GridBackground />
-      <AmbientBackground />
-      <ScanLines />
+      {/* Ambient Effects Layer - static backgrounds render immediately */}
+      <MemoizedGridBackground />
+      <Suspense fallback={null}>
+        <AmbientBackground />
+      </Suspense>
+      <MemoizedScanLines />
 
       {/* Section Progress Indicator */}
-      <SectionProgress />
+      <MemoizedSectionProgress />
 
       {/* Content Layer */}
       <div className="relative z-10">
-        {/* Section 1: Loading Screen / Hero */}
+        {/* Section 1: Loading Screen / Hero - render immediately (above fold) */}
         <LoadingScreen />
 
-        {/* Section 2: Discovery Phase */}
-        <DiscoveryPhase />
+        {/* Lazy loaded sections below the fold */}
+        <Suspense fallback={<SectionPlaceholder />}>
+          <DiscoveryPhase />
+        </Suspense>
 
-        {/* Section 3: Strategy Phase */}
-        <StrategyPhase />
+        <Suspense fallback={<SectionPlaceholder />}>
+          <StrategyPhase />
+        </Suspense>
 
-        {/* Section 4: Execution Phase */}
-        <ExecutionPhase />
+        <Suspense fallback={<SectionPlaceholder />}>
+          <ExecutionPhase />
+        </Suspense>
 
-        {/* Section 5: The Gauntlet (CI/CD) */}
-        <GauntletPhase />
+        <Suspense fallback={<SectionPlaceholder />}>
+          <GauntletPhase />
+        </Suspense>
 
-        {/* Section 6: The Loop (Self-Healing) */}
-        <LoopPhase />
+        <Suspense fallback={<SectionPlaceholder />}>
+          <LoopPhase />
+        </Suspense>
 
-        {/* Section 7: Game Complete (CTA) */}
-        <GameComplete />
+        <Suspense fallback={<SectionPlaceholder />}>
+          <GameComplete />
+        </Suspense>
       </div>
     </div>
   );
 }
 
-// Re-export components for individual use if needed
+// Re-export only the loading screen (used above the fold)
+// Other phases are lazy-loaded internally
 export { LoadingScreen } from './loading-screen';
-export { DiscoveryPhase } from './discovery-phase';
-export { StrategyPhase } from './strategy-phase';
-export { ExecutionPhase } from './execution-phase';
-export { GauntletPhase } from './gauntlet-phase';
-export { LoopPhase } from './loop-phase';
-export { GameComplete } from './game-complete';

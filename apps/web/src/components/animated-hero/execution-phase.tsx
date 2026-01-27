@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
-import { Terminal, HudPanel, ProgressBar, ActivityEntry } from './hud-elements';
+import { Terminal, HudPanel, ActivityEntry } from './hud-elements';
 
 const codeLines = [
   { type: 'keyword', content: 'export class', delay: 0 },
@@ -44,14 +44,19 @@ export function ExecutionPhase() {
   const comboRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLDivElement>(null);
 
-  const [stats, setStats] = useState({
-    files: 0,
-    tests: 0,
-    coverage: 0,
-    time: '00:00:00',
-  });
-  const [visibleLines, setVisibleLines] = useState(0);
-  const [comboCount, setComboCount] = useState(0);
+  // Refs for direct DOM manipulation during animation (avoids React re-renders)
+  const filesProgressRef = useRef<HTMLDivElement>(null);
+  const filesTextRef = useRef<HTMLSpanElement>(null);
+  const testsProgressRef = useRef<HTMLDivElement>(null);
+  const testsTextRef = useRef<HTMLSpanElement>(null);
+  const coverageProgressRef = useRef<HTMLDivElement>(null);
+  const coverageTextRef = useRef<HTMLSpanElement>(null);
+  const timeRef = useRef<HTMLSpanElement>(null);
+  const comboCountRef = useRef<HTMLSpanElement>(null);
+  const codeSpansRef = useRef<(HTMLSpanElement | null)[]>([]);
+
+  // Single state update at the end of animation for final render
+  const [animationComplete, setAnimationComplete] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -63,9 +68,7 @@ export function ExecutionPhase() {
     ).matches;
 
     if (prefersReducedMotion) {
-      setStats({ files: 34, tests: 89, coverage: 100, time: '00:14:32' });
-      setVisibleLines(codeLines.length);
-      setComboCount(12);
+      setAnimationComplete(true);
       return;
     }
 
@@ -77,22 +80,37 @@ export function ExecutionPhase() {
           end: 'bottom center',
           toggleActions: 'play none none reverse',
           onEnter: () => {
-            // Animate stats
+            // Animate stats using direct DOM manipulation (no React re-renders)
             gsap.to(
               {},
               {
                 duration: 3,
                 onUpdate: function () {
                   const progress = this.progress();
-                  setStats({
-                    files: Math.round(progress * 34),
-                    tests: Math.round(progress * 89),
-                    coverage: Math.round(progress * 100),
-                    time: formatTime(progress * 872), // 14:32 in seconds
+                  const files = Math.round(progress * 34);
+                  const tests = Math.round(progress * 89);
+                  const coverage = Math.round(progress * 100);
+                  const combo = Math.round(progress * 12);
+                  const visibleLineCount = Math.round(progress * codeLines.length);
+
+                  // Direct DOM updates - bypasses React reconciliation
+                  if (filesProgressRef.current) filesProgressRef.current.style.width = `${Math.round((files / 34) * 100)}%`;
+                  if (filesTextRef.current) filesTextRef.current.textContent = `${Math.round((files / 34) * 100)}%`;
+                  if (testsProgressRef.current) testsProgressRef.current.style.width = `${tests}%`;
+                  if (testsTextRef.current) testsTextRef.current.textContent = `${tests}%`;
+                  if (coverageProgressRef.current) coverageProgressRef.current.style.width = `${coverage}%`;
+                  if (coverageTextRef.current) coverageTextRef.current.textContent = `${coverage}%`;
+                  if (timeRef.current) timeRef.current.textContent = formatTime(progress * 872);
+                  if (comboCountRef.current) comboCountRef.current.textContent = `x${combo}`;
+
+                  // Show/hide code line spans directly
+                  codeSpansRef.current.forEach((span, i) => {
+                    if (span) {
+                      span.style.opacity = i < visibleLineCount ? '1' : '0';
+                    }
                   });
-                  setVisibleLines(Math.round(progress * codeLines.length));
-                  setComboCount(Math.round(progress * 12));
                 },
+                onComplete: () => setAnimationComplete(true),
               }
             );
           },
@@ -167,6 +185,29 @@ export function ExecutionPhase() {
     }
   };
 
+  // Custom progress bar component using refs for direct DOM manipulation
+  const AnimatedProgressBar = ({ label, progressRef, textRef }: {
+    label: string;
+    progressRef: React.RefObject<HTMLDivElement | null>;
+    textRef: React.RefObject<HTMLSpanElement | null>;
+  }) => (
+    <div className="flex items-center gap-3 group">
+      <span className="text-xs font-mono text-[var(--muted)] w-24 shrink-0 group-hover:text-[var(--foreground)] transition-colors">
+        {label}
+      </span>
+      <div className="flex-1 h-2 bg-[var(--border)] rounded-full overflow-hidden relative">
+        <div
+          ref={progressRef}
+          className="h-full rounded-full transition-none bg-[var(--accent)]"
+          style={{ width: animationComplete ? '100%' : '0%' }}
+        />
+      </div>
+      <span ref={textRef} className="text-xs font-mono text-[var(--muted)] w-12 text-right tabular-nums">
+        {animationComplete ? '100%' : '0%'}
+      </span>
+    </div>
+  );
+
   return (
     <section
       ref={sectionRef}
@@ -187,38 +228,36 @@ export function ExecutionPhase() {
             <Terminal className="h-full">
               <pre className="text-sm leading-relaxed">
                 <code>
-                  {codeLines.slice(0, visibleLines).map((line, i) => (
-                    <span key={i} className={getTokenColor(line.type)}>
+                  {codeLines.map((line, i) => (
+                    <span
+                      key={i}
+                      ref={(el) => { codeSpansRef.current[i] = el; }}
+                      className={getTokenColor(line.type)}
+                      style={{ opacity: animationComplete ? 1 : 0, transition: 'none' }}
+                    >
                       {line.type === 'newline' ? '\n' : line.content}
                     </span>
                   ))}
-                  <span className="inline-block w-2 h-4 bg-[var(--accent)] animate-pulse ml-0.5" />
+                  <span className="inline-block w-2 h-4 bg-[var(--accent)] ml-0.5" style={{ animation: 'pulse 1s ease-in-out infinite' }} />
                 </code>
               </pre>
             </Terminal>
           </div>
 
-          {/* Stats HUD */}
+          {/* Stats HUD - using refs for direct DOM manipulation */}
           <div ref={statsRef} className="space-y-4">
             <HudPanel title="BUILD STATS">
               <div className="space-y-4">
-                <ProgressBar
-                  label="FILES"
-                  progress={Math.round((stats.files / 34) * 100)}
-                />
-                <ProgressBar
-                  label="TESTS"
-                  progress={stats.tests}
-                />
-                <ProgressBar
-                  label="COVERAGE"
-                  progress={stats.coverage}
-                />
+                <AnimatedProgressBar label="FILES" progressRef={filesProgressRef} textRef={filesTextRef} />
+                <AnimatedProgressBar label="TESTS" progressRef={testsProgressRef} textRef={testsTextRef} />
+                <AnimatedProgressBar label="COVERAGE" progressRef={coverageProgressRef} textRef={coverageTextRef} />
                 <div className="flex justify-between items-center pt-2 border-t border-[var(--accent)]/20">
                   <span className="text-xs font-mono text-[var(--muted)]">
                     TIME ELAPSED
                   </span>
-                  <span className="font-mono text-[var(--accent)]">{stats.time}</span>
+                  <span ref={timeRef} className="font-mono text-[var(--accent)]">
+                    {animationComplete ? '00:14:32' : '00:00:00'}
+                  </span>
                 </div>
               </div>
             </HudPanel>
@@ -228,7 +267,9 @@ export function ExecutionPhase() {
               ref={comboRef}
               className="flex items-center justify-center gap-2 p-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10"
             >
-              <span className="text-3xl font-bold text-yellow-400">x{comboCount}</span>
+              <span ref={comboCountRef} className="text-3xl font-bold text-yellow-400">
+                {animationComplete ? 'x12' : 'x0'}
+              </span>
               <span className="text-sm font-mono text-yellow-400/80">COMMIT STREAK</span>
             </div>
           </div>
