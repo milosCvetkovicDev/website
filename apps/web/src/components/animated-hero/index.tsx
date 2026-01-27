@@ -24,6 +24,34 @@ function SectionPlaceholder() {
   return <div className="min-h-screen" />;
 }
 
+// Bootstrap loading overlay - fades out smoothly
+function BootstrapLoader({ visible }: { visible: boolean }) {
+  const [shouldRender, setShouldRender] = useState(true);
+
+  useEffect(() => {
+    if (!visible) {
+      // Remove from DOM after fade-out animation completes
+      const timer = setTimeout(() => setShouldRender(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
+
+  if (!shouldRender) return null;
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 bg-[var(--background)] flex items-center justify-center transition-opacity duration-500 ${
+        visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}
+    >
+      <div className="text-center">
+        <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-[var(--muted)] font-mono text-sm">Initializing...</p>
+      </div>
+    </div>
+  );
+}
+
 export function AnimatedHero() {
   const [mounted, setMounted] = useState(false);
 
@@ -31,20 +59,10 @@ export function AnimatedHero() {
     setMounted(true);
   }, []);
 
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[var(--muted)] font-mono text-sm">Initializing...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="relative">
+      {/* Bootstrap loader overlay - fades out when mounted */}
+      <BootstrapLoader visible={!mounted} />
       {/* Ambient Effects Layer - static backgrounds render immediately */}
       <MemoizedGridBackground />
       <Suspense fallback={null}>
