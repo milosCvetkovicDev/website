@@ -143,13 +143,15 @@ export function DiscoveryPhase() {
 
           {/* Mind Map / Tags */}
           <div className="space-y-6">
-            <HudPanel title="EXTRACTED REQUIREMENTS">
+            <HudPanel title="EXTRACTED REQUIREMENTS" glow>
               <div ref={tagsRef} className="flex flex-wrap gap-2">
-                {requirements.map((req) => (
+                {requirements.map((req, index) => (
                   <span
                     key={req.id}
-                    className="requirement-tag px-3 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] text-sm font-mono rounded-lg"
+                    className="requirement-tag px-3 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] text-sm font-mono rounded-lg transition-all duration-300 hover:bg-[var(--accent)]/20 hover:scale-105 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] cursor-default"
+                    style={{ animationDelay: `${index * 0.1}s` }}
                   >
+                    <span className="mr-1 opacity-50">#{index + 1}</span>
                     {req.label}
                   </span>
                 ))}

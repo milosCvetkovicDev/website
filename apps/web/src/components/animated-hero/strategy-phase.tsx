@@ -157,23 +157,29 @@ export function StrategyPhase() {
             <h3 className="text-xs font-mono text-[var(--muted)] uppercase tracking-wider mb-4">
               TECH TREE
             </h3>
-            {techChoices.map((tech) => (
+            {techChoices.map((tech, index) => (
               <div
                 key={tech.category}
-                className="tech-item flex items-center gap-4 p-4 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5"
+                className="tech-item group relative flex items-center gap-4 p-4 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 hover-lift cursor-default overflow-hidden"
               >
-                <span className="text-2xl">{tech.icon}</span>
+                {/* Selection indicator */}
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
+
+                <span className="text-2xl transition-transform duration-300 group-hover:scale-125">{tech.icon}</span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-[var(--muted)] uppercase">
+                    <span className="text-[10px] text-[var(--muted)] uppercase tracking-wider font-mono">
                       {tech.category}
                     </span>
-                    <span className="text-[var(--accent)]">→</span>
+                    <span className="text-[var(--accent)] transition-transform duration-300 group-hover:translate-x-1">→</span>
                     <span className="font-semibold">{tech.choice}</span>
                   </div>
-                  <p className="text-sm text-[var(--muted)]">{tech.reason}</p>
+                  <p className="text-sm text-[var(--muted)] group-hover:text-[var(--foreground)] transition-colors">{tech.reason}</p>
                 </div>
-                <span className="text-green-400">✓</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-green-400 transition-transform duration-300 group-hover:scale-110">✓</span>
+                  <span className="text-[10px] font-mono text-green-400/60 opacity-0 group-hover:opacity-100 transition-opacity">LOCKED</span>
+                </div>
               </div>
             ))}
           </div>

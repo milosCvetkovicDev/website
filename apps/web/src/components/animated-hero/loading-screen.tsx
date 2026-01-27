@@ -140,31 +140,23 @@ export function LoadingScreen() {
         ref={headlineRef}
         className={`text-center mt-16 max-w-2xl ${showContent ? '' : 'opacity-0'}`}
       >
-        <h1 className="text-3xl md:text-5xl font-bold mb-4">
+        <h1 className="text-3xl md:text-5xl font-bold mb-4 glitch-text">
           Most engineers show you the finished product.
         </h1>
         <p className="text-lg text-[var(--muted)]">
-          I&apos;ll show you how the sausage gets made. Scroll to watch me work.
+          I&apos;ll show you how the sausage gets made.{' '}
+          <span className="gradient-text font-semibold">Scroll to watch me work.</span>
         </p>
       </div>
 
       {/* Scroll Indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="text-[var(--muted)]"
-        >
-          <path d="M12 5v14" />
-          <path d="m19 12-7 7-7-7" />
-        </svg>
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+        <span className="text-[10px] font-mono text-[var(--accent)] tracking-widest uppercase">
+          Scroll
+        </span>
+        <div className="relative w-6 h-10 border-2 border-[var(--accent)]/50 rounded-full">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce" />
+        </div>
       </div>
     </section>
   );
