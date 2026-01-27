@@ -92,7 +92,7 @@ export const HudPanel = forwardRef<
           {title}
         </span>
         <div className="flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
           <span className="text-[10px] font-mono text-[var(--accent)]/60">ACTIVE</span>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 
 // Floating code particles that drift across the screen
+// Performance optimized: throttled to 30fps, uses filter instead of splice
 export function AmbientBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -21,30 +22,14 @@ export function AmbientBackground() {
     if (prefersReducedMotion) return;
 
     let animationId: number;
-    const particles: Particle[] = [];
+    let lastTime = 0;
+    const targetFPS = 30; // Throttle to 30fps for performance
+    const frameInterval = 1000 / targetFPS;
+
+    let particles: Particle[] = [];
     const codeSnippets = [
-      'async',
-      'await',
-      'const',
-      'function',
-      '=> {',
-      'return',
-      'import',
-      'export',
-      'class',
-      'interface',
-      '{ }',
-      '[ ]',
-      '( )',
-      '===',
-      '!==',
-      '...',
-      'try',
-      'catch',
-      'if',
-      'else',
-      '0x',
-      '///',
+      'async', 'await', 'const', 'function', '=> {', 'return',
+      'import', 'export', 'class', 'interface', '{ }', '[ ]',
     ];
 
     interface Particle {
@@ -53,7 +38,7 @@ export function AmbientBackground() {
       text: string;
       speed: number;
       opacity: number;
-      size: number;
+      font: string; // Cache font string
     }
 
     const resize = () => {
@@ -61,57 +46,70 @@ export function AmbientBackground() {
       canvas.height = window.innerHeight;
     };
 
-    const createParticle = (): Particle => ({
-      x: Math.random() * canvas.width,
-      y: canvas.height + 20,
-      text: codeSnippets[Math.floor(Math.random() * codeSnippets.length)],
-      speed: 0.3 + Math.random() * 0.5,
-      opacity: 0.03 + Math.random() * 0.07,
-      size: 10 + Math.random() * 4,
-    });
+    const createParticle = (): Particle => {
+      const size = 10 + Math.random() * 4;
+      return {
+        x: Math.random() * canvas.width,
+        y: canvas.height + 20,
+        text: codeSnippets[Math.floor(Math.random() * codeSnippets.length)],
+        speed: 0.3 + Math.random() * 0.5,
+        opacity: 0.03 + Math.random() * 0.07,
+        font: `${size}px monospace`, // Pre-compute font string
+      };
+    };
 
     const init = () => {
       resize();
-      // Start with some particles
-      for (let i = 0; i < 15; i++) {
+      // Start with fewer particles for better performance
+      for (let i = 0; i < 10; i++) {
         const p = createParticle();
         p.y = Math.random() * canvas.height;
         particles.push(p);
       }
     };
 
-    const animate = () => {
+    const animate = (currentTime: number) => {
+      animationId = requestAnimationFrame(animate);
+
+      // Throttle to target FPS
+      const deltaTime = currentTime - lastTime;
+      if (deltaTime < frameInterval) return;
+      lastTime = currentTime - (deltaTime % frameInterval);
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Add new particles occasionally
-      if (particles.length < 20 && Math.random() < 0.02) {
+      // Add new particles occasionally (reduced frequency)
+      if (particles.length < 15 && Math.random() < 0.01) {
         particles.push(createParticle());
       }
 
-      particles.forEach((p, index) => {
+      // Use filter instead of splice for better performance
+      particles = particles.filter((p) => {
         p.y -= p.speed;
+        if (p.y < -20) return false;
 
-        // Remove particles that are off screen
-        if (p.y < -20) {
-          particles.splice(index, 1);
-          return;
-        }
-
-        ctx.font = `${p.size}px monospace`;
+        ctx.font = p.font;
         ctx.fillStyle = `rgba(139, 92, 246, ${p.opacity})`;
         ctx.fillText(p.text, p.x, p.y);
+        return true;
       });
-
-      animationId = requestAnimationFrame(animate);
     };
 
     init();
-    animate();
+    animationId = requestAnimationFrame(animate);
 
-    window.addEventListener('resize', resize);
+    // Debounce resize handler
+    let resizeTimeout: NodeJS.Timeout;
+    const debouncedResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(resize, 150);
+    };
+
+    window.addEventListener('resize', debouncedResize);
 
     return () => {
-      window.removeEventListener('resize', resize);
+      window.removeEventListener('resize', debouncedResize);
+      clearTimeout(resizeTimeout);
       cancelAnimationFrame(animationId);
     };
   }, []);

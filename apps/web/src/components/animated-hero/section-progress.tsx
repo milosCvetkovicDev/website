@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 const sections = [
   { id: 'loading', label: 'INIT' },
@@ -15,6 +15,39 @@ const sections = [
 export function SectionProgress() {
   const [activeSection, setActiveSection] = useState(0);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const lastUpdateRef = useRef(0);
+
+  // Throttled scroll handler using RAF for smooth 60fps updates
+  const handleScroll = useCallback(() => {
+    if (rafRef.current) return; // Skip if already scheduled
+
+    rafRef.current = requestAnimationFrame(() => {
+      const now = performance.now();
+      // Throttle state updates to ~30fps to reduce re-renders
+      if (now - lastUpdateRef.current < 33) {
+        rafRef.current = null;
+        return;
+      }
+      lastUpdateRef.current = now;
+
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = (scrollTop / docHeight) * 100;
+
+      // Only update if changed significantly (avoid micro-updates)
+      setScrollProgress((prev) => Math.abs(prev - progress) > 0.5 ? progress : prev);
+
+      // Calculate active section based on scroll position
+      const sectionIndex = Math.min(
+        Math.floor((scrollTop / docHeight) * sections.length),
+        sections.length - 1
+      );
+      setActiveSection((prev) => prev !== sectionIndex ? sectionIndex : prev);
+
+      rafRef.current = null;
+    });
+  }, []);
 
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia(
@@ -23,23 +56,12 @@ export function SectionProgress() {
 
     if (prefersReducedMotion) return;
 
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = (scrollTop / docHeight) * 100;
-      setScrollProgress(progress);
-
-      // Calculate active section based on scroll position
-      const sectionIndex = Math.min(
-        Math.floor((scrollTop / docHeight) * sections.length),
-        sections.length - 1
-      );
-      setActiveSection(sectionIndex);
-    };
-
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [handleScroll]);
 
   return (
     <>
@@ -64,13 +86,8 @@ export function SectionProgress() {
                   index <= activeSection
                     ? 'bg-[var(--accent)]'
                     : 'bg-[var(--border)]'
-                }`}
-              >
-                {/* Active glow */}
-                {index === activeSection && (
-                  <div className="absolute inset-0 bg-[var(--accent)] rounded-full animate-ping opacity-30" />
-                )}
-              </div>
+                } ${index === activeSection ? 'shadow-[0_0_8px_rgba(139,92,246,0.6)]' : ''}`}
+              />
 
               {/* Label (shows on hover) */}
               <span
