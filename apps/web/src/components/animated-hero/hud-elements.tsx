@@ -38,11 +38,11 @@ function CornerBrackets({ className = '' }: { className?: string }) {
   );
 }
 
-// Glowing border animation
+// Glowing border effect (static, no animation to avoid flicker)
 function GlowBorder() {
   return (
     <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-transparent via-[var(--accent)]/20 to-transparent animate-shimmer" />
+      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-[var(--accent)]/0 via-[var(--accent)]/10 to-[var(--accent)]/0" />
     </div>
   );
 }
@@ -137,11 +137,11 @@ export function ProgressBar({
           }}
         />
         <div
-          className={`h-full rounded-full transition-all duration-500 ease-out relative ${colors[variant]}`}
+          className={`h-full rounded-full transition-all duration-500 ease-out relative overflow-hidden ${colors[variant]}`}
           style={{ width: `${progress}%` }}
         >
-          {/* Animated shine effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+          {/* Static shine effect - no animation to avoid flicker */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
         </div>
       </div>
       <span className="text-xs font-mono text-[var(--muted)] w-12 text-right tabular-nums">
@@ -207,10 +207,6 @@ export const NotificationToast = forwardRef<
       ref={ref}
       className={`relative px-4 py-3 rounded-lg border font-mono text-sm ${colors[type]} ${glowColors[type]} overflow-hidden`}
     >
-      {/* Animated border */}
-      <div className="absolute inset-0 rounded-lg">
-        <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-transparent via-current to-transparent opacity-20 animate-shimmer" />
-      </div>
       <div className="relative">{children}</div>
     </div>
   );
