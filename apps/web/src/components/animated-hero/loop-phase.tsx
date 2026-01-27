@@ -227,10 +227,10 @@ export function LoopPhase() {
           className={`mt-16 text-center ${showProtocol ? '' : 'opacity-0'}`}
         >
           <h2 className="text-2xl md:text-4xl font-bold mb-3">
-            The final boss is entropy. My system farms it for XP.
+            This happened at 3:14am. Nobody got paged.
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            At 3am, while you sleep, the code improves itself.
+            The system diagnosed itself, wrote a fix, and waited for a human to approve. That&apos;s the future I build.
           </p>
         </div>
       </div>

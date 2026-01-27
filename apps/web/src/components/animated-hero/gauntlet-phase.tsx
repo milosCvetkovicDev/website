@@ -263,10 +263,10 @@ export function GauntletPhase() {
           className={`mt-16 text-center ${showAchievement ? '' : 'opacity-0'}`}
         >
           <h2 className="text-2xl md:text-4xl font-bold mb-3">
-            No code reaches production without surviving the gauntlet.
+            &quot;It worked on my machine&quot; doesn&apos;t fly here.
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            Automated. Ruthless. Every. Single. Time.
+            Six gates. Zero shortcuts. Every commit proves itself or dies trying.
           </p>
         </div>
       </div>

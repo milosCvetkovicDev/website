@@ -93,9 +93,9 @@ export function GameComplete() {
               </div>
 
               <div className="pt-4 border-t border-[#30363d] text-center space-y-4">
-                <p className="text-xl font-semibold">This is how I play.</p>
+                <p className="text-xl font-semibold">This is how I work. Every time.</p>
                 <p className="text-[var(--muted)]">
-                  Want to start a co-op campaign?
+                  Got a system that needs building? Let&apos;s talk.
                 </p>
               </div>
             </div>
@@ -107,12 +107,12 @@ export function GameComplete() {
           href="/contact"
           className="inline-flex items-center justify-center px-8 py-4 mt-8 bg-[var(--accent)] text-white font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-all text-lg"
         >
-          Get In Touch
+          Start a Conversation
         </Link>
 
         {/* Scroll indicator to continue to rest of site */}
         <div className="mt-16 text-[var(--muted)] text-sm">
-          <p>Or keep scrolling to explore more</p>
+          <p>Or scroll down to see more of my work</p>
           <div className="mt-4 animate-bounce">
             <svg
               xmlns="http://www.w3.org/2000/svg"

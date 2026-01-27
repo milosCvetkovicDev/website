@@ -9,28 +9,28 @@ const techChoices = [
     category: 'Runtime',
     choice: 'Bun',
     icon: '⚡',
-    reason: '2x faster cold starts',
+    reason: 'Cold starts matter when errors are on fire',
     selected: true,
   },
   {
     category: 'Framework',
     choice: 'Elysia',
     icon: '🔷',
-    reason: 'Type-safe, minimal overhead',
+    reason: 'Type errors caught at compile time, not 3am',
     selected: true,
   },
   {
     category: 'AI Core',
     choice: 'Claude Agent SDK',
     icon: '🧠',
-    reason: 'The brain',
+    reason: 'The part that actually thinks',
     selected: true,
   },
   {
     category: 'Monitoring',
     choice: 'Azure Log Analytics',
     icon: '👁',
-    reason: 'The eyes',
+    reason: 'See everything. Miss nothing.',
     selected: true,
   },
 ];
@@ -318,10 +318,10 @@ export function StrategyPhase() {
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
           <h2 className="text-2xl md:text-4xl font-bold mb-3">
-            Every tool is a choice. Every choice is a trade-off.
+            Hype fades. The right tool for the job doesn&apos;t.
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            I don&apos;t grab the hot framework. I pick what wins.
+            I pick technologies that solve the problem, not pad my resume.
           </p>
         </div>
       </div>

@@ -251,10 +251,10 @@ export function ExecutionPhase() {
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
           <h2 className="text-2xl md:text-4xl font-bold mb-3">
-            Execution isn&apos;t typing faster. It&apos;s thinking in systems.
+            The bottleneck was never my typing speed.
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            Claude writes the code. I architect the machine.
+            AI writes the syntax. I make the decisions that matter.
           </p>
         </div>
       </div>

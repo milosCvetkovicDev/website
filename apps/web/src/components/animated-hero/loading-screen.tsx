@@ -88,7 +88,7 @@ export function LoadingScreen() {
       {/* Loading Progress */}
       <div className={`text-center mb-12 ${showContent ? 'hidden' : ''}`}>
         <p className="font-mono text-sm text-[var(--muted)] mb-4">
-          Initializing development environment...
+          Booting up the machine...
         </p>
         <div className="w-64 h-2 bg-[var(--border)] rounded-full overflow-hidden mx-auto">
           <div
@@ -141,10 +141,10 @@ export function LoadingScreen() {
         className={`text-center mt-16 max-w-2xl ${showContent ? '' : 'opacity-0'}`}
       >
         <h1 className="text-3xl md:text-5xl font-bold mb-4">
-          You&apos;re about to watch how the game is actually played.
+          Most engineers show you the finished product.
         </h1>
         <p className="text-lg text-[var(--muted)]">
-          Most devs show you the trophy. I&apos;ll show you the raid.
+          I&apos;ll show you how the sausage gets made. Scroll to watch me work.
         </p>
       </div>
 

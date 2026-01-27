@@ -113,27 +113,27 @@ export function DiscoveryPhase() {
                 <div className="flex gap-3">
                   <span className="text-[var(--accent)]">&gt;</span>
                   <p className="text-[var(--foreground)]">
-                    &quot;Build a system that monitors production and fixes itself.&quot;
+                    &quot;I&apos;m tired of 3am pages. Build something that fixes itself.&quot;
                   </p>
                 </div>
                 <div className="flex gap-3 text-[var(--muted)]">
                   <span className="text-green-400">←</span>
-                  <p>Analyzing requirements...</p>
-                </div>
-                <div className="flex gap-3 text-[var(--muted)]">
-                  <span className="text-green-400">←</span>
-                  <p>What triggers should activate the agent?</p>
+                  <p>Interesting. What does &quot;fix itself&quot; mean to you?</p>
                 </div>
                 <div className="flex gap-3">
                   <span className="text-[var(--accent)]">&gt;</span>
                   <p className="text-[var(--foreground)]">
-                    Production errors in Azure Log Analytics.
+                    Detect the error. Understand it. Open a PR with a fix.
                   </p>
                 </div>
                 <div className="flex gap-3 text-[var(--muted)]">
                   <span className="text-green-400">←</span>
+                  <p>Autonomous code changes need guardrails. What&apos;s the blast radius?</p>
+                </div>
+                <div className="flex gap-3 text-[var(--muted)]">
+                  <span className="text-green-400">←</span>
                   <p>
-                    Got it. I&apos;ll need safety constraints—budget limits, approval gates...
+                    I&apos;m thinking: budget caps, confidence thresholds, human approval...
                     <TypingCursor />
                   </p>
                 </div>
@@ -178,10 +178,10 @@ export function DiscoveryPhase() {
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
           <h2 className="text-2xl md:text-4xl font-bold mb-3">
-            First rule: know exactly what you&apos;re hunting.
+            Most bugs live in the gap between what you asked for and what you meant.
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            Before I write a single line, I know the shape of the whole system.
+            I close that gap before writing a single line of code.
           </p>
         </div>
       </div>
