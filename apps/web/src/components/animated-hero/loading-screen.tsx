@@ -149,8 +149,8 @@ export function LoadingScreen() {
         </p>
       </div>
 
-      {/* Scroll Indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+      {/* Scroll Indicator - positioned higher to account for header offset */}
+      <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
         <span className="text-[10px] font-mono text-[var(--accent)] tracking-widest uppercase">
           Scroll
         </span>
