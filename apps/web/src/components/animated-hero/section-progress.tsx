@@ -153,8 +153,8 @@ export function SectionProgress() {
           </svg>
         </div>
 
-        {/* Current section indicator */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[10px] text-[var(--accent)]/50 tracking-widest">
+        {/* Current section indicator - positioned bottom-left to avoid overlap with scroll indicator */}
+        <div className="absolute bottom-4 left-16 font-mono text-[10px] text-[var(--accent)]/50 tracking-widest">
           [{String(activeSection + 1).padStart(2, '0')}/{String(sections.length).padStart(2, '0')}] {sections[activeSection]?.label}
         </div>
       </div>
