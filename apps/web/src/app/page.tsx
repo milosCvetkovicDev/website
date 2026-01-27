@@ -1,13 +1,17 @@
-import { Hero, Highlights, FeaturedWork, TechStack, CTA } from '@/components';
+import { AnimatedHero } from '@/components/animated-hero';
+import { FeaturedWork, TechStack } from '@/components';
 
 export default function Home() {
   return (
     <>
-      <Hero />
-      <Highlights />
-      <FeaturedWork />
-      <TechStack />
-      <CTA />
+      {/* The animated story experience */}
+      <AnimatedHero />
+
+      {/* Additional content for those who want more */}
+      <div className="border-t border-[var(--border)]">
+        <FeaturedWork />
+        <TechStack />
+      </div>
     </>
   );
 }
