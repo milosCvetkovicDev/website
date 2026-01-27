@@ -253,6 +253,28 @@ body {
   animation: glitch 0.5s ease-in-out infinite;
 }
 
+/* Scan down animation for loading */
+@keyframes scan-down {
+  0% {
+    top: -2px;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.animate-scan-down {
+  animation: scan-down 2s linear infinite;
+}
+
 /* Scanline overlay for retro effect */
 .scanlines::after {
   content: '';
