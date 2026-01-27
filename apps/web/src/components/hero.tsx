@@ -10,10 +10,17 @@ const roles = [
 ];
 
 export function Hero() {
+  const [mounted, setMounted] = useState(false);
   const [currentRole, setCurrentRole] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
     const interval = setInterval(() => {
       setIsVisible(false);
       setTimeout(() => {
@@ -23,7 +30,7 @@ export function Hero() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [mounted]);
 
   return (
     <section className="py-20 md:py-32">
@@ -35,7 +42,7 @@ export function Hero() {
         <div className="h-12 md:h-16 mb-6">
           <span
             className={`text-2xl md:text-4xl font-semibold text-[var(--accent)] transition-opacity duration-300 ${
-              isVisible ? 'opacity-100' : 'opacity-0'
+              mounted && isVisible ? 'opacity-100' : 'opacity-0'
             }`}
           >
             {roles[currentRole]}
