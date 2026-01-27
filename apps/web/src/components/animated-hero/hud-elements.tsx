@@ -377,19 +377,26 @@ export function ActivityEntry({
 }
 
 // Data stream effect for background
+// Uses deterministic pattern to avoid hydration mismatch
 export function DataStream({ className = '' }: { className?: string }) {
+  // Generate deterministic binary-like pattern using simple hash
+  const generateLine = (seed: number): string => {
+    let result = '';
+    for (let i = 0; i < 80; i++) {
+      // Simple deterministic pattern based on position
+      result += ((seed * (i + 1) * 7) % 13) > 6 ? '1' : '0';
+    }
+    return result;
+  };
+
+  const lines = Array.from({ length: 50 }, (_, i) => generateLine(i + 1)).join('\n');
+
   return (
     <div
       className={`absolute inset-0 overflow-hidden pointer-events-none opacity-10 ${className}`}
     >
       <div className="absolute inset-0 font-mono text-[8px] leading-tight text-[var(--accent)] whitespace-pre animate-scroll-up">
-        {Array.from({ length: 50 })
-          .map(() =>
-            Array.from({ length: 80 })
-              .map(() => (Math.random() > 0.5 ? '1' : '0'))
-              .join('')
-          )
-          .join('\n')}
+        {lines}
       </div>
     </div>
   );
