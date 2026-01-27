@@ -62,10 +62,11 @@ export default function ContactPage() {
   return (
     <div className="py-16 md:py-24">
       <div className="mx-auto max-w-3xl px-6">
-        <h1 className="text-4xl md:text-5xl font-bold mb-6">Get In Touch</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-6">Let&apos;s Talk</h1>
         <p className="text-xl text-[var(--muted)] mb-12">
-          Interested in working together? I&apos;m open to consulting
-          opportunities, technical collaborations, and interesting projects.
+          Have a legacy system that needs rescuing? Building something ambitious
+          and need senior engineering firepower? Or just want to geek out about
+          AI agents? I&apos;m listening.
         </p>
 
         {/* Social Links */}
@@ -120,9 +121,9 @@ export default function ContactPage() {
             <div>
               <h3 className="font-semibold mb-2">Currently Available</h3>
               <p className="text-[var(--muted)]">
-                I&apos;m open to consulting engagements and interesting projects.
-                Reach out through any of the channels above to start a
-                conversation.
+                Taking on select projects—full-time roles, consulting
+                engagements, or technical partnerships. If the problem is
+                interesting, I want to hear about it.
               </p>
             </div>
           </div>

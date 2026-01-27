@@ -11,43 +11,43 @@ const timeline = [
     year: '2025 - Present',
     role: 'Senior Full-Stack Engineer',
     description:
-      'Leading platform modernization with Clean Architecture, pioneering AI-assisted development with Claude Code.',
+      'Rescuing a legacy platform while building AI agents that fix production bugs autonomously. Yes, really.',
   },
   {
     year: '2021 - 2025',
     role: 'JavaScript Tech Lead',
     description:
-      'Led cross-functional teams building scalable web applications. Drove technical strategy for enterprise projects.',
+      'Led teams shipping enterprise software. Introduced Clean Architecture that cut bug rates and sped up feature delivery.',
   },
   {
     year: '2016 - 2021',
     role: 'JavaScript Tech Lead',
     description:
-      'Developed microservices architecture, spearheaded cloud-native solutions on AWS and Azure.',
+      'Built microservices from scratch, migrated systems to the cloud, and learned that "it works on my machine" is never acceptable.',
   },
   {
     year: '2013 - 2016',
     role: 'Frontend Developer',
     description:
-      'Started career building web applications, growing from junior to senior roles.',
+      'Where it all started. Wrote a lot of jQuery, survived AngularJS, and discovered I liked breaking complex problems into simple pieces.',
   },
 ];
 
 const values = [
   {
-    title: 'Clean Code & DX',
+    title: 'Ship, Then Iterate',
     description:
-      'I believe exceptional developer experience leads to better products. Code should be readable, maintainable, and a joy to work with.',
+      'Perfect is the enemy of deployed. I ship working software fast, gather feedback, and improve. Waiting for perfect means waiting forever.',
   },
   {
-    title: 'Automation First',
+    title: 'Automate the Boring Stuff',
     description:
-      'If a task is done more than twice, it should be automated. From CI/CD to AI-assisted development, I embrace tools that multiply impact.',
+      'Every manual task is a bug waiting to happen. I build systems that handle the repetitive work so humans can focus on hard problems.',
   },
   {
-    title: 'Continuous Learning',
+    title: 'Make It Understandable',
     description:
-      'Technology evolves rapidly. Staying curious and embracing new paradigms like AI-native development keeps me effective.',
+      'Clever code is a liability. I write code that the next developer (or future me) can understand, debug, and extend without a decoder ring.',
   },
 ];
 
@@ -58,7 +58,7 @@ export default function AboutPage() {
         {/* Header */}
         <h1 className="text-4xl md:text-5xl font-bold mb-6">About Me</h1>
         <p className="text-xl text-[var(--muted)] mb-12">
-          Senior Full-Stack Engineer turning complexity into simplicity.
+          The engineer you call when the codebase is on fire.
         </p>
 
         {/* Bio */}
@@ -68,21 +68,21 @@ export default function AboutPage() {
           </h2>
           <div className="prose prose-lg dark:prose-invert max-w-none">
             <p className="text-lg leading-relaxed mb-4">
-              I&apos;m a results-driven JavaScript Tech Lead with over 10 years
-              of experience transforming legacy codebases into modern,
-              cloud-native solutions.
+              I&apos;ve spent 10+ years fixing the systems nobody else wants to
+              touch. Legacy monoliths, spaghetti code, &quot;temporary&quot; solutions
+              from 2015—I&apos;ve seen it all and shipped production fixes for
+              all of it.
             </p>
             <p className="text-lg leading-relaxed mb-4">
-              Currently, I&apos;m pioneering AI-assisted development workflows
-              using Claude Code and have built a self-healing agent using the
-              Claude Agent SDK that autonomously monitors production errors and
-              proposes fixes.
+              Now I&apos;m pushing the boundaries of what&apos;s possible with AI.
+              My self-healing agent monitors production errors 24/7 and opens
+              PRs with fixes autonomously. It&apos;s not science fiction—it&apos;s
+              running in production right now.
             </p>
             <p className="text-lg leading-relaxed">
-              I&apos;m passionate about clean code, automation, and creating
-              exceptional developer experiences. My expertise spans TypeScript,
-              React, Node.js, PostgreSQL, Azure, Kubernetes, and modern DevOps
-              practices.
+              I care about code that works, teams that ship, and systems that
+              don&apos;t page you at 3am. If that sounds like what you need,
+              we should talk.
             </p>
           </div>
         </section>

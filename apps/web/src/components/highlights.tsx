@@ -1,8 +1,8 @@
 const highlights = [
   {
-    title: 'AI Innovation',
+    title: 'AI That Ships',
     description:
-      'Pioneering AI-assisted development with Claude Code. Built a self-healing agent that monitors production errors and autonomously proposes fixes.',
+      '24/7 incident response without the 3am pages. I built an agent that detects production errors, diagnoses root causes, and opens PRs with fixes—while you sleep.',
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -25,9 +25,9 @@ const highlights = [
     ),
   },
   {
-    title: 'Legacy Modernization',
+    title: 'Legacy Rescue',
     description:
-      'Transforming monoliths into cloud-native solutions. Clean Architecture, DDD principles, and incremental migration strategies.',
+      'Your "untouchable" legacy system? I\'ve rescued worse. Incremental modernization that ships value every sprint—not a risky big-bang rewrite.',
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -47,9 +47,9 @@ const highlights = [
     ),
   },
   {
-    title: 'Full-Stack & DevOps',
+    title: 'Full Ownership',
     description:
-      'End-to-end ownership from React frontends to Node.js backends, Terraform infrastructure, and CI/CD pipelines.',
+      'One engineer, zero handoffs. I architect systems, write the code, configure the infrastructure, and ship it to production. No gaps, no excuses.',
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"

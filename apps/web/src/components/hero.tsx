@@ -49,9 +49,9 @@ export function Hero() {
           </span>
         </div>
         <p className="text-lg md:text-xl text-[var(--muted)] max-w-2xl mb-10">
-          I turn legacy codebases into cloud-native solutions and pioneer
-          AI-assisted development workflows. 10+ years of building scalable
-          applications with TypeScript, React, and Node.js.
+          I ship production systems that actually work—then make them better
+          with AI. From rescuing legacy codebases to building autonomous agents
+          that fix their own bugs, I solve the problems others avoid.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
           <Link

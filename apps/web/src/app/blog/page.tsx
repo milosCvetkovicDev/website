@@ -10,10 +10,10 @@ export default function BlogPage() {
   return (
     <div className="py-16 md:py-24">
       <div className="mx-auto max-w-3xl px-6">
-        <h1 className="text-4xl md:text-5xl font-bold mb-6">Blog</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-6">Writing</h1>
         <p className="text-xl text-[var(--muted)] mb-12">
-          Thoughts on AI-native development, software architecture, and
-          engineering leadership.
+          Hard-won lessons from the trenches. No fluff, no hype—just what
+          actually works.
         </p>
 
         {/* Coming soon placeholder */}
@@ -39,9 +39,9 @@ export default function BlogPage() {
           </div>
           <h2 className="text-xl font-semibold mb-3">Coming Soon</h2>
           <p className="text-[var(--muted)] max-w-md mx-auto">
-            I&apos;m working on articles about AI-assisted development workflows,
-            clean architecture patterns, and lessons from modernizing legacy
-            systems. Check back soon!
+            I&apos;m writing about building AI agents that actually ship, rescuing
+            legacy codebases without losing your mind, and the patterns that
+            make complex systems manageable. Stay tuned.
           </p>
         </div>
       </div>

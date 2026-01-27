@@ -5,11 +5,11 @@ export function CTA() {
     <section className="py-20 border-t border-[var(--border)]">
       <div className="mx-auto max-w-5xl px-6 text-center">
         <h2 className="text-3xl md:text-4xl font-bold mb-4">
-          Let&apos;s Build Something Together
+          Got a Hard Problem?
         </h2>
         <p className="text-lg text-[var(--muted)] mb-8 max-w-2xl mx-auto">
-          Open to new opportunities, consulting projects, and interesting
-          collaborations. Let&apos;s connect and discuss how I can help.
+          Whether you need a senior engineer, a technical consultant, or someone
+          to rescue that legacy system everyone&apos;s afraid to touch—let&apos;s talk.
         </p>
         <Link
           href="/contact"

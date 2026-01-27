@@ -131,10 +131,10 @@ export default function SkillsPage() {
   return (
     <div className="py-16 md:py-24">
       <div className="mx-auto max-w-5xl px-6">
-        <h1 className="text-4xl md:text-5xl font-bold mb-6">Skills & Expertise</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-6">What I Work With</h1>
         <p className="text-xl text-[var(--muted)] mb-12 max-w-2xl">
-          Click on any skill to see related projects. Over 10 years of experience
-          across the full stack.
+          Tools are just tools—what matters is shipping working software.
+          That said, here&apos;s what I reach for. Click any skill to see it in action.
         </p>
 
         {/* Selected skill details */}

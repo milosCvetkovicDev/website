@@ -12,10 +12,10 @@ export default function WorkPage() {
   return (
     <div className="py-16 md:py-24">
       <div className="mx-auto max-w-5xl px-6">
-        <h1 className="text-4xl md:text-5xl font-bold mb-6">My Work</h1>
+        <h1 className="text-4xl md:text-5xl font-bold mb-6">Things I&apos;ve Built</h1>
         <p className="text-xl text-[var(--muted)] mb-12 max-w-2xl">
-          Selected projects showcasing AI innovation, legacy modernization, and
-          infrastructure engineering.
+          Real projects, real constraints, real results. Here&apos;s what happens
+          when you point me at a hard problem.
         </p>
 
         <div className="grid gap-8">

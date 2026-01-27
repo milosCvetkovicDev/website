@@ -18,12 +18,12 @@ export const caseStudies: CaseStudy[] = [
     slug: 'self-healing-agent',
     title: 'Self-Healing Agent',
     description:
-      'AI-powered system that monitors production errors and autonomously proposes fixes via pull requests.',
+      'An AI agent that wakes up before you do. It monitors production, diagnoses errors, and opens PRs with fixes—all autonomously.',
     tags: ['Claude Agent SDK', 'Bun', 'Elysia', 'Azure'],
     challenge:
-      'Production incidents require immediate attention, but developers cannot monitor systems 24/7. Manual error investigation and fix implementation is time-consuming and delays resolution, especially during off-hours.',
+      'Production breaks at 3am. Nobody wants that call. But errors don\'t wait for business hours, and every minute of downtime costs money and trust. The question: can we fix bugs faster than humans can even wake up?',
     approach:
-      'Built an autonomous agent using Claude Agent SDK that integrates with Azure Log Analytics to monitor production errors in real-time. The agent analyzes error patterns, understands the codebase context, and proposes fixes through pull requests with proper validation gates.',
+      'I built an autonomous agent that never sleeps. It watches production logs, understands the codebase, and when something breaks, it diagnoses the issue and opens a PR with a fix. Humans review and merge—the agent does the grunt work.',
     contributions: [
       'Designed autonomous error analysis pipeline using Claude AI',
       'Implemented automatic PR creation with contextual fixes',
@@ -33,11 +33,11 @@ export const caseStudies: CaseStudy[] = [
       'Implemented learning metrics for calibration improvement',
     ],
     impact: [
-      'Reduced mean time to resolution (MTTR) for production incidents',
-      'Enabled 24/7 automated incident response coverage',
-      'Freed developers from repetitive debugging tasks',
-      'Built institutional knowledge through fix pattern learning',
-      'Maintained human oversight via approval gates',
+      'Production incidents get diagnosed before anyone wakes up',
+      'Developers stopped dreading on-call rotations',
+      'Fix patterns get learned and reused automatically',
+      'Humans stay in control—agent proposes, team approves',
+      'The system literally improves itself over time',
     ],
     techStack: [
       { category: 'Runtime', items: ['Bun'] },
@@ -52,12 +52,12 @@ export const caseStudies: CaseStudy[] = [
     slug: 'enterprise-b2b-platform',
     title: 'Enterprise B2B Platform',
     description:
-      'Full-stack modernization of a legacy enterprise platform using Clean Architecture and DDD principles.',
+      'Took a legacy codebase everyone was afraid to touch and turned it into a system the team actually enjoys working on.',
     tags: ['React', 'Node.js', 'PostgreSQL', 'Terraform'],
     challenge:
-      'Inherited a legacy enterprise platform with mixed concerns, inconsistent validation, scattered SQL queries, and minimal test coverage. The codebase needed modernization while maintaining business continuity.',
+      'The codebase had a reputation. SQL queries lived next to UI components. Validation happened... sometimes. Tests? What tests? Nobody wanted to touch it, but the business needed new features yesterday.',
     approach:
-      'Applied incremental modernization strategy: restructured to Clean Architecture layers, introduced Zod for validation, migrated to TypeORM with proper migrations, and established comprehensive testing patterns. Built robust CI/CD with security scanning.',
+      'I didn\'t propose a rewrite—that\'s how projects die. Instead, I introduced boundaries gradually. Clean Architecture emerged one module at a time. Every PR shipped value while improving the foundation underneath.',
     contributions: [
       'Migrated flat file structure to Clean Architecture (controllers → services → repositories)',
       'Replaced manual validation with Zod schemas and type inference',
@@ -68,11 +68,11 @@ export const caseStudies: CaseStudy[] = [
       'Established Playwright E2E testing with Page Object pattern and 4-way sharding',
     ],
     impact: [
-      'Faster development cycles through comprehensive automation',
-      'Significantly reduced CI time with affected-only deployments',
-      'Improved code quality through comprehensive testing',
-      'Secure deployments with automated vulnerability scanning',
-      'Reproducible infrastructure via Terraform IaC',
+      'New developers ship features in their first week',
+      'CI runs only what changed—deploys are fast again',
+      'Bug rate dropped as test coverage climbed',
+      'Security vulnerabilities caught before they reach production',
+      'Infrastructure changes are reviewed like code, not YOLO\'d',
     ],
     techStack: [
       { category: 'Frontend', items: ['React 18', 'Material-UI', 'Vite', 'TypeScript'] },
@@ -87,12 +87,12 @@ export const caseStudies: CaseStudy[] = [
     slug: 'nx-remote-cache',
     title: 'Nx Remote Cache Server',
     description:
-      'High-performance build cache server dramatically reducing CI/CD build times.',
+      'Why rebuild what hasn\'t changed? A custom cache server that slashed CI times and gave developers their coffee breaks back.',
     tags: ['Bun', 'Elysia', 'Azure Blob Storage'],
     challenge:
-      'Large monorepo builds were slow and expensive. Each CI run rebuilt unchanged packages, wasting compute resources and developer time. Needed a fast, reliable remote cache solution.',
+      'Every CI run rebuilt the entire monorepo. Developers waited. Cloud bills climbed. The math was simple: we were paying to compile the same unchanged code hundreds of times a day.',
     approach:
-      'Built a custom remote cache server optimized for Nx monorepos using Bun for maximum performance. Implemented dual-layer caching (in-memory LRU + Azure Blob Storage) for optimal hit rates and persistence.',
+      'Built a cache server from scratch using Bun for raw speed. Two-tier caching (hot in-memory, cold in blob storage) means cache hits are nearly instant. If it hasn\'t changed, we don\'t rebuild it. Period.',
     contributions: [
       'Built LRU in-memory caching for frequently accessed artifacts',
       'Implemented Azure Blob Storage backend for persistent cache',
@@ -101,10 +101,10 @@ export const caseStudies: CaseStudy[] = [
       'Created health checks for container orchestration integration',
     ],
     impact: [
-      'Cache hits skip rebuilds entirely, dramatically reducing CI time',
-      'Consistent builds across all developer machines',
-      'Reduced cloud compute costs through build artifact reuse',
-      'Improved developer productivity with faster feedback loops',
+      'CI pipelines went from coffee-break length to near-instant',
+      '"Works on my machine" became "works everywhere, identically"',
+      'Cloud compute bills dropped noticeably',
+      'Developers actually run the full test suite now (because it\'s fast)',
     ],
     techStack: [
       { category: 'Runtime', items: ['Bun'] },
