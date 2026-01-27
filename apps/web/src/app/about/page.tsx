@@ -1,9 +1,13 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'About | Milos Cvetkovic',
+  title: 'About',
   description:
-    'Senior Full-Stack Engineer with 10+ years of experience turning legacy codebases into cloud-native solutions.',
+    '10+ years fixing systems nobody else wants to touch. From legacy rescue to AI agents that fix their own bugs. Based in Belgrade, Serbia.',
+  openGraph: {
+    title: 'About Milos Cvetkovic',
+    description: 'The engineer you call when the codebase is on fire.',
+  },
 };
 
 const timeline = [

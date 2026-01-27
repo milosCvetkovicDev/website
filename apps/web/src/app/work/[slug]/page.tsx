@@ -22,8 +22,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return {
-    title: `${caseStudy.title} | Milos Cvetkovic`,
+    title: caseStudy.title,
     description: caseStudy.description,
+    openGraph: {
+      title: `${caseStudy.title} | Case Study`,
+      description: caseStudy.description,
+      type: 'article',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: caseStudy.title,
+      description: caseStudy.description,
+    },
   };
 }
 

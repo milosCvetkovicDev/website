@@ -1,9 +1,13 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Blog | Milos Cvetkovic',
+  title: 'Writing',
   description:
-    'Thoughts on AI-native development, software architecture, and engineering leadership.',
+    'Hard-won lessons on AI agents, legacy rescue, and building systems that scale. No fluff, no hype—just what actually works.',
+  openGraph: {
+    title: 'Writing',
+    description: 'Hard-won lessons from the trenches.',
+  },
 };
 
 export default function BlogPage() {

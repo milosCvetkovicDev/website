@@ -3,9 +3,13 @@ import Link from 'next/link';
 import { caseStudies } from '@/data/case-studies';
 
 export const metadata: Metadata = {
-  title: 'Work | Milos Cvetkovic',
+  title: 'Work',
   description:
-    'Case studies and projects showcasing AI innovation, legacy modernization, and full-stack development.',
+    'Real projects, real constraints, real results. Case studies on AI agents, legacy modernization, and high-performance systems.',
+  openGraph: {
+    title: 'Work & Case Studies',
+    description: 'What happens when you point me at a hard problem.',
+  },
 };
 
 export default function WorkPage() {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider, Navigation, Footer } from "@/components";
+import { ThemeProvider, Navigation, Footer, PersonJsonLd, WebsiteJsonLd } from "@/components";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,32 +14,59 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Milos Cvetkovic | Senior Full-Stack Engineer",
+  metadataBase: new URL("https://miloscvetkovic.com"),
+  title: {
+    default: "Milos Cvetkovic | Senior Full-Stack Engineer",
+    template: "%s | Milos Cvetkovic",
+  },
   description:
-    "AI-native engineer with 10+ years turning legacy codebases into cloud-native solutions. Expert in TypeScript, React, Node.js, and modern DevOps.",
+    "I ship production systems that actually work—then make them better with AI. 10+ years rescuing legacy codebases and building autonomous agents.",
   keywords: [
-    "Full-Stack Engineer",
-    "TypeScript",
-    "React",
-    "Node.js",
-    "AI Development",
+    "Senior Full-Stack Engineer",
+    "AI Engineer",
+    "TypeScript Developer",
+    "React Developer",
+    "Node.js Developer",
     "Claude Code",
+    "Claude Agent SDK",
     "Legacy Modernization",
     "Clean Architecture",
+    "Azure",
+    "DevOps",
   ],
   authors: [{ name: "Milos Cvetkovic" }],
+  creator: "Milos Cvetkovic",
   openGraph: {
-    title: "Milos Cvetkovic | Senior Full-Stack Engineer",
-    description:
-      "AI-native engineer with 10+ years turning legacy codebases into cloud-native solutions.",
     type: "website",
     locale: "en_US",
+    url: "https://miloscvetkovic.com",
+    siteName: "Milos Cvetkovic",
+    title: "Milos Cvetkovic | Senior Full-Stack Engineer",
+    description:
+      "I ship production systems that actually work—then make them better with AI. 10+ years rescuing legacy codebases.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Milos Cvetkovic | Senior Full-Stack Engineer",
     description:
-      "AI-native engineer with 10+ years turning legacy codebases into cloud-native solutions.",
+      "I ship production systems that actually work—then make them better with AI.",
+    creator: "@miloscvetkovic",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  verification: {
+    // Add these when you have them:
+    // google: "your-google-verification-code",
+    // yandex: "your-yandex-verification-code",
   },
 };
 
@@ -50,6 +77,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <PersonJsonLd />
+        <WebsiteJsonLd />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >

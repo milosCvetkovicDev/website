@@ -2,9 +2,13 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'Contact | Milos Cvetkovic',
+  title: 'Contact',
   description:
-    'Get in touch for collaboration opportunities, consulting, or just to say hello.',
+    'Have a legacy system that needs rescuing? Building something ambitious? Let\'s talk about your project.',
+  openGraph: {
+    title: 'Get In Touch',
+    description: 'Have a hard problem? Let\'s talk.',
+  },
 };
 
 const socialLinks = [
