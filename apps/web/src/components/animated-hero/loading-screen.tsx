@@ -1,83 +1,21 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { gsap, ScrollTrigger } from './use-gsap-scroll';
-import { Terminal, HudPanel, StatDisplay, NotificationToast } from './hud-elements';
+import { useRef, useEffect, useState } from 'react';
+import { Terminal, StatDisplay, NotificationToast } from './hud-elements';
 
 export function LoadingScreen() {
   const sectionRef = useRef<HTMLDivElement>(null);
-  const progressRef = useRef<HTMLDivElement>(null);
-  const progressTextRef = useRef<HTMLSpanElement>(null);
-  const hudRef = useRef<HTMLDivElement>(null);
-  const notificationRef = useRef<HTMLDivElement>(null);
-  const headlineRef = useRef<HTMLDivElement>(null);
-  const [showContent, setShowContent] = useState(false);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(true);
 
+  // Hide scroll indicator when user starts scrolling
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    const handleScroll = () => {
+      const scrolled = window.scrollY > 100;
+      setShowScrollIndicator(!scrolled);
+    };
 
-    // Check for reduced motion preference
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
-
-    if (prefersReducedMotion) {
-      setShowContent(true);
-      return;
-    }
-
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        onComplete: () => setShowContent(true),
-      });
-
-      // Progress bar animation
-      tl.to(progressRef.current, {
-        width: '100%',
-        duration: 2,
-        ease: 'power2.inOut',
-      })
-        .to(
-          progressTextRef.current,
-          {
-            textContent: 100,
-            duration: 2,
-            snap: { textContent: 1 },
-            ease: 'power2.inOut',
-          },
-          '<'
-        )
-        // Fade out progress bar
-        .to(
-          [progressRef.current?.parentElement, progressTextRef.current?.parentElement],
-          {
-            opacity: 0,
-            duration: 0.3,
-          }
-        )
-        // Reveal HUD
-        .fromTo(
-          hudRef.current,
-          { opacity: 0, y: 20 },
-          { opacity: 1, y: 0, duration: 0.5 }
-        )
-        // Notification pops in
-        .fromTo(
-          notificationRef.current,
-          { opacity: 0, scale: 0.9, y: -10 },
-          { opacity: 1, scale: 1, y: 0, duration: 0.4, ease: 'back.out(1.7)' },
-          '+=0.3'
-        )
-        // Headline fades in
-        .fromTo(
-          headlineRef.current,
-          { opacity: 0, y: 20 },
-          { opacity: 1, y: 0, duration: 0.5 },
-          '+=0.2'
-        );
-    }, sectionRef);
-
-    return () => ctx.revert();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   return (
@@ -85,28 +23,8 @@ export function LoadingScreen() {
       ref={sectionRef}
       className="min-h-screen flex flex-col items-center justify-center px-6 relative"
     >
-      {/* Loading Progress */}
-      <div className={`text-center mb-12 ${showContent ? 'hidden' : ''}`}>
-        <p className="font-mono text-sm text-[var(--muted)] mb-4">
-          Booting up the machine...
-        </p>
-        <div className="w-64 h-2 bg-[var(--border)] rounded-full overflow-hidden mx-auto">
-          <div
-            ref={progressRef}
-            className="h-full bg-[var(--accent)] rounded-full"
-            style={{ width: '0%' }}
-          />
-        </div>
-        <p className="font-mono text-xs text-[var(--muted)] mt-2">
-          <span ref={progressTextRef}>0</span>%
-        </p>
-      </div>
-
-      {/* HUD Panel */}
-      <div
-        ref={hudRef}
-        className={`w-full max-w-md ${showContent ? '' : 'opacity-0'}`}
-      >
+      {/* HUD Panel - shows immediately, BootstrapLoader handles initial loading */}
+      <div className="w-full max-w-md">
         <Terminal className="mb-6">
           <div className="space-y-2">
             <StatDisplay label="PLAYER" value="Milos Cvetkovic" />
@@ -125,7 +43,7 @@ export function LoadingScreen() {
         </Terminal>
 
         {/* Notification */}
-        <div ref={notificationRef} className={showContent ? '' : 'opacity-0'}>
+        <div className="mt-6">
           <NotificationToast type="info">
             <span className="flex items-center gap-2">
               <span>⚡</span>
@@ -136,10 +54,7 @@ export function LoadingScreen() {
       </div>
 
       {/* Headline */}
-      <div
-        ref={headlineRef}
-        className={`text-center mt-16 max-w-2xl ${showContent ? '' : 'opacity-0'}`}
-      >
+      <div className="text-center mt-12 max-w-2xl">
         <h1 className="text-3xl md:text-5xl font-bold mb-4 glitch-text">
           Most engineers show you the finished product.
         </h1>
@@ -149,8 +64,12 @@ export function LoadingScreen() {
         </p>
       </div>
 
-      {/* Scroll Indicator - positioned higher to account for header offset */}
-      <div className="absolute bottom-24 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+      {/* Scroll Indicator - fixed at bottom of viewport, fades on scroll */}
+      <div
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20 transition-opacity duration-300 ${
+          showScrollIndicator ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      >
         <span className="text-[10px] font-mono text-[var(--accent)] tracking-widest uppercase">
           Scroll
         </span>
