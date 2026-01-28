@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { Terminal, StatDisplay, NotificationToast } from './hud-elements';
+import { AnimatedText } from './animated-text';
 
 export function LoadingScreen() {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -47,7 +48,7 @@ export function LoadingScreen() {
           <NotificationToast type="info">
             <span className="flex items-center gap-2">
               <span>⚡</span>
-              <span>NEW QUEST RECEIVED</span>
+              <AnimatedText animation="morse">NEW QUEST RECEIVED</AnimatedText>
             </span>
           </NotificationToast>
         </div>
@@ -55,11 +56,15 @@ export function LoadingScreen() {
 
       {/* Headline */}
       <div className="text-center mt-12 max-w-2xl">
-        <h1 className="text-3xl md:text-5xl font-bold mb-4 glitch-text">
-          Most engineers show you the finished product.
+        <h1 className="text-3xl md:text-5xl font-bold mb-4">
+          <AnimatedText animation="gravity" className="glitch-text">
+            Most engineers show you the finished product.
+          </AnimatedText>
         </h1>
         <p className="text-lg text-[var(--muted)]">
-          I&apos;ll show you how the sausage gets made.{' '}
+          <AnimatedText animation="blur-reveal">
+            I&apos;ll show you how the sausage gets made.
+          </AnimatedText>{' '}
           <span className="gradient-text font-semibold">Scroll to watch me work.</span>
         </p>
       </div>
@@ -70,9 +75,9 @@ export function LoadingScreen() {
           showScrollIndicator ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
-        <span className="text-[10px] font-mono text-[var(--accent)] tracking-widest uppercase">
+        <AnimatedText animation="perspective" className="text-[10px] font-mono text-[var(--accent)] tracking-widest uppercase">
           Scroll
-        </span>
+        </AnimatedText>
         <div className="relative w-6 h-10 border-2 border-[var(--accent)]/50 rounded-full">
           <div className="absolute top-2 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce" />
         </div>

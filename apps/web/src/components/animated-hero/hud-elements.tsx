@@ -1,6 +1,7 @@
 'use client';
 
-import { forwardRef } from 'react';
+import { forwardRef, useRef, useCallback } from 'react';
+import { gsap } from './use-gsap-scroll';
 
 // Corner bracket decoration for HUD panels
 function CornerBrackets({ className = '' }: { className?: string }) {
@@ -76,7 +77,7 @@ Terminal.displayName = 'Terminal';
 // HUD Panel with corner brackets and glow
 export const HudPanel = forwardRef<
   HTMLDivElement,
-  { children: React.ReactNode; className?: string; title?: string; glow?: boolean }
+  { children: React.ReactNode; className?: string; title?: React.ReactNode; glow?: boolean }
 >(({ children, className = '', title, glow = false }, ref) => (
   <div
     ref={ref}
@@ -151,7 +152,7 @@ export function ProgressBar({
   );
 }
 
-// Stat Display with hover effect
+// Stat Display with glitch hover effect on value
 export function StatDisplay({
   label,
   value,
@@ -163,15 +164,32 @@ export function StatDisplay({
   className?: string;
   highlight?: boolean;
 }) {
+  const valueRef = useRef<HTMLSpanElement>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    if (!valueRef.current) return;
+
+    // Quick glitch effect
+    gsap.timeline()
+      .to(valueRef.current, { x: -2, duration: 0.05 })
+      .to(valueRef.current, { x: 2, duration: 0.05 })
+      .to(valueRef.current, { x: -1, duration: 0.05 })
+      .to(valueRef.current, { x: 0, duration: 0.05 })
+      .to(valueRef.current, { scale: 1.1, duration: 0.1 })
+      .to(valueRef.current, { scale: 1, duration: 0.2, ease: 'elastic.out(1, 0.3)' });
+  }, []);
+
   return (
     <div
-      className={`flex justify-between items-center group p-2 -mx-2 rounded transition-colors hover:bg-[var(--accent)]/5 ${className}`}
+      className={`flex justify-between items-center group p-2 -mx-2 rounded transition-colors hover:bg-[var(--accent)]/5 cursor-pointer ${className}`}
+      onMouseEnter={handleMouseEnter}
     >
       <span className="text-xs font-mono text-[var(--muted)] uppercase tracking-wider group-hover:text-[var(--foreground)] transition-colors">
         {label}
       </span>
       <span
-        className={`font-mono transition-all ${
+        ref={valueRef}
+        className={`font-mono transition-all inline-block ${
           highlight
             ? 'text-[var(--accent)] font-bold animate-pulse'
             : 'text-[var(--accent)]'

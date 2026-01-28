@@ -2,6 +2,9 @@
 
 import { useEffect, useState, lazy, Suspense, memo } from 'react';
 import { LoadingScreen } from './loading-screen';
+
+// Memoize loading screen to prevent re-renders
+const MemoizedLoadingScreen = memo(LoadingScreen);
 import { GridBackground, ScanLines } from './ambient-background';
 import { SectionProgress } from './section-progress';
 
@@ -204,7 +207,7 @@ export function AnimatedHero() {
       {/* Content Layer */}
       <div className="relative z-10">
         {/* Section 1: Loading Screen / Hero - render immediately (above fold) */}
-        <LoadingScreen />
+        <MemoizedLoadingScreen />
 
         {/* Lazy loaded sections below the fold */}
         <Suspense fallback={<SectionPlaceholder />}>

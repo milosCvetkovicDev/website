@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { Terminal, HudPanel, QuestItem, TypingCursor } from './hud-elements';
+import { AnimatedText } from './animated-text';
 
 const requirements = [
   { id: 'monitoring', label: 'monitoring', delay: 0 },
@@ -100,9 +101,11 @@ export function DiscoveryPhase() {
         {/* Phase Header */}
         <div className="flex items-center gap-3 mb-8">
           <span className="px-3 py-1 bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-mono rounded-full">
-            PHASE 1
+            <AnimatedText animation="morse">PHASE 1</AnimatedText>
           </span>
-          <span className="text-sm font-mono text-[var(--muted)]">DISCOVERY</span>
+          <AnimatedText animation="highlight" className="text-sm font-mono text-[var(--muted)]">
+            DISCOVERY
+          </AnimatedText>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -143,7 +146,7 @@ export function DiscoveryPhase() {
 
           {/* Mind Map / Tags */}
           <div className="space-y-6">
-            <HudPanel title="EXTRACTED REQUIREMENTS" glow>
+            <HudPanel title={<AnimatedText animation="scatter">EXTRACTED REQUIREMENTS</AnimatedText>} glow>
               <div ref={tagsRef} className="flex flex-wrap gap-2">
                 {requirements.map((req, index) => (
                   <span
@@ -180,10 +183,14 @@ export function DiscoveryPhase() {
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
           <h2 className="text-2xl md:text-4xl font-bold mb-3">
-            Most bugs live in the gap between what you asked for and what you meant.
+            <AnimatedText animation="wave">
+              Most bugs live in the gap between what you asked for and what you meant.
+            </AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            I close that gap before writing a single line of code.
+            <AnimatedText animation="typewriter">
+              I close that gap before writing a single line of code.
+            </AnimatedText>
           </p>
         </div>
       </div>

@@ -3,7 +3,7 @@ import Link from 'next/link';
 const socialLinks = [
   {
     name: 'LinkedIn',
-    href: 'https://linkedin.com/in/miloscvetkovic',
+    href: 'https://www.linkedin.com/in/milos-cvetkovic-dev',
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -24,7 +24,7 @@ const socialLinks = [
   },
   {
     name: 'Twitter',
-    href: 'https://twitter.com/miloscvetkovic',
+    href: 'https://x.com/milos_dev',
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -43,7 +43,7 @@ const socialLinks = [
   },
   {
     name: 'GitHub',
-    href: 'https://github.com/miloscvetkovic',
+    href: 'https://github.com/milosCvetkovicDev',
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"

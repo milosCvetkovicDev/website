@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://miloscvetkovic.com"),
+  metadataBase: new URL("https://miloscvetkovic.dev"),
   title: {
     default: "Milos Cvetkovic | Senior Full-Stack Engineer",
     template: "%s | Milos Cvetkovic",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://miloscvetkovic.com",
+    url: "https://miloscvetkovic.dev",
     siteName: "Milos Cvetkovic",
     title: "Milos Cvetkovic | Senior Full-Stack Engineer",
     description:
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     title: "Milos Cvetkovic | Senior Full-Stack Engineer",
     description:
       "I ship production systems that actually work—then make them better with AI.",
-    creator: "@miloscvetkovic",
+    creator: "@milos_dev",
   },
   robots: {
     index: true,
@@ -83,6 +83,7 @@ export default function RootLayout({
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
+        suppressHydrationWarning
       >
         <ThemeProvider>
           <Navigation />

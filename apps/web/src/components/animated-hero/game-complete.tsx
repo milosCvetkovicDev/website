@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { Terminal } from './hud-elements';
+import { AnimatedText } from './animated-text';
 
 export function GameComplete() {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -73,7 +74,7 @@ export function GameComplete() {
             <div className="space-y-4">
               <div className="text-center py-4 border-b border-[#30363d]">
                 <span className="text-lg font-bold text-green-400">
-                  SESSION COMPLETE
+                  <AnimatedText animation="scramble">SESSION COMPLETE</AnimatedText>
                 </span>
               </div>
 
@@ -93,9 +94,11 @@ export function GameComplete() {
               </div>
 
               <div className="pt-4 border-t border-[#30363d] text-center space-y-4">
-                <p className="text-xl font-semibold">This is how I work. Every time.</p>
+                <p className="text-xl font-semibold">
+                  <AnimatedText animation="perspective">This is how I work. Every time.</AnimatedText>
+                </p>
                 <p className="text-[var(--muted)]">
-                  Got a system that needs building? Let&apos;s talk.
+                  <AnimatedText animation="magnetic">Got a system that needs building? Let&apos;s talk.</AnimatedText>
                 </p>
               </div>
             </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { HudPanel, NotificationToast } from './hud-elements';
+import { AnimatedText } from './animated-text';
 
 const techChoices = [
   {
@@ -146,9 +147,11 @@ export function StrategyPhase() {
         {/* Phase Header */}
         <div className="flex items-center gap-3 mb-8">
           <span className="px-3 py-1 bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-mono rounded-full">
-            PHASE 2
+            <AnimatedText animation="perspective">PHASE 2</AnimatedText>
           </span>
-          <span className="text-sm font-mono text-[var(--muted)]">STRATEGY</span>
+          <AnimatedText animation="scramble" className="text-sm font-mono text-[var(--muted)]">
+            STRATEGY
+          </AnimatedText>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -324,10 +327,14 @@ export function StrategyPhase() {
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
           <h2 className="text-2xl md:text-4xl font-bold mb-3">
-            Hype fades. The right tool for the job doesn&apos;t.
+            <AnimatedText animation="magnetic">
+              Hype fades. The right tool for the job doesn&apos;t.
+            </AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            I pick technologies that solve the problem, not pad my resume.
+            <AnimatedText animation="elastic">
+              I pick technologies that solve the problem, not pad my resume.
+            </AnimatedText>
           </p>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { Terminal, HudPanel, ActivityEntry } from './hud-elements';
+import { AnimatedText } from './animated-text';
 
 const codeLines = [
   { type: 'keyword', content: 'export class', delay: 0 },
@@ -217,9 +218,11 @@ export function ExecutionPhase() {
         {/* Phase Header */}
         <div className="flex items-center gap-3 mb-8">
           <span className="px-3 py-1 bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-mono rounded-full">
-            PHASE 3
+            <AnimatedText animation="glitch">PHASE 3</AnimatedText>
           </span>
-          <span className="text-sm font-mono text-[var(--muted)]">EXECUTION</span>
+          <AnimatedText animation="stagger-up" className="text-sm font-mono text-[var(--muted)]">
+            EXECUTION
+          </AnimatedText>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -292,10 +295,14 @@ export function ExecutionPhase() {
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
           <h2 className="text-2xl md:text-4xl font-bold mb-3">
-            The bottleneck was never my typing speed.
+            <AnimatedText animation="scatter">
+              The bottleneck was never my typing speed.
+            </AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            AI writes the syntax. I make the decisions that matter.
+            <AnimatedText animation="blur-reveal">
+              AI writes the syntax. I make the decisions that matter.
+            </AnimatedText>
           </p>
         </div>
       </div>

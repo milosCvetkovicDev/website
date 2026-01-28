@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { HudPanel, PipelineStage, NotificationToast } from './hud-elements';
+import { AnimatedText } from './animated-text';
 
 const pipelineStages = [
   { name: 'LINT', duration: 0.5 },
@@ -154,9 +155,11 @@ export function GauntletPhase() {
         {/* Phase Header */}
         <div className="flex items-center gap-3 mb-8">
           <span className="px-3 py-1 bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-mono rounded-full">
-            PHASE 4
+            <AnimatedText animation="rainbow">PHASE 4</AnimatedText>
           </span>
-          <span className="text-sm font-mono text-[var(--muted)]">THE GAUNTLET</span>
+          <AnimatedText animation="gravity" className="text-sm font-mono text-[var(--muted)]">
+            THE GAUNTLET
+          </AnimatedText>
         </div>
 
         {/* Pipeline */}
@@ -263,10 +266,14 @@ export function GauntletPhase() {
           className={`mt-16 text-center ${showAchievement ? '' : 'opacity-0'}`}
         >
           <h2 className="text-2xl md:text-4xl font-bold mb-3">
-            &quot;It worked on my machine&quot; doesn&apos;t fly here.
+            <AnimatedText animation="glitch">
+              &quot;It worked on my machine&quot; doesn&apos;t fly here.
+            </AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            Six gates. Zero shortcuts. Every commit proves itself or dies trying.
+            <AnimatedText animation="highlight">
+              Six gates. Zero shortcuts. Every commit proves itself or dies trying.
+            </AnimatedText>
           </p>
         </div>
       </div>

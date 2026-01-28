@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { HudPanel, NotificationToast } from './hud-elements';
+import { AnimatedText } from './animated-text';
 
 const healingTimeline = [
   { time: '03:14 AM', event: 'NullPointerException in /api/orders', type: 'error' },
@@ -130,9 +131,11 @@ export function LoopPhase() {
         {/* Phase Header */}
         <div className="flex items-center gap-3 mb-8">
           <span className="px-3 py-1 bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-mono rounded-full">
-            PHASE 5
+            <AnimatedText animation="elastic">PHASE 5</AnimatedText>
           </span>
-          <span className="text-sm font-mono text-[var(--muted)]">THE LOOP</span>
+          <AnimatedText animation="wave" className="text-sm font-mono text-[var(--muted)]">
+            THE LOOP
+          </AnimatedText>
         </div>
 
         {/* Dashboard */}
@@ -227,10 +230,14 @@ export function LoopPhase() {
           className={`mt-16 text-center ${showProtocol ? '' : 'opacity-0'}`}
         >
           <h2 className="text-2xl md:text-4xl font-bold mb-3">
-            This happened at 3:14am. Nobody got paged.
+            <AnimatedText animation="morse">
+              This happened at 3:14am. Nobody got paged.
+            </AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            The system diagnosed itself, wrote a fix, and waited for a human to approve. That&apos;s the future I build.
+            <AnimatedText animation="stagger-up">
+              The system diagnosed itself, wrote a fix, and waited for a human to approve. That&apos;s the future I build.
+            </AnimatedText>
           </p>
         </div>
       </div>
