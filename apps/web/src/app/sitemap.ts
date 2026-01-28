@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 import { caseStudies } from '@/data/case-studies';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://miloscvetkovic.dev';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
 
   const staticPages = [
     {

@@ -1,42 +1,35 @@
 'use client';
 
-import { useRef, useCallback, useState, memo, useMemo } from 'react';
+import { useRef, useCallback, useState, memo, useMemo, useEffect } from 'react';
 import { gsap } from './use-gsap-scroll';
 
 type AnimationType = 'scramble' | 'wave' | 'magnetic' | 'scatter' | 'glitch' | 'typewriter' | 'elastic' | 'stagger-up' | 'rainbow' | 'perspective' | 'gravity' | 'blur-reveal' | 'highlight' | 'morse';
+
+// Restrict Tag type to common HTML elements to avoid TypeScript complexity
+type AllowedTag = 'span' | 'p' | 'h1' | 'h2' | 'h3' | 'div';
 
 interface AnimatedTextProps {
   children: string;
   animation: AnimationType;
   className?: string;
-  as?: 'span' | 'p' | 'h1' | 'h2' | 'h3' | 'div';
+  as?: AllowedTag;
   delay?: number;
 }
 
 // Characters for scramble effect
 const scrambleChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/~`ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-// Throttle helper to prevent animation spam
-function useThrottledCallback<T extends (...args: unknown[]) => void>(callback: T, delay: number): T {
-  const lastCall = useRef(0);
-  const isAnimating = useRef(false);
-
-  return useCallback((...args: unknown[]) => {
-    const now = Date.now();
-    if (now - lastCall.current >= delay && !isAnimating.current) {
-      lastCall.current = now;
-      isAnimating.current = true;
-      callback(...args);
-      setTimeout(() => { isAnimating.current = false; }, delay);
-    }
-  }, [callback, delay]) as T;
-}
-
 // Scramble text effect - characters shuffle then reveal
-const ScrambleText = memo(function ScrambleText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const ScrambleText = memo(function ScrambleText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const [displayText, setDisplayText] = useState(text);
   const animationRef = useRef<gsap.core.Tween | null>(null);
   const originalText = useRef(text);
+
+  useEffect(() => {
+    return () => {
+      animationRef.current?.kill();
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (animationRef.current?.isActive()) return;
@@ -87,9 +80,15 @@ function splitIntoWords(text: string) {
 const gpuAcceleratedStyle = { willChange: 'transform, opacity' } as const;
 
 // Wave effect - characters bob up and down in sequence
-const WaveText = memo(function WaveText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const WaveText = memo(function WaveText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
+
+  useEffect(() => {
+    return () => {
+      timelineRef.current?.kill();
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (timelineRef.current?.isActive()) return;
@@ -144,7 +143,7 @@ const WaveText = memo(function WaveText({ text, className, Tag }: { text: string
 });
 
 // Magnetic effect - text follows cursor slightly
-const MagneticText = memo(function MagneticText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const MagneticText = memo(function MagneticText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const containerRef = useRef<HTMLElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
 
@@ -179,7 +178,8 @@ const MagneticText = memo(function MagneticText({ text, className, Tag }: { text
 
   return (
     <Tag
-      ref={containerRef as React.RefObject<HTMLDivElement>}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ref={containerRef as any}
       className={`cursor-pointer inline-block ${className || ''}`}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
@@ -192,23 +192,33 @@ const MagneticText = memo(function MagneticText({ text, className, Tag }: { text
 });
 
 // Scatter effect - characters explode outward then return
-const ScatterText = memo(function ScatterText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const ScatterText = memo(function ScatterText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
+  const timelinesRef = useRef<gsap.core.Timeline[]>([]);
   const isAnimatingRef = useRef(false);
   const totalChars = useMemo(() => text.replace(/\s/g, '').length, [text]);
+
+  useEffect(() => {
+    return () => {
+      timelinesRef.current.forEach(tl => tl.kill());
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (isAnimatingRef.current) return;
     isAnimatingRef.current = true;
+    timelinesRef.current = [];
 
     charsRef.current.forEach((char, i) => {
       if (char) {
         const angle = (i / totalChars) * Math.PI * 2;
         const distance = 15 + Math.random() * 10;
 
-        gsap.timeline({
+        const tl = gsap.timeline({
           onComplete: () => { if (i === totalChars - 1) isAnimatingRef.current = false; }
-        })
+        });
+        timelinesRef.current.push(tl);
+        tl
           .to(char, {
             x: Math.cos(angle) * distance,
             y: Math.sin(angle) * distance,
@@ -259,10 +269,16 @@ const ScatterText = memo(function ScatterText({ text, className, Tag }: { text: 
 });
 
 // Glitch effect - RGB split and shake
-const GlitchText = memo(function GlitchText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const GlitchText = memo(function GlitchText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const containerRef = useRef<HTMLElement>(null);
   const [isGlitching, setIsGlitching] = useState(false);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
+
+  useEffect(() => {
+    return () => {
+      timelineRef.current?.kill();
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (timelineRef.current?.isActive()) return;
@@ -287,7 +303,8 @@ const GlitchText = memo(function GlitchText({ text, className, Tag }: { text: st
 
   return (
     <Tag
-      ref={containerRef as React.RefObject<HTMLDivElement>}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ref={containerRef as any}
       className={`cursor-pointer inline-block relative ${className || ''}`}
       onMouseEnter={handleMouseEnter}
       style={gpuAcceleratedStyle}
@@ -318,9 +335,15 @@ const GlitchText = memo(function GlitchText({ text, className, Tag }: { text: st
 });
 
 // Typewriter effect - characters reveal one by one
-const TypewriterText = memo(function TypewriterText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const TypewriterText = memo(function TypewriterText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const [visibleCount, setVisibleCount] = useState(text.length);
   const tweenRef = useRef<gsap.core.Tween | null>(null);
+
+  useEffect(() => {
+    return () => {
+      tweenRef.current?.kill();
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (tweenRef.current?.isActive()) return;
@@ -353,9 +376,15 @@ const TypewriterText = memo(function TypewriterText({ text, className, Tag }: { 
 });
 
 // Elastic stretch effect
-const ElasticText = memo(function ElasticText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const ElasticText = memo(function ElasticText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
+
+  useEffect(() => {
+    return () => {
+      timelineRef.current?.kill();
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (!textRef.current || timelineRef.current?.isActive()) return;
@@ -391,28 +420,37 @@ const ElasticText = memo(function ElasticText({ text, className, Tag }: { text: 
 });
 
 // Stagger up effect - characters slide up with stagger
-const StaggerUpText = memo(function StaggerUpText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const StaggerUpText = memo(function StaggerUpText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
+  const timelinesRef = useRef<gsap.core.Timeline[]>([]);
   const isAnimatingRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      timelinesRef.current.forEach(tl => tl.kill());
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (isAnimatingRef.current) return;
     isAnimatingRef.current = true;
+    timelinesRef.current = [];
 
     const totalChars = charsRef.current.filter(Boolean).length;
     let completedCount = 0;
 
     charsRef.current.forEach((char, i) => {
       if (char) {
-        gsap.timeline({
+        const tl = gsap.timeline({
           onComplete: () => {
             completedCount++;
             if (completedCount >= totalChars) {
               isAnimatingRef.current = false;
             }
           },
-        })
-          .set(char, { y: 0 })
+        });
+        timelinesRef.current.push(tl);
+        tl.set(char, { y: 0 })
           .to(char, {
             y: -20,
             opacity: 0,
@@ -463,9 +501,15 @@ const StaggerUpText = memo(function StaggerUpText({ text, className, Tag }: { te
 });
 
 // Rainbow color cycle effect
-const RainbowText = memo(function RainbowText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const RainbowText = memo(function RainbowText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
+
+  useEffect(() => {
+    return () => {
+      timelineRef.current?.kill();
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (timelineRef.current?.isActive()) return;
@@ -523,9 +567,15 @@ const RainbowText = memo(function RainbowText({ text, className, Tag }: { text: 
 });
 
 // 3D perspective flip effect
-const PerspectiveText = memo(function PerspectiveText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const PerspectiveText = memo(function PerspectiveText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
+
+  useEffect(() => {
+    return () => {
+      timelineRef.current?.kill();
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (!textRef.current || timelineRef.current?.isActive()) return;
@@ -556,13 +606,21 @@ const PerspectiveText = memo(function PerspectiveText({ text, className, Tag }: 
 });
 
 // Gravity drop effect - characters fall and bounce
-const GravityText = memo(function GravityText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const GravityText = memo(function GravityText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
+  const timelinesRef = useRef<gsap.core.Timeline[]>([]);
   const isAnimatingRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      timelinesRef.current.forEach(tl => tl.kill());
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (isAnimatingRef.current) return;
     isAnimatingRef.current = true;
+    timelinesRef.current = [];
 
     let completedCount = 0;
     const totalChars = charsRef.current.filter(Boolean).length;
@@ -570,13 +628,14 @@ const GravityText = memo(function GravityText({ text, className, Tag }: { text: 
     charsRef.current.forEach((char) => {
       if (char) {
         const delay = Math.random() * 0.2;
-        gsap.timeline({
+        const tl = gsap.timeline({
           onComplete: () => {
             completedCount++;
             if (completedCount >= totalChars) isAnimatingRef.current = false;
           }
-        })
-          .to(char, {
+        });
+        timelinesRef.current.push(tl);
+        tl.to(char, {
             y: 20,
             opacity: 0.5,
             duration: 0.15,
@@ -625,9 +684,15 @@ const GravityText = memo(function GravityText({ text, className, Tag }: { text: 
 });
 
 // Blur reveal effect - text starts blurry and sharpens
-const BlurRevealText = memo(function BlurRevealText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const BlurRevealText = memo(function BlurRevealText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
+
+  useEffect(() => {
+    return () => {
+      timelineRef.current?.kill();
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (!textRef.current || timelineRef.current?.isActive()) return;
@@ -658,16 +723,23 @@ const BlurRevealText = memo(function BlurRevealText({ text, className, Tag }: { 
 });
 
 // Highlight scan effect - scanning line passes through
-const HighlightText = memo(function HighlightText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const HighlightText = memo(function HighlightText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const [isAnimating, setIsAnimating] = useState(false);
   const animatingRef = useRef(false);
+  const tweenRef = useRef<gsap.core.Tween | null>(null);
+
+  useEffect(() => {
+    return () => {
+      tweenRef.current?.kill();
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (animatingRef.current) return;
     animatingRef.current = true;
     setIsAnimating(true);
 
-    gsap.to({}, {
+    tweenRef.current = gsap.to({}, {
       duration: 0.6,
       onComplete: () => {
         setIsAnimating(false);
@@ -684,31 +756,30 @@ const HighlightText = memo(function HighlightText({ text, className, Tag }: { te
       <span className="relative z-10">{text}</span>
       {isAnimating && (
         <span
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent z-0"
-          style={{
-            animation: 'highlight-scan 0.6s ease-out forwards',
-          }}
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent z-0 animate-highlight-scan"
           aria-hidden="true"
         />
       )}
-      <style jsx>{`
-        @keyframes highlight-scan {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
     </Tag>
   );
 });
 
 // Morse code blink effect - characters blink in sequence
-const MorseText = memo(function MorseText({ text, className, Tag }: { text: string; className?: string; Tag: keyof JSX.IntrinsicElements }) {
+const MorseText = memo(function MorseText({ text, className, Tag }: { text: string; className?: string; Tag: AllowedTag }) {
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
+  const timelinesRef = useRef<gsap.core.Timeline[]>([]);
   const isAnimatingRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      timelinesRef.current.forEach(tl => tl.kill());
+    };
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (isAnimatingRef.current) return;
     isAnimatingRef.current = true;
+    timelinesRef.current = [];
 
     const totalChars = charsRef.current.filter(Boolean).length;
     let completedAnimations = 0;
@@ -720,7 +791,7 @@ const MorseText = memo(function MorseText({ text, className, Tag }: { text: stri
         let delay = i * 0.05;
 
         pattern.forEach((dur, patternIdx) => {
-          gsap.timeline({
+          const tl = gsap.timeline({
             onComplete: () => {
               if (patternIdx === pattern.length - 1) {
                 completedAnimations++;
@@ -729,8 +800,9 @@ const MorseText = memo(function MorseText({ text, className, Tag }: { text: stri
                 }
               }
             },
-          })
-            .to(char, {
+          });
+          timelinesRef.current.push(tl);
+          tl.to(char, {
               opacity: 0.2,
               duration: dur,
               delay,

@@ -144,8 +144,8 @@ export default function AboutPage() {
             The longer version
           </h2>
           <div className="space-y-12">
-            {timeline.map((item, index) => (
-              <div key={index} className="relative">
+            {timeline.map((item) => (
+              <div key={item.year} className="relative">
                 {/* Year badge */}
                 <div className="flex items-center gap-4 mb-3">
                   <span className="px-3 py-1 text-sm font-mono font-bold bg-[var(--accent)]/10 text-[var(--accent)] rounded-full">

@@ -41,8 +41,18 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-/* Smooth theme transitions */
-* {
+/* Smooth theme transitions - applied to specific elements, not * selector for performance */
+body,
+header,
+footer,
+nav,
+main,
+section,
+article,
+aside,
+div[class*="bg-"],
+a,
+button {
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
@@ -327,6 +337,20 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Highlight scan animation for text effects */
+@keyframes highlight-scan {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-highlight-scan {
+  animation: highlight-scan 0.6s ease-out forwards;
 }
 
 /* Reduced motion support */

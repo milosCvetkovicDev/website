@@ -1,12 +1,14 @@
 // JSON-LD structured data for SEO rich snippets
 // Note: dangerouslySetInnerHTML is safe here as content is hardcoded, not user input
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
+
 export function PersonJsonLd() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
     name: "Milos Cvetkovic",
-    url: "https://miloscvetkovic.dev",
+    url: siteUrl,
     jobTitle: "Senior Full-Stack Engineer",
     description:
       "AI-native engineer with 10+ years turning legacy codebases into cloud-native solutions.",
@@ -41,7 +43,7 @@ export function WebsiteJsonLd() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "Milos Cvetkovic",
-    url: "https://miloscvetkovic.dev",
+    url: siteUrl,
     description:
       "Portfolio of Milos Cvetkovic - Senior Full-Stack Engineer specializing in AI-native development and legacy modernization.",
   };

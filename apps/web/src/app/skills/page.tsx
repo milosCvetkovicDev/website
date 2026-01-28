@@ -106,7 +106,14 @@ function SkillBar({ name, years, level, context }: {
         </span>
       </div>
       <div className="mb-3">
-        <div className="h-2 bg-[var(--border)] rounded-full overflow-hidden">
+        <div
+          className="h-2 bg-[var(--border)] rounded-full overflow-hidden"
+          role="progressbar"
+          aria-valuenow={level}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${name} proficiency: ${level}%`}
+        >
           <div
             className="h-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/70 rounded-full transition-all duration-500"
             style={{ width: `${level}%` }}

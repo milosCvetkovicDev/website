@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider, Navigation, Footer, PersonJsonLd, WebsiteJsonLd } from "@/components";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://miloscvetkovic.dev";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -14,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://miloscvetkovic.dev"),
+  metadataBase: new URL(siteUrl),
   title: {
     default: "Milos Cvetkovic | Senior Full-Stack Engineer",
     template: "%s | Milos Cvetkovic",
@@ -39,7 +41,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://miloscvetkovic.dev",
+    url: siteUrl,
     siteName: "Milos Cvetkovic",
     title: "Milos Cvetkovic | Senior Full-Stack Engineer",
     description:
@@ -86,8 +88,14 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ThemeProvider>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--accent)] focus:text-white focus:rounded-lg focus:outline-none"
+          >
+            Skip to main content
+          </a>
           <Navigation />
-          <main className="flex-1">{children}</main>
+          <main id="main-content" className="flex-1">{children}</main>
           <Footer />
         </ThemeProvider>
       </body>
