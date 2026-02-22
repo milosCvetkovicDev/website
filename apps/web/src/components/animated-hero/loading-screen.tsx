@@ -42,16 +42,16 @@ function PlayerCard() {
     <div
       className="w-full max-w-[420px] mb-8 rounded-lg font-mono text-xs overflow-hidden transition-all duration-300 hover:border-[rgba(139,92,246,0.35)] hover:shadow-[0_0_30px_rgba(139,92,246,0.06)]"
       style={{
-        background: 'rgba(22, 27, 34, 0.9)',
-        border: '1px solid rgba(90, 97, 144, 0.25)',
+        background: 'var(--hero-card-bg)',
+        border: '1px solid var(--hero-card-border)',
       }}
     >
       {/* Header with dots */}
       <div
         className="flex items-center gap-[7px] px-3 py-1.5"
         style={{
-          background: 'rgba(30, 34, 48, 0.9)',
-          borderBottom: '1px solid rgba(90, 97, 144, 0.2)',
+          background: 'var(--hero-card-header)',
+          borderBottom: '1px solid var(--hero-card-header-border)',
         }}
       >
         <div className="w-[10px] h-[10px] rounded-full bg-[#ff5f56]" />
@@ -70,7 +70,7 @@ function PlayerCard() {
               className="font-mono uppercase"
               style={{
                 fontSize: '10px',
-                color: '#8890a8',
+                color: 'var(--hero-card-label)',
                 letterSpacing: '0.06em',
               }}
             >
@@ -89,7 +89,7 @@ function PlayerCard() {
         <div
           className="flex justify-between items-center px-1.5 py-[3px] -mx-1.5 rounded transition-colors hover:bg-[rgba(139,92,246,0.05)]"
           style={{
-            borderTop: '1px solid rgba(90, 97, 144, 0.2)',
+            borderTop: '1px solid var(--hero-card-divider)',
             marginTop: '3px',
             paddingTop: '3px',
           }}
@@ -98,17 +98,17 @@ function PlayerCard() {
             className="font-mono uppercase"
             style={{
               fontSize: '10px',
-              color: '#8890a8',
+              color: 'var(--hero-card-label)',
               letterSpacing: '0.06em',
             }}
           >
             STATUS
           </span>
-          <span className="font-mono" style={{ fontSize: '12px', color: '#4ade80' }}>
+          <span className="font-mono" style={{ fontSize: '12px', color: 'var(--hero-card-status)' }}>
             <span
               className="inline-block w-[7px] h-[7px] rounded-full mr-1.5"
               style={{
-                background: '#4ade80',
+                background: 'var(--hero-card-status-dot)',
                 animation: 'hero-status-pulse 2s ease-in-out infinite',
               }}
             />
@@ -129,8 +129,8 @@ function SkillTags() {
           className="font-mono px-[9px] py-[3px] rounded-[3px] bg-transparent transition-all duration-200 hover:border-[rgba(139,92,246,0.4)] hover:text-[#a78bfa]"
           style={{
             fontSize: '10px',
-            border: '1px solid rgba(139, 92, 246, 0.15)',
-            color: 'rgba(167, 139, 250, 0.6)',
+            border: '1px solid var(--hero-skill-border)',
+            color: 'var(--hero-skill-text)',
           }}
         >
           {tag}
@@ -172,7 +172,7 @@ export function LoadingScreen() {
         className="absolute inset-0 pointer-events-none z-[2]"
         style={{
           background:
-            'radial-gradient(ellipse 45% 40% at 50% 45%, rgba(139,92,246,0.06) 0%, transparent 65%)',
+            `radial-gradient(ellipse 45% 40% at 50% 45%, var(--hero-glow) 0%, transparent 65%)`,
           animation: 'hero-breathe 6s ease-in-out infinite',
         }}
       />
@@ -181,7 +181,7 @@ export function LoadingScreen() {
         className="absolute inset-0 pointer-events-none z-[3]"
         style={{
           background:
-            'radial-gradient(ellipse 48% 42% at 50% 50%, transparent 10%, rgba(10,10,10,0.6) 100%)',
+            `radial-gradient(ellipse 48% 42% at 50% 50%, transparent 10%, var(--hero-vignette-end) 100%)`,
         }}
       />
       {/* Top fade */}
@@ -189,7 +189,7 @@ export function LoadingScreen() {
         className="absolute top-0 left-0 right-0 pointer-events-none z-[4]"
         style={{
           height: '8%',
-          background: 'linear-gradient(to top, transparent, rgba(10,10,10,0.3))',
+          background: `linear-gradient(to top, transparent, var(--hero-fade-color))`,
         }}
       />
       {/* Bottom fade */}
@@ -206,11 +206,11 @@ export function LoadingScreen() {
         className="relative z-10 flex flex-col items-center w-full max-w-[600px] rounded-2xl"
         style={{
           padding: '2.5rem 3rem',
-          background: 'rgba(10, 10, 14, 0.75)',
+          background: 'var(--hero-island-bg)',
           backdropFilter: 'blur(28px)',
           WebkitBackdropFilter: 'blur(28px)',
-          border: '1px solid rgba(90, 97, 144, 0.12)',
-          boxShadow: '0 0 80px rgba(0, 0, 0, 0.5)',
+          border: '1px solid var(--hero-island-border)',
+          boxShadow: `0 0 80px var(--hero-island-shadow)`,
         }}
       >
         {/* 4a. Compact player card */}
@@ -224,7 +224,8 @@ export function LoadingScreen() {
               fontSize: 'clamp(30px, 5.5vw, 50px)',
               lineHeight: 1.12,
               letterSpacing: '-0.025em',
-              textShadow: '0 2px 30px rgba(0,0,0,0.9)',
+              color: 'var(--hero-headline)',
+              textShadow: `0 2px 30px var(--hero-text-shadow)`,
             }}
           >
             <span style={{ whiteSpace: 'nowrap' }}>This happened at 3am.</span>
@@ -233,7 +234,7 @@ export function LoadingScreen() {
           </h1>
 
           {/* 4c. Subtitle */}
-          <p style={{ fontSize: '16px', color: '#b0b4c4', lineHeight: 1.6 }}>
+          <p style={{ fontSize: '16px', color: 'var(--hero-subtitle)', lineHeight: 1.6 }}>
             I build systems that inherit chaos and ship clarity.
             <br />
             <span
@@ -264,7 +265,7 @@ export function LoadingScreen() {
           style={{
             fontSize: '9px',
             color: 'rgba(139, 92, 246, 0.7)',
-            textShadow: '0 1px 10px rgba(0,0,0,0.9)',
+            textShadow: `0 1px 10px var(--hero-text-shadow)`,
           }}
         >
           <AnimatedText animation="perspective">
@@ -274,8 +275,8 @@ export function LoadingScreen() {
         <div
           className="relative w-[22px] h-[36px] rounded-[11px]"
           style={{
-            border: '1.5px solid rgba(139, 92, 246, 0.35)',
-            background: 'rgba(10, 10, 10, 0.6)',
+            border: `1.5px solid var(--hero-scroll-border)`,
+            background: 'var(--hero-scroll-bg)',
           }}
         >
           <div

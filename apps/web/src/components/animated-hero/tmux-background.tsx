@@ -27,18 +27,18 @@ type StatusColor = 's-ok' | 's-err' | 's-wrn';
 const MAX_LINES = 40;
 
 const LOG_COLORS: Record<LogLevel, string> = {
-  'l-err': 'rgba(247, 118, 142, 0.55)',
-  'l-wrn': 'rgba(224, 175, 104, 0.48)',
-  'l-inf': 'rgba(122, 162, 247, 0.38)',
-  'l-ok': 'rgba(158, 206, 106, 0.5)',
-  'l-dbg': 'rgba(86, 95, 137, 0.45)',
-  'l-agt': 'rgba(139, 92, 246, 0.55)',
+  'l-err': 'var(--log-err)',
+  'l-wrn': 'var(--log-wrn)',
+  'l-inf': 'var(--log-inf)',
+  'l-ok': 'var(--log-ok)',
+  'l-dbg': 'var(--log-dbg)',
+  'l-agt': 'var(--log-agt)',
 };
 
 const STATUS_COLORS: Record<StatusColor, string> = {
-  's-ok': '#b9e87a',
-  's-err': '#ffa0b0',
-  's-wrn': '#f0c97a',
+  's-ok': 'var(--tmux-status-ok)',
+  's-err': 'var(--tmux-status-err)',
+  's-wrn': 'var(--tmux-status-wrn)',
 };
 
 // ─── Pane Data ───────────────────────────────────────────────────────────────
@@ -294,8 +294,8 @@ function TabBar({ clock }: { clock: string }) {
     <div
       className="flex items-center h-[30px] border-b font-mono text-xs shrink-0 px-2.5"
       style={{
-        background: '#282d45',
-        borderColor: '#5a6190',
+        background: 'var(--tmux-bar)',
+        borderColor: 'var(--tmux-border)',
         fontSize: '12px',
       }}
     >
@@ -303,22 +303,22 @@ function TabBar({ clock }: { clock: string }) {
       <div
         className="py-1 px-3.5 border-r"
         style={{
-          background: '#3d4470',
-          color: '#f0f2ff',
-          borderColor: 'rgba(90, 97, 144, 0.6)',
+          background: 'var(--tmux-active-tab)',
+          color: 'var(--tmux-bar-text-bright)',
+          borderColor: 'var(--tmux-border)',
         }}
       >
         {'\u2B24'} production-monitor
       </div>
       <div
         className="py-1 px-3.5 border-r"
-        style={{ color: '#cdd6f4', borderColor: 'rgba(90, 97, 144, 0.6)' }}
+        style={{ color: 'var(--tmux-bar-text)', borderColor: 'var(--tmux-border)' }}
       >
         {'\u25CB'} staging
       </div>
       <div
         className="py-1 px-3.5 border-r"
-        style={{ color: '#cdd6f4', borderColor: 'rgba(90, 97, 144, 0.6)' }}
+        style={{ color: 'var(--tmux-bar-text)', borderColor: 'var(--tmux-border)' }}
       >
         {'\u25CB'} logs
       </div>
@@ -326,7 +326,7 @@ function TabBar({ clock }: { clock: string }) {
       {/* Right side */}
       <div
         className="ml-auto flex gap-4"
-        style={{ color: '#cdd6f4', fontSize: '11px' }}
+        style={{ color: 'var(--tmux-bar-text)', fontSize: '11px' }}
       >
         <span>milos@obsidian22</span>
         <span>{clock}</span>
@@ -340,13 +340,13 @@ function PaneTitle({ title, host }: { title: string; host: string }) {
     <div
       className="flex items-center justify-between h-[26px] px-3 border-b font-mono shrink-0"
       style={{
-        background: '#252a42',
-        borderColor: '#5a6190',
+        background: 'var(--tmux-pane-title)',
+        borderColor: 'var(--tmux-border)',
         fontSize: '11px',
-        color: '#cdd6f4',
+        color: 'var(--tmux-bar-text)',
       }}
     >
-      <span style={{ color: '#a8e4ff', fontWeight: 500 }}>{title}</span>
+      <span style={{ color: 'var(--tmux-pane-title-text)', fontWeight: 500 }}>{title}</span>
       <span>{host}</span>
     </div>
   );
@@ -363,10 +363,10 @@ function PaneStatus({
     <div
       className="flex items-center justify-between h-6 px-3 border-t font-mono shrink-0"
       style={{
-        background: '#252a42',
-        borderColor: '#5a6190',
+        background: 'var(--tmux-pane-title)',
+        borderColor: 'var(--tmux-border)',
         fontSize: '10px',
-        color: '#cdd6f4',
+        color: 'var(--tmux-bar-text)',
       }}
     >
       <span>
@@ -385,22 +385,22 @@ function StatusBar({ clock }: { clock: string }) {
     <div
       className="flex items-center h-7 border-t font-mono px-3 shrink-0"
       style={{
-        background: '#282d45',
-        borderColor: '#5a6190',
+        background: 'var(--tmux-bar)',
+        borderColor: 'var(--tmux-border)',
         fontSize: '11px',
-        color: '#cdd6f4',
+        color: 'var(--tmux-bar-text)',
       }}
     >
       <div className="flex gap-3">
-        <span style={{ color: '#b9e87a' }}>{'\u25A0'}</span>
+        <span style={{ color: 'var(--tmux-status-ok)' }}>{'\u25A0'}</span>
         <span>[0] production-monitor</span>
         <span>{'\u00B7'}</span>
         <span>5 panes</span>
       </div>
       <div className="ml-auto flex gap-4">
-        <span style={{ color: '#f0c97a' }}>{'\u26A1'} 3 alerts</span>
+        <span style={{ color: 'var(--tmux-status-alerts)' }}>{'\u26A1'} 3 alerts</span>
         <span>{'\u2502'}</span>
-        <span style={{ color: '#a8e4ff' }}>{'\u2191'} 99.97%</span>
+        <span style={{ color: 'var(--tmux-status-uptime)' }}>{'\u2191'} 99.97%</span>
         <span>{'\u2502'}</span>
         <span>us-east-1</span>
         <span>{'\u2502'}</span>
@@ -418,7 +418,7 @@ function StaticPane({ config }: { config: PaneConfig }) {
   return (
     <div
       className="flex flex-1 flex-col overflow-hidden min-w-0 border-r last:border-r-0"
-      style={{ borderColor: '#5a6190', borderRightWidth: '2px' }}
+      style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
     >
       <PaneTitle title={config.title} host={config.host} />
       <div className="flex-1 overflow-hidden relative">
@@ -493,7 +493,7 @@ function AnimatedPane({ config }: { config: PaneConfig }) {
   return (
     <div
       className="flex flex-1 flex-col overflow-hidden min-w-0 border-r last:border-r-0"
-      style={{ borderColor: '#5a6190', borderRightWidth: '2px' }}
+      style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
     >
       <PaneTitle title={config.title} host={config.host} />
       <div className="flex-1 overflow-hidden relative">
@@ -556,7 +556,7 @@ export function TmuxBackground() {
 
       <div
         className="absolute inset-0 z-0 flex flex-col pointer-events-none overflow-hidden"
-        style={{ background: '#0d1017' }}
+        style={{ background: 'var(--tmux-bg)' }}
       >
         {/* Top tab bar */}
         <TabBar clock={clock} />
