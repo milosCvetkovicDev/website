@@ -26,6 +26,7 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
     const prefersReducedMotion = usePrefersReducedMotion();
     const masterTimelineRef = useRef<gsap.core.Timeline | null>(null);
     const idleTimelineRef = useRef<gsap.core.Timeline | null>(null);
+    const idleTweensRef = useRef<gsap.core.Tween[]>([]);
     const rafIdRef = useRef<number>(0);
 
     useImperativeHandle(ref, () => ({
@@ -33,7 +34,74 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
         // No longer needed — rAF loop reads progressRef directly
       },
       startIdle: () => {
-        // Will be implemented with GSAP in Task 5
+        if (idleTimelineRef.current || prefersReducedMotion) return;
+        const svg = svgRef.current;
+        if (!svg) return;
+
+        const particles = svg.querySelectorAll('[data-particle]');
+        const icNodes = svg.querySelectorAll('[data-tier="ic"]');
+        const energyPulse = svg.querySelector('.energy-pulse');
+        const pathElements = svg.querySelectorAll('.circuit-paths path');
+
+        // Responsive particle count
+        const isMobile = window.innerWidth < 768;
+        const activeCount = isMobile
+          ? Math.min(8, particles.length)
+          : particles.length;
+
+        // Particle motion along paths
+        for (let i = 0; i < activeCount; i++) {
+          const particle = particles[i];
+          const route = particleRoutes[i];
+          if (!particle || !route) continue;
+          const pathEl = pathElements[route.pathIndex];
+          if (!pathEl) continue;
+
+          const tween = gsap.to(particle, {
+            motionPath: {
+              path: pathEl as SVGPathElement,
+              align: pathEl as SVGPathElement,
+              alignOrigin: [0.5, 0.5],
+            },
+            duration: 4 + Math.random() * 4,
+            repeat: -1,
+            ease: 'none',
+            delay: Math.random() * 3,
+          });
+          idleTweensRef.current.push(tween);
+        }
+
+        // IC node pulse — gentle opacity oscillation
+        const pulseTween = gsap.to(icNodes, {
+          opacity: 0.4,
+          duration: 2,
+          stagger: { each: 0.3, repeat: -1, yoyo: true },
+          ease: 'sine.inOut',
+        });
+        idleTweensRef.current.push(pulseTween);
+
+        // Periodic energy pulse every ~8 seconds
+        if (energyPulse) {
+          const pulseTimeline = gsap
+            .timeline({ repeat: -1, repeatDelay: 8 })
+            .fromTo(
+              energyPulse,
+              { attr: { r: 0 }, opacity: 0.15 },
+              {
+                attr: { r: 800 },
+                opacity: 0,
+                duration: 3,
+                ease: 'power2.out',
+              },
+            );
+          // Timeline extends Tween in GSAP's type hierarchy; cast for storage
+          idleTweensRef.current.push(
+            pulseTimeline as unknown as gsap.core.Tween,
+          );
+        }
+
+        // Store a dummy timeline ref to prevent re-entry
+        idleTimelineRef.current = gsap.timeline();
       },
     }));
 
@@ -150,8 +218,29 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
       return () => {
         cancelAnimationFrame(rafIdRef.current);
         master.kill();
+        idleTweensRef.current.forEach((t) => t.kill());
+        idleTweensRef.current = [];
       };
     }, [prefersReducedMotion, progressRef]);
+
+    // Pause/resume idle animations when the SVG scrolls out of view
+    useEffect(() => {
+      const svg = svgRef.current;
+      if (!svg) return;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const isVisible = entries[0]?.isIntersecting ?? false;
+          idleTweensRef.current.forEach((t) =>
+            isVisible ? t.play() : t.pause(),
+          );
+        },
+        { threshold: 0 },
+      );
+      observer.observe(svg);
+
+      return () => observer.disconnect();
+    }, []);
 
     // For reduced motion: show static fully-lit circuit
     const staticOpacity = prefersReducedMotion ? 1 : 0;
