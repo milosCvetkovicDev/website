@@ -20,6 +20,16 @@ interface CircuitBackgroundProps {
   progressRef: React.RefObject<number>;
 }
 
+// Label font sizes by node tier
+const LABEL_FONT_SIZE = { ic: 12, via: 9, solder: 7.5 } as const;
+
+// Label fill opacities by node tier (at rest, post-boot)
+const LABEL_FILL = {
+  ic: 'rgba(139, 92, 246, 0.7)',
+  via: 'rgba(139, 92, 246, 0.5)',
+  solder: 'rgba(139, 92, 246, 0.35)',
+} as const;
+
 export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBackgroundProps>(
   function CircuitBackground({ progressRef }, ref) {
     const svgRef = useRef<SVGSVGElement>(null);
@@ -119,6 +129,11 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
       const particles = svg.querySelectorAll('[data-particle]');
       const energyPulse = svg.querySelector('.energy-pulse');
 
+      // Labels — queried separately for staggered fade-in
+      const icLabels = svg.querySelectorAll('[data-label-tier="ic"]');
+      const viaLabels = svg.querySelectorAll('[data-label-tier="via"]');
+      const solderLabels = svg.querySelectorAll('[data-label-tier="solder"]');
+
       // Initialize: all paths hidden via DrawSVG, nodes invisible
       gsap.set([...trunkPaths, ...branchPaths, ...tracePaths], {
         drawSVG: '0%',
@@ -130,11 +145,12 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
         transformOrigin: 'center center',
       });
       gsap.set(particles, { opacity: 0 });
+      gsap.set([...icLabels, ...viaLabels, ...solderLabels], { opacity: 0 });
 
       // Build master timeline (paused, we scrub it with progress)
       const master = gsap.timeline({ paused: true });
 
-      // Phase 1 (0-0.3): Trunk paths trace
+      // Phase 1 (0-0.3): Trunk paths trace — main data highways
       master.to(trunkPaths, {
         drawSVG: '100%',
         duration: 0.3,
@@ -142,7 +158,7 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
         ease: 'power2.out',
       }, 0);
 
-      // Phase 2 (0.25-0.55): IC nodes, branch paths, via nodes
+      // Phase 2 (0.25-0.55): IC nodes + labels, branch paths, via nodes + labels
       master.to(icNodes, {
         opacity: 1,
         scale: 1,
@@ -150,6 +166,14 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
         stagger: 0.02,
         ease: 'back.out(1.7)',
       }, 0.25);
+
+      // IC labels fade in just after their nodes
+      master.to(icLabels, {
+        opacity: 1,
+        duration: 0.12,
+        stagger: 0.03,
+        ease: 'power2.out',
+      }, 0.3);
 
       master.to(branchPaths, {
         drawSVG: '100%',
@@ -166,7 +190,15 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
         ease: 'back.out(1.4)',
       }, 0.4);
 
-      // Phase 3 (0.6-0.9): Tertiary traces, solder nodes, particles
+      // Via labels fade in with their nodes
+      master.to(viaLabels, {
+        opacity: 1,
+        duration: 0.1,
+        stagger: 0.02,
+        ease: 'power2.out',
+      }, 0.45);
+
+      // Phase 3 (0.6-0.9): Tertiary traces, solder nodes + labels, particles
       master.to(tracePaths, {
         drawSVG: '100%',
         duration: 0.2,
@@ -181,6 +213,14 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
         stagger: 0.01,
         ease: 'power2.out',
       }, 0.7);
+
+      // Solder labels (faintest)
+      master.to(solderLabels, {
+        opacity: 1,
+        duration: 0.1,
+        stagger: 0.01,
+        ease: 'power2.out',
+      }, 0.75);
 
       master.to(particles, {
         opacity: 1,
@@ -299,6 +339,34 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
                 data-index={i}
               />
             ))}
+          </g>
+
+          {/* Technology Labels */}
+          <g className="circuit-labels">
+            {circuitNodes.map((node, i) => {
+              if (!node.label) return null;
+              const isLeft = node.labelAnchor === 'left';
+              const fontSize = LABEL_FONT_SIZE[node.tier];
+              const fill = LABEL_FILL[node.tier];
+              const dx = isLeft ? -(node.r + 8) : node.r + 8;
+              return (
+                <text
+                  key={`label-${i}`}
+                  x={node.cx + dx}
+                  y={node.cy}
+                  textAnchor={isLeft ? 'end' : 'start'}
+                  dominantBaseline="central"
+                  fontSize={fontSize}
+                  fontFamily="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace"
+                  fill={fill}
+                  opacity={staticOpacity}
+                  data-label-tier={node.tier}
+                  letterSpacing="0.05em"
+                >
+                  {node.label}
+                </text>
+              );
+            })}
           </g>
 
           {/* Data Particles */}

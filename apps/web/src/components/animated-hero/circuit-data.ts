@@ -1,9 +1,18 @@
 // ---------------------------------------------------------------------------
-// Circuit Board SVG Data
+// Circuit Board SVG Data — Technology Ecosystem
 // ---------------------------------------------------------------------------
 // Pure data module — no React, no GSAP.
-// Defines SVG paths, node positions and particle routes for a dense PCB
-// background rendered inside a viewBox of 0 0 1920 1080.
+// Defines SVG paths, labeled technology nodes and particle routes for a
+// meaningful PCB-style background rendered inside a viewBox of 0 0 1920 1080.
+//
+// Layout narrative (top → bottom):
+//   Upper band  — Discovery & Architecture (DDD, Event Storming, Clean Arch…)
+//   Center      — Claude AI (the bridge between understanding and building)
+//   Lower band  — Implementation Technologies (React, Node.js, Docker…)
+//
+// The boot animation traces paths top-to-bottom, telling the story of
+// receiving a development request and going from domain understanding
+// through architecture to technology implementation.
 // ---------------------------------------------------------------------------
 
 // ---- Interfaces -----------------------------------------------------------
@@ -19,6 +28,8 @@ export interface CircuitNode {
   cy: number;
   r: number;
   tier: 'ic' | 'via' | 'solder';
+  label?: string;
+  labelAnchor?: 'left' | 'right';
 }
 
 export interface ParticleRoute {
@@ -217,74 +228,110 @@ export const circuitPaths: CircuitPath[] = [
   ...tracePaths, // indices 23 – 34
 ];
 
-// ---- Circuit Nodes (46) ---------------------------------------------------
+// ---- Circuit Nodes (46) — labeled technology ecosystem --------------------
 
 // Every node sits at an actual path intersection or endpoint.
+// Labels tell the software-development story from discovery to deployment.
 
 // IC pads — 8 large circles at major trunk junctions
+// These are the headline technologies / methodologies.
 const icNodes: CircuitNode[] = [
-  // T0/T5 junction (320,180 → trunk jog puts crossing at 480,260)
-  { cx: 480, cy: 260, r: 10, tier: 'ic' },
-  // T1/T5 junction (400,340 on T5 horizontal, T1 reaches 640,340)
-  { cx: 640, cy: 340, r: 9, tier: 'ic' },
-  // T0/T7 junction (1440,180)
-  { cx: 1440, cy: 180, r: 10, tier: 'ic' },
-  // T1/T7 junction (1440,400 on T7 horizontal → T1 reaches 1280,400)
-  { cx: 1280, cy: 400, r: 9, tier: 'ic' },
-  // T2/T6 junction (960,540)
-  { cx: 960, cy: 540, r: 10, tier: 'ic' },
-  // T3/T5 junction (400,780)
-  { cx: 400, cy: 780, r: 10, tier: 'ic' },
-  // T3/T7 junction (1520,720)
-  { cx: 1520, cy: 720, r: 9, tier: 'ic' },
-  // T4/T6 junction (1040,840 area → B9 endpoint is 1200,840)
-  { cx: 1200, cy: 840, r: 8, tier: 'ic' },
+  // --- Upper band: Discovery & Architecture ---
+  // T0/T5 junction
+  { cx: 480, cy: 260, r: 10, tier: 'ic', label: 'DDD' },
+  // T1/T5 junction
+  { cx: 640, cy: 340, r: 9, tier: 'ic', label: 'Event Storming' },
+  // T0/T7 junction
+  { cx: 1440, cy: 180, r: 10, tier: 'ic', label: 'Clean Architecture', labelAnchor: 'left' },
+  // T1/T7 junction
+  { cx: 1280, cy: 400, r: 9, tier: 'ic', label: 'Microservices', labelAnchor: 'left' },
+  // --- Center: the bridge ---
+  // T2/T6 junction (center of the network)
+  { cx: 960, cy: 540, r: 10, tier: 'ic', label: 'Claude AI', labelAnchor: 'left' },
+  // --- Lower band: Implementation ---
+  // T3/T5 junction
+  { cx: 400, cy: 780, r: 10, tier: 'ic', label: 'React' },
+  // T3/T7 junction
+  { cx: 1520, cy: 720, r: 9, tier: 'ic', label: 'Node.js', labelAnchor: 'left' },
+  // T4/T6 junction area
+  { cx: 1200, cy: 840, r: 8, tier: 'ic', label: 'Docker' },
 ];
 
 // Via points — 18 medium circles at branch intersections
+// Supporting technologies, practices and frameworks.
 const viaNodes: CircuitNode[] = [
-  { cx: 640, cy: 120, r: 5, tier: 'via' }, // B0/B13 junction
-  { cx: 960, cy: 180, r: 5, tier: 'via' }, // B0 end / B2 start / T6 crossing
-  { cx: 400, cy: 180, r: 5, tier: 'via' }, // T5 horizontal on T0
-  { cx: 720, cy: 400, r: 5, tier: 'via' }, // B3 start on T1
-  { cx: 720, cy: 540, r: 5, tier: 'via' }, // B3 elbow
-  { cx: 1440, cy: 540, r: 5, tier: 'via' }, // B4 end
-  { cx: 160, cy: 400, r: 5, tier: 'via' }, // B10 end on T1
-  { cx: 160, cy: 180, r: 5, tier: 'via' }, // B10 start on T0
-  { cx: 400, cy: 720, r: 5, tier: 'via' }, // B5 end on T3
-  { cx: 160, cy: 600, r: 5, tier: 'via' }, // B5 start
-  { cx: 960, cy: 600, r: 5, tier: 'via' }, // B6 start / T2 jog
-  { cx: 960, cy: 720, r: 5, tier: 'via' }, // B6 end on T3
-  { cx: 1680, cy: 400, r: 5, tier: 'via' }, // B11 end
-  { cx: 1440, cy: 260, r: 5, tier: 'via' }, // B11 start / B2 end
-  { cx: 720, cy: 840, r: 5, tier: 'via' }, // T4 jog / B12 start
-  { cx: 960, cy: 900, r: 5, tier: 'via' }, // B12 end on T4
-  { cx: 1680, cy: 900, r: 5, tier: 'via' }, // B7 end
-  { cx: 1200, cy: 900, r: 5, tier: 'via' }, // B14 start / T4 jog
+  // B0/B13 junction — core language
+  { cx: 640, cy: 120, r: 5, tier: 'via', label: 'TypeScript' },
+  // B0 end / T6 crossing — DDD practice
+  { cx: 960, cy: 180, r: 5, tier: 'via', label: 'Domain Modeling' },
+  // T5 horizontal on T0 — DDD concept
+  { cx: 400, cy: 180, r: 5, tier: 'via', label: 'Bounded Contexts' },
+  // B3 start on T1 — architecture pattern
+  { cx: 720, cy: 400, r: 5, tier: 'via', label: 'CQRS' },
+  // B3 elbow — frontend framework
+  { cx: 720, cy: 540, r: 5, tier: 'via', label: 'Next.js' },
+  // B4 end — cloud platform
+  { cx: 1440, cy: 540, r: 5, tier: 'via', label: 'Azure', labelAnchor: 'left' },
+  // B10 end on T1 — practice
+  { cx: 160, cy: 400, r: 5, tier: 'via', label: 'TDD' },
+  // B10 start on T0 — discovery process
+  { cx: 160, cy: 180, r: 5, tier: 'via', label: 'User Stories' },
+  // B5 end on T3 — frontend styling
+  { cx: 400, cy: 720, r: 5, tier: 'via', label: 'Tailwind CSS' },
+  // B5 start — practice
+  { cx: 160, cy: 600, r: 5, tier: 'via', label: 'Code Review' },
+  // B6 start / T2 jog — backend framework
+  { cx: 960, cy: 600, r: 5, tier: 'via', label: 'NestJS' },
+  // B6 end on T3 — container orchestration
+  { cx: 960, cy: 720, r: 5, tier: 'via', label: 'Kubernetes' },
+  // B11 end — DevOps practice
+  { cx: 1680, cy: 400, r: 5, tier: 'via', label: 'CI/CD', labelAnchor: 'left' },
+  // B11 start / B2 end — architecture concern
+  { cx: 1440, cy: 260, r: 5, tier: 'via', label: 'API Design', labelAnchor: 'left' },
+  // T4 jog / B12 start — DevOps tool
+  { cx: 720, cy: 840, r: 5, tier: 'via', label: 'GitHub Actions' },
+  // B12 end on T4 — build system
+  { cx: 960, cy: 900, r: 5, tier: 'via', label: 'Nx' },
+  // B7 end — testing framework
+  { cx: 1680, cy: 900, r: 5, tier: 'via', label: 'Playwright', labelAnchor: 'left' },
+  // B14 start / T4 jog — database
+  { cx: 1200, cy: 900, r: 5, tier: 'via', label: 'PostgreSQL' },
 ];
 
 // Solder points — 20 small circles at endpoints and corners
+// Some labeled (tools & patterns), some unlabeled (visual density).
 const solderNodes: CircuitNode[] = [
-  { cx: 320, cy: 260, r: 3, tier: 'solder' }, // T5 jog corner
-  { cx: 1040, cy: 540, r: 3, tier: 'solder' }, // T6 jog corner
-  { cx: 1040, cy: 720, r: 3, tier: 'solder' }, // B9 start
-  { cx: 1200, cy: 720, r: 3, tier: 'solder' }, // B9 elbow
-  { cx: 400, cy: 900, r: 3, tier: 'solder' }, // B8 elbow
-  { cx: 720, cy: 900, r: 3, tier: 'solder' }, // B8 end / T4 start-jog
-  { cx: 960, cy: 60, r: 3, tier: 'solder' }, // B13 end
-  { cx: 1520, cy: 400, r: 3, tier: 'solder' }, // T7 jog corner
-  { cx: 1520, cy: 1000, r: 3, tier: 'solder' }, // B14 end
-  { cx: 520, cy: 300, r: 3, tier: 'solder' }, // Tr0 end
-  { cx: 1320, cy: 300, r: 3, tier: 'solder' }, // Tr1 end
-  { cx: 600, cy: 80, r: 3, tier: 'solder' }, // Tr2 end
-  { cx: 440, cy: 820, r: 3, tier: 'solder' }, // Tr3 end
-  { cx: 920, cy: 500, r: 3, tier: 'solder' }, // Tr4 end
-  { cx: 1480, cy: 440, r: 3, tier: 'solder' }, // Tr5 end
-  { cx: 1720, cy: 940, r: 3, tier: 'solder' }, // Tr6 end
-  { cx: 120, cy: 640, r: 3, tier: 'solder' }, // Tr7 end
-  { cx: 1240, cy: 880, r: 3, tier: 'solder' }, // Tr8 end
-  { cx: 680, cy: 800, r: 3, tier: 'solder' }, // Tr9 end
-  { cx: 1000, cy: 940, r: 3, tier: 'solder' }, // Tr11 end
+  // --- Labeled solder nodes ---
+  // T5 jog corner — DDD building block
+  { cx: 320, cy: 260, r: 3, tier: 'solder', label: 'Aggregates' },
+  // T6 jog corner — backend runtime
+  { cx: 1040, cy: 540, r: 3, tier: 'solder', label: 'Express' },
+  // B9 start — validation library
+  { cx: 1040, cy: 720, r: 3, tier: 'solder', label: 'Zod' },
+  // B9 elbow — job queue
+  { cx: 1200, cy: 720, r: 3, tier: 'solder', label: 'pg-boss' },
+  // B8 elbow — animation library
+  { cx: 400, cy: 900, r: 3, tier: 'solder', label: 'GSAP' },
+  // B8 end / T4 start-jog — JS runtime
+  { cx: 720, cy: 900, r: 3, tier: 'solder', label: 'Bun' },
+  // B13 end — edge runtime
+  { cx: 960, cy: 60, r: 3, tier: 'solder', label: 'Elysia' },
+  // T7 jog corner — observability
+  { cx: 1520, cy: 400, r: 3, tier: 'solder', label: 'Monitoring', labelAnchor: 'left' },
+  // B14 end — IaC tool
+  { cx: 1520, cy: 1000, r: 3, tier: 'solder', label: 'Terraform', labelAnchor: 'left' },
+  // --- Unlabeled dots (visual density) ---
+  { cx: 520, cy: 300, r: 3, tier: 'solder' },
+  { cx: 1320, cy: 300, r: 3, tier: 'solder' },
+  { cx: 600, cy: 80, r: 3, tier: 'solder' },
+  { cx: 440, cy: 820, r: 3, tier: 'solder' },
+  { cx: 920, cy: 500, r: 3, tier: 'solder' },
+  { cx: 1480, cy: 440, r: 3, tier: 'solder' },
+  { cx: 1720, cy: 940, r: 3, tier: 'solder' },
+  { cx: 120, cy: 640, r: 3, tier: 'solder' },
+  { cx: 1240, cy: 880, r: 3, tier: 'solder' },
+  { cx: 680, cy: 800, r: 3, tier: 'solder' },
+  { cx: 1000, cy: 940, r: 3, tier: 'solder' },
 ];
 
 export const circuitNodes: CircuitNode[] = [
