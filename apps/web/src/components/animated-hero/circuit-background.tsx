@@ -1,27 +1,157 @@
 'use client';
 
-import { useRef, forwardRef, useImperativeHandle } from 'react';
+import { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import gsap from 'gsap';
+import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
+import { DrawSVGPlugin } from 'gsap/DrawSVGPlugin';
 import { circuitPaths, circuitNodes, particleRoutes } from './circuit-data';
 import { usePrefersReducedMotion } from './use-gsap-scroll';
+
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(MotionPathPlugin, DrawSVGPlugin);
+}
 
 export interface CircuitBackgroundHandle {
   syncProgress: (progress: number) => void;
   startIdle: () => void;
 }
 
-export const CircuitBackground = forwardRef<CircuitBackgroundHandle>(
-  function CircuitBackground(_props, ref) {
+interface CircuitBackgroundProps {
+  progressRef: React.RefObject<number>;
+}
+
+export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBackgroundProps>(
+  function CircuitBackground({ progressRef }, ref) {
     const svgRef = useRef<SVGSVGElement>(null);
     const prefersReducedMotion = usePrefersReducedMotion();
+    const masterTimelineRef = useRef<gsap.core.Timeline | null>(null);
+    const idleTimelineRef = useRef<gsap.core.Timeline | null>(null);
+    const rafIdRef = useRef<number>(0);
 
     useImperativeHandle(ref, () => ({
       syncProgress: (_progress: number) => {
-        // Will be implemented with GSAP in Task 4
+        // No longer needed — rAF loop reads progressRef directly
       },
       startIdle: () => {
         // Will be implemented with GSAP in Task 5
       },
     }));
+
+    // Boot animation: build a GSAP master timeline and scrub it via rAF
+    useEffect(() => {
+      const svg = svgRef.current;
+      if (!svg || prefersReducedMotion) return;
+
+      const trunkPaths = svg.querySelectorAll('[data-tier="trunk"]');
+      const branchPaths = svg.querySelectorAll('[data-tier="branch"]');
+      const tracePaths = svg.querySelectorAll('[data-tier="trace"]');
+      const icNodes = svg.querySelectorAll('[data-tier="ic"]');
+      const viaNodes = svg.querySelectorAll('[data-tier="via"]');
+      const solderNodes = svg.querySelectorAll('[data-tier="solder"]');
+      const particles = svg.querySelectorAll('[data-particle]');
+      const energyPulse = svg.querySelector('.energy-pulse');
+
+      // Initialize: all paths hidden via DrawSVG, nodes invisible
+      gsap.set([...trunkPaths, ...branchPaths, ...tracePaths], {
+        drawSVG: '0%',
+        opacity: 1,
+      });
+      gsap.set([...icNodes, ...viaNodes, ...solderNodes], {
+        opacity: 0,
+        scale: 0.3,
+        transformOrigin: 'center center',
+      });
+      gsap.set(particles, { opacity: 0 });
+
+      // Build master timeline (paused, we scrub it with progress)
+      const master = gsap.timeline({ paused: true });
+
+      // Phase 1 (0-0.3): Trunk paths trace
+      master.to(trunkPaths, {
+        drawSVG: '100%',
+        duration: 0.3,
+        stagger: 0.03,
+        ease: 'power2.out',
+      }, 0);
+
+      // Phase 2 (0.25-0.55): IC nodes, branch paths, via nodes
+      master.to(icNodes, {
+        opacity: 1,
+        scale: 1,
+        duration: 0.15,
+        stagger: 0.02,
+        ease: 'back.out(1.7)',
+      }, 0.25);
+
+      master.to(branchPaths, {
+        drawSVG: '100%',
+        duration: 0.3,
+        stagger: 0.02,
+        ease: 'power1.out',
+      }, 0.3);
+
+      master.to(viaNodes, {
+        opacity: 1,
+        scale: 1,
+        duration: 0.15,
+        stagger: 0.01,
+        ease: 'back.out(1.4)',
+      }, 0.4);
+
+      // Phase 3 (0.6-0.9): Tertiary traces, solder nodes, particles
+      master.to(tracePaths, {
+        drawSVG: '100%',
+        duration: 0.2,
+        stagger: 0.015,
+        ease: 'power1.out',
+      }, 0.6);
+
+      master.to(solderNodes, {
+        opacity: 1,
+        scale: 1,
+        duration: 0.1,
+        stagger: 0.01,
+        ease: 'power2.out',
+      }, 0.7);
+
+      master.to(particles, {
+        opacity: 1,
+        duration: 0.1,
+        stagger: 0.02,
+      }, 0.75);
+
+      // Phase 4 (0.9-1.0): Energy pulse
+      if (energyPulse) {
+        master.fromTo(
+          energyPulse,
+          { attr: { r: 0 }, opacity: 0.3 },
+          {
+            attr: { r: 600 },
+            opacity: 0,
+            duration: 0.1,
+            ease: 'power2.out',
+          },
+          0.9,
+        );
+      }
+
+      masterTimelineRef.current = master;
+
+      // rAF loop: scrub master timeline to match boot progress
+      const syncLoop = () => {
+        const p = (progressRef.current ?? 0) / 100;
+        const current = master.progress();
+        const next = current + (p - current) * 0.1;
+        master.progress(Math.min(next, 1));
+        rafIdRef.current = requestAnimationFrame(syncLoop);
+      };
+      rafIdRef.current = requestAnimationFrame(syncLoop);
+
+      return () => {
+        cancelAnimationFrame(rafIdRef.current);
+        master.kill();
+      };
+    }, [prefersReducedMotion, progressRef]);
 
     // For reduced motion: show static fully-lit circuit
     const staticOpacity = prefersReducedMotion ? 1 : 0;

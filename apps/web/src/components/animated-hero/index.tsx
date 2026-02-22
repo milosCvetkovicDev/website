@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, lazy, Suspense, memo } from 'react';
 import { LoadingScreen } from './loading-screen';
+import { CircuitBackground } from './circuit-background';
+import type { CircuitBackgroundHandle } from './circuit-background';
 
 // Memoize loading screen to prevent re-renders
 const MemoizedLoadingScreen = memo(LoadingScreen);
@@ -15,7 +17,6 @@ const ExecutionPhase = lazy(() => import('./execution-phase').then(m => ({ defau
 const GauntletPhase = lazy(() => import('./gauntlet-phase').then(m => ({ default: m.GauntletPhase })));
 const LoopPhase = lazy(() => import('./loop-phase').then(m => ({ default: m.LoopPhase })));
 const GameComplete = lazy(() => import('./game-complete').then(m => ({ default: m.GameComplete })));
-const AmbientBackground = lazy(() => import('./ambient-background').then(m => ({ default: m.AmbientBackground })));
 
 // Memoize static background components
 const MemoizedGridBackground = memo(GridBackground);
@@ -189,10 +190,16 @@ function BootstrapLoader({ visible, progressRef }: { visible: boolean; progressR
 export function AnimatedHero() {
   const [mounted, setMounted] = useState(false);
   const bootProgressRef = useRef(0);
+  const circuitRef = useRef<CircuitBackgroundHandle>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    circuitRef.current?.startIdle();
+  }, [mounted]);
 
   return (
     <div className="relative">
@@ -200,9 +207,7 @@ export function AnimatedHero() {
       <BootstrapLoader visible={!mounted} progressRef={bootProgressRef} />
       {/* Ambient Effects Layer - static backgrounds render immediately */}
       <MemoizedGridBackground />
-      <Suspense fallback={null}>
-        <AmbientBackground />
-      </Suspense>
+      <CircuitBackground ref={circuitRef} progressRef={bootProgressRef} />
       <MemoizedScanLines />
 
       {/* Section Progress Indicator */}
