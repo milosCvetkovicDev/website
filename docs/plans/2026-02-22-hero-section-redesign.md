@@ -2,209 +2,42 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Redesign the homepage hero section with story-driven content (inciting incident terminal, updated player card from CV, atmospheric background) confined to the hero only.
+**Goal:** Replace the monotonous global background and generic hero content with a tmux/iTerm2-style terminal background (5 animated log panes) and a story-driven foreground (CV-accurate player card, "This happened at 3am" headline, skill tags) wrapped in a frosted glass content island.
 
-**Architecture:** Replace three global fixed background layers (GridBackground, AmbientBackground canvas, ScanLines) with a single section-scoped atmospheric background. Replace the current loading-screen content (generic player card + vague headline) with an animated incident terminal showing the self-healing agent in action, updated CV-accurate player stats, and a stronger headline that hooks into the narrative arc.
+**Architecture:** The tmux background is a single client component that renders 5 terminal panes with animated log sequences (K8s, PostgreSQL, CI/CD, Nginx, Prometheus). The foreground content sits inside a frosted glass island with `backdrop-filter: blur`. The old global background layers (GridBackground, AmbientBackground, ScanLines) are removed entirely — background is now scoped to the hero section only via `position: absolute`.
 
-**Tech Stack:** React 19, TypeScript, Tailwind v4, GSAP (@gsap/react), Next.js App Router
+**Tech Stack:** React 19, TypeScript, Tailwind v4, Next.js App Router, Geist Mono (already loaded)
 
----
-
-### Task 1: Create the HeroBackground component
-
-**Files:**
-- Create: `apps/web/src/components/animated-hero/hero-background.tsx`
-
-**Step 1: Create the contained atmospheric background**
-
-This replaces `GridBackground`, `AmbientBackground`, and `ScanLines` with a single component scoped to the hero section (`position: absolute`, not `fixed`).
-
-```tsx
-'use client';
-
-// Atmospheric background contained to hero section only.
-// Replaces the global GridBackground + AmbientBackground + ScanLines layers.
-export function HeroBackground() {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-      {/* Nebula gradient clouds */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: [
-            'radial-gradient(ellipse 60% 50% at 30% 35%, rgba(124, 58, 237, 0.12) 0%, transparent 70%)',
-            'radial-gradient(ellipse 50% 45% at 70% 28%, rgba(6, 182, 212, 0.06) 0%, transparent 60%)',
-            'radial-gradient(ellipse 45% 40% at 50% 58%, rgba(67, 56, 202, 0.08) 0%, transparent 65%)',
-          ].join(', '),
-        }}
-      />
-
-      {/* Central glow behind incident terminal */}
-      <div
-        className="absolute inset-0 animate-pulse"
-        style={{
-          background: 'radial-gradient(ellipse 35% 30% at 50% 42%, rgba(139, 92, 246, 0.1) 0%, transparent 70%)',
-          animationDuration: '5s',
-        }}
-      />
-
-      {/* Noise texture via SVG filter */}
-      <svg className="absolute inset-0 w-full h-full opacity-[0.03]">
-        <filter id="heroNoise">
-          <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
-          <feColorMatrix type="saturate" values="0" />
-        </filter>
-        <rect width="100%" height="100%" filter="url(#heroNoise)" fill="#2a1a4e" />
-      </svg>
-
-      {/* Bottom fade to background color */}
-      <div
-        className="absolute inset-x-0 bottom-0 h-[30%]"
-        style={{
-          background: 'linear-gradient(to bottom, transparent, var(--background))',
-        }}
-      />
-    </div>
-  );
-}
-```
-
-**Step 2: Verify no TypeScript errors**
-
-Run: `cd /Users/milos/projects/personal/portfolio/.claude/worktrees/go-live && pnpm typecheck`
-Expected: PASS (new file, no imports yet)
-
-**Step 3: Commit**
-
-```bash
-git add apps/web/src/components/animated-hero/hero-background.tsx
-git commit -m "feat: add HeroBackground component scoped to hero section"
-```
+**Reference:** Approved design prototype at `docs/design-previews/hero-redesign-v5.html`
 
 ---
 
-### Task 2: Create the IncidentTerminal component
+### Task 1: Create the TmuxBackground component
 
 **Files:**
-- Create: `apps/web/src/components/animated-hero/incident-terminal.tsx`
+- Create: `apps/web/src/components/animated-hero/tmux-background.tsx`
 
-**Step 1: Build the animated typing terminal**
+**Step 1: Create the tmux background with log data and pane rendering**
 
-This is the center-stage "inciting incident" — an animated log sequence showing the self-healing agent resolving a 3am production error.
+This is the largest new file. It renders the full tmux UI (tab bar, 5 panes with title/status bars, bottom status bar) and animates log lines into each pane using `setTimeout` loops.
 
-```tsx
-'use client';
+The component must:
+- Be a `'use client'` component
+- Use `useEffect` for animation loops with cleanup
+- Use `useRef` for DOM manipulation (appending log lines)
+- Respect `prefers-reduced-motion` (skip animation, show static content)
+- Throttle DOM operations (no requestAnimationFrame needed — setTimeout at 400-900ms intervals)
 
-import { useState, useEffect, useRef } from 'react';
+Port the exact HTML structure, CSS classes (as Tailwind), log data arrays, and JS animation logic from `docs/design-previews/hero-redesign-v5.html`.
 
-interface LogEntry {
-  timestamp: string;
-  level: 'alert' | 'agent' | 'success' | 'status';
-  message: string;
-  delay: number; // ms from start before this line appears
-}
+Key decisions:
+- Use Tailwind classes where possible, inline styles for complex gradients
+- Log data arrays are constants defined at module level (not in component)
+- Each pane is its own `<div>` with title bar, scrollable body, and status bar
+- Clock in the tab bar ticks every second via `setInterval`
+- Use `font-mono` (Geist Mono) instead of JetBrains Mono — already loaded in the project
 
-const LOG_SEQUENCE: LogEntry[] = [
-  { timestamp: '03:14:07', level: 'alert', message: 'Error rate spike — production', delay: 800 },
-  { timestamp: '03:14:08', level: 'agent', message: 'Analyzing root cause...', delay: 2000 },
-  { timestamp: '03:14:12', level: 'agent', message: 'Fix generated → PR #847 opened', delay: 3800 },
-  { timestamp: '03:14:15', level: 'success', message: 'Tests passing. Awaiting approval.', delay: 5200 },
-  { timestamp: '', level: 'status', message: 'Nobody got paged.', delay: 6400 },
-];
-
-const LEVEL_STYLES: Record<LogEntry['level'], string> = {
-  alert: 'text-red-400',
-  agent: 'text-[var(--accent)]',
-  success: 'text-green-400',
-  status: 'text-[var(--muted)]',
-};
-
-const LEVEL_LABELS: Record<LogEntry['level'], string> = {
-  alert: 'ALERT',
-  agent: 'AGENT',
-  success: '✓',
-  status: 'STATUS',
-};
-
-export function IncidentTerminal() {
-  const [visibleLines, setVisibleLines] = useState(0);
-  const [typingIndex, setTypingIndex] = useState(-1);
-  const hasStarted = useRef(false);
-
-  useEffect(() => {
-    if (hasStarted.current) return;
-    hasStarted.current = true;
-
-    LOG_SEQUENCE.forEach((entry, i) => {
-      // Start typing effect slightly before full reveal
-      setTimeout(() => setTypingIndex(i), entry.delay - 200);
-      setTimeout(() => {
-        setVisibleLines(i + 1);
-        setTypingIndex(-1);
-      }, entry.delay);
-    });
-  }, []);
-
-  return (
-    <div className="w-full max-w-lg">
-      {/* Terminal chrome */}
-      <div className="bg-[#0d1117] border border-[#30363d] rounded-lg overflow-hidden shadow-[0_0_60px_rgba(139,92,246,0.08)]">
-        {/* Title bar */}
-        <div className="flex items-center gap-2 px-4 py-2 bg-[#161b22] border-b border-[#30363d]">
-          <div className="flex gap-2">
-            <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
-            <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
-            <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
-          </div>
-          <span className="ml-auto text-[10px] font-mono text-[var(--muted)]/60 uppercase tracking-wider">
-            production · live
-          </span>
-        </div>
-
-        {/* Log entries */}
-        <div className="p-4 font-mono text-sm space-y-1.5 min-h-[140px]">
-          {LOG_SEQUENCE.slice(0, visibleLines).map((entry, i) => (
-            <div key={i} className="flex gap-3 animate-fade-in">
-              {entry.timestamp ? (
-                <span className="text-[var(--muted)]/50 shrink-0 tabular-nums">
-                  [{entry.timestamp}]
-                </span>
-              ) : (
-                <span className="shrink-0 w-[88px]" />
-              )}
-              <span className={`shrink-0 w-14 ${LEVEL_STYLES[entry.level]}`}>
-                {LEVEL_LABELS[entry.level]}
-              </span>
-              <span className={entry.level === 'status' ? 'text-[var(--foreground)] font-semibold' : 'text-[var(--foreground)]/80'}>
-                {entry.message}
-              </span>
-            </div>
-          ))}
-
-          {/* Typing indicator */}
-          {typingIndex >= 0 && (
-            <div className="flex gap-3">
-              <span className="text-[var(--muted)]/50 shrink-0 tabular-nums">
-                [{LOG_SEQUENCE[typingIndex]?.timestamp || '       '}]
-              </span>
-              <span className={`shrink-0 w-14 ${LEVEL_STYLES[LOG_SEQUENCE[typingIndex]?.level || 'agent']}`}>
-                {LEVEL_LABELS[LOG_SEQUENCE[typingIndex]?.level || 'agent']}
-              </span>
-              <span className="inline-flex items-center gap-0.5">
-                <span className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse" />
-                <span className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse [animation-delay:150ms]" />
-                <span className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-pulse [animation-delay:300ms]" />
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-```
-
-**Step 2: Verify no TypeScript errors**
+**Step 2: Typecheck**
 
 Run: `cd /Users/milos/projects/personal/portfolio/.claude/worktrees/go-live && pnpm typecheck`
 Expected: PASS
@@ -212,127 +45,31 @@ Expected: PASS
 **Step 3: Commit**
 
 ```bash
-git add apps/web/src/components/animated-hero/incident-terminal.tsx
-git commit -m "feat: add IncidentTerminal component with animated log sequence"
+git add apps/web/src/components/animated-hero/tmux-background.tsx
+git commit -m "feat: add TmuxBackground component with 5 animated terminal panes"
 ```
 
 ---
 
-### Task 3: Rewrite loading-screen.tsx with new content
+### Task 2: Rewrite loading-screen.tsx with new foreground content
 
 **Files:**
-- Modify: `apps/web/src/components/animated-hero/loading-screen.tsx` (full rewrite)
+- Modify: `apps/web/src/components/animated-hero/loading-screen.tsx`
 
-**Step 1: Replace the loading screen with the new hero content**
+**Step 1: Rewrite the hero content**
 
-Replace the entire content of `loading-screen.tsx`. This uses the existing `Terminal`, `StatDisplay`, and `AnimatedText` components, plus the new `IncidentTerminal`.
+Replace the entire component. The new version has:
+- `TmuxBackground` as the background (absolute positioned)
+- Overlay layers (glow, vignette, fades) — pure CSS divs
+- Content island — frosted glass wrapper (`backdrop-blur`, dark semi-transparent bg)
+- Compact player card inside the island (using existing `Terminal` and `StatDisplay` from `hud-elements.tsx`)
+- Updated stats from CV: CLASS → "Full Stack Engineer & Architect", SPEC → "AI-Native Development", XP → "13 years · 6 domains · 3 clouds", STATUS → "Building at Obsidian 22"
+- Headline: "This happened at 3am." (nowrap) + "Nobody woke up."
+- Subtitle: "I build systems that inherit chaos and ship clarity." + gradient "Scroll to see how."
+- Skill tags: TypeScript, React, NestJS, Azure, Terraform, Claude Code, DDD, Kubernetes
+- Scroll indicator (same as current, repositioned to `bottom-11` to clear tmux status bar)
 
-```tsx
-'use client';
-
-import { useRef, useEffect, useState } from 'react';
-import { Terminal, StatDisplay } from './hud-elements';
-import { AnimatedText } from './animated-text';
-import { IncidentTerminal } from './incident-terminal';
-import { HeroBackground } from './hero-background';
-
-const SKILL_TAGS = [
-  'TypeScript', 'React', 'NestJS', 'Azure', 'Terraform',
-  'Claude Code', 'DDD', 'Kubernetes',
-];
-
-export function LoadingScreen() {
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const [showScrollIndicator, setShowScrollIndicator] = useState(true);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowScrollIndicator(window.scrollY <= 100);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  return (
-    <section
-      ref={sectionRef}
-      className="min-h-screen flex flex-col items-center justify-center px-6 relative"
-    >
-      {/* Contained atmospheric background */}
-      <HeroBackground />
-
-      {/* Player Card — compact, positioned above the incident */}
-      <div className="relative z-10 w-full max-w-md mb-8">
-        <Terminal>
-          <div className="space-y-2">
-            <StatDisplay label="PLAYER" value="Milos Cvetkovic" />
-            <StatDisplay label="CLASS" value="Full Stack Engineer & Architect" />
-            <StatDisplay label="SPEC" value="AI-Native Development" />
-            <StatDisplay label="XP" value="13 years · 6 domains · 3 clouds" />
-            <div className="flex justify-between items-center pt-2 border-t border-[#30363d]">
-              <span className="text-xs font-mono text-[var(--muted)] uppercase tracking-wider">
-                STATUS
-              </span>
-              <span className="font-mono text-green-400 flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                Building at Obsidian 22
-              </span>
-            </div>
-          </div>
-        </Terminal>
-      </div>
-
-      {/* Inciting Incident — center stage */}
-      <div className="relative z-10">
-        <IncidentTerminal />
-      </div>
-
-      {/* Headline */}
-      <div className="relative z-10 text-center mt-10 max-w-2xl">
-        <h1 className="text-3xl md:text-5xl font-bold mb-4">
-          <AnimatedText animation="gravity" className="glitch-text">
-            This happened at 3am. Nobody woke up.
-          </AnimatedText>
-        </h1>
-        <p className="text-lg text-[var(--muted)]">
-          <AnimatedText animation="blur-reveal">
-            I build systems that inherit chaos and ship clarity.
-          </AnimatedText>{' '}
-          <span className="gradient-text font-semibold">Scroll to see how.</span>
-        </p>
-      </div>
-
-      {/* Skill Tags */}
-      <div className="relative z-10 flex flex-wrap justify-center gap-2 mt-8 max-w-lg">
-        {SKILL_TAGS.map((tag) => (
-          <span
-            key={tag}
-            className="px-2.5 py-1 text-[11px] font-mono rounded border border-[var(--accent)]/20 text-[var(--accent)]/70 bg-[var(--accent)]/5 hover:border-[var(--accent)]/40 hover:text-[var(--accent)] transition-colors"
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
-
-      {/* Scroll Indicator */}
-      <div
-        className={`fixed bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20 transition-opacity duration-300 ${
-          showScrollIndicator ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-      >
-        <AnimatedText animation="perspective" className="text-[10px] font-mono text-[var(--accent)] tracking-widest uppercase">
-          Scroll
-        </AnimatedText>
-        <div className="relative w-6 h-10 border-2 border-[var(--accent)]/50 rounded-full">
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce" />
-        </div>
-      </div>
-    </section>
-  );
-}
-```
-
-**Step 2: Verify no TypeScript errors**
+**Step 2: Typecheck**
 
 Run: `cd /Users/milos/projects/personal/portfolio/.claude/worktrees/go-live && pnpm typecheck`
 Expected: PASS
@@ -341,181 +78,141 @@ Expected: PASS
 
 ```bash
 git add apps/web/src/components/animated-hero/loading-screen.tsx
-git commit -m "feat: rewrite hero with incident terminal, CV-accurate player card, and stronger headline"
+git commit -m "feat: rewrite hero with tmux background, content island, and CV-accurate player card"
 ```
 
 ---
 
-### Task 4: Remove global background layers from AnimatedHero
+### Task 3: Remove global background layers from AnimatedHero
 
 **Files:**
 - Modify: `apps/web/src/components/animated-hero/index.tsx`
 
-**Step 1: Remove the global GridBackground, AmbientBackground, and ScanLines**
+**Step 1: Remove global background imports and rendering**
 
-In `index.tsx`, remove:
-- Import of `GridBackground, ScanLines` from `./ambient-background`
-- Lazy import of `AmbientBackground`
-- Memoized wrappers: `MemoizedGridBackground`, `MemoizedScanLines`
-- Their JSX: `<MemoizedGridBackground />`, `<AmbientBackground />`, `<MemoizedScanLines />`
+Remove these from `index.tsx`:
+- Import: `import { GridBackground, ScanLines } from './ambient-background';`
+- Lazy import: `const AmbientBackground = lazy(() => import('./ambient-background')...);`
+- Memoized wrappers: `const MemoizedGridBackground = memo(GridBackground);` and `const MemoizedScanLines = memo(ScanLines);`
+- JSX: `<MemoizedGridBackground />`, `<Suspense fallback={null}><AmbientBackground /></Suspense>`, `<MemoizedScanLines />`
 
-The background is now handled inside `LoadingScreen` via `<HeroBackground />`.
+Background is now handled inside `LoadingScreen` via `<TmuxBackground />`.
 
-After editing, the `AnimatedHero` component should look like:
-
-```tsx
-'use client';
-
-import { useEffect, useState, lazy, Suspense, memo } from 'react';
-import { LoadingScreen } from './loading-screen';
-
-const MemoizedLoadingScreen = memo(LoadingScreen);
-import { SectionProgress } from './section-progress';
-
-const DiscoveryPhase = lazy(() => import('./discovery-phase').then(m => ({ default: m.DiscoveryPhase })));
-const StrategyPhase = lazy(() => import('./strategy-phase').then(m => ({ default: m.StrategyPhase })));
-const ExecutionPhase = lazy(() => import('./execution-phase').then(m => ({ default: m.ExecutionPhase })));
-const GauntletPhase = lazy(() => import('./gauntlet-phase').then(m => ({ default: m.GauntletPhase })));
-const LoopPhase = lazy(() => import('./loop-phase').then(m => ({ default: m.LoopPhase })));
-const GameComplete = lazy(() => import('./game-complete').then(m => ({ default: m.GameComplete })));
-
-const MemoizedSectionProgress = memo(SectionProgress);
-
-function SectionPlaceholder() {
-  return <div className="min-h-screen" />;
-}
-
-const bootMessages = [
-  { text: 'Initializing system...', delay: 0 },
-  { text: 'Loading portfolio modules...', delay: 200 },
-  { text: 'Establishing connection...', delay: 400 },
-  { text: 'System ready', delay: 600 },
-];
-
-function BootstrapLoader({ visible }: { visible: boolean }) {
-  // ... keep existing BootstrapLoader implementation unchanged ...
-}
-
-export function AnimatedHero() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  return (
-    <div className="relative">
-      <BootstrapLoader visible={!mounted} />
-
-      {/* Section Progress Indicator */}
-      <MemoizedSectionProgress />
-
-      {/* Content Layer */}
-      <div className="relative z-10">
-        <MemoizedLoadingScreen />
-
-        <Suspense fallback={<SectionPlaceholder />}>
-          <DiscoveryPhase />
-        </Suspense>
-        <Suspense fallback={<SectionPlaceholder />}>
-          <StrategyPhase />
-        </Suspense>
-        <Suspense fallback={<SectionPlaceholder />}>
-          <ExecutionPhase />
-        </Suspense>
-        <Suspense fallback={<SectionPlaceholder />}>
-          <GauntletPhase />
-        </Suspense>
-        <Suspense fallback={<SectionPlaceholder />}>
-          <LoopPhase />
-        </Suspense>
-        <Suspense fallback={<SectionPlaceholder />}>
-          <GameComplete />
-        </Suspense>
-      </div>
-    </div>
-  );
-}
-
-export { LoadingScreen } from './loading-screen';
-```
-
-**Step 2: Verify no TypeScript errors**
+**Step 2: Typecheck**
 
 Run: `cd /Users/milos/projects/personal/portfolio/.claude/worktrees/go-live && pnpm typecheck`
 Expected: PASS
 
-**Step 3: Verify the dev server renders correctly**
-
-Run: `cd /Users/milos/projects/personal/portfolio/.claude/worktrees/go-live && pnpm dev:web`
-Check: http://localhost:3000 — hero should show the new content with contained background. Scrolling past hero section should show solid dark background.
-
-**Step 4: Commit**
+**Step 3: Commit**
 
 ```bash
 git add apps/web/src/components/animated-hero/index.tsx
-git commit -m "refactor: remove global background layers, background now scoped to hero"
+git commit -m "refactor: remove global background layers from AnimatedHero"
 ```
 
 ---
 
-### Task 5: Clean up unused ambient-background exports
+### Task 4: Delete unused ambient-background.tsx
 
 **Files:**
-- Modify: `apps/web/src/components/animated-hero/ambient-background.tsx`
+- Delete: `apps/web/src/components/animated-hero/ambient-background.tsx`
 
-**Step 1: Check if GridBackground, AmbientBackground, ScanLines are used elsewhere**
+**Step 1: Verify no other imports**
 
-Run: `grep -r "GridBackground\|AmbientBackground\|ScanLines" apps/web/src/ --include="*.tsx" --include="*.ts"`
+Run: `grep -r "ambient-background" apps/web/src/ --include="*.tsx" --include="*.ts"`
+Expected: Only `index.tsx` (already cleaned in Task 3). If any other file imports it, update that file first.
 
-If they're only referenced in the files we already modified, they can be safely deleted or kept as dead code.
+**Step 2: Delete the file**
 
-**Step 2: Remove or mark as deprecated**
+```bash
+rm apps/web/src/components/animated-hero/ambient-background.tsx
+```
 
-If no other files reference them, delete the entire `ambient-background.tsx` file since all three components are replaced by `hero-background.tsx`.
+**Step 3: Typecheck**
 
-**Step 3: Verify build passes**
-
-Run: `cd /Users/milos/projects/personal/portfolio/.claude/worktrees/go-live && pnpm typecheck && pnpm build`
+Run: `cd /Users/milos/projects/personal/portfolio/.claude/worktrees/go-live && pnpm typecheck`
 Expected: PASS
 
 **Step 4: Commit**
 
 ```bash
 git add -A
-git commit -m "chore: remove unused ambient-background components (replaced by HeroBackground)"
+git commit -m "chore: remove unused ambient-background.tsx"
 ```
 
 ---
 
-### Task 6: Visual QA and polish
+### Task 5: Add hero-specific CSS variables and keyframes to globals.css
 
 **Files:**
-- Potentially tweak: `hero-background.tsx`, `incident-terminal.tsx`, `loading-screen.tsx`
+- Modify: `apps/web/src/app/globals.css`
 
-**Step 1: Test in browser**
+**Step 1: Add tmux-specific CSS custom properties**
 
-Run dev server and check:
-- [ ] Hero background is contained to first section only
-- [ ] No background bleeds into Discovery Phase section below
-- [ ] Incident terminal animation plays on page load
+Add to the `.dark` block in globals.css:
+```css
+  --tmux-border: #5a6190;
+  --tmux-bar: #282d45;
+  --tmux-bg: #0d1017;
+```
+
+And add the `logAppear` keyframe animation (used by the tmux log lines):
+```css
+@keyframes log-appear {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-log-appear {
+  animation: log-appear 0.25s ease forwards;
+}
+```
+
+**Step 2: Typecheck + lint**
+
+Run: `cd /Users/milos/projects/personal/portfolio/.claude/worktrees/go-live && pnpm typecheck && pnpm lint`
+Expected: PASS
+
+**Step 3: Commit**
+
+```bash
+git add apps/web/src/app/globals.css
+git commit -m "style: add tmux background CSS variables and log-appear animation"
+```
+
+---
+
+### Task 6: Visual QA in browser
+
+**Files:**
+- Potentially tweak: `tmux-background.tsx`, `loading-screen.tsx`, `globals.css`
+
+**Step 1: Start dev server and test**
+
+Run: `cd /Users/milos/projects/personal/portfolio/.claude/worktrees/go-live && pnpm dev:web`
+
+Open http://localhost:3000 and verify:
+- [ ] Tmux background renders with 5 panes, tab bar, status bar
+- [ ] Log lines animate into each pane at different speeds
+- [ ] Content island is centered with frosted glass effect
 - [ ] Player card shows correct CV data
-- [ ] Skill tags render and have hover states
+- [ ] Headline reads "This happened at 3am. / Nobody woke up."
+- [ ] Skill tags render on one row
 - [ ] Scroll indicator works and fades on scroll
-- [ ] Light/dark theme both look correct
-- [ ] Mobile responsive (card and terminal stack properly on small screens)
+- [ ] Scrolling past hero section shows clean dark background (no bleed)
 - [ ] Boot loader still works and fades into hero correctly
-- [ ] `prefers-reduced-motion` is respected (no animation)
+- [ ] Dark mode works (default)
+- [ ] Light mode doesn't break (tmux bg should only show in dark mode or adapt)
+- [ ] Mobile responsive — content island stacks properly, panes still visible behind
+- [ ] `prefers-reduced-motion` disables log animations
+- [ ] No console errors
 
-**Step 2: Adjust spacing/timing as needed**
+**Step 2: Fix any issues found**
 
-Tune: animation delays in `IncidentTerminal`, gradient opacities in `HeroBackground`, spacing between elements in `LoadingScreen`.
-
-**Step 3: Final commit**
+**Step 3: Commit**
 
 ```bash
 git add -A
-git commit -m "style: polish hero section spacing, timing, and responsive layout"
+git commit -m "style: polish hero section after visual QA"
 ```
 
 ---
@@ -523,12 +220,19 @@ git commit -m "style: polish hero section spacing, timing, and responsive layout
 ### Task 7: Clean up design preview files
 
 **Files:**
-- Delete: `docs/design-previews/` (all 6 files — 3 SVG + 3 HTML)
+- Delete: `docs/design-previews/` directory (all HTML and SVG files)
 
 These were temporary design exploration artifacts.
 
+**Step 1: Delete**
+
 ```bash
 rm -rf docs/design-previews/
+```
+
+**Step 2: Commit**
+
+```bash
 git add -A
 git commit -m "chore: remove temporary design preview files"
 ```
