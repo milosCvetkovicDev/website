@@ -12,7 +12,7 @@ if (typeof window !== 'undefined') {
 }
 
 export interface CircuitBackgroundHandle {
-  syncProgress: (progress: number) => void;
+  syncProgress: () => void;
   startIdle: () => void;
 }
 
@@ -30,7 +30,7 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
     const rafIdRef = useRef<number>(0);
 
     useImperativeHandle(ref, () => ({
-      syncProgress: (_progress: number) => {
+      syncProgress: () => {
         // No longer needed — rAF loop reads progressRef directly
       },
       startIdle: () => {
