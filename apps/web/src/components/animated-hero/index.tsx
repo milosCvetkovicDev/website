@@ -2,11 +2,10 @@
 
 import { useEffect, useState, lazy, Suspense, memo } from 'react';
 import { LoadingScreen } from './loading-screen';
+import { SectionProgress } from './section-progress';
 
 // Memoize loading screen to prevent re-renders
 const MemoizedLoadingScreen = memo(LoadingScreen);
-import { GridBackground, ScanLines } from './ambient-background';
-import { SectionProgress } from './section-progress';
 
 // Lazy load heavy components that are below the fold
 const DiscoveryPhase = lazy(() => import('./discovery-phase').then(m => ({ default: m.DiscoveryPhase })));
@@ -15,11 +14,7 @@ const ExecutionPhase = lazy(() => import('./execution-phase').then(m => ({ defau
 const GauntletPhase = lazy(() => import('./gauntlet-phase').then(m => ({ default: m.GauntletPhase })));
 const LoopPhase = lazy(() => import('./loop-phase').then(m => ({ default: m.LoopPhase })));
 const GameComplete = lazy(() => import('./game-complete').then(m => ({ default: m.GameComplete })));
-const AmbientBackground = lazy(() => import('./ambient-background').then(m => ({ default: m.AmbientBackground })));
 
-// Memoize static background components
-const MemoizedGridBackground = memo(GridBackground);
-const MemoizedScanLines = memo(ScanLines);
 const MemoizedSectionProgress = memo(SectionProgress);
 
 // Minimal loading placeholder for lazy sections
@@ -194,12 +189,6 @@ export function AnimatedHero() {
     <div className="relative">
       {/* Bootstrap loader overlay - fades out when mounted */}
       <BootstrapLoader visible={!mounted} />
-      {/* Ambient Effects Layer - static backgrounds render immediately */}
-      <MemoizedGridBackground />
-      <Suspense fallback={null}>
-        <AmbientBackground />
-      </Suspense>
-      <MemoizedScanLines />
 
       {/* Section Progress Indicator */}
       <MemoizedSectionProgress />
