@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, lazy, Suspense, memo } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense, memo } from 'react';
 import { LoadingScreen } from './loading-screen';
 
 // Memoize loading screen to prevent re-renders
@@ -36,7 +36,7 @@ const bootMessages = [
 ];
 
 // HUD-styled bootstrap loader with progress and boot sequence
-function BootstrapLoader({ visible }: { visible: boolean }) {
+function BootstrapLoader({ visible, progressRef }: { visible: boolean; progressRef: React.MutableRefObject<number> }) {
   const [shouldRender, setShouldRender] = useState(true);
   const [progress, setProgress] = useState(0);
   const [currentMessage, setCurrentMessage] = useState(0);
@@ -59,7 +59,9 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
         }
         // Ease out - slower as it approaches 100
         const increment = Math.max(1, Math.floor((100 - prev) / 10));
-        return Math.min(prev + increment, 95); // Cap at 95 until content loads
+        const next = Math.min(prev + increment, 95); // Cap at 95 until content loads
+        progressRef.current = next;
+        return next;
       });
     }, 50);
 
@@ -72,14 +74,15 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
       clearInterval(progressInterval);
       messageTimers.forEach(clearTimeout);
     };
-  }, [visible]);
+  }, [visible, progressRef]);
 
   // Complete progress when content is ready
   useEffect(() => {
     if (!visible && progress < 100) {
       setProgress(100);
+      progressRef.current = 100;
     }
-  }, [visible, progress]);
+  }, [visible, progress, progressRef]);
 
   if (!shouldRender) return null;
 
@@ -185,6 +188,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
 export function AnimatedHero() {
   const [mounted, setMounted] = useState(false);
+  const bootProgressRef = useRef(0);
 
   useEffect(() => {
     setMounted(true);
@@ -193,7 +197,7 @@ export function AnimatedHero() {
   return (
     <div className="relative">
       {/* Bootstrap loader overlay - fades out when mounted */}
-      <BootstrapLoader visible={!mounted} />
+      <BootstrapLoader visible={!mounted} progressRef={bootProgressRef} />
       {/* Ambient Effects Layer - static backgrounds render immediately */}
       <MemoizedGridBackground />
       <Suspense fallback={null}>
