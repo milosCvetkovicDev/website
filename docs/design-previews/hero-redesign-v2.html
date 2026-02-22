@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hero Redesign v2 — Log Background</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --background: #0a0a0a;
+    --foreground: #fafafa;
+    --accent: #8b5cf6;
+    --muted: #a3a3a3;
+    --border: #262626;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ─── HERO ─── */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+    overflow: hidden;
+  }
+
+  /* ─── BACKGROUND: FLOATING LOG LINES ─── */
+  .log-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .log-bg__line {
+    position: absolute;
+    white-space: nowrap;
+    font-family: 'Geist Mono', 'SF Mono', monospace;
+    font-size: 12px;
+    line-height: 1;
+    opacity: 0;
+    animation: logDrift linear infinite;
+    will-change: transform, opacity;
+  }
+
+  @keyframes logDrift {
+    0% {
+      transform: translateX(110vw);
+      opacity: 0;
+    }
+    3% {
+      opacity: var(--log-opacity, 0.06);
+    }
+    92% {
+      opacity: var(--log-opacity, 0.06);
+    }
+    100% {
+      transform: translateX(-120vw);
+      opacity: 0;
+    }
+  }
+
+  /* Color classes for log levels */
+  .log-bg__line--error { color: #f87171; }
+  .log-bg__line--warn { color: #fbbf24; }
+  .log-bg__line--info { color: #60a5fa; }
+  .log-bg__line--debug { color: #6b7280; }
+  .log-bg__line--success { color: #4ade80; }
+  .log-bg__line--accent { color: var(--accent); }
+
+  /* Nebula gradients */
+  .hero-bg__nebula {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background:
+      radial-gradient(ellipse 55% 45% at 28% 30%, rgba(124, 58, 237, 0.1) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 35% at 72% 25%, rgba(6, 182, 212, 0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 45% 38% at 50% 60%, rgba(67, 56, 202, 0.07) 0%, transparent 65%);
+  }
+
+  /* Central glow */
+  .hero-bg__glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background: radial-gradient(ellipse 40% 35% at 50% 45%, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+    animation: breathe 6s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Vignette — darkens edges, focuses center */
+  .hero-bg__vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    background: radial-gradient(ellipse 70% 65% at 50% 50%, transparent 30%, rgba(10, 10, 10, 0.7) 100%);
+  }
+
+  /* Bottom fade */
+  .hero-bg__fade {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 25%;
+    pointer-events: none;
+    z-index: 3;
+    background: linear-gradient(to bottom, transparent, var(--background));
+  }
+
+  /* ─── PLAYER CARD ─── */
+  .player-card {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 440px;
+    margin-bottom: 2.5rem;
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 13px;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .player-card:hover {
+    border-color: rgba(139, 92, 246, 0.4);
+    box-shadow: 0 0 60px rgba(139, 92, 246, 0.1);
+  }
+
+  .player-card__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(22, 27, 34, 0.9);
+    border-bottom: 1px solid #30363d;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot--red { background: #ff5f56; }
+  .dot--yellow { background: #ffbd2e; }
+  .dot--green { background: #27c93f; }
+
+  .player-card__body { padding: 16px; }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    margin: 0 -8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+  .stat-row:hover { background: rgba(139, 92, 246, 0.05); }
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .stat-value { color: var(--accent); }
+  .stat-divider { border-top: 1px solid #30363d; margin-top: 6px; padding-top: 6px; }
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: #4ade80;
+    border-radius: 50%;
+    margin-right: 8px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .status-value { color: #4ade80; }
+
+  /* ─── HEADLINE ─── */
+  .headline {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    max-width: 640px;
+  }
+  .headline h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 16px;
+    letter-spacing: -0.02em;
+  }
+  .headline p {
+    font-size: 17px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .gradient-text {
+    font-weight: 600;
+    background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* ─── SKILL TAGS ─── */
+  .skill-tags {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 2rem;
+    max-width: 520px;
+  }
+  .skill-tag {
+    padding: 4px 10px;
+    font-family: 'Geist Mono', monospace;
+    font-size: 11px;
+    border-radius: 4px;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    color: rgba(139, 92, 246, 0.6);
+    background: rgba(139, 92, 246, 0.04);
+    transition: all 0.2s;
+  }
+  .skill-tag:hover {
+    border-color: rgba(139, 92, 246, 0.45);
+    color: var(--accent);
+    background: rgba(139, 92, 246, 0.08);
+  }
+
+  /* ─── SCROLL INDICATOR ─── */
+  .scroll-indicator {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    transition: opacity 0.3s;
+  }
+  .scroll-label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+  }
+  .scroll-pill {
+    width: 24px; height: 40px;
+    border: 2px solid rgba(139, 92, 246, 0.5);
+    border-radius: 12px;
+    position: relative;
+  }
+  .scroll-dot {
+    position: absolute; top: 8px; left: 50%;
+    transform: translateX(-50%);
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: scrollBounce 1.5s ease-in-out infinite;
+  }
+  @keyframes scrollBounce {
+    0%, 100% { top: 8px; opacity: 1; }
+    50% { top: 22px; opacity: 0.4; }
+  }
+
+  /* ─── BELOW FOLD ─── */
+  .below-fold {
+    min-height: 100vh;
+    background: var(--background);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    font-family: 'Geist Mono', monospace;
+    font-size: 14px;
+    text-align: center;
+    padding: 2rem;
+    line-height: 1.8;
+  }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <!-- Background: floating log lines -->
+  <div class="log-bg" id="logBg"></div>
+
+  <!-- Atmospheric layers -->
+  <div class="hero-bg__nebula"></div>
+  <div class="hero-bg__glow"></div>
+  <div class="hero-bg__vignette"></div>
+  <div class="hero-bg__fade"></div>
+
+  <!-- Player Card -->
+  <div class="player-card">
+    <div class="player-card__header">
+      <div class="dot dot--red"></div>
+      <div class="dot dot--yellow"></div>
+      <div class="dot dot--green"></div>
+    </div>
+    <div class="player-card__body">
+      <div class="stat-row">
+        <span class="stat-label">Player</span>
+        <span class="stat-value">Milos Cvetkovic</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Class</span>
+        <span class="stat-value">Full Stack Engineer & Architect</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Spec</span>
+        <span class="stat-value">AI-Native Development</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">XP</span>
+        <span class="stat-value">13 years · 6 domains · 3 clouds</span>
+      </div>
+      <div class="stat-row stat-divider">
+        <span class="stat-label">Status</span>
+        <span class="status-value"><span class="status-dot"></span>Building at Obsidian 22</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Headline -->
+  <div class="headline">
+    <h1>This happened at 3am. Nobody woke up.</h1>
+    <p>I build systems that inherit chaos and ship clarity. <span class="gradient-text">Scroll to see how.</span></p>
+  </div>
+
+  <!-- Skill Tags -->
+  <div class="skill-tags">
+    <span class="skill-tag">TypeScript</span>
+    <span class="skill-tag">React</span>
+    <span class="skill-tag">NestJS</span>
+    <span class="skill-tag">Azure</span>
+    <span class="skill-tag">Terraform</span>
+    <span class="skill-tag">Claude Code</span>
+    <span class="skill-tag">DDD</span>
+    <span class="skill-tag">Kubernetes</span>
+  </div>
+
+  <!-- Scroll Indicator -->
+  <div class="scroll-indicator" id="scrollIndicator">
+    <span class="scroll-label">Scroll</span>
+    <div class="scroll-pill"><div class="scroll-dot"></div></div>
+  </div>
+</section>
+
+<div class="below-fold">
+  <div>
+    ↑ Background stops at hero boundary.<br>
+    Clean dark below — each section owns its visual treatment.<br><br>
+    <span style="color: var(--accent);">Next: Discovery Phase</span>
+  </div>
+</div>
+
+<script>
+// Real production log lines — famous errors, real stack traces, actual infra messages
+const LOG_LINES = [
+  // Errors (red)
+  { text: '[ERROR] 03:14:07 OOMKilled — Container exceeded 512Mi memory limit', level: 'error' },
+  { text: '[FATAL] java.lang.OutOfMemoryError: GC overhead limit exceeded', level: 'error' },
+  { text: '[ERROR] ECONNREFUSED 10.0.3.12:5432 — PostgreSQL connection refused', level: 'error' },
+  { text: '[ERROR] 500 Internal Server Error — POST /api/v2/orders — upstream timeout', level: 'error' },
+  { text: '[PANIC] goroutine 1 [running]: runtime.throw({0x4a2e80, 0x1e})', level: 'error' },
+  { text: '[ERROR] Unhandled rejection: TypeError: Cannot read properties of undefined (reading "id")', level: 'error' },
+  { text: '[FATAL] kafka: client has run out of available brokers to talk to', level: 'error' },
+  { text: '[ERROR] SIGKILL received — process 18247 terminated by OOM killer', level: 'error' },
+  { text: '[ERROR] SSL_ERROR_HANDSHAKE_FAILURE_ALERT — certificate expired 2h ago', level: 'error' },
+  { text: '[ERROR] MongoServerError: connection pool cleared, retrying...', level: 'error' },
+  { text: '[CRIT] Redis CLUSTERDOWN — hash slot not served', level: 'error' },
+  { text: '[ERROR] net/http: request canceled (Client.Timeout exceeded)', level: 'error' },
+
+  // Warnings (yellow)
+  { text: '[WARN] Connection pool exhausted — 50/50 connections in use, 23 waiting', level: 'warn' },
+  { text: '[WARN] Disk usage at 94% on /dev/sda1 — threshold: 90%', level: 'warn' },
+  { text: '[WARN] Request latency p99 = 4200ms (SLA: 500ms) — degraded', level: 'warn' },
+  { text: '[WARN] Rate limit approaching: 4,892/5,000 requests this minute', level: 'warn' },
+  { text: '[WARN] Certificate expires in 72h — CN=*.production.internal', level: 'warn' },
+  { text: '[WARN] Replication lag: 12s behind primary (threshold: 5s)', level: 'warn' },
+
+  // Info / agent actions (blue/purple)
+  { text: '[INFO] Deploying container image sha256:a7f3e2... to production-east-1', level: 'info' },
+  { text: '[INFO] Health check passed: 200 OK — /healthz (14ms)', level: 'info' },
+  { text: '[INFO] Rolling update: 3/5 pods ready — deployment/api-server', level: 'info' },
+  { text: '[AGENT] Analyzing root cause of error spike...', level: 'accent' },
+  { text: '[AGENT] Identified: null pointer in OrderService.processPayment():142', level: 'accent' },
+  { text: '[AGENT] Fix generated → PR #847 opened — awaiting approval', level: 'accent' },
+  { text: '[AGENT] CI pipeline passed — 847 tests green, 0 failures', level: 'accent' },
+
+  // Success / resolution (green)
+  { text: '[OK] Auto-scaled: 3 → 8 replicas — CPU stabilized at 45%', level: 'success' },
+  { text: '[OK] Circuit breaker reset — upstream /payments healthy', level: 'success' },
+  { text: '[OK] Deployment complete: v2.14.3 — all health checks passing', level: 'success' },
+  { text: '[OK] Error rate normalized: 0.02% (was 12.4%) — incident resolved', level: 'success' },
+  { text: '[OK] PR #847 merged — production patched, zero downtime', level: 'success' },
+
+  // Debug / trace (gray)
+  { text: '[DEBUG] SELECT * FROM orders WHERE status = $1 — 847ms (slow query)', level: 'debug' },
+  { text: '[TRACE] TCP retransmit to 10.0.7.4:443 — RTT 340ms', level: 'debug' },
+  { text: '[DEBUG] GC pause: 1.2s — heap: 1.8G/2G — consider increasing -Xmx', level: 'debug' },
+  { text: '[DEBUG] DNS lookup api.stripe.com: 127ms (cached: miss)', level: 'debug' },
+  { text: '[TRACE] TLS handshake: ECDHE-RSA-AES256-GCM-SHA384 — 48ms', level: 'debug' },
+];
+
+const container = document.getElementById('logBg');
+
+// Create floating log lines at random vertical positions
+function spawnLogLine() {
+  const entry = LOG_LINES[Math.floor(Math.random() * LOG_LINES.length)];
+  const el = document.createElement('div');
+  el.className = `log-bg__line log-bg__line--${entry.level}`;
+  el.textContent = entry.text;
+
+  // Random vertical position
+  const top = 5 + Math.random() * 88; // 5% to 93%
+  el.style.top = top + '%';
+
+  // Random opacity — errors slightly brighter, debug dimmer
+  const opacityMap = { error: 0.08, warn: 0.06, info: 0.05, accent: 0.07, success: 0.06, debug: 0.035 };
+  el.style.setProperty('--log-opacity', opacityMap[entry.level] || 0.05);
+
+  // Random speed (40s to 80s to cross the screen)
+  const duration = 40 + Math.random() * 40;
+  el.style.animationDuration = duration + 's';
+
+  // Random start delay
+  const delay = Math.random() * -duration; // negative = already in progress
+  el.style.animationDelay = delay + 's';
+
+  // Slight font size variation for depth
+  const fontSize = 11 + Math.random() * 3;
+  el.style.fontSize = fontSize + 'px';
+
+  container.appendChild(el);
+
+  // Remove and respawn after animation completes
+  el.addEventListener('animationiteration', () => {
+    // On loop, reassign a new log line
+    const newEntry = LOG_LINES[Math.floor(Math.random() * LOG_LINES.length)];
+    el.className = `log-bg__line log-bg__line--${newEntry.level}`;
+    el.textContent = newEntry.text;
+    el.style.setProperty('--log-opacity', opacityMap[newEntry.level] || 0.05);
+    el.style.top = (5 + Math.random() * 88) + '%';
+  });
+}
+
+// Spawn initial batch — stagger them so they're spread across the screen
+const LINE_COUNT = 18;
+for (let i = 0; i < LINE_COUNT; i++) {
+  spawnLogLine();
+}
+
+// Scroll indicator fade
+window.addEventListener('scroll', () => {
+  const el = document.getElementById('scrollIndicator');
+  el.style.opacity = window.scrollY > 80 ? '0' : '1';
+  el.style.pointerEvents = window.scrollY > 80 ? 'none' : 'auto';
+}, { passive: true });
+</script>
+</body>
+</html>

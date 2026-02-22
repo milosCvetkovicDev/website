@@ -1,0 +1,189 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="1440" height="900">
+  <defs>
+    <!-- Nebula noise filter -->
+    <filter id="nebulaNoise" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.003" numOctaves="4" seed="42" result="noise"/>
+      <feColorMatrix type="saturate" values="3" in="noise" result="saturatedNoise"/>
+      <feGaussianBlur stdDeviation="40" in="saturatedNoise" result="blurredNoise"/>
+    </filter>
+
+    <!-- Star glow -->
+    <filter id="starGlow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Large star glow -->
+    <filter id="bigStarGlow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Central light source -->
+    <radialGradient id="centralLight" cx="50%" cy="45%" r="40%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.25"/>
+      <stop offset="30%" stop-color="#6d28d9" stop-opacity="0.12"/>
+      <stop offset="60%" stop-color="#1e1b4b" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="transparent" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Nebula cloud 1 - violet -->
+    <radialGradient id="nebula1" cx="30%" cy="35%" r="35%">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.2"/>
+      <stop offset="50%" stop-color="#5b21b6" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="transparent" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Nebula cloud 2 - cyan -->
+    <radialGradient id="nebula2" cx="70%" cy="30%" r="30%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.12"/>
+      <stop offset="40%" stop-color="#0891b2" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="transparent" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Nebula cloud 3 - deep blue -->
+    <radialGradient id="nebula3" cx="55%" cy="60%" r="25%">
+      <stop offset="0%" stop-color="#4338ca" stop-opacity="0.15"/>
+      <stop offset="60%" stop-color="#312e81" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="transparent" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Bottom fade gradient -->
+    <linearGradient id="bottomFade" x1="0" y1="0.7" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0a0a" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#0a0a0a" stop-opacity="1"/>
+    </linearGradient>
+
+    <!-- Terminal card shadow -->
+    <filter id="cardGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feFlood flood-color="#8b5cf6" flood-opacity="0.15" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Base background -->
+  <rect width="1440" height="900" fill="#0a0a0a"/>
+
+  <!-- Noise texture layer for organic feel -->
+  <rect width="1440" height="900" fill="#1a0a2e" opacity="0.3" filter="url(#nebulaNoise)"/>
+
+  <!-- Nebula clouds -->
+  <rect width="1440" height="900" fill="url(#nebula1)"/>
+  <rect width="1440" height="900" fill="url(#nebula2)"/>
+  <rect width="1440" height="900" fill="url(#nebula3)"/>
+
+  <!-- Central dramatic light behind terminal -->
+  <rect width="1440" height="900" fill="url(#centralLight)"/>
+
+  <!-- Additional atmospheric glow -->
+  <ellipse cx="400" cy="300" rx="300" ry="200" fill="#7c3aed" opacity="0.04"/>
+  <ellipse cx="1000" cy="250" rx="250" ry="180" fill="#06b6d4" opacity="0.03"/>
+  <ellipse cx="720" cy="500" rx="200" ry="150" fill="#4338ca" opacity="0.05"/>
+
+  <!-- Deep star layer (small, dim) -->
+  <g opacity="0.3">
+    <circle cx="120" cy="80" r="0.5" fill="#e2e8f0"/>
+    <circle cx="340" cy="150" r="0.5" fill="#cbd5e1"/>
+    <circle cx="560" cy="60" r="0.5" fill="#e2e8f0"/>
+    <circle cx="780" cy="120" r="0.5" fill="#cbd5e1"/>
+    <circle cx="1000" cy="90" r="0.5" fill="#e2e8f0"/>
+    <circle cx="1220" cy="140" r="0.5" fill="#cbd5e1"/>
+    <circle cx="200" cy="300" r="0.5" fill="#e2e8f0"/>
+    <circle cx="420" cy="400" r="0.5" fill="#cbd5e1"/>
+    <circle cx="1100" cy="350" r="0.5" fill="#e2e8f0"/>
+    <circle cx="1300" cy="280" r="0.5" fill="#cbd5e1"/>
+    <circle cx="80" cy="500" r="0.5" fill="#e2e8f0"/>
+    <circle cx="650" cy="680" r="0.5" fill="#cbd5e1"/>
+    <circle cx="900" cy="600" r="0.5" fill="#e2e8f0"/>
+    <circle cx="1350" cy="500" r="0.5" fill="#cbd5e1"/>
+    <circle cx="250" cy="700" r="0.5" fill="#e2e8f0"/>
+    <circle cx="500" cy="550" r="0.5" fill="#cbd5e1"/>
+    <circle cx="1150" cy="650" r="0.5" fill="#e2e8f0"/>
+    <circle cx="50" cy="200" r="0.5" fill="#cbd5e1"/>
+    <circle cx="700" cy="250" r="0.5" fill="#e2e8f0"/>
+    <circle cx="1400" cy="400" r="0.5" fill="#cbd5e1"/>
+  </g>
+
+  <!-- Mid star layer -->
+  <g opacity="0.5">
+    <circle cx="180" cy="120" r="1" fill="#e2e8f0" filter="url(#starGlow)"/>
+    <circle cx="450" cy="200" r="0.8" fill="#c4b5fd"/>
+    <circle cx="800" cy="80" r="1" fill="#e2e8f0" filter="url(#starGlow)"/>
+    <circle cx="1100" cy="180" r="0.8" fill="#a5b4fc"/>
+    <circle cx="300" cy="450" r="1" fill="#e2e8f0"/>
+    <circle cx="1250" cy="350" r="0.8" fill="#c4b5fd" filter="url(#starGlow)"/>
+    <circle cx="150" cy="600" r="1" fill="#e2e8f0"/>
+    <circle cx="950" cy="500" r="0.8" fill="#a5b4fc"/>
+    <circle cx="600" cy="750" r="1" fill="#e2e8f0" filter="url(#starGlow)"/>
+    <circle cx="1350" cy="600" r="0.8" fill="#c4b5fd"/>
+  </g>
+
+  <!-- Bright star layer (large, glowing) -->
+  <g opacity="0.8">
+    <circle cx="280" cy="180" r="1.5" fill="#f8fafc" filter="url(#bigStarGlow)"/>
+    <circle cx="920" cy="150" r="2" fill="#ddd6fe" filter="url(#bigStarGlow)"/>
+    <circle cx="1320" cy="250" r="1.5" fill="#f8fafc" filter="url(#bigStarGlow)"/>
+    <circle cx="600" cy="350" r="1.8" fill="#a5f3fc" filter="url(#bigStarGlow)"/>
+    <circle cx="100" cy="400" r="1.5" fill="#f8fafc" filter="url(#bigStarGlow)"/>
+  </g>
+
+  <!-- Terminal Card -->
+  <g transform="translate(520, 230)" filter="url(#cardGlow)">
+    <!-- Card background -->
+    <rect width="400" height="180" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+    <!-- Title bar -->
+    <rect width="400" height="32" rx="8" fill="#161b22"/>
+    <rect x="0" y="24" width="400" height="8" fill="#161b22"/>
+    <line x1="0" y1="32" x2="400" y2="32" stroke="#30363d" stroke-width="1"/>
+    <!-- Traffic lights -->
+    <circle cx="20" cy="16" r="5" fill="#ff5f56"/>
+    <circle cx="38" cy="16" r="5" fill="#ffbd2e"/>
+    <circle cx="56" cy="16" r="5" fill="#27c93f"/>
+
+    <!-- Stats -->
+    <text x="20" y="60" font-family="monospace" font-size="11" fill="#6b7280">PLAYER</text>
+    <text x="380" y="60" font-family="monospace" font-size="11" fill="#8b5cf6" text-anchor="end">Milos Cvetkovic</text>
+
+    <text x="20" y="88" font-family="monospace" font-size="11" fill="#6b7280">CLASS</text>
+    <text x="380" y="88" font-family="monospace" font-size="11" fill="#8b5cf6" text-anchor="end">AI-Native Engineer</text>
+
+    <text x="20" y="116" font-family="monospace" font-size="11" fill="#6b7280">LEVEL</text>
+    <text x="380" y="116" font-family="monospace" font-size="11" fill="#8b5cf6" text-anchor="end">10+ years</text>
+
+    <line x1="20" y1="130" x2="380" y2="130" stroke="#30363d" stroke-width="1"/>
+    <text x="20" y="155" font-family="monospace" font-size="11" fill="#6b7280">STATUS</text>
+    <circle cx="340" cy="151" r="4" fill="#4ade80"/>
+    <text x="380" y="155" font-family="monospace" font-size="11" fill="#4ade80" text-anchor="end">Ready</text>
+  </g>
+
+  <!-- Notification toast -->
+  <g transform="translate(520, 430)">
+    <rect width="400" height="40" rx="8" fill="rgba(139,92,246,0.1)" stroke="#8b5cf6" stroke-opacity="0.5" stroke-width="1"/>
+    <text x="20" y="25" font-family="monospace" font-size="12" fill="#8b5cf6">⚡ NEW QUEST RECEIVED</text>
+  </g>
+
+  <!-- Headline -->
+  <text x="720" y="530" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="bold" fill="#f8fafc" text-anchor="middle">Most engineers show you</text>
+  <text x="720" y="580" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="bold" fill="#f8fafc" text-anchor="middle">the finished product.</text>
+
+  <text x="620" y="625" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#9ca3af" text-anchor="middle">I'll show you how the sausage gets made.</text>
+  <text x="820" y="625" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#8b5cf6" font-weight="600" text-anchor="middle">Scroll to watch me work.</text>
+
+  <!-- Bottom fade to black -->
+  <rect width="1440" height="900" fill="url(#bottomFade)"/>
+
+  <!-- Label -->
+  <rect x="20" y="20" width="320" height="36" rx="6" fill="#8b5cf6" opacity="0.9"/>
+  <text x="36" y="43" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="white">APPROACH A: Nebula Canvas (Recommended)</text>
+</svg>

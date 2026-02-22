@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Approach A: Nebula Canvas</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0a;
+    color: #f8fafc;
+    font-family: system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+  }
+
+  .hero {
+    position: relative;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  canvas#nebula {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+  }
+
+  /* Bottom fade to solid black */
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30%;
+    background: linear-gradient(to bottom, transparent, #0a0a0a);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Terminal card */
+  .terminal {
+    width: 400px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    overflow: hidden;
+    box-shadow: 0 0 60px rgba(139, 92, 246, 0.12), 0 0 120px rgba(139, 92, 246, 0.06);
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .terminal:hover {
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 0 80px rgba(139, 92, 246, 0.2), 0 0 160px rgba(139, 92, 246, 0.08);
+  }
+
+  .terminal-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-red { background: #ff5f56; }
+  .dot-yellow { background: #ffbd2e; }
+  .dot-green { background: #27c93f; }
+
+  .terminal-body { padding: 16px; }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    margin: 0 -8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+    cursor: default;
+  }
+  .stat-row:hover { background: rgba(139, 92, 246, 0.05); }
+  .stat-label {
+    font-size: 11px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .stat-value { color: #8b5cf6; }
+
+  .stat-divider {
+    border-top: 1px solid #30363d;
+    margin: 8px 0;
+    padding-top: 8px;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #4ade80;
+    border-radius: 50%;
+    margin-right: 8px;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Toast */
+  .toast {
+    width: 400px;
+    margin-top: 24px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(139, 92, 246, 0.5);
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+  }
+
+  /* Headline */
+  .headline {
+    text-align: center;
+    margin-top: 48px;
+    max-width: 640px;
+  }
+  .headline h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 16px;
+  }
+  .headline p {
+    font-size: 17px;
+    color: #9ca3af;
+  }
+  .headline .accent {
+    color: #8b5cf6;
+    font-weight: 600;
+    background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Scroll indicator */
+  .scroll-indicator {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .scroll-label {
+    font-family: 'SF Mono', monospace;
+    font-size: 10px;
+    color: #8b5cf6;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+  }
+  .scroll-pill {
+    width: 24px;
+    height: 40px;
+    border: 2px solid rgba(139, 92, 246, 0.5);
+    border-radius: 12px;
+    position: relative;
+  }
+  .scroll-dot {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 6px;
+    height: 6px;
+    background: #8b5cf6;
+    border-radius: 50%;
+    animation: scrollBounce 1.5s ease-in-out infinite;
+  }
+  @keyframes scrollBounce {
+    0%, 100% { top: 8px; opacity: 1; }
+    50% { top: 22px; opacity: 0.4; }
+  }
+
+  /* Below-fold placeholder */
+  .below-fold {
+    height: 100vh;
+    background: #0a0a0a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    font-family: monospace;
+    font-size: 14px;
+    border-top: 1px solid #1a1a2e;
+  }
+
+  /* Label badge */
+  .label {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 100;
+    background: #8b5cf6;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+  }
+</style>
+</head>
+<body>
+
+<div class="label">APPROACH A: Nebula Canvas (Recommended)</div>
+
+<section class="hero">
+  <canvas id="nebula"></canvas>
+
+  <div class="content">
+    <div class="terminal">
+      <div class="terminal-header">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-yellow"></div>
+        <div class="dot dot-green"></div>
+      </div>
+      <div class="terminal-body">
+        <div class="stat-row">
+          <span class="stat-label">Player</span>
+          <span class="stat-value">Milos Cvetkovic</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Class</span>
+          <span class="stat-value">AI-Native Engineer</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Level</span>
+          <span class="stat-value">10+ years</span>
+        </div>
+        <div class="stat-row stat-divider">
+          <span class="stat-label">Status</span>
+          <span class="stat-value"><span class="status-dot"></span>Ready</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast">⚡ NEW QUEST RECEIVED</div>
+
+    <div class="headline">
+      <h1>Most engineers show you the finished product.</h1>
+      <p>I'll show you how the sausage gets made. <span class="accent">Scroll to watch me work.</span></p>
+    </div>
+  </div>
+
+  <div class="scroll-indicator">
+    <span class="scroll-label">Scroll</span>
+    <div class="scroll-pill"><div class="scroll-dot"></div></div>
+  </div>
+</section>
+
+<div class="below-fold">
+  ↑ Background stops at hero boundary. Clean solid dark below. ↑
+</div>
+
+<script>
+const canvas = document.getElementById('nebula');
+const ctx = canvas.getContext('2d');
+let width, height;
+let mouseX = 0.5, mouseY = 0.5;
+let animId;
+
+function resize() {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+document.addEventListener('mousemove', (e) => {
+  mouseX = e.clientX / width;
+  mouseY = e.clientY / height;
+});
+
+// Star layers with depth
+const stars = [];
+function createStars() {
+  stars.length = 0;
+  // Layer 1: deep (small, dim)
+  for (let i = 0; i < 120; i++) {
+    stars.push({
+      x: Math.random(), y: Math.random(),
+      size: 0.3 + Math.random() * 0.7,
+      brightness: 0.15 + Math.random() * 0.2,
+      depth: 0.2 + Math.random() * 0.3,
+      twinkleSpeed: 0.5 + Math.random() * 2,
+      twinkleOffset: Math.random() * Math.PI * 2,
+      color: Math.random() > 0.7 ? [196, 181, 253] : [226, 232, 240], // violet tint or white
+    });
+  }
+  // Layer 2: mid
+  for (let i = 0; i < 50; i++) {
+    stars.push({
+      x: Math.random(), y: Math.random(),
+      size: 0.8 + Math.random() * 1.2,
+      brightness: 0.3 + Math.random() * 0.3,
+      depth: 0.5 + Math.random() * 0.3,
+      twinkleSpeed: 0.3 + Math.random() * 1.5,
+      twinkleOffset: Math.random() * Math.PI * 2,
+      color: Math.random() > 0.5 ? [165, 180, 252] : [226, 232, 240],
+    });
+  }
+  // Layer 3: bright (large, glowing)
+  for (let i = 0; i < 15; i++) {
+    stars.push({
+      x: Math.random(), y: Math.random(),
+      size: 1.5 + Math.random() * 2,
+      brightness: 0.5 + Math.random() * 0.4,
+      depth: 0.8 + Math.random() * 0.2,
+      twinkleSpeed: 0.2 + Math.random() * 0.8,
+      twinkleOffset: Math.random() * Math.PI * 2,
+      color: Math.random() > 0.6 ? [165, 243, 252] : [248, 250, 252], // cyan or white
+      glow: true,
+    });
+  }
+}
+createStars();
+
+// Nebula cloud data
+const nebulaClouds = [
+  { cx: 0.3, cy: 0.3, rx: 0.35, ry: 0.28, color: [124, 58, 237], opacity: 0.08, depth: 0.3 },
+  { cx: 0.7, cy: 0.25, rx: 0.28, ry: 0.22, color: [6, 182, 212], opacity: 0.06, depth: 0.4 },
+  { cx: 0.5, cy: 0.55, rx: 0.3, ry: 0.25, color: [67, 56, 202], opacity: 0.07, depth: 0.35 },
+  { cx: 0.2, cy: 0.65, rx: 0.2, ry: 0.18, color: [109, 40, 217], opacity: 0.04, depth: 0.25 },
+  { cx: 0.8, cy: 0.6, rx: 0.22, ry: 0.2, color: [236, 72, 153], opacity: 0.03, depth: 0.45 },
+];
+
+let time = 0;
+const targetFPS = 30;
+const frameInterval = 1000 / targetFPS;
+let lastTime = 0;
+
+function drawNebula(t) {
+  // Deep space base
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, width, height);
+
+  // Parallax offset based on mouse
+  const px = (mouseX - 0.5) * 2;
+  const py = (mouseY - 0.5) * 2;
+
+  // Draw nebula clouds with parallax
+  for (const cloud of nebulaClouds) {
+    const offsetX = px * cloud.depth * 30;
+    const offsetY = py * cloud.depth * 30;
+    const cx = cloud.cx * width + offsetX;
+    const cy = cloud.cy * height + offsetY;
+
+    const grad = ctx.createRadialGradient(
+      cx, cy, 0,
+      cx, cy, cloud.rx * width
+    );
+    const [r, g, b] = cloud.color;
+    // Subtle breathing animation
+    const breathe = 1 + Math.sin(t * 0.0003 + cloud.cx * 10) * 0.15;
+    const op = cloud.opacity * breathe;
+    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${op})`);
+    grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${op * 0.4})`);
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  // Central light source behind terminal
+  const clx = width / 2 + px * 10;
+  const cly = height * 0.42 + py * 10;
+  const centralGrad = ctx.createRadialGradient(clx, cly, 0, clx, cly, width * 0.35);
+  centralGrad.addColorStop(0, 'rgba(139, 92, 246, 0.18)');
+  centralGrad.addColorStop(0.3, 'rgba(109, 40, 217, 0.08)');
+  centralGrad.addColorStop(0.6, 'rgba(30, 27, 75, 0.03)');
+  centralGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = centralGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Draw stars with parallax and twinkle
+  for (const star of stars) {
+    const offsetX = px * star.depth * 20;
+    const offsetY = py * star.depth * 20;
+    const sx = star.x * width + offsetX;
+    const sy = star.y * height + offsetY;
+
+    // Twinkle
+    const twinkle = 0.6 + 0.4 * Math.sin(t * 0.001 * star.twinkleSpeed + star.twinkleOffset);
+    const alpha = star.brightness * twinkle;
+    const [r, g, b] = star.color;
+
+    if (star.glow) {
+      // Draw glow halo
+      const glowGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, star.size * 4);
+      glowGrad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha * 0.5})`);
+      glowGrad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, ${alpha * 0.1})`);
+      glowGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = glowGrad;
+      ctx.fillRect(sx - star.size * 4, sy - star.size * 4, star.size * 8, star.size * 8);
+    }
+
+    // Draw star core
+    ctx.beginPath();
+    ctx.arc(sx, sy, star.size, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    ctx.fill();
+  }
+}
+
+function animate(currentTime) {
+  animId = requestAnimationFrame(animate);
+  const delta = currentTime - lastTime;
+  if (delta < frameInterval) return;
+  lastTime = currentTime - (delta % frameInterval);
+  time = currentTime;
+  drawNebula(time);
+}
+
+animId = requestAnimationFrame(animate);
+</script>
+</body>
+</html>
