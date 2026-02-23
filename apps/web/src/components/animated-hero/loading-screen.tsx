@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { TmuxBackground } from './tmux-background';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { AnimatedText } from './animated-text';
+
+const TmuxBackground = lazy(() =>
+  import('./tmux-background').then((m) => ({ default: m.TmuxBackground })),
+);
 
 const SKILL_TAGS = [
   'TypeScript',
@@ -149,8 +152,10 @@ export function LoadingScreen() {
       {/* Inject keyframes */}
       <style dangerouslySetInnerHTML={{ __html: BREATHE_CSS }} />
 
-      {/* 1. TmuxBackground -- absolute-positioned background */}
-      <TmuxBackground />
+      {/* 1. TmuxBackground -- absolute-positioned background (lazy loaded) */}
+      <Suspense fallback={null}>
+        <TmuxBackground />
+      </Suspense>
 
       {/* 2. Overlay layers */}
       {/* Glow */}

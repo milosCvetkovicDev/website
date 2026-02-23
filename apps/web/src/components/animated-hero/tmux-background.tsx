@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -278,18 +278,13 @@ const PANE_CONFIG: PaneConfig[] = [
   },
 ];
 
-// ─── Keyframes injected once ─────────────────────────────────────────────────
-
-const KEYFRAMES_CSS = `
-@keyframes tmux-log-appear {
-  from { opacity: 0; transform: translateY(3px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-`;
-
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
-function TabBar({ clock }: { clock: string }) {
+function ClockDisplay({ value }: { value: string }) {
+  return <span>{value}</span>;
+}
+
+const TabBar = memo(function TabBar({ clock }: { clock: string }) {
   return (
     <div
       className="flex items-center h-[30px] border-b font-mono text-xs shrink-0 px-2.5"
@@ -329,13 +324,13 @@ function TabBar({ clock }: { clock: string }) {
         style={{ color: 'var(--tmux-bar-text)', fontSize: '11px' }}
       >
         <span>milos@obsidian22</span>
-        <span>{clock}</span>
+        <ClockDisplay value={clock} />
       </div>
     </div>
   );
-}
+});
 
-function PaneTitle({ title, host }: { title: string; host: string }) {
+const PaneTitle = memo(function PaneTitle({ title, host }: { title: string; host: string }) {
   return (
     <div
       className="flex items-center justify-between h-[26px] px-3 border-b font-mono shrink-0"
@@ -350,9 +345,9 @@ function PaneTitle({ title, host }: { title: string; host: string }) {
       <span>{host}</span>
     </div>
   );
-}
+});
 
-function PaneStatus({
+const PaneStatus = memo(function PaneStatus({
   statusLeft,
   statusRight,
 }: {
@@ -378,9 +373,9 @@ function PaneStatus({
       <span>{statusRight}</span>
     </div>
   );
-}
+});
 
-function StatusBar({ clock }: { clock: string }) {
+const StatusBar = memo(function StatusBar({ clock }: { clock: string }) {
   return (
     <div
       className="flex items-center h-7 border-t font-mono px-3 shrink-0"
@@ -404,11 +399,11 @@ function StatusBar({ clock }: { clock: string }) {
         <span>{'\u2502'}</span>
         <span>us-east-1</span>
         <span>{'\u2502'}</span>
-        <span>{clock}</span>
+        <ClockDisplay value={clock} />
       </div>
     </div>
   );
-}
+});
 
 // ─── Static Snapshot (reduced motion) ────────────────────────────────────────
 
@@ -443,7 +438,13 @@ function StaticPane({ config }: { config: PaneConfig }) {
 
 // ─── Animated Pane ───────────────────────────────────────────────────────────
 
-function AnimatedPane({ config }: { config: PaneConfig }) {
+function AnimatedPane({
+  config,
+  isVisibleRef,
+}: {
+  config: PaneConfig;
+  isVisibleRef: React.RefObject<boolean>;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const indexRef = useRef(0);
   const lineCountRef = useRef(0);
@@ -473,7 +474,7 @@ function AnimatedPane({ config }: { config: PaneConfig }) {
     const timeouts: ReturnType<typeof setTimeout>[] = [];
 
     function tick() {
-      addLine();
+      if (isVisibleRef.current) addLine();
       const jitter = config.speed * 0.3;
       const delay =
         config.speed + (Math.random() - 0.5) * jitter;
@@ -514,9 +515,25 @@ function AnimatedPane({ config }: { config: PaneConfig }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function TmuxBackground() {
-  const [clock, setClock] = useState('03:14:07');
-  const [statusClock, setStatusClock] = useState('Sat Feb 22 03:14');
+  const [clocks, setClocks] = useState({ clock: '03:14:07', status: 'Sat Feb 22 03:14' });
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isVisibleRef = useRef(true);
+
+  // Track visibility with IntersectionObserver
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisibleRef.current = entry.isIntersecting;
+      },
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Detect reduced motion preference
   useEffect(() => {
@@ -531,17 +548,17 @@ export function TmuxBackground() {
     return () => mql.removeEventListener('change', handleChange);
   }, []);
 
-  // Tick clock every second
+  // Tick clock every second (pauses when off-screen)
   useEffect(() => {
     if (prefersReducedMotion) return;
 
     let seconds = 7;
     const interval = setInterval(() => {
+      if (!isVisibleRef.current) return;
       seconds++;
       const s = String(seconds % 60).padStart(2, '0');
       const m = String(14 + Math.floor(seconds / 60)).padStart(2, '0');
-      setClock(`03:${m}:${s}`);
-      setStatusClock(`Sat Feb 22 03:${m}`);
+      setClocks({ clock: `03:${m}:${s}`, status: `Sat Feb 22 03:${m}` });
     }, 1000);
 
     return () => clearInterval(interval);
@@ -550,31 +567,27 @@ export function TmuxBackground() {
   const paneConfigs = useMemo(() => PANE_CONFIG, []);
 
   return (
-    <>
-      {/* Inject keyframes for log line animation */}
-      <style dangerouslySetInnerHTML={{ __html: KEYFRAMES_CSS }} />
+    <div
+      ref={containerRef}
+      className="absolute inset-0 z-0 flex flex-col pointer-events-none overflow-hidden"
+      style={{ background: 'var(--tmux-bg)' }}
+    >
+      {/* Top tab bar */}
+      <TabBar clock={clocks.clock} />
 
-      <div
-        className="absolute inset-0 z-0 flex flex-col pointer-events-none overflow-hidden"
-        style={{ background: 'var(--tmux-bg)' }}
-      >
-        {/* Top tab bar */}
-        <TabBar clock={clock} />
-
-        {/* 5 panes in a row */}
-        <div className="flex flex-1 overflow-hidden">
-          {paneConfigs.map((config) =>
-            prefersReducedMotion ? (
-              <StaticPane key={config.title} config={config} />
-            ) : (
-              <AnimatedPane key={config.title} config={config} />
-            ),
-          )}
-        </div>
-
-        {/* Bottom tmux status bar */}
-        <StatusBar clock={statusClock} />
+      {/* 5 panes in a row */}
+      <div className="flex flex-1 overflow-hidden">
+        {paneConfigs.map((config) =>
+          prefersReducedMotion ? (
+            <StaticPane key={config.title} config={config} />
+          ) : (
+            <AnimatedPane key={config.title} config={config} isVisibleRef={isVisibleRef} />
+          ),
+        )}
       </div>
-    </>
+
+      {/* Bottom tmux status bar */}
+      <StatusBar clock={clocks.status} />
+    </div>
   );
 }
