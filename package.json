@@ -6,7 +6,8 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "dev:web": "turbo dev --filter=web",
-    "dev:playground": "turbo dev --filter=playground"
+    "dev:playground": "turbo dev --filter=playground",
+    "test": "turbo test"
   },
   "devDependencies": {
     "turbo": "^2"
