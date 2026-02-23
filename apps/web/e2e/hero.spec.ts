@@ -2,9 +2,10 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Hero Section', () => {
   test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('/');
-    // Wait for boot loader to fade out
-    await page.waitForTimeout(2000);
+    // Wait for hero content to be visible instead of arbitrary timeout
+    await page.waitForSelector('h1', { state: 'visible' });
   });
 
   test('renders the headline', async ({ page }) => {
@@ -44,10 +45,8 @@ test.describe('Hero Section', () => {
   });
 
   test('tmux log lines animate into panes', async ({ page }) => {
-    // Wait for logs to start appearing
-    await page.waitForTimeout(3000);
-    // Check that at least one real log line appeared
-    await expect(page.getByText('OOMKilled', { exact: false }).first()).toBeVisible();
+    // Wait for actual log content to appear instead of arbitrary timeout
+    await expect(page.getByText('OOMKilled', { exact: false }).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('scroll indicator fades on scroll', async ({ page }) => {

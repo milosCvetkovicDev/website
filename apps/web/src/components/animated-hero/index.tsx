@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, lazy, Suspense, memo, type ReactNode } from 'react';
-import { LoadingScreen } from './loading-screen';
+import { HeroSection } from './hero-section';
 import { SectionProgress } from './section-progress';
 
-// Memoize loading screen to prevent re-renders
-const MemoizedLoadingScreen = memo(LoadingScreen);
+// Memoize hero section to prevent re-renders
+const MemoizedHeroSection = memo(HeroSection);
 
 // Lazy load heavy components that are below the fold
 const DiscoveryPhase = lazy(() => import('./discovery-phase').then(m => ({ default: m.DiscoveryPhase })));
@@ -195,8 +195,8 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
 
       {/* Content Layer */}
       <div className="relative z-10">
-        {/* Section 1: Loading Screen / Hero - server-rendered children passed through */}
-        <MemoizedLoadingScreen>{children}</MemoizedLoadingScreen>
+        {/* Section 1: Hero - server-rendered children passed through */}
+        <MemoizedHeroSection>{children}</MemoizedHeroSection>
 
         {/* Lazy loaded sections below the fold */}
         <Suspense fallback={<SectionPlaceholder />}>
@@ -227,6 +227,6 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
   );
 }
 
-// Re-export only the loading screen (used above the fold)
+// Re-export only the hero section (used above the fold)
 // Other phases are lazy-loaded internally
-export { LoadingScreen } from './loading-screen';
+export { HeroSection } from './hero-section';

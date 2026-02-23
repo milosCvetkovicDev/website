@@ -94,7 +94,7 @@ function PlayerCard() {
 
 function SkillTags() {
   return (
-    <ul className="flex flex-wrap justify-center gap-1.5 mt-6 max-w-[520px] list-none p-0 m-0" aria-label="Technical skills">
+    <ul className="flex flex-wrap justify-center gap-1.5 mt-6 max-w-[520px] list-none p-0 mx-0 mb-0" aria-label="Technical skills">
       {SKILL_TAGS.map((tag) => (
         <li
           key={tag}
@@ -131,16 +131,15 @@ export function HeroContent() {
             fontSize: 'clamp(30px, 5.5vw, 50px)',
             lineHeight: 1.12,
             letterSpacing: '-0.025em',
-            textShadow: '0 2px 30px rgba(0,0,0,0.9)',
           }}
         >
           <span style={{ whiteSpace: 'nowrap' }}>This happened at 3am.</span>
           <br />
           Nobody woke up.
-          <span className="sr-only">
-            {' '}- Milos Cvetkovic, Senior Full Stack Engineer specializing in AI-native development, TypeScript, React, and cloud architecture
-          </span>
         </h1>
+        <p className="sr-only">
+          Milos Cvetkovic, Senior Full Stack Engineer specializing in AI-native development, TypeScript, React, and cloud architecture
+        </p>
 
         {/* Subtitle */}
         <p className="text-[#6b7280] dark:text-[#b0b4c4]" style={{ fontSize: '16px', lineHeight: 1.6 }}>

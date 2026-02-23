@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -280,10 +280,6 @@ const PANE_CONFIG: PaneConfig[] = [
 
 // ─── Sub-Components ──────────────────────────────────────────────────────────
 
-function ClockDisplay({ value }: { value: string }) {
-  return <span>{value}</span>;
-}
-
 const TabBar = memo(function TabBar({ clock }: { clock: string }) {
   return (
     <div
@@ -324,7 +320,7 @@ const TabBar = memo(function TabBar({ clock }: { clock: string }) {
         style={{ color: 'var(--tmux-bar-text)', fontSize: '11px' }}
       >
         <span>milos@obsidian22</span>
-        <ClockDisplay value={clock} />
+        <span>{clock}</span>
       </div>
     </div>
   );
@@ -399,7 +395,7 @@ const StatusBar = memo(function StatusBar({ clock }: { clock: string }) {
         <span>{'\u2502'}</span>
         <span>us-east-1</span>
         <span>{'\u2502'}</span>
-        <ClockDisplay value={clock} />
+        <span>{clock}</span>
       </div>
     </div>
   );
@@ -459,7 +455,7 @@ function AnimatedPane({
     const line = document.createElement('div');
     line.style.color = LOG_COLORS[entry.cls];
     line.style.opacity = '0';
-    line.style.animation = 'tmux-log-appear 0.25s ease forwards';
+    line.style.animation = 'log-appear 0.25s ease forwards';
     line.textContent = entry.text || '\u00A0';
     scrollEl.appendChild(line);
     lineCountRef.current++;
@@ -470,25 +466,17 @@ function AnimatedPane({
     }
   }, [config.seq]);
 
-  useEffect(() => {
-    const timeouts: ReturnType<typeof setTimeout>[] = [];
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  useEffect(() => {
     function tick() {
       if (isVisibleRef.current) addLine();
       const jitter = config.speed * 0.3;
-      const delay =
-        config.speed + (Math.random() - 0.5) * jitter;
-      const id = setTimeout(tick, delay);
-      timeouts.push(id);
+      const delay = config.speed + (Math.random() - 0.5) * jitter;
+      timerRef.current = setTimeout(tick, delay);
     }
-
-    // Start with a random initial delay (0-2s)
-    const initialId = setTimeout(tick, Math.random() * 2000);
-    timeouts.push(initialId);
-
-    return () => {
-      timeouts.forEach(clearTimeout);
-    };
+    timerRef.current = setTimeout(tick, Math.random() * 2000);
+    return () => clearTimeout(timerRef.current);
   }, [addLine, config.speed]);
 
   return (
@@ -564,8 +552,6 @@ export function TmuxBackground() {
     return () => clearInterval(interval);
   }, [prefersReducedMotion]);
 
-  const paneConfigs = useMemo(() => PANE_CONFIG, []);
-
   return (
     <div
       ref={containerRef}
@@ -578,7 +564,7 @@ export function TmuxBackground() {
 
       {/* 5 panes in a row */}
       <div className="flex flex-1 overflow-hidden">
-        {paneConfigs.map((config) =>
+        {PANE_CONFIG.map((config) =>
           prefersReducedMotion ? (
             <StaticPane key={config.title} config={config} />
           ) : (

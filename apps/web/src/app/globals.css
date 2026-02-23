@@ -403,11 +403,6 @@ button {
   animation: log-appear 0.25s ease forwards;
 }
 
-@keyframes tmux-log-appear {
-  from { opacity: 0; transform: translateY(3px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 /* Hero breathing and scroll animations */
 @keyframes hero-breathe {
   0%, 100% { opacity: 1; }

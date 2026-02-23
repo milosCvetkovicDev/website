@@ -37,9 +37,9 @@ describe('HeroContent', () => {
     expect(screen.getByText('Kubernetes')).toBeInTheDocument();
   });
 
-  it('renders sr-only SEO text for crawlers', () => {
+  it('renders sr-only SEO text for crawlers as a separate paragraph', () => {
     render(<HeroContent />);
-    const srOnly = document.querySelector('.sr-only');
+    const srOnly = document.querySelector('p.sr-only');
     expect(srOnly).toBeInTheDocument();
     expect(srOnly?.textContent).toContain('AI-native development');
     expect(srOnly?.textContent).toContain('TypeScript');

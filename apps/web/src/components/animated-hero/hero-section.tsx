@@ -1,14 +1,13 @@
 'use client';
 
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 
 const TmuxBackground = lazy(() =>
   import('./tmux-background').then((m) => ({ default: m.TmuxBackground })),
 );
 
 
-export function LoadingScreen({ children }: { children?: ReactNode }) {
-  const sectionRef = useRef<HTMLDivElement>(null);
+export function HeroSection({ children }: { children?: ReactNode }) {
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
 
   // Hide scroll indicator when user starts scrolling
@@ -24,15 +23,12 @@ export function LoadingScreen({ children }: { children?: ReactNode }) {
 
   return (
     <section
-      ref={sectionRef}
       aria-label="Hero - Milos Cvetkovic, Senior Full Stack Engineer"
       className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden"
     >
       {/* 1. TmuxBackground -- absolute-positioned background (lazy loaded) */}
       <Suspense fallback={null}>
-        <div aria-hidden="true">
-          <TmuxBackground />
-        </div>
+        <TmuxBackground />
       </Suspense>
 
       {/* 2. Overlay layers (decorative) */}
@@ -40,7 +36,6 @@ export function LoadingScreen({ children }: { children?: ReactNode }) {
       <div
         className="absolute inset-0 pointer-events-none z-[2]"
         aria-hidden="true"
-        role="presentation"
         style={{
           background:
             'radial-gradient(ellipse 45% 40% at 50% 45%, rgba(139,92,246,0.06) 0%, transparent 65%)',
@@ -51,7 +46,6 @@ export function LoadingScreen({ children }: { children?: ReactNode }) {
       <div
         className="absolute inset-0 pointer-events-none z-[3] block dark:hidden"
         aria-hidden="true"
-        role="presentation"
         style={{
           background:
             'radial-gradient(ellipse 48% 42% at 50% 50%, transparent 10%, rgba(250,250,250,0.5) 100%)',
@@ -61,7 +55,6 @@ export function LoadingScreen({ children }: { children?: ReactNode }) {
       <div
         className="absolute inset-0 pointer-events-none z-[3] hidden dark:block"
         aria-hidden="true"
-        role="presentation"
         style={{
           background:
             'radial-gradient(ellipse 48% 42% at 50% 50%, transparent 10%, rgba(10,10,10,0.6) 100%)',
@@ -71,7 +64,6 @@ export function LoadingScreen({ children }: { children?: ReactNode }) {
       <div
         className="absolute top-0 left-0 right-0 pointer-events-none z-[4] block dark:hidden"
         aria-hidden="true"
-        role="presentation"
         style={{
           height: '8%',
           background: 'linear-gradient(to top, transparent, rgba(250,250,250,0.3))',
@@ -81,7 +73,6 @@ export function LoadingScreen({ children }: { children?: ReactNode }) {
       <div
         className="absolute top-0 left-0 right-0 pointer-events-none z-[4] hidden dark:block"
         aria-hidden="true"
-        role="presentation"
         style={{
           height: '8%',
           background: 'linear-gradient(to top, transparent, rgba(10,10,10,0.3))',
@@ -91,7 +82,6 @@ export function LoadingScreen({ children }: { children?: ReactNode }) {
       <div
         className="absolute bottom-0 left-0 right-0 pointer-events-none z-[4]"
         aria-hidden="true"
-        role="presentation"
         style={{
           height: '15%',
           background: 'linear-gradient(to bottom, transparent, var(--background))',
