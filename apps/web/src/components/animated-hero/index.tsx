@@ -1,14 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState, lazy, Suspense, memo } from 'react';
-import { LoadingScreen } from './loading-screen';
-import { CircuitBackground } from './circuit-background';
-import type { CircuitBackgroundHandle } from './circuit-background';
-
-// Memoize loading screen to prevent re-renders
-const MemoizedLoadingScreen = memo(LoadingScreen);
-import { GridBackground, ScanLines } from './ambient-background';
+import { useEffect, useState, lazy, Suspense, memo, type ReactNode } from 'react';
+import { HeroSection } from './hero-section';
 import { SectionProgress } from './section-progress';
+
+// Memoize hero section to prevent re-renders
+const MemoizedHeroSection = memo(HeroSection);
 
 // Lazy load heavy components that are below the fold
 const DiscoveryPhase = lazy(() => import('./discovery-phase').then(m => ({ default: m.DiscoveryPhase })));
@@ -18,9 +15,6 @@ const GauntletPhase = lazy(() => import('./gauntlet-phase').then(m => ({ default
 const LoopPhase = lazy(() => import('./loop-phase').then(m => ({ default: m.LoopPhase })));
 const GameComplete = lazy(() => import('./game-complete').then(m => ({ default: m.GameComplete })));
 
-// Memoize static background components
-const MemoizedGridBackground = memo(GridBackground);
-const MemoizedScanLines = memo(ScanLines);
 const MemoizedSectionProgress = memo(SectionProgress);
 
 // Minimal loading placeholder for lazy sections
@@ -37,7 +31,7 @@ const bootMessages = [
 ];
 
 // HUD-styled bootstrap loader with progress and boot sequence
-function BootstrapLoader({ visible, progressRef }: { visible: boolean; progressRef: React.MutableRefObject<number> }) {
+function BootstrapLoader({ visible }: { visible: boolean }) {
   const [shouldRender, setShouldRender] = useState(true);
   const [progress, setProgress] = useState(0);
   const [currentMessage, setCurrentMessage] = useState(0);
@@ -60,9 +54,7 @@ function BootstrapLoader({ visible, progressRef }: { visible: boolean; progressR
         }
         // Ease out - slower as it approaches 100
         const increment = Math.max(1, Math.floor((100 - prev) / 10));
-        const next = Math.min(prev + increment, 95); // Cap at 95 until content loads
-        progressRef.current = next;
-        return next;
+        return Math.min(prev + increment, 95); // Cap at 95 until content loads
       });
     }, 50);
 
@@ -75,21 +67,20 @@ function BootstrapLoader({ visible, progressRef }: { visible: boolean; progressR
       clearInterval(progressInterval);
       messageTimers.forEach(clearTimeout);
     };
-  }, [visible, progressRef]);
+  }, [visible]);
 
   // Complete progress when content is ready
   useEffect(() => {
     if (!visible && progress < 100) {
       setProgress(100);
-      progressRef.current = 100;
     }
-  }, [visible, progress, progressRef]);
+  }, [visible, progress]);
 
   if (!shouldRender) return null;
 
   return (
     <div
-      className={`fixed inset-0 z-50 bg-[var(--background)] flex items-center justify-center transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[1] bg-[var(--background)] flex items-center justify-center transition-opacity duration-500 ${
         isComplete ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
@@ -187,36 +178,25 @@ function BootstrapLoader({ visible, progressRef }: { visible: boolean; progressR
   );
 }
 
-export function AnimatedHero() {
+export function AnimatedHero({ children }: { children?: ReactNode }) {
   const [mounted, setMounted] = useState(false);
-  const bootProgressRef = useRef(0);
-  const circuitRef = useRef<CircuitBackgroundHandle>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!mounted) return;
-    circuitRef.current?.startIdle();
-  }, [mounted]);
-
   return (
     <div className="relative">
       {/* Bootstrap loader overlay - fades out when mounted */}
-      <BootstrapLoader visible={!mounted} progressRef={bootProgressRef} />
-      {/* Ambient Effects Layer - static backgrounds render immediately */}
-      <MemoizedGridBackground />
-      <CircuitBackground ref={circuitRef} progressRef={bootProgressRef} />
-      <MemoizedScanLines />
+      <BootstrapLoader visible={!mounted} />
 
       {/* Section Progress Indicator */}
       <MemoizedSectionProgress />
 
       {/* Content Layer */}
       <div className="relative z-10">
-        {/* Section 1: Loading Screen / Hero - render immediately (above fold) */}
-        <MemoizedLoadingScreen />
+        {/* Section 1: Hero - server-rendered children passed through */}
+        <MemoizedHeroSection>{children}</MemoizedHeroSection>
 
         {/* Lazy loaded sections below the fold */}
         <Suspense fallback={<SectionPlaceholder />}>
@@ -247,6 +227,6 @@ export function AnimatedHero() {
   );
 }
 
-// Re-export only the loading screen (used above the fold)
+// Re-export only the hero section (used above the fold)
 // Other phases are lazy-loaded internally
-export { LoadingScreen } from './loading-screen';
+export { HeroSection } from './hero-section';

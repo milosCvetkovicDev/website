@@ -22,18 +22,23 @@ export const metadata: Metadata = {
     template: "%s | Milos Cvetkovic",
   },
   description:
-    "I ship production systems that actually work—then make them better with AI. 10+ years rescuing legacy codebases and building autonomous agents.",
+    "Senior Full Stack Engineer & Architect building systems that inherit chaos and ship clarity. 13 years of AI-native development, self-healing agents, and cloud-native architecture across TypeScript, React, NestJS, Azure, and Kubernetes.",
   keywords: [
     "Senior Full-Stack Engineer",
-    "AI Engineer",
-    "TypeScript Developer",
-    "React Developer",
-    "Node.js Developer",
+    "AI-Native Development",
+    "TypeScript",
+    "React",
+    "NestJS",
+    "Azure",
+    "Terraform",
     "Claude Code",
-    "Claude Agent SDK",
+    "DDD",
+    "Kubernetes",
+    "Self-Healing Agents",
+    "Cloud Architecture",
+    "Node.js Developer",
     "Legacy Modernization",
     "Clean Architecture",
-    "Azure",
     "DevOps",
   ],
   authors: [{ name: "Milos Cvetkovic" }],
@@ -45,13 +50,13 @@ export const metadata: Metadata = {
     siteName: "Milos Cvetkovic",
     title: "Milos Cvetkovic | Senior Full-Stack Engineer",
     description:
-      "I ship production systems that actually work—then make them better with AI. 10+ years rescuing legacy codebases.",
+      "Senior Full Stack Engineer & Architect building systems that inherit chaos and ship clarity. 13 years of AI-native development, self-healing agents, and cloud-native architecture.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Milos Cvetkovic | Senior Full-Stack Engineer",
     description:
-      "I ship production systems that actually work—then make them better with AI.",
+      "Senior Full Stack Engineer & Architect building systems that inherit chaos and ship clarity. AI-native development, self-healing agents, cloud architecture.",
     creator: "@milos_dev",
   },
   robots: {
@@ -64,11 +69,6 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
-  },
-  verification: {
-    // Add these when you have them:
-    // google: "your-google-verification-code",
-    // yandex: "your-yandex-verification-code",
   },
 };
 

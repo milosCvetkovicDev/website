@@ -1,7 +1,4 @@
-'use client';
-
 import Link from 'next/link';
-import { useRef } from 'react';
 
 const featuredProjects = [
   {
@@ -58,11 +55,8 @@ function CornerBrackets() {
 
 // Project card with HUD styling
 function ProjectCard({ project, index }: { project: typeof featuredProjects[0]; index: number }) {
-  const cardRef = useRef<HTMLAnchorElement>(null);
-
   return (
     <Link
-      ref={cardRef}
       href={`/work/${project.slug}`}
       className="group relative block p-6 rounded-lg border border-[var(--border)] bg-[var(--card)]/50 backdrop-blur-sm hover:bg-[var(--accent)]/5 hover:border-[var(--accent)]/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)]"
     >
