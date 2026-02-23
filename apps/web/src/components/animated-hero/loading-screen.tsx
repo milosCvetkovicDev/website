@@ -48,20 +48,21 @@ function PlayerCard() {
       {/* Header with dots */}
       <div
         className="flex items-center gap-[7px] px-3 py-1.5 bg-[#f5f5f8]/95 dark:bg-[rgba(30,34,48,0.9)] border-b border-black/[0.06] dark:border-[rgba(90,97,144,0.2)]"
+        aria-hidden="true"
       >
         <div className="w-[10px] h-[10px] rounded-full bg-[#ff5f56]" />
         <div className="w-[10px] h-[10px] rounded-full bg-[#ffbd2e]" />
         <div className="w-[10px] h-[10px] rounded-full bg-[#27c93f]" />
       </div>
 
-      {/* Body with stats */}
-      <div className="px-3 py-[10px]">
+      {/* Body with stats - semantic definition list */}
+      <dl className="px-3 py-[10px]">
         {PLAYER_STATS.map((stat) => (
           <div
             key={stat.label}
             className="flex justify-between items-center px-1.5 py-[3px] -mx-1.5 rounded transition-colors hover:bg-[rgba(139,92,246,0.05)]"
           >
-            <span
+            <dt
               className="font-mono uppercase text-[#6b7280] dark:text-[#8890a8]"
               style={{
                 fontSize: '10px',
@@ -69,13 +70,13 @@ function PlayerCard() {
               }}
             >
               {stat.label}
-            </span>
-            <span
+            </dt>
+            <dd
               className="font-mono"
               style={{ fontSize: '12px', color: 'var(--accent)' }}
             >
               {stat.value}
-            </span>
+            </dd>
           </div>
         ))}
 
@@ -87,7 +88,7 @@ function PlayerCard() {
             paddingTop: '3px',
           }}
         >
-          <span
+          <dt
             className="font-mono uppercase text-[#6b7280] dark:text-[#8890a8]"
             style={{
               fontSize: '10px',
@@ -95,27 +96,28 @@ function PlayerCard() {
             }}
           >
             STATUS
-          </span>
-          <span className="font-mono text-[#16a34a] dark:text-[#4ade80]" style={{ fontSize: '12px' }}>
+          </dt>
+          <dd className="font-mono text-[#16a34a] dark:text-[#4ade80]" style={{ fontSize: '12px' }}>
             <span
               className="inline-block w-[7px] h-[7px] rounded-full mr-1.5 bg-[#16a34a] dark:bg-[#4ade80]"
               style={{
                 animation: 'hero-status-pulse 2s ease-in-out infinite',
               }}
+              aria-hidden="true"
             />
             Building at Obsidian 22
-          </span>
+          </dd>
         </div>
-      </div>
+      </dl>
     </div>
   );
 }
 
 function SkillTags() {
   return (
-    <div className="flex flex-wrap justify-center gap-1.5 mt-6 max-w-[520px]">
+    <ul className="flex flex-wrap justify-center gap-1.5 mt-6 max-w-[520px] list-none p-0 m-0" aria-label="Technical skills">
       {SKILL_TAGS.map((tag) => (
-        <span
+        <li
           key={tag}
           className="font-mono px-[9px] py-[3px] rounded-[3px] bg-transparent transition-all duration-200 border border-[rgba(99,102,241,0.2)] dark:border-[rgba(139,92,246,0.15)] text-[rgba(99,102,241,0.7)] dark:text-[rgba(167,139,250,0.6)] hover:border-[rgba(139,92,246,0.4)] hover:text-[#a78bfa]"
           style={{
@@ -123,9 +125,9 @@ function SkillTags() {
           }}
         >
           {tag}
-        </span>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -147,6 +149,7 @@ export function LoadingScreen() {
   return (
     <section
       ref={sectionRef}
+      aria-label="Hero - Milos Cvetkovic, Senior Full Stack Engineer"
       className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden"
     >
       {/* Inject keyframes */}
@@ -154,13 +157,17 @@ export function LoadingScreen() {
 
       {/* 1. TmuxBackground -- absolute-positioned background (lazy loaded) */}
       <Suspense fallback={null}>
-        <TmuxBackground />
+        <div aria-hidden="true">
+          <TmuxBackground />
+        </div>
       </Suspense>
 
-      {/* 2. Overlay layers */}
+      {/* 2. Overlay layers (decorative) */}
       {/* Glow */}
       <div
         className="absolute inset-0 pointer-events-none z-[2]"
+        aria-hidden="true"
+        role="presentation"
         style={{
           background:
             'radial-gradient(ellipse 45% 40% at 50% 45%, rgba(139,92,246,0.06) 0%, transparent 65%)',
@@ -170,6 +177,8 @@ export function LoadingScreen() {
       {/* Vignette - light */}
       <div
         className="absolute inset-0 pointer-events-none z-[3] block dark:hidden"
+        aria-hidden="true"
+        role="presentation"
         style={{
           background:
             'radial-gradient(ellipse 48% 42% at 50% 50%, transparent 10%, rgba(250,250,250,0.5) 100%)',
@@ -178,6 +187,8 @@ export function LoadingScreen() {
       {/* Vignette - dark */}
       <div
         className="absolute inset-0 pointer-events-none z-[3] hidden dark:block"
+        aria-hidden="true"
+        role="presentation"
         style={{
           background:
             'radial-gradient(ellipse 48% 42% at 50% 50%, transparent 10%, rgba(10,10,10,0.6) 100%)',
@@ -186,6 +197,8 @@ export function LoadingScreen() {
       {/* Top fade - light */}
       <div
         className="absolute top-0 left-0 right-0 pointer-events-none z-[4] block dark:hidden"
+        aria-hidden="true"
+        role="presentation"
         style={{
           height: '8%',
           background: 'linear-gradient(to top, transparent, rgba(250,250,250,0.3))',
@@ -194,6 +207,8 @@ export function LoadingScreen() {
       {/* Top fade - dark */}
       <div
         className="absolute top-0 left-0 right-0 pointer-events-none z-[4] hidden dark:block"
+        aria-hidden="true"
+        role="presentation"
         style={{
           height: '8%',
           background: 'linear-gradient(to top, transparent, rgba(10,10,10,0.3))',
@@ -202,6 +217,8 @@ export function LoadingScreen() {
       {/* Bottom fade */}
       <div
         className="absolute bottom-0 left-0 right-0 pointer-events-none z-[4]"
+        aria-hidden="true"
+        role="presentation"
         style={{
           height: '15%',
           background: 'linear-gradient(to bottom, transparent, var(--background))',
@@ -234,6 +251,9 @@ export function LoadingScreen() {
             <span style={{ whiteSpace: 'nowrap' }}>This happened at 3am.</span>
             <br />
             Nobody woke up.
+            <span className="sr-only">
+              {' '}- Milos Cvetkovic, Senior Full Stack Engineer specializing in AI-native development, TypeScript, React, and cloud architecture
+            </span>
           </h1>
 
           {/* 4c. Subtitle */}
@@ -259,6 +279,7 @@ export function LoadingScreen() {
 
       {/* 5. Scroll indicator -- fixed, bottom-11, z-20 */}
       <div
+        aria-hidden="true"
         className={`fixed bottom-11 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 z-20 transition-opacity duration-300 ${
           showScrollIndicator ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}

@@ -570,6 +570,7 @@ export function TmuxBackground() {
     <div
       ref={containerRef}
       className="absolute inset-0 z-0 flex flex-col pointer-events-none overflow-hidden"
+      aria-hidden="true"
       style={{ background: 'var(--tmux-bg)' }}
     >
       {/* Top tab bar */}
