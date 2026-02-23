@@ -200,14 +200,16 @@ export default async function CaseStudyPage({ params }: PageProps) {
         {/* CTA */}
         <section className="pt-8 border-t border-[var(--border)]">
           <p className="text-[var(--muted)] mb-4">
-            Interested in working together on a similar project?
+            Want to see more projects like this? Connect with me on social media.
           </p>
-          <Link
-            href="/contact"
+          <a
+            href="https://www.linkedin.com/in/milos-cvetkovic-dev"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center justify-center px-6 py-3 bg-[var(--accent)] text-white font-medium rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           >
-            Get In Touch
-          </Link>
+            Connect on LinkedIn
+          </a>
         </section>
       </div>
     </div>

@@ -11,7 +11,7 @@ const navLinks = [
   { href: '/work', label: 'Work' },
   { href: '/skills', label: 'Skills' },
   { href: '/blog', label: 'Writing' },
-  { href: '/contact', label: 'Contact' },
+  { href: '/contact', label: 'Connect' },
 ];
 
 function ThemeToggle() {

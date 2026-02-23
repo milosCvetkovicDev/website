@@ -244,19 +244,21 @@ export default function WorkPage() {
 
         {/* CTA */}
         <div className="mt-16 text-center p-8 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5">
-          <h2 className="text-2xl font-bold mb-4">Got a project that needs this treatment?</h2>
+          <h2 className="text-2xl font-bold mb-4">Like what you see?</h2>
           <p className="text-[var(--muted)] mb-6 max-w-lg mx-auto">
-            Whether it&apos;s a legacy rescue, an AI agent, or something entirely new—I&apos;m always interested in hard problems.
+            I share engineering deep dives, project updates, and lessons learned. Connect with me to follow along.
           </p>
-          <Link
-            href="/contact"
+          <a
+            href="https://www.linkedin.com/in/milos-cvetkovic-dev"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--accent)] text-white font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           >
-            <span>Let&apos;s Talk</span>
+            <span>Connect on LinkedIn</span>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
-          </Link>
+          </a>
         </div>
       </div>
     </div>

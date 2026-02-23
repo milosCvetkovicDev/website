@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { Terminal } from './hud-elements';
 import { AnimatedText } from './animated-text';
@@ -98,20 +97,22 @@ export function GameComplete() {
                   <AnimatedText animation="perspective">This is how I work. Every time.</AnimatedText>
                 </p>
                 <p className="text-[var(--muted)]">
-                  <AnimatedText animation="magnetic">Got a system that needs building? Let&apos;s talk.</AnimatedText>
+                  <AnimatedText animation="magnetic">Follow along for more engineering deep dives.</AnimatedText>
                 </p>
               </div>
             </div>
           </Terminal>
         </div>
 
-        <Link
+        <a
           ref={ctaRef}
-          href="/contact"
+          href="https://www.linkedin.com/in/milos-cvetkovic-dev"
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center justify-center px-8 py-4 mt-8 bg-[var(--accent)] text-white font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-all text-lg"
         >
-          Start a Conversation
-        </Link>
+          Connect on LinkedIn
+        </a>
 
         {/* Scroll indicator to continue to rest of site */}
         <div className="mt-16 text-[var(--muted)] text-sm">

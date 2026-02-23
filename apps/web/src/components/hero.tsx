@@ -60,18 +60,16 @@ export function Hero() {
           >
             View My Work
           </Link>
-          <Link
-            href="/contact"
+          <a
+            href="https://www.linkedin.com/in/milos-cvetkovic-dev"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center justify-center px-6 py-3 border border-[var(--border)] font-medium rounded-lg hover:bg-[var(--card-hover)] transition-colors"
           >
-            Get In Touch
-          </Link>
+            Connect on LinkedIn
+          </a>
         </div>
         <div className="mt-12 flex items-center gap-6 text-sm text-[var(--muted)]">
-          <span className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            Available for opportunities
-          </span>
           <span>Belgrade, Serbia</span>
         </div>
       </div>
