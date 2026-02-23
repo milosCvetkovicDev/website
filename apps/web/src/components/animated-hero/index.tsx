@@ -80,7 +80,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
   return (
     <div
-      className={`fixed inset-0 z-50 bg-[var(--background)] flex items-center justify-center transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[1] bg-[var(--background)] flex items-center justify-center transition-opacity duration-500 ${
         isComplete ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >

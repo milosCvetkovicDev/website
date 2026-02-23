@@ -1,26 +1,11 @@
 'use client';
 
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
-import { AnimatedText } from './animated-text';
 
 const TmuxBackground = lazy(() =>
   import('./tmux-background').then((m) => ({ default: m.TmuxBackground })),
 );
 
-const BREATHE_CSS = `
-@keyframes hero-breathe {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-@keyframes hero-scroll-bounce {
-  0%, 100% { top: 7px; opacity: 1; }
-  50% { top: 20px; opacity: 0.4; }
-}
-@keyframes hero-status-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-`;
 
 export function LoadingScreen({ children }: { children?: ReactNode }) {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -43,9 +28,6 @@ export function LoadingScreen({ children }: { children?: ReactNode }) {
       aria-label="Hero - Milos Cvetkovic, Senior Full Stack Engineer"
       className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden"
     >
-      {/* Inject keyframes */}
-      <style dangerouslySetInnerHTML={{ __html: BREATHE_CSS }} />
-
       {/* 1. TmuxBackground -- absolute-positioned background (lazy loaded) */}
       <Suspense fallback={null}>
         <div aria-hidden="true">
@@ -134,9 +116,7 @@ export function LoadingScreen({ children }: { children?: ReactNode }) {
             textShadow: '0 1px 10px rgba(0,0,0,0.9)',
           }}
         >
-          <AnimatedText animation="perspective">
-            Scroll
-          </AnimatedText>
+          Scroll
         </span>
         <div
           className="relative w-[22px] h-[36px] rounded-[11px] border-[1.5px] border-[rgba(99,102,241,0.3)] dark:border-[rgba(139,92,246,0.35)] bg-white/60 dark:bg-[rgba(10,10,10,0.6)]"
