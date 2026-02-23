@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, lazy, Suspense, memo } from 'react';
+import { useEffect, useState, lazy, Suspense, memo, type ReactNode } from 'react';
 import { LoadingScreen } from './loading-screen';
 import { SectionProgress } from './section-progress';
 
@@ -178,7 +178,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
   );
 }
 
-export function AnimatedHero() {
+export function AnimatedHero({ children }: { children?: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -195,8 +195,8 @@ export function AnimatedHero() {
 
       {/* Content Layer */}
       <div className="relative z-10">
-        {/* Section 1: Loading Screen / Hero - render immediately (above fold) */}
-        <MemoizedLoadingScreen />
+        {/* Section 1: Loading Screen / Hero - server-rendered children passed through */}
+        <MemoizedLoadingScreen>{children}</MemoizedLoadingScreen>
 
         {/* Lazy loaded sections below the fold */}
         <Suspense fallback={<SectionPlaceholder />}>
