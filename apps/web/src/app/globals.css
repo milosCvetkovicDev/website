@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #fafafa;
   --foreground: #171717;
@@ -9,6 +11,26 @@
   --border: #e5e5e5;
   --card: #ffffff;
   --card-hover: #f5f5f5;
+  --tmux-border: #d0d0d8;
+  --tmux-bar: #e4e4e8;
+  --tmux-bg: #fafafa;
+  --tmux-bar-text: #4a4a5a;
+  --tmux-bar-text-bright: #1e1e2e;
+  --tmux-pane-title: #ececf0;
+  --tmux-pane-title-text: #6366f1;
+  --tmux-active-tab: #d0d0d8;
+  --tmux-status-ok: #16a34a;
+  --tmux-status-err: #dc2626;
+  --tmux-status-wrn: #b45309;
+  --tmux-status-accent: #6366f1;
+  --tmux-status-alerts: #b45309;
+  --tmux-status-uptime: #2563eb;
+  --log-err: rgba(220, 38, 38, 0.45);
+  --log-wrn: rgba(180, 120, 20, 0.45);
+  --log-inf: rgba(37, 99, 235, 0.35);
+  --log-ok: rgba(22, 163, 74, 0.45);
+  --log-dbg: rgba(107, 114, 128, 0.35);
+  --log-agt: rgba(124, 58, 237, 0.45);
 }
 
 .dark {
@@ -20,6 +42,26 @@
   --border: #262626;
   --card: #171717;
   --card-hover: #262626;
+  --tmux-border: #5a6190;
+  --tmux-bar: #282d45;
+  --tmux-bg: #0d1017;
+  --tmux-bar-text: #cdd6f4;
+  --tmux-bar-text-bright: #f0f2ff;
+  --tmux-pane-title: #252a42;
+  --tmux-pane-title-text: #a8e4ff;
+  --tmux-active-tab: #3d4470;
+  --tmux-status-ok: #b9e87a;
+  --tmux-status-err: #ffa0b0;
+  --tmux-status-wrn: #f0c97a;
+  --tmux-status-accent: #a8e4ff;
+  --tmux-status-alerts: #f0c97a;
+  --tmux-status-uptime: #a8e4ff;
+  --log-err: rgba(247, 118, 142, 0.55);
+  --log-wrn: rgba(224, 175, 104, 0.48);
+  --log-inf: rgba(122, 162, 247, 0.38);
+  --log-ok: rgba(158, 206, 106, 0.5);
+  --log-dbg: rgba(86, 95, 137, 0.45);
+  --log-agt: rgba(139, 92, 246, 0.55);
 }
 
 @theme inline {
@@ -351,6 +393,28 @@ button {
 
 .animate-highlight-scan {
   animation: highlight-scan 0.6s ease-out forwards;
+}
+
+@keyframes log-appear {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-log-appear {
+  animation: log-appear 0.25s ease forwards;
+}
+
+/* Hero breathing and scroll animations */
+@keyframes hero-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes hero-scroll-bounce {
+  0%, 100% { top: 7px; opacity: 1; }
+  50% { top: 20px; opacity: 0.4; }
+}
+@keyframes hero-status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* Reduced motion support */

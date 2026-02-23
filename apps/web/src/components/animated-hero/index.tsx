@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState, lazy, Suspense, memo } from 'react';
-import { LoadingScreen } from './loading-screen';
-
-// Memoize loading screen to prevent re-renders
-const MemoizedLoadingScreen = memo(LoadingScreen);
-import { GridBackground, ScanLines } from './ambient-background';
+import { useEffect, useState, lazy, Suspense, memo, type ReactNode } from 'react';
+import { HeroSection } from './hero-section';
 import { SectionProgress } from './section-progress';
+
+// Memoize hero section to prevent re-renders
+const MemoizedHeroSection = memo(HeroSection);
 
 // Lazy load heavy components that are below the fold
 const DiscoveryPhase = lazy(() => import('./discovery-phase').then(m => ({ default: m.DiscoveryPhase })));
@@ -15,11 +14,7 @@ const ExecutionPhase = lazy(() => import('./execution-phase').then(m => ({ defau
 const GauntletPhase = lazy(() => import('./gauntlet-phase').then(m => ({ default: m.GauntletPhase })));
 const LoopPhase = lazy(() => import('./loop-phase').then(m => ({ default: m.LoopPhase })));
 const GameComplete = lazy(() => import('./game-complete').then(m => ({ default: m.GameComplete })));
-const AmbientBackground = lazy(() => import('./ambient-background').then(m => ({ default: m.AmbientBackground })));
 
-// Memoize static background components
-const MemoizedGridBackground = memo(GridBackground);
-const MemoizedScanLines = memo(ScanLines);
 const MemoizedSectionProgress = memo(SectionProgress);
 
 // Minimal loading placeholder for lazy sections
@@ -85,7 +80,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
   return (
     <div
-      className={`fixed inset-0 z-50 bg-[var(--background)] flex items-center justify-center transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[1] bg-[var(--background)] flex items-center justify-center transition-opacity duration-500 ${
         isComplete ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
@@ -183,7 +178,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
   );
 }
 
-export function AnimatedHero() {
+export function AnimatedHero({ children }: { children?: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -194,20 +189,14 @@ export function AnimatedHero() {
     <div className="relative">
       {/* Bootstrap loader overlay - fades out when mounted */}
       <BootstrapLoader visible={!mounted} />
-      {/* Ambient Effects Layer - static backgrounds render immediately */}
-      <MemoizedGridBackground />
-      <Suspense fallback={null}>
-        <AmbientBackground />
-      </Suspense>
-      <MemoizedScanLines />
 
       {/* Section Progress Indicator */}
       <MemoizedSectionProgress />
 
       {/* Content Layer */}
       <div className="relative z-10">
-        {/* Section 1: Loading Screen / Hero - render immediately (above fold) */}
-        <MemoizedLoadingScreen />
+        {/* Section 1: Hero - server-rendered children passed through */}
+        <MemoizedHeroSection>{children}</MemoizedHeroSection>
 
         {/* Lazy loaded sections below the fold */}
         <Suspense fallback={<SectionPlaceholder />}>
@@ -238,6 +227,6 @@ export function AnimatedHero() {
   );
 }
 
-// Re-export only the loading screen (used above the fold)
+// Re-export only the hero section (used above the fold)
 // Other phases are lazy-loaded internally
-export { LoadingScreen } from './loading-screen';
+export { HeroSection } from './hero-section';
