@@ -213,21 +213,41 @@ export default function AboutPage() {
         {/* CTA */}
         <section className="text-center py-12 px-6 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5">
           <h2 className="text-2xl font-bold mb-4">
-            Got a system that needs saving?
+            Let&apos;s connect
           </h2>
           <p className="text-[var(--muted)] mb-6 max-w-lg mx-auto">
-            Whether it&apos;s a legacy rescue, a greenfield build, or you just want
-            to talk about AI agents—I&apos;m always up for a good engineering challenge.
+            I share engineering insights, open-source work, and lessons learned
+            from the trenches. Follow along or drop me a message.
           </p>
-          <Link
-            href="/contact"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--accent)] text-white font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
-          >
-            <span>Let&apos;s Talk</span>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
-          </Link>
+          <div className="flex flex-wrap justify-center gap-4">
+            <a
+              href="https://www.linkedin.com/in/milos-cvetkovic-dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--accent)] text-white font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
+            >
+              <span>LinkedIn</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </a>
+            <a
+              href="https://github.com/milosCvetkovicDev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-[var(--accent)] text-[var(--accent)] font-semibold rounded-lg hover:bg-[var(--accent)]/10 transition-colors"
+            >
+              <span>GitHub</span>
+            </a>
+            <a
+              href="https://x.com/milos_dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-[var(--accent)] text-[var(--accent)] font-semibold rounded-lg hover:bg-[var(--accent)]/10 transition-colors"
+            >
+              <span>X / Twitter</span>
+            </a>
+          </div>
         </section>
       </div>
     </div>
