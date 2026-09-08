@@ -19,15 +19,15 @@ The hero section background is a dense circuit board pattern covering the full v
 
 ### SVG Element Counts
 
-| Element | Count | Description |
-|---------|-------|-------------|
-| Primary trunk paths | ~8 | Thick, long horizontal/vertical runs spanning viewport |
-| Secondary branches | ~15 | Medium paths branching at 90deg from trunks |
-| Tertiary traces | ~12-15 | Thin short connectors, stubs, dead-ends |
-| IC pad nodes | ~6-8 | Large circles at major intersections |
-| Via points | ~15-20 | Medium circles where paths cross |
-| Solder points | ~20 | Small circles at endpoints/corners |
-| Data particles | 8-12 | Moving circles traveling along paths |
+| Element             | Count  | Description                                            |
+| ------------------- | ------ | ------------------------------------------------------ |
+| Primary trunk paths | ~8     | Thick, long horizontal/vertical runs spanning viewport |
+| Secondary branches  | ~15    | Medium paths branching at 90deg from trunks            |
+| Tertiary traces     | ~12-15 | Thin short connectors, stubs, dead-ends                |
+| IC pad nodes        | ~6-8   | Large circles at major intersections                   |
+| Via points          | ~15-20 | Medium circles where paths cross                       |
+| Solder points       | ~20    | Small circles at endpoints/corners                     |
+| Data particles      | 8-12   | Moving circles traveling along paths                   |
 
 ### Color Palette (all using `--accent` / `#8B5CF6`)
 
@@ -38,13 +38,13 @@ The hero section background is a dense circuit board pattern covering the full v
 
 ## Animation Timeline
 
-| Boot % | Circuit State |
-|--------|---------------|
-| 0% | Dark void. Single pulse ripple from center. |
-| 0-30% | Primary trunk paths trace outward (stroke-dashoffset animation). |
-| 30-60% | Nodes glow on (opacity + scale). Secondary branches trace. |
-| 60-90% | Data particles begin flowing via MotionPathPlugin. Node pulse loop starts. |
-| 90-100% | Full network alive. Energy wave. Tertiary traces complete. |
+| Boot %    | Circuit State                                                              |
+| --------- | -------------------------------------------------------------------------- |
+| 0%        | Dark void. Single pulse ripple from center.                                |
+| 0-30%     | Primary trunk paths trace outward (stroke-dashoffset animation).           |
+| 30-60%    | Nodes glow on (opacity + scale). Secondary branches trace.                 |
+| 60-90%    | Data particles begin flowing via MotionPathPlugin. Node pulse loop starts. |
+| 90-100%   | Full network alive. Energy wave. Tertiary traces complete.                 |
 | Post-boot | Idle mode: slow particle flow, gentle node pulsing, energy wave every ~8s. |
 
 ## Architecture
@@ -122,8 +122,8 @@ After boot: idle timeline loops particle motion, node pulse, and periodic energy
 
 ## Files to Create/Modify
 
-| File | Action |
-|------|--------|
-| `animated-hero/circuit-background.tsx` | CREATE — new component |
-| `animated-hero/index.tsx` | MODIFY — add CircuitBackground, lift boot progress |
+| File                                   | Action                                                            |
+| -------------------------------------- | ----------------------------------------------------------------- |
+| `animated-hero/circuit-background.tsx` | CREATE — new component                                            |
+| `animated-hero/index.tsx`              | MODIFY — add CircuitBackground, lift boot progress                |
 | `animated-hero/ambient-background.tsx` | MODIFY — possibly remove AmbientBackground or reduce its presence |

@@ -15,6 +15,7 @@
 ### Task 1: Create the TmuxBackground component
 
 **Files:**
+
 - Create: `apps/web/src/components/animated-hero/tmux-background.tsx`
 
 **Step 1: Create the tmux background with log data and pane rendering**
@@ -22,6 +23,7 @@
 This is the largest new file. It renders the full tmux UI (tab bar, 5 panes with title/status bars, bottom status bar) and animates log lines into each pane using `setTimeout` loops.
 
 The component must:
+
 - Be a `'use client'` component
 - Use `useEffect` for animation loops with cleanup
 - Use `useRef` for DOM manipulation (appending log lines)
@@ -31,6 +33,7 @@ The component must:
 Port the exact HTML structure, CSS classes (as Tailwind), log data arrays, and JS animation logic from `docs/design-previews/hero-redesign-v5.html`.
 
 Key decisions:
+
 - Use Tailwind classes where possible, inline styles for complex gradients
 - Log data arrays are constants defined at module level (not in component)
 - Each pane is its own `<div>` with title bar, scrollable body, and status bar
@@ -54,11 +57,13 @@ git commit -m "feat: add TmuxBackground component with 5 animated terminal panes
 ### Task 2: Rewrite loading-screen.tsx with new foreground content
 
 **Files:**
+
 - Modify: `apps/web/src/components/animated-hero/loading-screen.tsx`
 
 **Step 1: Rewrite the hero content**
 
 Replace the entire component. The new version has:
+
 - `TmuxBackground` as the background (absolute positioned)
 - Overlay layers (glow, vignette, fades) — pure CSS divs
 - Content island — frosted glass wrapper (`backdrop-blur`, dark semi-transparent bg)
@@ -86,11 +91,13 @@ git commit -m "feat: rewrite hero with tmux background, content island, and CV-a
 ### Task 3: Remove global background layers from AnimatedHero
 
 **Files:**
+
 - Modify: `apps/web/src/components/animated-hero/index.tsx`
 
 **Step 1: Remove global background imports and rendering**
 
 Remove these from `index.tsx`:
+
 - Import: `import { GridBackground, ScanLines } from './ambient-background';`
 - Lazy import: `const AmbientBackground = lazy(() => import('./ambient-background')...);`
 - Memoized wrappers: `const MemoizedGridBackground = memo(GridBackground);` and `const MemoizedScanLines = memo(ScanLines);`
@@ -115,6 +122,7 @@ git commit -m "refactor: remove global background layers from AnimatedHero"
 ### Task 4: Delete unused ambient-background.tsx
 
 **Files:**
+
 - Delete: `apps/web/src/components/animated-hero/ambient-background.tsx`
 
 **Step 1: Verify no other imports**
@@ -145,22 +153,31 @@ git commit -m "chore: remove unused ambient-background.tsx"
 ### Task 5: Add hero-specific CSS variables and keyframes to globals.css
 
 **Files:**
+
 - Modify: `apps/web/src/app/globals.css`
 
 **Step 1: Add tmux-specific CSS custom properties**
 
 Add to the `.dark` block in globals.css:
+
 ```css
-  --tmux-border: #5a6190;
-  --tmux-bar: #282d45;
-  --tmux-bg: #0d1017;
+--tmux-border: #5a6190;
+--tmux-bar: #282d45;
+--tmux-bg: #0d1017;
 ```
 
 And add the `logAppear` keyframe animation (used by the tmux log lines):
+
 ```css
 @keyframes log-appear {
-  from { opacity: 0; transform: translateY(3px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .animate-log-appear {
   animation: log-appear 0.25s ease forwards;
@@ -184,6 +201,7 @@ git commit -m "style: add tmux background CSS variables and log-appear animation
 ### Task 6: Visual QA in browser
 
 **Files:**
+
 - Potentially tweak: `tmux-background.tsx`, `loading-screen.tsx`, `globals.css`
 
 **Step 1: Start dev server and test**
@@ -191,6 +209,7 @@ git commit -m "style: add tmux background CSS variables and log-appear animation
 Run: `cd /Users/milos/projects/personal/portfolio/.claude/worktrees/go-live && pnpm dev:web`
 
 Open http://localhost:3000 and verify:
+
 - [ ] Tmux background renders with 5 panes, tab bar, status bar
 - [ ] Log lines animate into each pane at different speeds
 - [ ] Content island is centered with frosted glass effect
@@ -220,6 +239,7 @@ git commit -m "style: polish hero section after visual QA"
 ### Task 7: Clean up design preview files
 
 **Files:**
+
 - Delete: `docs/design-previews/` directory (all HTML and SVG files)
 
 These were temporary design exploration artifacts.

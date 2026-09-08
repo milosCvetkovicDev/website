@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -83,19 +83,15 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-/* Smooth theme transitions - applied to specific elements, not * selector for performance */
+/* Smooth theme transitions — only structural elements that change on theme switch */
 body,
 header,
 footer,
 nav,
-main,
-section,
-article,
-aside,
-div[class*="bg-"],
-a,
-button {
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+main {
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 /* Selection color */
@@ -155,10 +151,12 @@ button {
 
 /* Blink cursor animation */
 @keyframes blink {
-  0%, 50% {
+  0%,
+  50% {
     opacity: 1;
   }
-  51%, 100% {
+  51%,
+  100% {
     opacity: 0;
   }
 }
@@ -183,7 +181,8 @@ button {
 
 /* Glow pulse animation */
 @keyframes glow-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
   }
   50% {
@@ -213,7 +212,8 @@ button {
 
 /* Float animation for particles */
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -275,25 +275,34 @@ button {
 
 /* Glitch text effect */
 @keyframes glitch {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0);
     text-shadow: none;
   }
   20% {
     transform: translate(-2px, 2px);
-    text-shadow: 2px 0 #8b5cf6, -2px 0 #06b6d4;
+    text-shadow:
+      2px 0 #8b5cf6,
+      -2px 0 #06b6d4;
   }
   40% {
     transform: translate(2px, -2px);
-    text-shadow: -2px 0 #8b5cf6, 2px 0 #06b6d4;
+    text-shadow:
+      -2px 0 #8b5cf6,
+      2px 0 #06b6d4;
   }
   60% {
     transform: translate(-1px, 1px);
-    text-shadow: 1px 0 #8b5cf6, -1px 0 #06b6d4;
+    text-shadow:
+      1px 0 #8b5cf6,
+      -1px 0 #06b6d4;
   }
   80% {
     transform: translate(1px, -1px);
-    text-shadow: -1px 0 #8b5cf6, 1px 0 #06b6d4;
+    text-shadow:
+      -1px 0 #8b5cf6,
+      1px 0 #06b6d4;
   }
 }
 
@@ -354,7 +363,9 @@ button {
 
 /* Hover lift effect */
 .hover-lift {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .hover-lift:hover {
@@ -396,8 +407,14 @@ button {
 }
 
 @keyframes log-appear {
-  from { opacity: 0; transform: translateY(3px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .animate-log-appear {
   animation: log-appear 0.25s ease forwards;
@@ -405,16 +422,33 @@ button {
 
 /* Hero breathing and scroll animations */
 @keyframes hero-breathe {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 @keyframes hero-scroll-bounce {
-  0%, 100% { top: 7px; opacity: 1; }
-  50% { top: 20px; opacity: 0.4; }
+  0%,
+  100% {
+    top: 7px;
+    opacity: 1;
+  }
+  50% {
+    top: 20px;
+    opacity: 0.4;
+  }
 }
 @keyframes hero-status-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* Reduced motion support */

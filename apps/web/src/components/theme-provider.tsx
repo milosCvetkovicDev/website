@@ -1,8 +1,20 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useSyncExternalStore,
+} from 'react';
+import { useIsHydrated } from '@/hooks/use-is-hydrated';
+import { DARK_COLOR_SCHEME_QUERY, THEME_STORAGE_KEY } from '@/lib/theme';
 
 type Theme = 'light' | 'dark';
+
+export { THEME_STORAGE_KEY };
+const DARK_QUERY = DARK_COLOR_SCHEME_QUERY;
 
 interface ThemeContextType {
   theme: Theme;
@@ -16,39 +28,76 @@ const ThemeContext = createContext<ThemeContextType>({
   mounted: false,
 });
 
+// The theme lives outside React (localStorage + OS preference); React subscribes to it.
+const listeners = new Set<() => void>();
+
+// Used only when localStorage is blocked (private mode, site data disabled, quota exceeded).
+let memoryTheme: Theme | null = null;
+
+const canMatchMedia = () => typeof window.matchMedia === 'function';
+
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  const mediaQueryList = canMatchMedia() ? window.matchMedia(DARK_QUERY) : null;
+  const onStorage = (event: StorageEvent) => {
+    // key === null means the whole store was cleared from another tab.
+    if (event.key === null || event.key === THEME_STORAGE_KEY) onChange();
+  };
+  mediaQueryList?.addEventListener('change', onChange);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    listeners.delete(onChange);
+    mediaQueryList?.removeEventListener('change', onChange);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
+function readStoredTheme(): Theme | null {
+  if (memoryTheme) return memoryTheme;
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    return stored === 'light' || stored === 'dark' ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function readTheme(): Theme {
+  const stored = readStoredTheme();
+  if (stored) return stored;
+  return canMatchMedia() && window.matchMedia(DARK_QUERY).matches ? 'dark' : 'light';
+}
+
+const getServerTheme = (): Theme => 'dark';
+
+function writeTheme(next: Theme) {
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, next);
+  } catch {
+    memoryTheme = next;
+  }
+  listeners.forEach((listener) => listener());
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
-  const [mounted, setMounted] = useState(false);
+  const theme = useSyncExternalStore(subscribe, readTheme, getServerTheme);
+  const mounted = useIsHydrated();
 
+  // Mirror the theme onto <html> once hydrated. The inline script in layout.tsx does the same
+  // before first paint, so nothing flips during the hydration commit itself.
   useEffect(() => {
-    const stored = localStorage.getItem('theme') as Theme | null;
-    if (stored) {
-      setTheme(stored);
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
-    } else {
-      setTheme('light');
-    }
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted) {
-      document.documentElement.classList.remove('light', 'dark');
-      document.documentElement.classList.add(theme);
-      localStorage.setItem('theme', theme);
-    }
+    if (!mounted) return;
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.classList.toggle('light', theme === 'light');
   }, [theme, mounted]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  };
+  const toggleTheme = useCallback(() => {
+    writeTheme(readTheme() === 'dark' ? 'light' : 'dark');
+  }, []);
 
-  return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, mounted }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  const value = useMemo(() => ({ theme, toggleTheme, mounted }), [theme, toggleTheme, mounted]);
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

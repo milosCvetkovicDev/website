@@ -9,28 +9,28 @@ function CornerBrackets({ className = '' }: { className?: string }) {
     <>
       {/* Top-left */}
       <svg
-        className={`absolute -top-px -left-px w-4 h-4 text-[var(--accent)] ${className}`}
+        className={`absolute -top-px -left-px h-4 w-4 text-[var(--accent)] ${className}`}
         viewBox="0 0 16 16"
       >
         <path d="M0 8 L0 0 L8 0" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
       {/* Top-right */}
       <svg
-        className={`absolute -top-px -right-px w-4 h-4 text-[var(--accent)] ${className}`}
+        className={`absolute -top-px -right-px h-4 w-4 text-[var(--accent)] ${className}`}
         viewBox="0 0 16 16"
       >
         <path d="M8 0 L16 0 L16 8" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
       {/* Bottom-left */}
       <svg
-        className={`absolute -bottom-px -left-px w-4 h-4 text-[var(--accent)] ${className}`}
+        className={`absolute -bottom-px -left-px h-4 w-4 text-[var(--accent)] ${className}`}
         viewBox="0 0 16 16"
       >
         <path d="M0 8 L0 16 L8 16" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
       {/* Bottom-right */}
       <svg
-        className={`absolute -bottom-px -right-px w-4 h-4 text-[var(--accent)] ${className}`}
+        className={`absolute -right-px -bottom-px h-4 w-4 text-[var(--accent)] ${className}`}
         viewBox="0 0 16 16"
       >
         <path d="M8 16 L16 16 L16 8" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -42,7 +42,7 @@ function CornerBrackets({ className = '' }: { className?: string }) {
 // Glowing border effect (static, no animation to avoid flicker)
 function GlowBorder() {
   return (
-    <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+    <div className="pointer-events-none absolute inset-0 rounded-lg opacity-0 transition-opacity duration-500 group-hover:opacity-100">
       <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-[var(--accent)]/0 via-[var(--accent)]/10 to-[var(--accent)]/0" />
     </div>
   );
@@ -55,21 +55,19 @@ export const Terminal = forwardRef<
 >(({ children, className = '', title }, ref) => (
   <div
     ref={ref}
-    className={`group relative bg-[#0d1117] border border-[#30363d] rounded-lg font-mono text-sm overflow-hidden transition-all duration-300 hover:border-[var(--accent)]/50 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)] ${className}`}
+    className={`group relative overflow-hidden rounded-lg border border-[#30363d] bg-[#0d1117] font-mono text-sm transition-all duration-300 hover:border-[var(--accent)]/50 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)] ${className}`}
   >
-    <CornerBrackets className="opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+    <CornerBrackets className="opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
     <GlowBorder />
-    <div className="flex items-center gap-2 px-4 py-2 bg-[#161b22] border-b border-[#30363d]">
+    <div className="flex items-center gap-2 border-b border-[#30363d] bg-[#161b22] px-4 py-2">
       <div className="flex gap-2">
-        <span className="w-3 h-3 rounded-full bg-[#ff5f56] transition-transform hover:scale-110" />
-        <span className="w-3 h-3 rounded-full bg-[#ffbd2e] transition-transform hover:scale-110" />
-        <span className="w-3 h-3 rounded-full bg-[#27c93f] transition-transform hover:scale-110" />
+        <span className="h-3 w-3 rounded-full bg-[#ff5f56] transition-transform hover:scale-110" />
+        <span className="h-3 w-3 rounded-full bg-[#ffbd2e] transition-transform hover:scale-110" />
+        <span className="h-3 w-3 rounded-full bg-[#27c93f] transition-transform hover:scale-110" />
       </div>
-      {title && (
-        <span className="ml-auto text-xs text-[var(--muted)] font-mono">{title}</span>
-      )}
+      {title && <span className="ml-auto font-mono text-xs text-[var(--muted)]">{title}</span>}
     </div>
-    <div className="p-4 relative">{children}</div>
+    <div className="relative p-4">{children}</div>
   </div>
 ));
 Terminal.displayName = 'Terminal';
@@ -77,24 +75,29 @@ Terminal.displayName = 'Terminal';
 // HUD Panel with corner brackets and glow
 export const HudPanel = forwardRef<
   HTMLDivElement,
-  { children: React.ReactNode; className?: string; title?: React.ReactNode; glow?: boolean }
+  {
+    children: React.ReactNode;
+    className?: string;
+    title?: React.ReactNode;
+    glow?: boolean;
+  }
 >(({ children, className = '', title, glow = false }, ref) => (
   <div
     ref={ref}
-    className={`group relative border border-[var(--accent)]/30 bg-[var(--accent)]/5 rounded-lg backdrop-blur-sm transition-all duration-300 hover:border-[var(--accent)]/60 hover:bg-[var(--accent)]/10 ${
+    className={`group relative rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 backdrop-blur-sm transition-all duration-300 hover:border-[var(--accent)]/60 hover:bg-[var(--accent)]/10 ${
       glow ? 'shadow-[0_0_30px_rgba(139,92,246,0.15)]' : ''
     } ${className}`}
   >
     <CornerBrackets />
     <GlowBorder />
     {title && (
-      <div className="px-4 py-2 border-b border-[var(--accent)]/30 flex items-center justify-between">
-        <span className="text-xs font-mono text-[var(--accent)] uppercase tracking-wider">
+      <div className="flex items-center justify-between border-b border-[var(--accent)]/30 px-4 py-2">
+        <span className="font-mono text-xs tracking-wider text-[var(--accent)] uppercase">
           {title}
         </span>
         <div className="flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-          <span className="text-[10px] font-mono text-[var(--accent)]/60">ACTIVE</span>
+          <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+          <span className="font-mono text-[10px] text-[var(--accent)]/60">ACTIVE</span>
         </div>
       </div>
     )}
@@ -123,29 +126,29 @@ export function ProgressBar({
   };
 
   return (
-    <div className={`flex items-center gap-3 group ${className}`}>
+    <div className={`group flex items-center gap-3 ${className}`}>
       {label && (
-        <span className="text-xs font-mono text-[var(--muted)] w-24 shrink-0 group-hover:text-[var(--foreground)] transition-colors">
+        <span className="w-24 shrink-0 font-mono text-xs text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
           {label}
         </span>
       )}
-      <div className="flex-1 h-2 bg-[var(--border)] rounded-full overflow-hidden relative">
+      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
         {/* Track glow */}
         <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
           style={{
             background: `linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.2) ${progress}%, transparent ${progress}%)`,
           }}
         />
         <div
-          className={`h-full rounded-full transition-all duration-500 ease-out relative overflow-hidden ${colors[variant]}`}
+          className={`relative h-full overflow-hidden rounded-full transition-all duration-500 ease-out ${colors[variant]}`}
           style={{ width: `${progress}%` }}
         >
           {/* Static shine effect - no animation to avoid flicker */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
         </div>
       </div>
-      <span className="text-xs font-mono text-[var(--muted)] w-12 text-right tabular-nums">
+      <span className="w-12 text-right font-mono text-xs text-[var(--muted)] tabular-nums">
         {progress}%
       </span>
     </div>
@@ -170,29 +173,32 @@ export function StatDisplay({
     if (!valueRef.current) return;
 
     // Quick glitch effect
-    gsap.timeline()
+    gsap
+      .timeline()
       .to(valueRef.current, { x: -2, duration: 0.05 })
       .to(valueRef.current, { x: 2, duration: 0.05 })
       .to(valueRef.current, { x: -1, duration: 0.05 })
       .to(valueRef.current, { x: 0, duration: 0.05 })
       .to(valueRef.current, { scale: 1.1, duration: 0.1 })
-      .to(valueRef.current, { scale: 1, duration: 0.2, ease: 'elastic.out(1, 0.3)' });
+      .to(valueRef.current, {
+        scale: 1,
+        duration: 0.2,
+        ease: 'elastic.out(1, 0.3)',
+      });
   }, []);
 
   return (
     <div
-      className={`flex justify-between items-center group p-2 -mx-2 rounded transition-colors hover:bg-[var(--accent)]/5 cursor-pointer ${className}`}
+      className={`group -mx-2 flex cursor-pointer items-center justify-between rounded p-2 transition-colors hover:bg-[var(--accent)]/5 ${className}`}
       onMouseEnter={handleMouseEnter}
     >
-      <span className="text-xs font-mono text-[var(--muted)] uppercase tracking-wider group-hover:text-[var(--foreground)] transition-colors">
+      <span className="font-mono text-xs tracking-wider text-[var(--muted)] uppercase transition-colors group-hover:text-[var(--foreground)]">
         {label}
       </span>
       <span
         ref={valueRef}
-        className={`font-mono transition-all inline-block ${
-          highlight
-            ? 'text-[var(--accent)] font-bold animate-pulse'
-            : 'text-[var(--accent)]'
+        className={`inline-block font-mono transition-all ${
+          highlight ? 'animate-pulse font-bold text-[var(--accent)]' : 'text-[var(--accent)]'
         }`}
       >
         {value}
@@ -223,7 +229,7 @@ export const NotificationToast = forwardRef<
   return (
     <div
       ref={ref}
-      className={`relative px-4 py-3 rounded-lg border font-mono text-sm ${colors[type]} ${glowColors[type]} overflow-hidden`}
+      className={`relative rounded-lg border px-4 py-3 font-mono text-sm ${colors[type]} ${glowColors[type]} overflow-hidden`}
     >
       <div className="relative">{children}</div>
     </div>
@@ -240,11 +246,11 @@ export function QuestItem({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 font-mono text-sm group">
+    <div className="group flex items-center gap-2 font-mono text-sm">
       <span
         className={`transition-all duration-300 ${
           completed
-            ? 'text-green-400 scale-110'
+            ? 'scale-110 text-green-400'
             : 'text-[var(--muted)] group-hover:text-[var(--accent)]'
         }`}
       >
@@ -273,7 +279,7 @@ export function TypingCursor({ color = 'accent' }: { color?: 'accent' | 'white' 
 
   return (
     <span
-      className={`inline-block w-2 h-5 ml-0.5 animate-blink ${colors[color]}`}
+      className={`animate-blink ml-0.5 inline-block h-5 w-2 ${colors[color]}`}
       style={{ animationTimingFunction: 'steps(1)' }}
     />
   );
@@ -293,12 +299,12 @@ export function CodeLine({
 }) {
   return (
     <div
-      className={`flex group transition-colors ${
+      className={`group flex transition-colors ${
         highlighted ? 'bg-[var(--accent)]/10' : 'hover:bg-[var(--accent)]/5'
       } -mx-4 px-4 ${className}`}
     >
       {lineNumber !== undefined && (
-        <span className="w-8 shrink-0 text-[var(--muted)]/50 text-right pr-4 select-none group-hover:text-[var(--muted)] transition-colors">
+        <span className="w-8 shrink-0 pr-4 text-right text-[var(--muted)]/50 transition-colors select-none group-hover:text-[var(--muted)]">
           {lineNumber}
         </span>
       )}
@@ -339,22 +345,22 @@ export function PipelineStage({
   };
 
   return (
-    <div className="flex items-center gap-4 font-mono text-sm group">
-      <span className="w-28 shrink-0 text-[var(--muted)] group-hover:text-[var(--foreground)] transition-colors">
+    <div className="group flex items-center gap-4 font-mono text-sm">
+      <span className="w-28 shrink-0 text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
         {name}
       </span>
-      <div className="flex-1 h-2 bg-[var(--border)] rounded-full overflow-hidden relative">
+      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
         <div
           className={`h-full rounded-full transition-all duration-500 ${progressColors[status]}`}
           style={{ width: `${progress}%` }}
         >
           {status === 'running' && (
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+            <div className="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
           )}
         </div>
       </div>
       <span className={`w-8 text-center ${statusColors[status]}`}>
-        <span className={status === 'running' ? 'animate-spin inline-block' : ''}>
+        <span className={status === 'running' ? 'inline-block animate-spin' : ''}>
           {statusIcons[status]}
         </span>
       </span>
@@ -384,12 +390,10 @@ export function ActivityEntry({
   };
 
   return (
-    <div className="flex items-start gap-2 font-mono text-sm group py-1 hover:bg-[var(--accent)]/5 -mx-2 px-2 rounded transition-colors">
+    <div className="group -mx-2 flex items-start gap-2 rounded px-2 py-1 font-mono text-sm transition-colors hover:bg-[var(--accent)]/5">
       <span className={`${colors[status]} shrink-0`}>{icons[status]}</span>
-      <span className="text-[var(--foreground)] flex-1">{children}</span>
-      {timestamp && (
-        <span className="text-[var(--muted)] text-xs shrink-0">{timestamp}</span>
-      )}
+      <span className="flex-1 text-[var(--foreground)]">{children}</span>
+      {timestamp && <span className="shrink-0 text-xs text-[var(--muted)]">{timestamp}</span>}
     </div>
   );
 }
@@ -402,7 +406,7 @@ export function DataStream({ className = '' }: { className?: string }) {
     let result = '';
     for (let i = 0; i < 80; i++) {
       // Simple deterministic pattern based on position
-      result += ((seed * (i + 1) * 7) % 13) > 6 ? '1' : '0';
+      result += (seed * (i + 1) * 7) % 13 > 6 ? '1' : '0';
     }
     return result;
   };
@@ -410,10 +414,8 @@ export function DataStream({ className = '' }: { className?: string }) {
   const lines = Array.from({ length: 50 }, (_, i) => generateLine(i + 1)).join('\n');
 
   return (
-    <div
-      className={`absolute inset-0 overflow-hidden pointer-events-none opacity-10 ${className}`}
-    >
-      <div className="absolute inset-0 font-mono text-[8px] leading-tight text-[var(--accent)] whitespace-pre animate-scroll-up">
+    <div className={`pointer-events-none absolute inset-0 overflow-hidden opacity-10 ${className}`}>
+      <div className="animate-scroll-up absolute inset-0 font-mono text-[8px] leading-tight whitespace-pre text-[var(--accent)]">
         {lines}
       </div>
     </div>
@@ -430,10 +432,7 @@ export function HexBadge({
 }) {
   return (
     <div className={`relative inline-flex items-center justify-center ${className}`}>
-      <svg
-        viewBox="0 0 100 100"
-        className="w-16 h-16 text-[var(--accent)]"
-      >
+      <svg viewBox="0 0 100 100" className="h-16 w-16 text-[var(--accent)]">
         <polygon
           points="50 3, 93 25, 93 75, 50 97, 7 75, 7 25"
           fill="none"

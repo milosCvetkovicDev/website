@@ -24,8 +24,7 @@ const featuredProjects = [
   {
     slug: 'nx-remote-cache',
     title: 'Nx Remote Cache Server',
-    description:
-      'High-performance build cache server dramatically reducing CI/CD build times.',
+    description: 'High-performance build cache server dramatically reducing CI/CD build times.',
     tags: ['Bun', 'Elysia', 'Azure Blob Storage'],
     metric: { value: '5x', label: 'faster builds' },
     status: 'PRODUCTION',
@@ -37,16 +36,28 @@ const featuredProjects = [
 function CornerBrackets() {
   return (
     <>
-      <svg className="absolute -top-px -left-px w-3 h-3 text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300" viewBox="0 0 12 12">
+      <svg
+        className="absolute -top-px -left-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        viewBox="0 0 12 12"
+      >
         <path d="M0 6 L0 0 L6 0" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
-      <svg className="absolute -top-px -right-px w-3 h-3 text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300" viewBox="0 0 12 12">
+      <svg
+        className="absolute -top-px -right-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        viewBox="0 0 12 12"
+      >
         <path d="M6 0 L12 0 L12 6" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
-      <svg className="absolute -bottom-px -left-px w-3 h-3 text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300" viewBox="0 0 12 12">
+      <svg
+        className="absolute -bottom-px -left-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        viewBox="0 0 12 12"
+      >
         <path d="M0 6 L0 12 L6 12" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
-      <svg className="absolute -bottom-px -right-px w-3 h-3 text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300" viewBox="0 0 12 12">
+      <svg
+        className="absolute -right-px -bottom-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        viewBox="0 0 12 12"
+      >
         <path d="M6 12 L12 12 L12 6" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
     </>
@@ -54,55 +65,58 @@ function CornerBrackets() {
 }
 
 // Project card with HUD styling
-function ProjectCard({ project, index }: { project: typeof featuredProjects[0]; index: number }) {
+function ProjectCard({ project, index }: { project: (typeof featuredProjects)[0]; index: number }) {
   return (
     <Link
       href={`/work/${project.slug}`}
-      className="group relative block p-6 rounded-lg border border-[var(--border)] bg-[var(--card)]/50 backdrop-blur-sm hover:bg-[var(--accent)]/5 hover:border-[var(--accent)]/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)]"
+      className="group relative block rounded-lg border border-[var(--border)] bg-[var(--card)]/50 p-6 backdrop-blur-sm transition-all duration-300 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/5 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)]"
     >
       <CornerBrackets />
 
       {/* Top row: Number, Category, Status */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-2xl font-bold text-[var(--accent)]/30 group-hover:text-[var(--accent)]/60 transition-colors">
+          <span className="font-mono text-2xl font-bold text-[var(--accent)]/30 transition-colors group-hover:text-[var(--accent)]/60">
             {String(index + 1).padStart(2, '0')}
           </span>
-          <span className="px-2 py-0.5 text-[10px] font-mono tracking-wider text-[var(--muted)] border border-[var(--border)] rounded group-hover:border-[var(--accent)]/30 group-hover:text-[var(--accent)] transition-colors">
+          <span className="rounded border border-[var(--border)] px-2 py-0.5 font-mono text-[10px] tracking-wider text-[var(--muted)] transition-colors group-hover:border-[var(--accent)]/30 group-hover:text-[var(--accent)]">
             {project.category}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-[10px] font-mono text-green-500/80">{project.status}</span>
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+          <span className="font-mono text-[10px] text-green-500/80">{project.status}</span>
         </div>
       </div>
 
       {/* Main content */}
-      <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Title & Description */}
-        <div className="flex-1 min-w-0">
-          <h3 className="text-xl font-semibold mb-2 group-hover:text-[var(--accent)] transition-colors flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <h3 className="mb-2 flex items-center gap-2 text-xl font-semibold transition-colors group-hover:text-[var(--accent)]">
             {project.title}
             <svg
-              className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300"
+              className="h-4 w-4 -translate-x-2 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 8l4 4m0 0l-4 4m4-4H3"
+              />
             </svg>
           </h3>
-          <p className="text-[var(--muted)] text-sm leading-relaxed mb-4">
-            {project.description}
-          </p>
+          <p className="mb-4 text-sm leading-relaxed text-[var(--muted)]">{project.description}</p>
 
           {/* Tags */}
           <div className="flex flex-wrap gap-2">
             {project.tags.map((tag) => (
               <span
                 key={tag}
-                className="px-2 py-1 text-xs font-mono rounded bg-[var(--accent)]/10 text-[var(--accent)]/80 group-hover:bg-[var(--accent)]/20 transition-colors"
+                className="rounded bg-[var(--accent)]/10 px-2 py-1 font-mono text-xs text-[var(--accent)]/80 transition-colors group-hover:bg-[var(--accent)]/20"
               >
                 {tag}
               </span>
@@ -111,18 +125,18 @@ function ProjectCard({ project, index }: { project: typeof featuredProjects[0]; 
         </div>
 
         {/* Metric highlight */}
-        <div className="lg:w-36 shrink-0 p-4 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 text-center group-hover:border-[var(--accent)]/40 group-hover:bg-[var(--accent)]/10 transition-colors">
-          <div className="text-3xl font-bold text-[var(--accent)] mb-1 font-mono">
+        <div className="shrink-0 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-4 text-center transition-colors group-hover:border-[var(--accent)]/40 group-hover:bg-[var(--accent)]/10 lg:w-36">
+          <div className="mb-1 font-mono text-3xl font-bold text-[var(--accent)]">
             {project.metric.value}
           </div>
-          <div className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-wider">
+          <div className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
             {project.metric.label}
           </div>
         </div>
       </div>
 
       {/* Scan line effect on hover */}
-      <div className="absolute inset-0 overflow-hidden rounded-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg opacity-0 transition-opacity group-hover:opacity-100">
         <div
           className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/20 to-transparent"
           style={{
@@ -137,23 +151,24 @@ function ProjectCard({ project, index }: { project: typeof featuredProjects[0]; 
 
 export function FeaturedWork() {
   return (
-    <section className="py-20 relative overflow-hidden">
+    <section className="relative overflow-hidden py-20">
       {/* Subtle grid background */}
       <div
         className="absolute inset-0 opacity-[0.02]"
         style={{
-          backgroundImage: 'linear-gradient(rgba(139, 92, 246, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.5) 1px, transparent 1px)',
+          backgroundImage:
+            'linear-gradient(rgba(139, 92, 246, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.5) 1px, transparent 1px)',
           backgroundSize: '60px 60px',
         }}
       />
 
       <div className="relative mx-auto max-w-5xl px-6">
         {/* Section header */}
-        <div className="flex items-center justify-between mb-12">
+        <div className="mb-12 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-              <h2 className="text-xs font-mono text-[var(--accent)] uppercase tracking-widest">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
+              <h2 className="font-mono text-xs tracking-widest text-[var(--accent)] uppercase">
                 Featured Work
               </h2>
             </div>
@@ -161,16 +176,21 @@ export function FeaturedWork() {
           </div>
           <Link
             href="/work"
-            className="group flex items-center gap-2 text-xs font-mono text-[var(--muted)] hover:text-[var(--accent)] transition-colors"
+            className="group flex items-center gap-2 font-mono text-xs text-[var(--muted)] transition-colors hover:text-[var(--accent)]"
           >
             <span>VIEW ARCHIVE</span>
             <svg
-              className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+              className="h-4 w-4 transition-transform group-hover:translate-x-1"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 8l4 4m0 0l-4 4m4-4H3"
+              />
             </svg>
           </Link>
         </div>
@@ -184,16 +204,21 @@ export function FeaturedWork() {
 
         {/* Bottom CTA */}
         <div className="mt-12 text-center">
-          <p className="text-sm text-[var(--muted)] mb-4 font-mono">
+          <p className="mb-4 font-mono text-sm text-[var(--muted)]">
             Want to see the full breakdown?
           </p>
           <Link
             href="/work"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-[var(--accent)]/50 text-[var(--accent)] font-mono text-sm hover:bg-[var(--accent)]/10 hover:border-[var(--accent)] transition-all"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--accent)]/50 px-6 py-3 font-mono text-sm text-[var(--accent)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent)]/10"
           >
             <span>Explore All Projects</span>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M14 5l7 7m0 0l-7 7m7-7H3"
+              />
             </svg>
           </Link>
         </div>

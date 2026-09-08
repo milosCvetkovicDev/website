@@ -6,10 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings 0",
+    "lint:fix": "eslint --fix",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
@@ -32,6 +35,14 @@
     "jsdom": "^28.1.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "@repo/prettier-config": "workspace:*"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,mjs,cjs}": [
+      "eslint --fix --max-warnings 0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{json,md,css,yml,yaml}": "prettier --write"
   }
 }

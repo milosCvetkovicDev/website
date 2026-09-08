@@ -1,5 +1,6 @@
 'use client';
 
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -52,11 +53,26 @@ const PANE_CONFIG: PaneConfig[] = [
     speed: 650,
     seq: [
       { text: '$ kubectl get pods -n production -w', cls: 'l-dbg' },
-      { text: 'NAME                          READY   STATUS    RESTARTS   AGE', cls: 'l-dbg' },
-      { text: 'api-server-6d7f4c8b9-x2k9p   1/1     Running   0          4d12h', cls: 'l-ok' },
-      { text: 'api-server-6d7f4c8b9-m3j1q   1/1     Running   0          4d12h', cls: 'l-ok' },
-      { text: 'api-server-6d7f4c8b9-r7n4t   1/1     Running   0          4d12h', cls: 'l-ok' },
-      { text: 'worker-5c8b9d7f4-h7n2r       1/1     Running   0          4d12h', cls: 'l-ok' },
+      {
+        text: 'NAME                          READY   STATUS    RESTARTS   AGE',
+        cls: 'l-dbg',
+      },
+      {
+        text: 'api-server-6d7f4c8b9-x2k9p   1/1     Running   0          4d12h',
+        cls: 'l-ok',
+      },
+      {
+        text: 'api-server-6d7f4c8b9-m3j1q   1/1     Running   0          4d12h',
+        cls: 'l-ok',
+      },
+      {
+        text: 'api-server-6d7f4c8b9-r7n4t   1/1     Running   0          4d12h',
+        cls: 'l-ok',
+      },
+      {
+        text: 'worker-5c8b9d7f4-h7n2r       1/1     Running   0          4d12h',
+        cls: 'l-ok',
+      },
       { text: '', cls: 'l-dbg' },
       { text: '[03:14:05] Processing order batch (142 items)', cls: 'l-inf' },
       { text: '[03:14:06] warn: Heap usage 487Mi/512Mi (95.1%)', cls: 'l-wrn' },
@@ -75,7 +91,10 @@ const PANE_CONFIG: PaneConfig[] = [
       { text: 'Events:', cls: 'l-dbg' },
       { text: '  Warning BackOff restarting failed container', cls: 'l-wrn' },
       { text: '', cls: 'l-dbg' },
-      { text: '[AGENT] OOMKilled 2/3 pods \u2014 analyzing memory', cls: 'l-agt' },
+      {
+        text: '[AGENT] OOMKilled 2/3 pods \u2014 analyzing memory',
+        cls: 'l-agt',
+      },
       { text: '[AGENT] Root cause: unbounded Map OrderCache:47', cls: 'l-agt' },
       { text: '[AGENT] Fix: LRU eviction, cap 10k entries', cls: 'l-agt' },
       { text: '[AGENT] PR #847 opened', cls: 'l-agt' },
@@ -93,19 +112,40 @@ const PANE_CONFIG: PaneConfig[] = [
     statusRight: 'pool: 12/50',
     speed: 800,
     seq: [
-      { text: '$ tail -f /var/log/postgresql/postgresql-16-main.log', cls: 'l-dbg' },
+      {
+        text: '$ tail -f /var/log/postgresql/postgresql-16-main.log',
+        cls: 'l-dbg',
+      },
       { text: '', cls: 'l-dbg' },
-      { text: 'LOG: duration: 4.231 ms  statement: SELECT id, status', cls: 'l-dbg' },
+      {
+        text: 'LOG: duration: 4.231 ms  statement: SELECT id, status',
+        cls: 'l-dbg',
+      },
       { text: '     FROM orders WHERE customer_id = $1', cls: 'l-dbg' },
-      { text: 'LOG: duration: 2.108 ms  statement: INSERT INTO audit_log', cls: 'l-dbg' },
-      { text: 'LOG: duration: 11.4 ms  statement: SELECT p.*, i.qty', cls: 'l-inf' },
-      { text: '     FROM products p JOIN inventory i ON p.id = i.pid', cls: 'l-inf' },
+      {
+        text: 'LOG: duration: 2.108 ms  statement: INSERT INTO audit_log',
+        cls: 'l-dbg',
+      },
+      {
+        text: 'LOG: duration: 11.4 ms  statement: SELECT p.*, i.qty',
+        cls: 'l-inf',
+      },
+      {
+        text: '     FROM products p JOIN inventory i ON p.id = i.pid',
+        cls: 'l-inf',
+      },
       { text: '', cls: 'l-dbg' },
       { text: 'LOG: duration: 847.312 ms  statement:', cls: 'l-wrn' },
       { text: '     SELECT o.*, c.name, SUM(li.qty * li.price)', cls: 'l-wrn' },
-      { text: '     FROM orders o JOIN customers c ON o.cid = c.id', cls: 'l-wrn' },
+      {
+        text: '     FROM orders o JOIN customers c ON o.cid = c.id',
+        cls: 'l-wrn',
+      },
       { text: '     JOIN line_items li ON o.id = li.oid', cls: 'l-wrn' },
-      { text: '     GROUP BY o.id, c.name  -- Seq Scan (no index)', cls: 'l-wrn' },
+      {
+        text: '     GROUP BY o.id, c.name  -- Seq Scan (no index)',
+        cls: 'l-wrn',
+      },
       { text: '', cls: 'l-dbg' },
       { text: 'LOG: duration: 2001.3 ms  statement:', cls: 'l-err' },
       { text: '     SELECT count(*) FROM orders', cls: 'l-err' },
@@ -120,7 +160,10 @@ const PANE_CONFIG: PaneConfig[] = [
       { text: '', cls: 'l-dbg' },
       { text: '[AGENT] Analyzing pg_stat_statements...', cls: 'l-agt' },
       { text: '[AGENT] Missing index: orders(created_at)', cls: 'l-agt' },
-      { text: '[AGENT] N+1 detected: OrderRepository.findWithItems()', cls: 'l-agt' },
+      {
+        text: '[AGENT] N+1 detected: OrderRepository.findWithItems()',
+        cls: 'l-agt',
+      },
       { text: '', cls: 'l-dbg' },
       { text: 'LOG: duration: 3.651 ms  statement:', cls: 'l-ok' },
       { text: '     SELECT count(*) FROM orders -- Index Scan', cls: 'l-ok' },
@@ -196,7 +239,10 @@ const PANE_CONFIG: PaneConfig[] = [
       { text: '$ tail -f /var/log/nginx/access.log', cls: 'l-dbg' },
       { text: '10.0.1.42 "GET /api/v2/orders" 200 4832 14ms', cls: 'l-inf' },
       { text: '10.0.1.55 "POST /api/v2/orders" 201 247 23ms', cls: 'l-inf' },
-      { text: '10.0.1.42 "GET /api/v2/customers?p=1" 200 12480 8ms', cls: 'l-inf' },
+      {
+        text: '10.0.1.42 "GET /api/v2/customers?p=1" 200 12480 8ms',
+        cls: 'l-inf',
+      },
       { text: '10.0.1.78 "GET /api/v2/inventory" 200 8192 11ms', cls: 'l-inf' },
       { text: '10.0.1.55 "POST /api/v2/payments" 201 156 145ms', cls: 'l-inf' },
       { text: '10.0.1.99 "GET /healthz" 200 2 2ms', cls: 'l-dbg' },
@@ -283,7 +329,7 @@ const PANE_CONFIG: PaneConfig[] = [
 const TabBar = memo(function TabBar({ clock }: { clock: string }) {
   return (
     <div
-      className="flex items-center h-[30px] border-b font-mono text-xs shrink-0 px-2.5"
+      className="flex h-[30px] shrink-0 items-center border-b px-2.5 font-mono text-xs"
       style={{
         background: 'var(--tmux-bar)',
         borderColor: 'var(--tmux-border)',
@@ -292,7 +338,7 @@ const TabBar = memo(function TabBar({ clock }: { clock: string }) {
     >
       {/* Tabs */}
       <div
-        className="py-1 px-3.5 border-r"
+        className="border-r px-3.5 py-1"
         style={{
           background: 'var(--tmux-active-tab)',
           color: 'var(--tmux-bar-text-bright)',
@@ -302,14 +348,20 @@ const TabBar = memo(function TabBar({ clock }: { clock: string }) {
         {'\u2B24'} production-monitor
       </div>
       <div
-        className="py-1 px-3.5 border-r"
-        style={{ color: 'var(--tmux-bar-text)', borderColor: 'var(--tmux-border)' }}
+        className="border-r px-3.5 py-1"
+        style={{
+          color: 'var(--tmux-bar-text)',
+          borderColor: 'var(--tmux-border)',
+        }}
       >
         {'\u25CB'} staging
       </div>
       <div
-        className="py-1 px-3.5 border-r"
-        style={{ color: 'var(--tmux-bar-text)', borderColor: 'var(--tmux-border)' }}
+        className="border-r px-3.5 py-1"
+        style={{
+          color: 'var(--tmux-bar-text)',
+          borderColor: 'var(--tmux-border)',
+        }}
       >
         {'\u25CB'} logs
       </div>
@@ -329,7 +381,7 @@ const TabBar = memo(function TabBar({ clock }: { clock: string }) {
 const PaneTitle = memo(function PaneTitle({ title, host }: { title: string; host: string }) {
   return (
     <div
-      className="flex items-center justify-between h-[26px] px-3 border-b font-mono shrink-0"
+      className="flex h-[26px] shrink-0 items-center justify-between border-b px-3 font-mono"
       style={{
         background: 'var(--tmux-pane-title)',
         borderColor: 'var(--tmux-border)',
@@ -352,7 +404,7 @@ const PaneStatus = memo(function PaneStatus({
 }) {
   return (
     <div
-      className="flex items-center justify-between h-6 px-3 border-t font-mono shrink-0"
+      className="flex h-6 shrink-0 items-center justify-between border-t px-3 font-mono"
       style={{
         background: 'var(--tmux-pane-title)',
         borderColor: 'var(--tmux-border)',
@@ -361,9 +413,7 @@ const PaneStatus = memo(function PaneStatus({
       }}
     >
       <span>
-        <span style={{ color: STATUS_COLORS[statusLeft.cls] }}>
-          {statusLeft.symbol}
-        </span>{' '}
+        <span style={{ color: STATUS_COLORS[statusLeft.cls] }}>{statusLeft.symbol}</span>{' '}
         {statusLeft.label}
       </span>
       <span>{statusRight}</span>
@@ -374,7 +424,7 @@ const PaneStatus = memo(function PaneStatus({
 const StatusBar = memo(function StatusBar({ clock }: { clock: string }) {
   return (
     <div
-      className="flex items-center h-7 border-t font-mono px-3 shrink-0"
+      className="flex h-7 shrink-0 items-center border-t px-3 font-mono"
       style={{
         background: 'var(--tmux-bar)',
         borderColor: 'var(--tmux-border)',
@@ -408,13 +458,13 @@ function StaticPane({ config }: { config: PaneConfig }) {
   const lines = config.seq.slice(0, 15);
   return (
     <div
-      className="flex flex-1 flex-col overflow-hidden min-w-0 border-r last:border-r-0"
+      className="flex min-w-0 flex-1 flex-col overflow-hidden border-r last:border-r-0"
       style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
     >
       <PaneTitle title={config.title} host={config.host} />
-      <div className="flex-1 overflow-hidden relative">
+      <div className="relative flex-1 overflow-hidden">
         <div
-          className="absolute bottom-0 left-0 right-0 font-mono whitespace-nowrap"
+          className="absolute right-0 bottom-0 left-0 font-mono whitespace-nowrap"
           style={{ padding: '6px 10px', fontSize: '14px', lineHeight: '1.65' }}
         >
           {lines.map((entry, i) => (
@@ -424,10 +474,7 @@ function StaticPane({ config }: { config: PaneConfig }) {
           ))}
         </div>
       </div>
-      <PaneStatus
-        statusLeft={config.statusLeft}
-        statusRight={config.statusRight}
-      />
+      <PaneStatus statusLeft={config.statusLeft} statusRight={config.statusRight} />
     </div>
   );
 }
@@ -475,27 +522,43 @@ function AnimatedPane({
       const delay = config.speed + (Math.random() - 0.5) * jitter;
       timerRef.current = setTimeout(tick, delay);
     }
-    timerRef.current = setTimeout(tick, Math.random() * 2000);
-    return () => clearTimeout(timerRef.current);
-  }, [addLine, config.speed]);
+
+    // Defer animation start until the browser is idle so we don't
+    // compete with initial render, hydration, and boot animation
+    let idleHandle: number | undefined;
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+
+    if ('requestIdleCallback' in window) {
+      idleHandle = requestIdleCallback(() => {
+        timerRef.current = setTimeout(tick, Math.random() * 2000);
+      });
+    } else {
+      fallbackTimer = setTimeout(() => {
+        timerRef.current = setTimeout(tick, Math.random() * 2000);
+      }, 1200);
+    }
+
+    return () => {
+      if (idleHandle !== undefined) cancelIdleCallback(idleHandle);
+      if (fallbackTimer !== undefined) clearTimeout(fallbackTimer);
+      clearTimeout(timerRef.current);
+    };
+  }, [addLine, config.speed, isVisibleRef]);
 
   return (
     <div
-      className="flex flex-1 flex-col overflow-hidden min-w-0 border-r last:border-r-0"
+      className="flex min-w-0 flex-1 flex-col overflow-hidden border-r last:border-r-0"
       style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
     >
       <PaneTitle title={config.title} host={config.host} />
-      <div className="flex-1 overflow-hidden relative">
+      <div className="relative flex-1 overflow-hidden">
         <div
           ref={scrollRef}
-          className="absolute bottom-0 left-0 right-0 font-mono whitespace-nowrap"
+          className="absolute right-0 bottom-0 left-0 font-mono whitespace-nowrap"
           style={{ padding: '6px 10px', fontSize: '14px', lineHeight: '1.65' }}
         />
       </div>
-      <PaneStatus
-        statusLeft={config.statusLeft}
-        statusRight={config.statusRight}
-      />
+      <PaneStatus statusLeft={config.statusLeft} statusRight={config.statusRight} />
     </div>
   );
 }
@@ -503,8 +566,11 @@ function AnimatedPane({
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function TmuxBackground() {
-  const [clocks, setClocks] = useState({ clock: '03:14:07', status: 'Sat Feb 22 03:14' });
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [clocks, setClocks] = useState({
+    clock: '03:14:07',
+    status: 'Sat Feb 22 03:14',
+  });
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isVisibleRef = useRef(true);
@@ -512,7 +578,7 @@ export function TmuxBackground() {
   // Track visibility with IntersectionObserver
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(
       ([entry]) => {
         isVisibleRef.current = entry.isIntersecting;
@@ -521,19 +587,6 @@ export function TmuxBackground() {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
-
-  // Detect reduced motion preference
-  useEffect(() => {
-    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setPrefersReducedMotion(mql.matches);
-
-    function handleChange(e: MediaQueryListEvent) {
-      setPrefersReducedMotion(e.matches);
-    }
-
-    mql.addEventListener('change', handleChange);
-    return () => mql.removeEventListener('change', handleChange);
   }, []);
 
   // Tick clock every second (pauses when off-screen)
@@ -545,8 +598,10 @@ export function TmuxBackground() {
       if (!isVisibleRef.current) return;
       seconds++;
       const s = String(seconds % 60).padStart(2, '0');
-      const m = String(14 + Math.floor(seconds / 60)).padStart(2, '0');
-      setClocks({ clock: `03:${m}:${s}`, status: `Sat Feb 22 03:${m}` });
+      const totalMinutes = 14 + Math.floor(seconds / 60);
+      const h = String(3 + Math.floor(totalMinutes / 60)).padStart(2, '0');
+      const m = String(totalMinutes % 60).padStart(2, '0');
+      setClocks({ clock: `${h}:${m}:${s}`, status: `Sat Feb 22 ${h}:${m}` });
     }, 1000);
 
     return () => clearInterval(interval);
@@ -555,7 +610,7 @@ export function TmuxBackground() {
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 z-0 flex flex-col pointer-events-none overflow-hidden"
+      className="pointer-events-none absolute inset-0 z-0 flex flex-col overflow-hidden"
       aria-hidden="true"
       style={{ background: 'var(--tmux-bg)' }}
     >

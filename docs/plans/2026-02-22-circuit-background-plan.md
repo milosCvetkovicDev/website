@@ -13,6 +13,7 @@
 ### Task 1: Lift boot progress to a shared ref
 
 **Files:**
+
 - Modify: `apps/web/src/components/animated-hero/index.tsx`
 
 **Step 1: Add a progress ref to AnimatedHero**
@@ -72,6 +73,7 @@ git commit -m "refactor: lift boot progress to shared ref for circuit background
 ### Task 2: Create the circuit SVG data module
 
 **Files:**
+
 - Create: `apps/web/src/components/animated-hero/circuit-data.ts`
 
 This is a pure data module — no React, no GSAP. It defines the SVG path strings, node positions, and particle route indices. Keeping data separate from rendering makes both easier to maintain and test.
@@ -104,15 +106,47 @@ export interface ParticleRoute {
 export const circuitPaths: CircuitPath[] = [
   // === TRUNK PATHS (8) === thick main arteries
   // Horizontal trunks
-  { d: 'M0,200 H480 L480,200 H960 L960,200 H1440 L1440,200 H1920', tier: 'trunk', strokeWidth: 2.5 },
-  { d: 'M0,540 H320 L320,540 H640 L640,540 H1280 L1280,540 H1920', tier: 'trunk', strokeWidth: 2.5 },
-  { d: 'M0,880 H400 L400,880 H800 L800,880 H1200 L1200,880 H1920', tier: 'trunk', strokeWidth: 2.5 },
+  {
+    d: 'M0,200 H480 L480,200 H960 L960,200 H1440 L1440,200 H1920',
+    tier: 'trunk',
+    strokeWidth: 2.5,
+  },
+  {
+    d: 'M0,540 H320 L320,540 H640 L640,540 H1280 L1280,540 H1920',
+    tier: 'trunk',
+    strokeWidth: 2.5,
+  },
+  {
+    d: 'M0,880 H400 L400,880 H800 L800,880 H1200 L1200,880 H1920',
+    tier: 'trunk',
+    strokeWidth: 2.5,
+  },
   // Vertical trunks
-  { d: 'M320,0 V270 L320,270 V540 L320,540 V810 L320,810 V1080', tier: 'trunk', strokeWidth: 2.5 },
-  { d: 'M640,0 V200 L640,200 V540 L640,540 V880 L640,880 V1080', tier: 'trunk', strokeWidth: 2.5 },
-  { d: 'M960,0 V200 L960,200 V540 L960,540 V880 L960,880 V1080', tier: 'trunk', strokeWidth: 2.5 },
-  { d: 'M1280,0 V200 L1280,200 V540 L1280,540 V880 L1280,880 V1080', tier: 'trunk', strokeWidth: 2.5 },
-  { d: 'M1600,0 V270 L1600,270 V540 L1600,540 V810 L1600,810 V1080', tier: 'trunk', strokeWidth: 2.5 },
+  {
+    d: 'M320,0 V270 L320,270 V540 L320,540 V810 L320,810 V1080',
+    tier: 'trunk',
+    strokeWidth: 2.5,
+  },
+  {
+    d: 'M640,0 V200 L640,200 V540 L640,540 V880 L640,880 V1080',
+    tier: 'trunk',
+    strokeWidth: 2.5,
+  },
+  {
+    d: 'M960,0 V200 L960,200 V540 L960,540 V880 L960,880 V1080',
+    tier: 'trunk',
+    strokeWidth: 2.5,
+  },
+  {
+    d: 'M1280,0 V200 L1280,200 V540 L1280,540 V880 L1280,880 V1080',
+    tier: 'trunk',
+    strokeWidth: 2.5,
+  },
+  {
+    d: 'M1600,0 V270 L1600,270 V540 L1600,540 V810 L1600,810 V1080',
+    tier: 'trunk',
+    strokeWidth: 2.5,
+  },
 
   // === BRANCH PATHS (15) === medium branches off trunks
   // Horizontal branches
@@ -154,7 +188,7 @@ export const circuitNodes: CircuitNode[] = [
   // IC pads — large, at major intersections (8)
   { cx: 320, cy: 200, r: 8, tier: 'ic' },
   { cx: 640, cy: 200, r: 8, tier: 'ic' },
-  { cx: 960, cy: 540, r: 10, tier: 'ic' },  // Center — largest
+  { cx: 960, cy: 540, r: 10, tier: 'ic' }, // Center — largest
   { cx: 1280, cy: 200, r: 8, tier: 'ic' },
   { cx: 320, cy: 540, r: 8, tier: 'ic' },
   { cx: 640, cy: 540, r: 8, tier: 'ic' },
@@ -208,13 +242,13 @@ export const circuitNodes: CircuitNode[] = [
 // Indices reference circuitPaths. Particles travel along these paths.
 // Choose a mix of trunk and branch paths for visual variety.
 export const particleRoutes: ParticleRoute[] = [
-  { pathIndex: 0 },  // top horizontal trunk
-  { pathIndex: 1 },  // middle horizontal trunk
-  { pathIndex: 2 },  // bottom horizontal trunk
-  { pathIndex: 3 },  // left vertical trunk
-  { pathIndex: 5 },  // center vertical trunk
-  { pathIndex: 6 },  // right-center vertical trunk
-  { pathIndex: 8 },  // branch: 320,270 → 640
+  { pathIndex: 0 }, // top horizontal trunk
+  { pathIndex: 1 }, // middle horizontal trunk
+  { pathIndex: 2 }, // bottom horizontal trunk
+  { pathIndex: 3 }, // left vertical trunk
+  { pathIndex: 5 }, // center vertical trunk
+  { pathIndex: 6 }, // right-center vertical trunk
+  { pathIndex: 8 }, // branch: 320,270 → 640
   { pathIndex: 10 }, // branch: 480,440 → 800
   { pathIndex: 12 }, // branch: 960,660 → 1280
   { pathIndex: 14 }, // branch: 640,760 → 960
@@ -240,6 +274,7 @@ git commit -m "feat: add circuit board SVG data for hero background"
 ### Task 3: Create the CircuitBackground component (static render)
 
 **Files:**
+
 - Create: `apps/web/src/components/animated-hero/circuit-background.tsx`
 
 Build the component that renders the SVG with all paths, nodes, and particles — but without animation first. This lets us see the visual result and iterate on the layout before adding GSAP.
@@ -279,12 +314,12 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle>(
     const staticOpacity = prefersReducedMotion ? 1 : 0;
 
     return (
-      <div className="fixed inset-0 pointer-events-none z-[1] overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden">
         <svg
           ref={svgRef}
           viewBox="0 0 1920 1080"
           preserveAspectRatio="xMidYMid slice"
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 h-full w-full"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
@@ -362,7 +397,7 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle>(
         </svg>
       </div>
     );
-  }
+  },
 );
 ```
 
@@ -383,6 +418,7 @@ git commit -m "feat: add CircuitBackground component with static SVG render"
 ### Task 4: Wire CircuitBackground into AnimatedHero and add boot animation
 
 **Files:**
+
 - Modify: `apps/web/src/components/animated-hero/index.tsx`
 - Modify: `apps/web/src/components/animated-hero/circuit-background.tsx`
 
@@ -406,7 +442,7 @@ useEffect(() => {
 }, [mounted]);
 
 // Render CircuitBackground in JSX (between GridBackground and ScanLines):
-<CircuitBackground ref={circuitRef} progressRef={bootProgressRef} />
+<CircuitBackground ref={circuitRef} progressRef={bootProgressRef} />;
 ```
 
 Also remove the `AmbientBackground` lazy import and render — it's being replaced by CircuitBackground.
@@ -466,71 +502,104 @@ useEffect(() => {
   const master = gsap.timeline({ paused: true });
 
   // Phase 1 (0-0.3): Trunk paths trace outward
-  master.to(trunkPaths, {
-    drawSVG: '100%',
-    duration: 0.3,
-    stagger: 0.03,
-    ease: 'power2.out',
-  }, 0);
+  master.to(
+    trunkPaths,
+    {
+      drawSVG: '100%',
+      duration: 0.3,
+      stagger: 0.03,
+      ease: 'power2.out',
+    },
+    0,
+  );
 
   // Phase 2 (0.25-0.55): IC nodes glow on, branches trace
-  master.to(icNodes, {
-    opacity: 1,
-    scale: 1,
-    duration: 0.15,
-    stagger: 0.02,
-    ease: 'back.out(1.7)',
-  }, 0.25);
+  master.to(
+    icNodes,
+    {
+      opacity: 1,
+      scale: 1,
+      duration: 0.15,
+      stagger: 0.02,
+      ease: 'back.out(1.7)',
+    },
+    0.25,
+  );
 
-  master.to(branchPaths, {
-    drawSVG: '100%',
-    duration: 0.3,
-    stagger: 0.02,
-    ease: 'power1.out',
-  }, 0.3);
+  master.to(
+    branchPaths,
+    {
+      drawSVG: '100%',
+      duration: 0.3,
+      stagger: 0.02,
+      ease: 'power1.out',
+    },
+    0.3,
+  );
 
-  master.to(viaNodes, {
-    opacity: 1,
-    scale: 1,
-    duration: 0.15,
-    stagger: 0.01,
-    ease: 'back.out(1.4)',
-  }, 0.4);
+  master.to(
+    viaNodes,
+    {
+      opacity: 1,
+      scale: 1,
+      duration: 0.15,
+      stagger: 0.01,
+      ease: 'back.out(1.4)',
+    },
+    0.4,
+  );
 
   // Phase 3 (0.6-0.9): Tertiary traces, solder nodes, particles appear
-  master.to(tracePaths, {
-    drawSVG: '100%',
-    duration: 0.2,
-    stagger: 0.015,
-    ease: 'power1.out',
-  }, 0.6);
+  master.to(
+    tracePaths,
+    {
+      drawSVG: '100%',
+      duration: 0.2,
+      stagger: 0.015,
+      ease: 'power1.out',
+    },
+    0.6,
+  );
 
-  master.to(solderNodes, {
-    opacity: 1,
-    scale: 1,
-    duration: 0.1,
-    stagger: 0.01,
-    ease: 'power2.out',
-  }, 0.7);
+  master.to(
+    solderNodes,
+    {
+      opacity: 1,
+      scale: 1,
+      duration: 0.1,
+      stagger: 0.01,
+      ease: 'power2.out',
+    },
+    0.7,
+  );
 
   // Particles fade in
-  master.to(particles, {
-    opacity: 1,
-    duration: 0.1,
-    stagger: 0.02,
-  }, 0.75);
+  master.to(
+    particles,
+    {
+      opacity: 1,
+      duration: 0.1,
+      stagger: 0.02,
+    },
+    0.75,
+  );
 
   // Phase 4 (0.9-1.0): Energy pulse
   if (energyPulse) {
-    master.fromTo(energyPulse, {
-      attr: { r: 0 },
-      opacity: 0.3,
-    }, {
-      attr: { r: 600 },
-      opacity: 0,
-      duration: 0.1,
-      ease: 'power2.out',
-    }, 0.9);
+    master.fromTo(
+      energyPulse,
+      {
+        attr: { r: 0 },
+        opacity: 0.3,
+      },
+      {
+        attr: { r: 600 },
+        opacity: 0,
+        duration: 0.1,
+        ease: 'power2.out',
+      },
+      0.9,
+    );
   }
 
   // Store timeline ref for scrubbing
@@ -565,6 +634,7 @@ Expected: PASS
 Run: `cd /Users/milos/projects/personal/portfolio/.worktrees/go-live && pnpm dev:web`
 
 Open http://localhost:3000 and verify:
+
 - Circuit paths trace as boot progress fills
 - Nodes glow at intersections
 - The boot screen shows the circuit animating behind it
@@ -582,6 +652,7 @@ git commit -m "feat: add GSAP boot animation to circuit background synced with l
 ### Task 5: Add idle loop animation (post-boot)
 
 **Files:**
+
 - Modify: `apps/web/src/components/animated-hero/circuit-background.tsx`
 
 After the boot animation completes, start a looping idle animation: particles traveling along paths, nodes pulsing, and periodic energy waves.
@@ -668,7 +739,7 @@ useEffect(() => {
         visible ? idleTimelineRef.current.play() : idleTimelineRef.current.pause();
       }
     },
-    { threshold: 0 }
+    { threshold: 0 },
   );
   observer.observe(svg);
 
@@ -684,6 +755,7 @@ Expected: PASS
 **Step 4: Test visually**
 
 Run dev server and verify:
+
 - After boot completes, particles begin traveling along circuit paths
 - IC nodes pulse gently
 - Energy wave ripples every ~8s
@@ -701,6 +773,7 @@ git commit -m "feat: add idle loop with particle motion, node pulse, and energy 
 ### Task 6: Remove AmbientBackground and clean up
 
 **Files:**
+
 - Modify: `apps/web/src/components/animated-hero/index.tsx`
 - Modify: `apps/web/src/components/animated-hero/ambient-background.tsx`
 
@@ -709,11 +782,13 @@ The `CircuitBackground` replaces `AmbientBackground` (floating code particles). 
 **Step 1: Remove AmbientBackground from index.tsx**
 
 Remove the lazy import line:
+
 ```tsx
 // DELETE: const AmbientBackground = lazy(() => import('./ambient-background').then(m => ({ default: m.AmbientBackground })));
 ```
 
 Remove the JSX render:
+
 ```tsx
 // DELETE:
 // <Suspense fallback={null}>
@@ -742,6 +817,7 @@ git commit -m "refactor: remove AmbientBackground, replaced by CircuitBackground
 ### Task 7: Polish — responsive particle count and visual tuning
 
 **Files:**
+
 - Modify: `apps/web/src/components/animated-hero/circuit-background.tsx`
 
 **Step 1: Add responsive particle count**
@@ -758,6 +834,7 @@ const activeParticles = Array.from(particles).slice(0, activeParticleCount);
 **Step 2: Fine-tune opacity values**
 
 After visual testing, adjust these values for the right balance:
+
 - Path resting opacity: adjust if too bright or too dim
 - Node glow intensity: adjust filter stdDeviation
 - Particle glow radius: adjust filter
@@ -795,6 +872,7 @@ Expected: No lint errors
 Run: `cd /Users/milos/projects/personal/portfolio/.worktrees/go-live/apps/web && npx next start`
 
 Test:
+
 - [ ] Page loads → boot screen with circuit animating behind
 - [ ] Circuit traces sync with progress bar
 - [ ] Boot completes → circuit fully visible, idle animation starts

@@ -9,33 +9,35 @@ Personal portfolio website for Milos Cvetkovic, Senior Full-Stack Software Engin
 
 ## Goals & Audience
 
-| Goal | Target Audience |
-|------|-----------------|
-| Land new roles | Recruiters, hiring managers |
-| Attract consulting work | Potential clients, CTOs |
-| Build personal brand | Developer community, peers |
+| Goal                    | Target Audience             |
+| ----------------------- | --------------------------- |
+| Land new roles          | Recruiters, hiring managers |
+| Attract consulting work | Potential clients, CTOs     |
+| Build personal brand    | Developer community, peers  |
 
 ## Brand Identity
 
 ### Tone
+
 - **Innovative & bold** — Highlight AI-native approach, forward-thinking
 - **Approachable & human** — Friendly, relatable, easy to connect with
 
 ### Visual Identity
 
-| Element | Value |
-|---------|-------|
-| Theme | Dark/light toggle (user preference) |
-| Dark background | `#0a0a0a` |
-| Light background | `#fafafa` |
-| Dark text | `#fafafa` |
-| Light text | `#171717` |
-| Accent color | `#8b5cf6` (purple) |
-| Headings font | Geist |
-| Body font | Geist |
-| Code font | Geist Mono |
+| Element          | Value                               |
+| ---------------- | ----------------------------------- |
+| Theme            | Dark/light toggle (user preference) |
+| Dark background  | `#0a0a0a`                           |
+| Light background | `#fafafa`                           |
+| Dark text        | `#fafafa`                           |
+| Light text       | `#171717`                           |
+| Accent color     | `#8b5cf6` (purple)                  |
+| Headings font    | Geist                               |
+| Body font        | Geist                               |
+| Code font        | Geist Mono                          |
 
 ### Why Purple?
+
 Purple conveys innovation and AI-forward thinking, aligning with the pioneering work in AI-assisted development.
 
 ## Information Architecture
@@ -75,6 +77,7 @@ Purple conveys innovation and AI-forward thinking, aligning with the pioneering 
 ```
 
 **Sections:**
+
 1. Hero with rotating taglines
 2. Highlights (3 cards: AI Innovation, Modernization, Full-Stack)
 3. Featured Work (2-3 case study previews)
@@ -84,6 +87,7 @@ Purple conveys innovation and AI-forward thinking, aligning with the pioneering 
 ### About Page (/about)
 
 **Sections:**
+
 1. Professional photo/avatar placeholder
 2. Short bio (2-3 sentences)
 3. Journey timeline (2013 → 2026)
@@ -93,6 +97,7 @@ Purple conveys innovation and AI-forward thinking, aligning with the pioneering 
 ### Work Page (/work)
 
 Grid of case study cards with:
+
 - Project name
 - One-line description
 - Tech stack badges
@@ -125,11 +130,13 @@ Grid of case study cards with:
 ### Skills Page (/skills)
 
 Interactive grid with:
+
 - Hover for technology details
 - Click to filter related projects
 - Grouped by category
 
 **Categories:**
+
 - AI & Automation (Claude Code, Claude Agent SDK, AI-Native Dev)
 - Languages (TypeScript, JavaScript, SQL)
 - Frontend (React, Next.js, Angular, Tailwind)
@@ -141,6 +148,7 @@ Interactive grid with:
 ### Blog Page (/blog)
 
 Placeholder with:
+
 - "Coming soon" message
 - Topics preview (AI workflows, modernization, architecture, DevOps)
 - Social follow CTA
@@ -165,11 +173,11 @@ Placeholder with:
 
 ### Featured Projects
 
-| Internal Name | Public Name | Hook |
-|---------------|-------------|------|
-| Self-Healing Agent | Self-Healing Agent | "Built an AI that fixes its own bugs" |
+| Internal Name              | Public Name             | Hook                                                        |
+| -------------------------- | ----------------------- | ----------------------------------------------------------- |
+| Self-Healing Agent         | Self-Healing Agent      | "Built an AI that fixes its own bugs"                       |
 | Commodity Trading Platform | Enterprise B2B Platform | "Modernized legacy to cloud-native with Clean Architecture" |
-| Build Cache Server | Nx Remote Cache Server | "High-performance build infrastructure with Bun" |
+| Build Cache Server         | Nx Remote Cache Server  | "High-performance build infrastructure with Bun"            |
 
 ### Case Study 1: Self-Healing Agent
 
@@ -177,6 +185,7 @@ Placeholder with:
 AI-powered system that monitors production errors and autonomously proposes fixes via pull requests.
 
 **Tech stack:**
+
 - Runtime: Bun
 - Framework: Elysia
 - AI: Claude Agent SDK (Anthropic)
@@ -185,6 +194,7 @@ AI-powered system that monitors production errors and autonomously proposes fixe
 - VCS: GitHub API
 
 **Key contributions:**
+
 - Designed autonomous error analysis using Claude AI
 - Implemented automatic PR creation with fixes
 - Built CI pipeline monitoring with retry logic (max 3 attempts)
@@ -192,6 +202,7 @@ AI-powered system that monitors production errors and autonomously proposes fixe
 - Created kill switch and emergency override controls
 
 **Impact:**
+
 - Reduced mean time to resolution (MTTR)
 - 24/7 automated incident response
 - Human oversight maintained via approval gates
@@ -202,6 +213,7 @@ AI-powered system that monitors production errors and autonomously proposes fixe
 Full-stack modernization of a legacy enterprise platform, applying Clean Architecture and DDD principles.
 
 **Tech stack:**
+
 - Frontend: React 18, Material-UI, Vite, TypeScript
 - Backend: Express.js/Node.js, TypeORM, PostgreSQL, Zod
 - Testing: Jest, Playwright (4-way sharding)
@@ -210,6 +222,7 @@ Full-stack modernization of a legacy enterprise platform, applying Clean Archite
 - CI/CD: GitHub Actions, Nx monorepo
 
 **Key contributions:**
+
 - Migrated flat file structure to Clean Architecture layers
 - Replaced manual validation with Zod schemas
 - Built background job system with pg-boss
@@ -218,6 +231,7 @@ Full-stack modernization of a legacy enterprise platform, applying Clean Archite
 - Designed multi-environment Terraform architecture
 
 **Impact:**
+
 - Faster development cycles through automation
 - Reduced CI time with affected-only deployments
 - Improved code quality through comprehensive testing
@@ -228,18 +242,21 @@ Full-stack modernization of a legacy enterprise platform, applying Clean Archite
 High-performance remote cache server for Nx build artifacts, dramatically reducing CI/CD build times.
 
 **Tech stack:**
+
 - Runtime: Bun
 - Framework: Elysia
 - Storage: Azure Blob Storage + LRU in-memory cache
 - Auth: Dual-token (read/write) with timing-safe comparison
 
 **Key contributions:**
+
 - Built LRU in-memory caching for hot artifacts
 - Implemented Azure Blob Storage for persistence
 - Added rate limiting (1000 req/min)
 - Created health checks for container orchestration
 
 **Impact:**
+
 - Cache hits skip rebuilds entirely
 - Consistent builds across developer machines
 - Reduced cloud compute costs
@@ -247,12 +264,14 @@ High-performance remote cache server for Nx build artifacts, dramatically reduci
 ## Technical Implementation
 
 ### Stack
+
 - Framework: Next.js 15 (App Router)
 - Styling: Tailwind CSS 4
 - Language: TypeScript 5
 - Hosting: Vercel (free tier)
 
 ### Features to Implement
+
 - Dark/light mode toggle with system preference detection
 - Rotating text animation in hero
 - Interactive skills grid with filtering
@@ -261,6 +280,7 @@ High-performance remote cache server for Nx build artifacts, dramatically reduci
 - Responsive design (mobile-first)
 
 ### Not Included (YAGNI)
+
 - Contact form (add later if needed)
 - Analytics (add later)
 - CMS integration (static content for now)

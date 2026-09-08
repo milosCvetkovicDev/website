@@ -21,17 +21,15 @@ const PLAYER_STATS = [
 
 function PlayerCard() {
   return (
-    <div
-      className="w-full max-w-[420px] mb-8 rounded-lg font-mono text-xs overflow-hidden transition-all duration-300 border bg-white/95 dark:bg-[rgba(22,27,34,0.9)] border-black/[0.08] dark:border-[rgba(90,97,144,0.25)] hover:border-[rgba(139,92,246,0.35)] hover:shadow-[0_0_30px_rgba(139,92,246,0.06)]"
-    >
+    <div className="mb-8 w-full max-w-[420px] overflow-hidden rounded-lg border border-black/[0.08] bg-white/95 font-mono text-xs transition-all duration-300 hover:border-[rgba(139,92,246,0.35)] hover:shadow-[0_0_30px_rgba(139,92,246,0.06)] dark:border-[rgba(90,97,144,0.25)] dark:bg-[rgba(22,27,34,0.9)]">
       {/* Header with dots */}
       <div
-        className="flex items-center gap-[7px] px-3 py-1.5 bg-[#f5f5f8]/95 dark:bg-[rgba(30,34,48,0.9)] border-b border-black/[0.06] dark:border-[rgba(90,97,144,0.2)]"
+        className="flex items-center gap-[7px] border-b border-black/[0.06] bg-[#f5f5f8]/95 px-3 py-1.5 dark:border-[rgba(90,97,144,0.2)] dark:bg-[rgba(30,34,48,0.9)]"
         aria-hidden="true"
       >
-        <div className="w-[10px] h-[10px] rounded-full bg-[#ff5f56]" />
-        <div className="w-[10px] h-[10px] rounded-full bg-[#ffbd2e]" />
-        <div className="w-[10px] h-[10px] rounded-full bg-[#27c93f]" />
+        <div className="h-[10px] w-[10px] rounded-full bg-[#ff5f56]" />
+        <div className="h-[10px] w-[10px] rounded-full bg-[#ffbd2e]" />
+        <div className="h-[10px] w-[10px] rounded-full bg-[#27c93f]" />
       </div>
 
       {/* Body with stats - semantic definition list */}
@@ -39,10 +37,10 @@ function PlayerCard() {
         {PLAYER_STATS.map((stat) => (
           <div
             key={stat.label}
-            className="flex justify-between items-center px-1.5 py-[3px] -mx-1.5 rounded transition-colors hover:bg-[rgba(139,92,246,0.05)]"
+            className="-mx-1.5 flex items-center justify-between rounded px-1.5 py-[3px] transition-colors hover:bg-[rgba(139,92,246,0.05)]"
           >
             <dt
-              className="font-mono uppercase text-[#6b7280] dark:text-[#8890a8]"
+              className="font-mono text-[#6b7280] uppercase dark:text-[#8890a8]"
               style={{
                 fontSize: '10px',
                 letterSpacing: '0.06em',
@@ -50,10 +48,7 @@ function PlayerCard() {
             >
               {stat.label}
             </dt>
-            <dd
-              className="font-mono"
-              style={{ fontSize: '12px', color: 'var(--accent)' }}
-            >
+            <dd className="font-mono" style={{ fontSize: '12px', color: 'var(--accent)' }}>
               {stat.value}
             </dd>
           </div>
@@ -61,14 +56,14 @@ function PlayerCard() {
 
         {/* Status row with divider */}
         <div
-          className="flex justify-between items-center px-1.5 py-[3px] -mx-1.5 rounded transition-colors hover:bg-[rgba(139,92,246,0.05)] border-t border-black/[0.06] dark:border-[rgba(90,97,144,0.2)]"
+          className="-mx-1.5 flex items-center justify-between rounded border-t border-black/[0.06] px-1.5 py-[3px] transition-colors hover:bg-[rgba(139,92,246,0.05)] dark:border-[rgba(90,97,144,0.2)]"
           style={{
             marginTop: '3px',
             paddingTop: '3px',
           }}
         >
           <dt
-            className="font-mono uppercase text-[#6b7280] dark:text-[#8890a8]"
+            className="font-mono text-[#6b7280] uppercase dark:text-[#8890a8]"
             style={{
               fontSize: '10px',
               letterSpacing: '0.06em',
@@ -78,7 +73,7 @@ function PlayerCard() {
           </dt>
           <dd className="font-mono text-[#16a34a] dark:text-[#4ade80]" style={{ fontSize: '12px' }}>
             <span
-              className="inline-block w-[7px] h-[7px] rounded-full mr-1.5 bg-[#16a34a] dark:bg-[#4ade80]"
+              className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-[#16a34a] dark:bg-[#4ade80]"
               style={{
                 animation: 'hero-status-pulse 2s ease-in-out infinite',
               }}
@@ -94,11 +89,14 @@ function PlayerCard() {
 
 function SkillTags() {
   return (
-    <ul className="flex flex-wrap justify-center gap-1.5 mt-6 max-w-[520px] list-none p-0 mx-0 mb-0" aria-label="Technical skills">
+    <ul
+      className="mx-0 mt-6 mb-0 flex max-w-[520px] list-none flex-wrap justify-center gap-1.5 p-0"
+      aria-label="Technical skills"
+    >
       {SKILL_TAGS.map((tag) => (
         <li
           key={tag}
-          className="font-mono px-[9px] py-[3px] rounded-[3px] bg-transparent transition-all duration-200 border border-[rgba(99,102,241,0.2)] dark:border-[rgba(139,92,246,0.15)] text-[rgba(99,102,241,0.7)] dark:text-[rgba(167,139,250,0.6)] hover:border-[rgba(139,92,246,0.4)] hover:text-[#a78bfa]"
+          className="rounded-[3px] border border-[rgba(99,102,241,0.2)] bg-transparent px-[9px] py-[3px] font-mono text-[rgba(99,102,241,0.7)] transition-all duration-200 hover:border-[rgba(139,92,246,0.4)] hover:text-[#a78bfa] dark:border-[rgba(139,92,246,0.15)] dark:text-[rgba(167,139,250,0.6)]"
           style={{
             fontSize: '10px',
           }}
@@ -113,7 +111,7 @@ function SkillTags() {
 export function HeroContent() {
   return (
     <div
-      className="relative z-10 flex flex-col items-center w-full max-w-[600px] rounded-2xl border bg-white/80 dark:bg-[rgba(10,10,14,0.75)] border-black/[0.08] dark:border-[rgba(90,97,144,0.12)] shadow-[0_0_80px_rgba(0,0,0,0.08)] dark:shadow-[0_0_80px_rgba(0,0,0,0.5)]"
+      className="relative z-10 flex w-full max-w-[600px] flex-col items-center rounded-2xl border border-black/[0.08] bg-white/80 shadow-[0_0_80px_rgba(0,0,0,0.08)] dark:border-[rgba(90,97,144,0.12)] dark:bg-[rgba(10,10,14,0.75)] dark:shadow-[0_0_80px_rgba(0,0,0,0.5)]"
       style={{
         padding: '2.5rem 3rem',
         backdropFilter: 'blur(28px)',
@@ -124,9 +122,9 @@ export function HeroContent() {
       <PlayerCard />
 
       {/* Headline */}
-      <div className="text-center max-w-[540px]">
+      <div className="max-w-[540px] text-center">
         <h1
-          className="font-extrabold mb-3.5 text-[#1e1e2e] dark:text-white"
+          className="mb-3.5 font-extrabold text-[#1e1e2e] dark:text-white"
           style={{
             fontSize: 'clamp(30px, 5.5vw, 50px)',
             lineHeight: 1.12,
@@ -138,11 +136,15 @@ export function HeroContent() {
           Nobody woke up.
         </h1>
         <p className="sr-only">
-          Milos Cvetkovic, Senior Full Stack Engineer specializing in AI-native development, TypeScript, React, and cloud architecture
+          Milos Cvetkovic, Senior Full Stack Engineer specializing in AI-native development,
+          TypeScript, React, and cloud architecture
         </p>
 
         {/* Subtitle */}
-        <p className="text-[#6b7280] dark:text-[#b0b4c4]" style={{ fontSize: '16px', lineHeight: 1.6 }}>
+        <p
+          className="text-[#6b7280] dark:text-[#b0b4c4]"
+          style={{ fontSize: '16px', lineHeight: 1.6 }}
+        >
           I build systems that inherit chaos and ship clarity.
           <br />
           <span

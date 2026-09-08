@@ -9,14 +9,14 @@ Monorepo setup for personal website with room for experiments and future growth.
 
 ## Decision Summary
 
-| Aspect | Choice |
-|--------|--------|
-| Monorepo tool | Turborepo |
-| Package manager | pnpm 9 |
-| Framework | Next.js 15 (App Router) |
-| Styling | Tailwind CSS 4 |
-| Language | TypeScript 5 |
-| Hosting | Vercel (free tier) |
+| Aspect          | Choice                  |
+| --------------- | ----------------------- |
+| Monorepo tool   | Turborepo               |
+| Package manager | pnpm 9                  |
+| Framework       | Next.js 15 (App Router) |
+| Styling         | Tailwind CSS 4          |
+| Language        | TypeScript 5            |
+| Hosting         | Vercel (free tier)      |
 
 ## Project Structure
 
@@ -108,17 +108,17 @@ portfolio/
 
 This monorepo can accommodate various technologies:
 
-| Category | Options |
-|----------|---------|
-| React frameworks | Next.js, Remix, Vite + React, Gatsby |
+| Category            | Options                                  |
+| ------------------- | ---------------------------------------- |
+| React frameworks    | Next.js, Remix, Vite + React, Gatsby     |
 | Other UI frameworks | Vue/Nuxt, Svelte/SvelteKit, Solid, Astro |
-| Backend/API | Express, Fastify, Hono, Node.js scripts |
-| Full-stack | Next.js API routes, tRPC, GraphQL server |
-| Static sites | Vite, Astro, plain HTML/CSS/JS |
-| Mobile | React Native, Expo |
-| Desktop | Electron, Tauri |
-| CLI tools | Node.js CLI scripts |
-| Packages | Shared UI components, utilities, configs |
+| Backend/API         | Express, Fastify, Hono, Node.js scripts  |
+| Full-stack          | Next.js API routes, tRPC, GraphQL server |
+| Static sites        | Vite, Astro, plain HTML/CSS/JS           |
+| Mobile              | React Native, Expo                       |
+| Desktop             | Electron, Tauri                          |
+| CLI tools           | Node.js CLI scripts                      |
+| Packages            | Shared UI components, utilities, configs |
 
 ### Adding New Apps
 
@@ -138,6 +138,7 @@ Bun can be used within this monorepo:
 - **Bun-native frameworks**: Hono, Elysia work great
 
 Example Bun app scripts:
+
 ```json
 {
   "scripts": {

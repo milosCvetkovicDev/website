@@ -14,14 +14,13 @@ export default function BlogPage() {
   return (
     <div className="py-16 md:py-24">
       <div className="mx-auto max-w-3xl px-6">
-        <h1 className="text-4xl md:text-5xl font-bold mb-6">Writing</h1>
-        <p className="text-xl text-[var(--muted)] mb-12">
-          Hard-won lessons from the trenches. No fluff, no hype—just what
-          actually works.
+        <h1 className="mb-6 text-4xl font-bold md:text-5xl">Writing</h1>
+        <p className="mb-12 text-xl text-[var(--muted)]">
+          Hard-won lessons from the trenches. No fluff, no hype—just what actually works.
         </p>
 
         {/* Coming soon placeholder */}
-        <div className="p-12 rounded-xl border border-[var(--border)] bg-[var(--card)] text-center">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-12 text-center">
           <div className="mb-6">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -41,11 +40,11 @@ export default function BlogPage() {
               <circle cx="11" cy="11" r="2" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold mb-3">Coming Soon</h2>
-          <p className="text-[var(--muted)] max-w-md mx-auto">
-            I&apos;m writing about building AI agents that actually ship, rescuing
-            legacy codebases without losing your mind, and the patterns that
-            make complex systems manageable. Stay tuned.
+          <h2 className="mb-3 text-xl font-semibold">Coming Soon</h2>
+          <p className="mx-auto max-w-md text-[var(--muted)]">
+            I&apos;m writing about building AI agents that actually ship, rescuing legacy codebases
+            without losing your mind, and the patterns that make complex systems manageable. Stay
+            tuned.
           </p>
         </div>
       </div>

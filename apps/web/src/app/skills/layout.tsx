@@ -10,10 +10,6 @@ export const metadata: Metadata = {
   },
 };
 
-export default function SkillsLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function SkillsLayout({ children }: { children: React.ReactNode }) {
   return children;
 }

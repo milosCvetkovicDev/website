@@ -23,12 +23,12 @@ export function GauntletPhase() {
   const achievementRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLDivElement>(null);
 
-  const [stageStates, setStageStates] = useState<
-    { status: StageStatus; progress: number }[]
-  >(pipelineStages.map(() => ({ status: 'pending', progress: 0 })));
-  const [deploymentStatus, setDeploymentStatus] = useState<
-    'idle' | 'deploying' | 'success'
-  >('idle');
+  const [stageStates, setStageStates] = useState<{ status: StageStatus; progress: number }[]>(
+    pipelineStages.map(() => ({ status: 'pending', progress: 0 })),
+  );
+  const [deploymentStatus, setDeploymentStatus] = useState<'idle' | 'deploying' | 'success'>(
+    'idle',
+  );
   const [showAchievement, setShowAchievement] = useState(false);
 
   useEffect(() => {
@@ -36,9 +36,7 @@ export function GauntletPhase() {
 
     gsap.registerPlugin(ScrollTrigger);
 
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (prefersReducedMotion) {
       setStageStates(pipelineStages.map(() => ({ status: 'passed', progress: 100 })));
@@ -66,7 +64,7 @@ export function GauntletPhase() {
             trigger: sectionRef.current,
             start: 'top center',
           },
-        }
+        },
       );
     }, sectionRef);
 
@@ -107,7 +105,7 @@ export function GauntletPhase() {
                 return newStates;
               });
             },
-          }
+          },
         );
       }, delay * 1000);
 
@@ -120,7 +118,7 @@ export function GauntletPhase() {
       gsap.fromTo(
         deployRef.current,
         { opacity: 0, scale: 0.9 },
-        { opacity: 1, scale: 1, duration: 0.4 }
+        { opacity: 1, scale: 1, duration: 0.4 },
       );
 
       setTimeout(() => {
@@ -132,14 +130,20 @@ export function GauntletPhase() {
           gsap.fromTo(
             achievementRef.current,
             { opacity: 0, y: 20, scale: 0.8 },
-            { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: 'back.out(1.7)' }
+            {
+              opacity: 1,
+              y: 0,
+              scale: 1,
+              duration: 0.5,
+              ease: 'back.out(1.7)',
+            },
           );
 
           // Headline
           gsap.fromTo(
             headlineRef.current,
             { opacity: 0, y: 20 },
-            { opacity: 1, y: 0, duration: 0.5 }
+            { opacity: 1, y: 0, duration: 0.5 },
           );
         }, 300);
       }, 1000);
@@ -147,17 +151,14 @@ export function GauntletPhase() {
   };
 
   return (
-    <section
-      ref={sectionRef}
-      className="min-h-screen flex items-center justify-center px-6 py-24"
-    >
+    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
       <div className="w-full max-w-3xl">
         {/* Phase Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <span className="px-3 py-1 bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-mono rounded-full">
+        <div className="mb-8 flex items-center gap-3">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
             <AnimatedText animation="rainbow">PHASE 4</AnimatedText>
           </span>
-          <AnimatedText animation="gravity" className="text-sm font-mono text-[var(--muted)]">
+          <AnimatedText animation="gravity" className="font-mono text-sm text-[var(--muted)]">
             THE GAUNTLET
           </AnimatedText>
         </div>
@@ -182,7 +183,7 @@ export function GauntletPhase() {
         <div ref={deployRef} className="mt-6">
           {deploymentStatus !== 'idle' && (
             <div
-              className={`p-6 rounded-lg border text-center transition-all duration-500 ${
+              className={`rounded-lg border p-6 text-center transition-all duration-500 ${
                 deploymentStatus === 'success'
                   ? 'border-green-500/50 bg-green-500/10'
                   : 'border-yellow-500/50 bg-yellow-500/10'
@@ -190,10 +191,7 @@ export function GauntletPhase() {
             >
               {deploymentStatus === 'deploying' ? (
                 <div className="flex items-center justify-center gap-3">
-                  <svg
-                    className="animate-spin h-5 w-5 text-yellow-400"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg className="h-5 w-5 animate-spin text-yellow-400" viewBox="0 0 24 24">
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -209,15 +207,13 @@ export function GauntletPhase() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  <span className="font-mono text-yellow-400">
-                    DEPLOYING TO PRODUCTION...
-                  </span>
+                  <span className="font-mono text-yellow-400">DEPLOYING TO PRODUCTION...</span>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center justify-center gap-2">
                     <svg
-                      className="w-6 h-6 text-green-400"
+                      className="h-6 w-6 text-green-400"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -229,11 +225,9 @@ export function GauntletPhase() {
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    <span className="font-mono text-green-400 text-lg">
-                      DEPLOYMENT SUCCESSFUL
-                    </span>
+                    <span className="font-mono text-lg text-green-400">DEPLOYMENT SUCCESSFUL</span>
                   </div>
-                  <p className="text-sm text-green-400/70 font-mono">
+                  <p className="font-mono text-sm text-green-400/70">
                     Production environment updated
                   </p>
                 </div>
@@ -243,10 +237,7 @@ export function GauntletPhase() {
         </div>
 
         {/* Achievement */}
-        <div
-          ref={achievementRef}
-          className={`mt-6 ${showAchievement ? '' : 'opacity-0'}`}
-        >
+        <div ref={achievementRef} className={`mt-6 ${showAchievement ? '' : 'opacity-0'}`}>
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
               <span className="text-xl">🏆</span>
@@ -265,7 +256,7 @@ export function GauntletPhase() {
           ref={headlineRef}
           className={`mt-16 text-center ${showAchievement ? '' : 'opacity-0'}`}
         >
-          <h2 className="text-2xl md:text-4xl font-bold mb-3">
+          <h2 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="glitch">
               &quot;It worked on my machine&quot; doesn&apos;t fly here.
             </AnimatedText>

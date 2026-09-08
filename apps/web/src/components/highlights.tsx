@@ -73,24 +73,22 @@ const highlights = [
 
 export function Highlights() {
   return (
-    <section className="py-16 border-t border-[var(--border)]">
+    <section className="border-t border-[var(--border)] py-16">
       <div className="mx-auto max-w-5xl px-6">
-        <h2 className="text-sm font-medium text-[var(--muted)] uppercase tracking-wider mb-8">
+        <h2 className="mb-8 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
           What I Do
         </h2>
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid gap-6 md:grid-cols-3">
           {highlights.map((item) => (
             <div
               key={item.title}
-              className="p-6 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--card-hover)] transition-colors"
+              className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 transition-colors hover:bg-[var(--card-hover)]"
             >
-              <div className="w-12 h-12 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center mb-4">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent)]/10 text-[var(--accent)]">
                 {item.icon}
               </div>
-              <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-              <p className="text-[var(--muted)] text-sm leading-relaxed">
-                {item.description}
-              </p>
+              <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
+              <p className="text-sm leading-relaxed text-[var(--muted)]">{item.description}</p>
             </div>
           ))}
         </div>

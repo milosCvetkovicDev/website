@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { Terminal, HudPanel, ActivityEntry } from './hud-elements';
 import { AnimatedText } from './animated-text';
@@ -64,9 +64,7 @@ export function ExecutionPhase() {
 
     gsap.registerPlugin(ScrollTrigger);
 
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (prefersReducedMotion) {
       setAnimationComplete(true);
@@ -95,11 +93,14 @@ export function ExecutionPhase() {
                   const visibleLineCount = Math.round(progress * codeLines.length);
 
                   // Direct DOM updates - bypasses React reconciliation
-                  if (filesProgressRef.current) filesProgressRef.current.style.width = `${Math.round((files / 34) * 100)}%`;
-                  if (filesTextRef.current) filesTextRef.current.textContent = `${Math.round((files / 34) * 100)}%`;
+                  if (filesProgressRef.current)
+                    filesProgressRef.current.style.width = `${Math.round((files / 34) * 100)}%`;
+                  if (filesTextRef.current)
+                    filesTextRef.current.textContent = `${Math.round((files / 34) * 100)}%`;
                   if (testsProgressRef.current) testsProgressRef.current.style.width = `${tests}%`;
                   if (testsTextRef.current) testsTextRef.current.textContent = `${tests}%`;
-                  if (coverageProgressRef.current) coverageProgressRef.current.style.width = `${coverage}%`;
+                  if (coverageProgressRef.current)
+                    coverageProgressRef.current.style.width = `${coverage}%`;
                   if (coverageTextRef.current) coverageTextRef.current.textContent = `${coverage}%`;
                   if (timeRef.current) timeRef.current.textContent = formatTime(progress * 872);
                   if (comboCountRef.current) comboCountRef.current.textContent = `x${combo}`;
@@ -112,25 +113,21 @@ export function ExecutionPhase() {
                   });
                 },
                 onComplete: () => setAnimationComplete(true),
-              }
+              },
             );
           },
         },
       });
 
       // Code panel slides in
-      tl.fromTo(
-        codeRef.current,
-        { opacity: 0, x: -30 },
-        { opacity: 1, x: 0, duration: 0.5 }
-      );
+      tl.fromTo(codeRef.current, { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.5 });
 
       // Stats panel slides in
       tl.fromTo(
         statsRef.current,
         { opacity: 0, x: 30 },
         { opacity: 1, x: 0, duration: 0.5 },
-        '<0.1'
+        '<0.1',
       );
 
       // Activity feed
@@ -138,7 +135,7 @@ export function ExecutionPhase() {
         activityRef.current,
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.4 },
-        '+=0.3'
+        '+=0.3',
       );
 
       // Combo counter
@@ -146,7 +143,7 @@ export function ExecutionPhase() {
         comboRef.current,
         { opacity: 0, scale: 0.5 },
         { opacity: 1, scale: 1, duration: 0.3, ease: 'back.out(1.7)' },
-        '+=0.2'
+        '+=0.2',
       );
 
       // Headline
@@ -154,7 +151,7 @@ export function ExecutionPhase() {
         headlineRef.current,
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.3'
+        '+=0.3',
       );
     }, sectionRef);
 
@@ -187,45 +184,49 @@ export function ExecutionPhase() {
   };
 
   // Custom progress bar component using refs for direct DOM manipulation
-  const AnimatedProgressBar = ({ label, progressRef, textRef }: {
+  const AnimatedProgressBar = ({
+    label,
+    progressRef,
+    textRef,
+  }: {
     label: string;
     progressRef: React.RefObject<HTMLDivElement | null>;
     textRef: React.RefObject<HTMLSpanElement | null>;
   }) => (
-    <div className="flex items-center gap-3 group">
-      <span className="text-xs font-mono text-[var(--muted)] w-24 shrink-0 group-hover:text-[var(--foreground)] transition-colors">
+    <div className="group flex items-center gap-3">
+      <span className="w-24 shrink-0 font-mono text-xs text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
         {label}
       </span>
-      <div className="flex-1 h-2 bg-[var(--border)] rounded-full overflow-hidden relative">
+      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
         <div
           ref={progressRef}
-          className="h-full rounded-full transition-none bg-[var(--accent)]"
+          className="h-full rounded-full bg-[var(--accent)] transition-none"
           style={{ width: animationComplete ? '100%' : '0%' }}
         />
       </div>
-      <span ref={textRef} className="text-xs font-mono text-[var(--muted)] w-12 text-right tabular-nums">
+      <span
+        ref={textRef}
+        className="w-12 text-right font-mono text-xs text-[var(--muted)] tabular-nums"
+      >
         {animationComplete ? '100%' : '0%'}
       </span>
     </div>
   );
 
   return (
-    <section
-      ref={sectionRef}
-      className="min-h-screen flex items-center justify-center px-6 py-24"
-    >
+    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
       <div className="w-full max-w-5xl">
         {/* Phase Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <span className="px-3 py-1 bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-mono rounded-full">
+        <div className="mb-8 flex items-center gap-3">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
             <AnimatedText animation="glitch">PHASE 3</AnimatedText>
           </span>
-          <AnimatedText animation="stagger-up" className="text-sm font-mono text-[var(--muted)]">
+          <AnimatedText animation="stagger-up" className="font-mono text-sm text-[var(--muted)]">
             EXECUTION
           </AnimatedText>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid gap-8 md:grid-cols-2">
           {/* Code Streaming */}
           <div ref={codeRef}>
             <Terminal className="h-full">
@@ -234,14 +235,22 @@ export function ExecutionPhase() {
                   {codeLines.map((line, i) => (
                     <span
                       key={i}
-                      ref={(el) => { codeSpansRef.current[i] = el; }}
+                      ref={(el) => {
+                        codeSpansRef.current[i] = el;
+                      }}
                       className={getTokenColor(line.type)}
-                      style={{ opacity: animationComplete ? 1 : 0, transition: 'none' }}
+                      style={{
+                        opacity: animationComplete ? 1 : 0,
+                        transition: 'none',
+                      }}
                     >
                       {line.type === 'newline' ? '\n' : line.content}
                     </span>
                   ))}
-                  <span className="inline-block w-2 h-4 bg-[var(--accent)] ml-0.5" style={{ animation: 'pulse 1s ease-in-out infinite' }} />
+                  <span
+                    className="ml-0.5 inline-block h-4 w-2 bg-[var(--accent)]"
+                    style={{ animation: 'pulse 1s ease-in-out infinite' }}
+                  />
                 </code>
               </pre>
             </Terminal>
@@ -251,13 +260,23 @@ export function ExecutionPhase() {
           <div ref={statsRef} className="space-y-4">
             <HudPanel title="BUILD STATS">
               <div className="space-y-4">
-                <AnimatedProgressBar label="FILES" progressRef={filesProgressRef} textRef={filesTextRef} />
-                <AnimatedProgressBar label="TESTS" progressRef={testsProgressRef} textRef={testsTextRef} />
-                <AnimatedProgressBar label="COVERAGE" progressRef={coverageProgressRef} textRef={coverageTextRef} />
-                <div className="flex justify-between items-center pt-2 border-t border-[var(--accent)]/20">
-                  <span className="text-xs font-mono text-[var(--muted)]">
-                    TIME ELAPSED
-                  </span>
+                <AnimatedProgressBar
+                  label="FILES"
+                  progressRef={filesProgressRef}
+                  textRef={filesTextRef}
+                />
+                <AnimatedProgressBar
+                  label="TESTS"
+                  progressRef={testsProgressRef}
+                  textRef={testsTextRef}
+                />
+                <AnimatedProgressBar
+                  label="COVERAGE"
+                  progressRef={coverageProgressRef}
+                  textRef={coverageTextRef}
+                />
+                <div className="flex items-center justify-between border-t border-[var(--accent)]/20 pt-2">
+                  <span className="font-mono text-xs text-[var(--muted)]">TIME ELAPSED</span>
                   <span ref={timeRef} className="font-mono text-[var(--accent)]">
                     {animationComplete ? '00:14:32' : '00:00:00'}
                   </span>
@@ -268,12 +287,12 @@ export function ExecutionPhase() {
             {/* Combo Counter */}
             <div
               ref={comboRef}
-              className="flex items-center justify-center gap-2 p-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10"
+              className="flex items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4"
             >
               <span ref={comboCountRef} className="text-3xl font-bold text-yellow-400">
                 {animationComplete ? 'x12' : 'x0'}
               </span>
-              <span className="text-sm font-mono text-yellow-400/80">COMMIT STREAK</span>
+              <span className="font-mono text-sm text-yellow-400/80">COMMIT STREAK</span>
             </div>
           </div>
         </div>
@@ -281,7 +300,7 @@ export function ExecutionPhase() {
         {/* Activity Feed */}
         <div ref={activityRef} className="mt-8">
           <HudPanel title="ACTIVITY LOG">
-            <div className="grid md:grid-cols-2 gap-2">
+            <div className="grid gap-2 md:grid-cols-2">
               {activities.map((activity, i) => (
                 <ActivityEntry key={i} status="success">
                   <span className="text-[var(--accent)]">{activity.file}</span>
@@ -294,7 +313,7 @@ export function ExecutionPhase() {
 
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
-          <h2 className="text-2xl md:text-4xl font-bold mb-3">
+          <h2 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="scatter">
               The bottleneck was never my typing speed.
             </AnimatedText>

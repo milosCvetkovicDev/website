@@ -21,7 +21,7 @@ export const caseStudies: CaseStudy[] = [
       'An AI agent that wakes up before you do. It monitors production, diagnoses errors, and opens PRs with fixes—all autonomously.',
     tags: ['Claude Agent SDK', 'Bun', 'Elysia', 'Azure'],
     challenge:
-      'Production breaks at 3am. Nobody wants that call. But errors don\'t wait for business hours, and every minute of downtime costs money and trust. The question: can we fix bugs faster than humans can even wake up?',
+      "Production breaks at 3am. Nobody wants that call. But errors don't wait for business hours, and every minute of downtime costs money and trust. The question: can we fix bugs faster than humans can even wake up?",
     approach:
       'I built an autonomous agent that never sleeps. It watches production logs, understands the codebase, and when something breaks, it diagnoses the issue and opens a PR with a fix. Humans review and merge—the agent does the grunt work.',
     contributions: [
@@ -57,7 +57,7 @@ export const caseStudies: CaseStudy[] = [
     challenge:
       'The codebase had a reputation. SQL queries lived next to UI components. Validation happened... sometimes. Tests? What tests? Nobody wanted to touch it, but the business needed new features yesterday.',
     approach:
-      'I didn\'t propose a rewrite—that\'s how projects die. Instead, I introduced boundaries gradually. Clean Architecture emerged one module at a time. Every PR shipped value while improving the foundation underneath.',
+      "I didn't propose a rewrite—that's how projects die. Instead, I introduced boundaries gradually. Clean Architecture emerged one module at a time. Every PR shipped value while improving the foundation underneath.",
     contributions: [
       'Migrated flat file structure to Clean Architecture (controllers → services → repositories)',
       'Replaced manual validation with Zod schemas and type inference',
@@ -72,14 +72,23 @@ export const caseStudies: CaseStudy[] = [
       'CI runs only what changed—deploys are fast again',
       'Bug rate dropped as test coverage climbed',
       'Security vulnerabilities caught before they reach production',
-      'Infrastructure changes are reviewed like code, not YOLO\'d',
+      "Infrastructure changes are reviewed like code, not YOLO'd",
     ],
     techStack: [
-      { category: 'Frontend', items: ['React 18', 'Material-UI', 'Vite', 'TypeScript'] },
-      { category: 'Backend', items: ['Express.js', 'Node.js', 'TypeORM', 'Zod'] },
+      {
+        category: 'Frontend',
+        items: ['React 18', 'Material-UI', 'Vite', 'TypeScript'],
+      },
+      {
+        category: 'Backend',
+        items: ['Express.js', 'Node.js', 'TypeORM', 'Zod'],
+      },
       { category: 'Database', items: ['PostgreSQL', 'pg-boss'] },
       { category: 'Testing', items: ['Jest', 'Playwright', 'Supertest'] },
-      { category: 'Infrastructure', items: ['Azure Container Apps', 'Terraform'] },
+      {
+        category: 'Infrastructure',
+        items: ['Azure Container Apps', 'Terraform'],
+      },
       { category: 'CI/CD', items: ['GitHub Actions', 'Nx'] },
     ],
   },
@@ -87,12 +96,12 @@ export const caseStudies: CaseStudy[] = [
     slug: 'nx-remote-cache',
     title: 'Nx Remote Cache Server',
     description:
-      'Why rebuild what hasn\'t changed? A custom cache server that slashed CI times and gave developers their coffee breaks back.',
+      "Why rebuild what hasn't changed? A custom cache server that slashed CI times and gave developers their coffee breaks back.",
     tags: ['Bun', 'Elysia', 'Azure Blob Storage'],
     challenge:
       'Every CI run rebuilt the entire monorepo. Developers waited. Cloud bills climbed. The math was simple: we were paying to compile the same unchanged code hundreds of times a day.',
     approach:
-      'Built a cache server from scratch using Bun for raw speed. Two-tier caching (hot in-memory, cold in blob storage) means cache hits are nearly instant. If it hasn\'t changed, we don\'t rebuild it. Period.',
+      "Built a cache server from scratch using Bun for raw speed. Two-tier caching (hot in-memory, cold in blob storage) means cache hits are nearly instant. If it hasn't changed, we don't rebuild it. Period.",
     contributions: [
       'Built LRU in-memory caching for frequently accessed artifacts',
       'Implemented Azure Blob Storage backend for persistent cache',
@@ -104,7 +113,7 @@ export const caseStudies: CaseStudy[] = [
       'CI pipelines went from coffee-break length to near-instant',
       '"Works on my machine" became "works everywhere, identically"',
       'Cloud compute bills dropped noticeably',
-      'Developers actually run the full test suite now (because it\'s fast)',
+      "Developers actually run the full test suite now (because it's fast)",
     ],
     techStack: [
       { category: 'Runtime', items: ['Bun'] },

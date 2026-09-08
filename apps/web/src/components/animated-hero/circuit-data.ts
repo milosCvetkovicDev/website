@@ -242,17 +242,45 @@ const icNodes: CircuitNode[] = [
   // T1/T5 junction
   { cx: 640, cy: 340, r: 9, tier: 'ic', label: 'Event Storming' },
   // T0/T7 junction
-  { cx: 1440, cy: 180, r: 10, tier: 'ic', label: 'Clean Architecture', labelAnchor: 'left' },
+  {
+    cx: 1440,
+    cy: 180,
+    r: 10,
+    tier: 'ic',
+    label: 'Clean Architecture',
+    labelAnchor: 'left',
+  },
   // T1/T7 junction
-  { cx: 1280, cy: 400, r: 9, tier: 'ic', label: 'Microservices', labelAnchor: 'left' },
+  {
+    cx: 1280,
+    cy: 400,
+    r: 9,
+    tier: 'ic',
+    label: 'Microservices',
+    labelAnchor: 'left',
+  },
   // --- Center: the bridge ---
   // T2/T6 junction (center of the network)
-  { cx: 960, cy: 540, r: 10, tier: 'ic', label: 'Claude AI', labelAnchor: 'left' },
+  {
+    cx: 960,
+    cy: 540,
+    r: 10,
+    tier: 'ic',
+    label: 'Claude AI',
+    labelAnchor: 'left',
+  },
   // --- Lower band: Implementation ---
   // T3/T5 junction
   { cx: 400, cy: 780, r: 10, tier: 'ic', label: 'React' },
   // T3/T7 junction
-  { cx: 1520, cy: 720, r: 9, tier: 'ic', label: 'Node.js', labelAnchor: 'left' },
+  {
+    cx: 1520,
+    cy: 720,
+    r: 9,
+    tier: 'ic',
+    label: 'Node.js',
+    labelAnchor: 'left',
+  },
   // T4/T6 junction area
   { cx: 1200, cy: 840, r: 8, tier: 'ic', label: 'Docker' },
 ];
@@ -287,13 +315,27 @@ const viaNodes: CircuitNode[] = [
   // B11 end — DevOps practice
   { cx: 1680, cy: 400, r: 5, tier: 'via', label: 'CI/CD', labelAnchor: 'left' },
   // B11 start / B2 end — architecture concern
-  { cx: 1440, cy: 260, r: 5, tier: 'via', label: 'API Design', labelAnchor: 'left' },
+  {
+    cx: 1440,
+    cy: 260,
+    r: 5,
+    tier: 'via',
+    label: 'API Design',
+    labelAnchor: 'left',
+  },
   // T4 jog / B12 start — DevOps tool
   { cx: 720, cy: 840, r: 5, tier: 'via', label: 'GitHub Actions' },
   // B12 end on T4 — build system
   { cx: 960, cy: 900, r: 5, tier: 'via', label: 'Nx' },
   // B7 end — testing framework
-  { cx: 1680, cy: 900, r: 5, tier: 'via', label: 'Playwright', labelAnchor: 'left' },
+  {
+    cx: 1680,
+    cy: 900,
+    r: 5,
+    tier: 'via',
+    label: 'Playwright',
+    labelAnchor: 'left',
+  },
   // B14 start / T4 jog — database
   { cx: 1200, cy: 900, r: 5, tier: 'via', label: 'PostgreSQL' },
 ];
@@ -317,9 +359,23 @@ const solderNodes: CircuitNode[] = [
   // B13 end — edge runtime
   { cx: 960, cy: 60, r: 3, tier: 'solder', label: 'Elysia' },
   // T7 jog corner — observability
-  { cx: 1520, cy: 400, r: 3, tier: 'solder', label: 'Monitoring', labelAnchor: 'left' },
+  {
+    cx: 1520,
+    cy: 400,
+    r: 3,
+    tier: 'solder',
+    label: 'Monitoring',
+    labelAnchor: 'left',
+  },
   // B14 end — IaC tool
-  { cx: 1520, cy: 1000, r: 3, tier: 'solder', label: 'Terraform', labelAnchor: 'left' },
+  {
+    cx: 1520,
+    cy: 1000,
+    r: 3,
+    tier: 'solder',
+    label: 'Terraform',
+    labelAnchor: 'left',
+  },
   // --- Unlabeled dots (visual density) ---
   { cx: 520, cy: 300, r: 3, tier: 'solder' },
   { cx: 1320, cy: 300, r: 3, tier: 'solder' },

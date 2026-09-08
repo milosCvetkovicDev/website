@@ -53,9 +53,7 @@ export function StrategyPhase() {
 
     gsap.registerPlugin(ScrollTrigger);
 
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (prefersReducedMotion) return;
 
@@ -82,7 +80,7 @@ export function StrategyPhase() {
             duration: 0.4,
             stagger: 0.15,
             ease: 'power2.out',
-          }
+          },
         );
       }
 
@@ -100,7 +98,7 @@ export function StrategyPhase() {
             stagger: 0.2,
             ease: 'back.out(1.7)',
           },
-          '+=0.2'
+          '+=0.2',
         );
       }
 
@@ -109,7 +107,7 @@ export function StrategyPhase() {
         architectureRef.current,
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.2'
+        '+=0.2',
       );
 
       // SVG lines draw
@@ -118,11 +116,7 @@ export function StrategyPhase() {
         lines.forEach((line) => {
           const length = (line as SVGPathElement).getTotalLength?.() || 100;
           gsap.set(line, { strokeDasharray: length, strokeDashoffset: length });
-          tl.to(
-            line,
-            { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut' },
-            '-=0.3'
-          );
+          tl.to(line, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut' }, '-=0.3');
         });
       }
 
@@ -131,7 +125,7 @@ export function StrategyPhase() {
         headlineRef.current,
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.2'
+        '+=0.2',
       );
     }, sectionRef);
 
@@ -139,49 +133,56 @@ export function StrategyPhase() {
   }, []);
 
   return (
-    <section
-      ref={sectionRef}
-      className="min-h-screen flex items-center justify-center px-6 py-24"
-    >
+    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
       <div className="w-full max-w-5xl">
         {/* Phase Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <span className="px-3 py-1 bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-mono rounded-full">
+        <div className="mb-8 flex items-center gap-3">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
             <AnimatedText animation="perspective">PHASE 2</AnimatedText>
           </span>
-          <AnimatedText animation="scramble" className="text-sm font-mono text-[var(--muted)]">
+          <AnimatedText animation="scramble" className="font-mono text-sm text-[var(--muted)]">
             STRATEGY
           </AnimatedText>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid gap-8 md:grid-cols-2">
           {/* Tech Tree */}
           <div ref={techTreeRef} className="space-y-3">
-            <h3 className="text-xs font-mono text-[var(--muted)] uppercase tracking-wider mb-4">
+            <h3 className="mb-4 font-mono text-xs tracking-wider text-[var(--muted)] uppercase">
               TECH TREE
             </h3>
-            {techChoices.map((tech, index) => (
+            {techChoices.map((tech) => (
               <div
                 key={tech.category}
-                className="tech-item group relative flex items-center gap-4 p-4 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 hover-lift cursor-default overflow-hidden"
+                className="tech-item group hover-lift relative flex cursor-default items-center gap-4 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4"
               >
                 {/* Selection indicator */}
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
+                <div className="absolute top-0 bottom-0 left-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
 
-                <span className="text-2xl transition-transform duration-300 group-hover:scale-125">{tech.icon}</span>
+                <span className="text-2xl transition-transform duration-300 group-hover:scale-125">
+                  {tech.icon}
+                </span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-[var(--muted)] uppercase tracking-wider font-mono">
+                    <span className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
                       {tech.category}
                     </span>
-                    <span className="text-[var(--accent)] transition-transform duration-300 group-hover:translate-x-1">→</span>
+                    <span className="text-[var(--accent)] transition-transform duration-300 group-hover:translate-x-1">
+                      →
+                    </span>
                     <span className="font-semibold">{tech.choice}</span>
                   </div>
-                  <p className="text-sm text-[var(--muted)] group-hover:text-[var(--foreground)] transition-colors">{tech.reason}</p>
+                  <p className="text-sm text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
+                    {tech.reason}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-green-400 transition-transform duration-300 group-hover:scale-110">✓</span>
-                  <span className="text-[10px] font-mono text-green-400/60 opacity-0 group-hover:opacity-100 transition-opacity">LOCKED</span>
+                  <span className="text-green-400 transition-transform duration-300 group-hover:scale-110">
+                    ✓
+                  </span>
+                  <span className="font-mono text-[10px] text-green-400/60 opacity-0 transition-opacity group-hover:opacity-100">
+                    LOCKED
+                  </span>
                 </div>
               </div>
             ))}
@@ -190,7 +191,7 @@ export function StrategyPhase() {
           {/* Synergies & Architecture */}
           <div className="space-y-6">
             <div ref={synergiesRef} className="space-y-2">
-              <h3 className="text-xs font-mono text-[var(--muted)] uppercase tracking-wider mb-3">
+              <h3 className="mb-3 font-mono text-xs tracking-wider text-[var(--muted)] uppercase">
                 SYNERGIES DETECTED
               </h3>
               {synergies.map((synergy) => (
@@ -213,7 +214,7 @@ export function StrategyPhase() {
                 <div className="relative h-48">
                   <svg
                     viewBox="0 0 300 180"
-                    className="w-full h-full"
+                    className="h-full w-full"
                     fill="none"
                     stroke="currentColor"
                   >
@@ -230,7 +231,7 @@ export function StrategyPhase() {
                       x="50"
                       y="95"
                       textAnchor="middle"
-                      className="fill-[var(--foreground)] text-[10px] font-mono"
+                      className="fill-[var(--foreground)] font-mono text-[10px]"
                     >
                       Azure Logs
                     </text>
@@ -247,7 +248,7 @@ export function StrategyPhase() {
                       x="150"
                       y="95"
                       textAnchor="middle"
-                      className="fill-[var(--foreground)] text-[10px] font-mono"
+                      className="fill-[var(--foreground)] font-mono text-[10px]"
                     >
                       Claude Agent
                     </text>
@@ -264,7 +265,7 @@ export function StrategyPhase() {
                       x="250"
                       y="95"
                       textAnchor="middle"
-                      className="fill-[var(--foreground)] text-[10px] font-mono"
+                      className="fill-[var(--foreground)] font-mono text-[10px]"
                     >
                       GitHub API
                     </text>
@@ -288,7 +289,7 @@ export function StrategyPhase() {
                       x="100"
                       y="80"
                       textAnchor="middle"
-                      className="fill-[var(--muted)] text-[8px] font-mono"
+                      className="fill-[var(--muted)] font-mono text-[8px]"
                     >
                       errors
                     </text>
@@ -296,7 +297,7 @@ export function StrategyPhase() {
                       x="200"
                       y="80"
                       textAnchor="middle"
-                      className="fill-[var(--muted)] text-[8px] font-mono"
+                      className="fill-[var(--muted)] font-mono text-[8px]"
                     >
                       PRs
                     </text>
@@ -311,10 +312,7 @@ export function StrategyPhase() {
                         refY="3.5"
                         orient="auto"
                       >
-                        <polygon
-                          points="0 0, 10 3.5, 0 7"
-                          className="fill-[var(--accent)]"
-                        />
+                        <polygon points="0 0, 10 3.5, 0 7" className="fill-[var(--accent)]" />
                       </marker>
                     </defs>
                   </svg>
@@ -326,7 +324,7 @@ export function StrategyPhase() {
 
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
-          <h2 className="text-2xl md:text-4xl font-bold mb-3">
+          <h2 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="magnetic">
               Hype fades. The right tool for the job doesn&apos;t.
             </AnimatedText>

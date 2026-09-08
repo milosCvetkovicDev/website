@@ -65,9 +65,9 @@ const socialLinks = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-[var(--border)] mt-auto">
+    <footer className="mt-auto border-t border-[var(--border)]">
       <div className="mx-auto max-w-5xl px-6 py-8">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
           <p className="text-sm text-[var(--muted)]">
             {new Date().getFullYear()} Milos Cvetkovic. Built with Next.js.
           </p>
@@ -78,7 +78,7 @@ export function Footer() {
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                className="text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
                 aria-label={link.name}
               >
                 {link.icon}
