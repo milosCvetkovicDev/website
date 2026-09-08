@@ -13,3 +13,7 @@ playwright-report
 pnpm-lock.yaml
 next-env.d.ts
 *.tsbuildinfo
+
+# Personal / machine-local files
+.claude/settings.local.json
+.remember
