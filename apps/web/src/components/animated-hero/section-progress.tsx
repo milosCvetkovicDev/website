@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback, memo } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 const sections = [
   { id: 'loading', label: 'INIT' },

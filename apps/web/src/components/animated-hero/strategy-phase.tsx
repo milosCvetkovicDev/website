@@ -151,7 +151,7 @@ export function StrategyPhase() {
             <h3 className="mb-4 font-mono text-xs tracking-wider text-[var(--muted)] uppercase">
               TECH TREE
             </h3>
-            {techChoices.map((tech, index) => (
+            {techChoices.map((tech) => (
               <div
                 key={tech.category}
                 className="tech-item group hover-lift relative flex cursor-default items-center gap-4 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4"
