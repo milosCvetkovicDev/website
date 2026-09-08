@@ -5,8 +5,9 @@ Personal portfolio site. A Turborepo 2 + pnpm monorepo whose only shipping app i
 
 ## Architecture
 
-pnpm 10.33 workspace (`apps/*`, `packages/*`) driven by Turborepo. Node 22 is pinned in `.nvmrc`,
-`engines.node` and `packageManager`.
+pnpm 10.33 workspace (`apps/*`, `packages/*`, per `pnpm-workspace.yaml`) driven by Turborepo 2.10.
+Node 22 is pinned in `.nvmrc` only; `engines.node` sets a `>=22` floor and `packageManager` pins
+pnpm (`pnpm@10.33.0`), not Node. CI reads Node from `.nvmrc` and pnpm from `packageManager`.
 
 - `apps/web` — the site. Next.js 16 (App Router), React 19, Tailwind v4, GSAP + `@gsap/react`.
   Source in `src/{app,components,data,hooks,test}`, e2e specs in `e2e/`.
@@ -22,9 +23,10 @@ pnpm 10.33 workspace (`apps/*`, `packages/*`) driven by Turborepo. Node 22 is pi
 
 `/`, `/about`, `/blog`, `/contact`, `/skills`, `/work`, `/work/[slug]`.
 
-`apps/web/src/app` also holds `sitemap.ts`, `robots.ts`, `error.tsx` and `not-found.tsx`. Those two
-route handlers plus `layout.tsx` and `components/json-ld.tsx` read `NEXT_PUBLIC_SITE_URL`, falling
-back to `https://miloscvetkovic.dev`.
+`apps/web/src/app` also holds the metadata files `sitemap.ts` and `robots.ts`, plus `error.tsx` and
+`not-found.tsx`. `sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
+`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There are no route handlers
+(`route.ts`) and no middleware.
 
 ## Commands
 
@@ -35,20 +37,28 @@ back to `https://miloscvetkovic.dev`.
 | `pnpm dev:playground`                                            | Vite dev server for the sandbox                                         |
 | `pnpm build`                                                     | `next build` (web) and `tsc -b && vite build` (playground)              |
 | `pnpm lint`                                                      | ESLint in each app with `--max-warnings 0`                              |
-| `pnpm lint:fix`                                                  | The same with `--fix`                                                   |
+| `pnpm lint:fix`                                                  | `eslint --fix` in each app, without `--max-warnings 0`                  |
 | `pnpm typecheck`                                                 | `next typegen && tsc --noEmit` (web), `tsc -b` (playground)             |
 | `pnpm test`                                                      | Vitest unit tests (web only)                                            |
 | `pnpm test:e2e`                                                  | Playwright specs in `apps/web/e2e`                                      |
 | `pnpm format`                                                    | Prettier over the whole repo, writing changes                           |
 | `pnpm format:check`                                              | Prettier in check mode, no writes                                       |
-| `pnpm clean`                                                     | Removes build output and `node_modules` everywhere                      |
+| `pnpm clean`                                                     | `turbo clean` in both apps, then `rm -rf node_modules` at the root      |
 | `pnpm prepare`                                                   | `husky`; runs on install and is what creates the git hooks              |
 | `pnpm --filter web test:e2e`                                     | Playwright without going through Turborepo                              |
 | `pnpm --filter web test:watch`                                   | Vitest in watch mode                                                    |
 | `pnpm --filter web exec vitest run <path>`                       | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx` |
 | `pnpm --filter web exec playwright install --with-deps chromium` | Needed once before the first e2e run                                    |
 
-`typecheck` and `test` depend on `^build` in `turbo.json`, so a cold run builds dependencies first.
+`pnpm lint:fix` drops `--max-warnings 0`, so it exits 0 on warnings that `pnpm lint` and CI fail on.
+Always finish with `pnpm lint`.
+
+`pnpm clean` only reaches the two apps, because `packages/*` define no `clean` task. Their
+`node_modules` survive it and have to be deleted by hand before a truly cold reinstall.
+
+`typecheck` and `test` declare `dependsOn: ["^build"]` in `turbo.json`. Nothing an app depends on
+has a `build` task today (`@repo/prettier-config` is config only), so this is currently a no-op. It
+is there so that a future buildable package is compiled before the apps typecheck against it.
 
 ## Quality gates
 
@@ -65,12 +75,14 @@ back to `https://miloscvetkovic.dev`.
 - `eslint-disable` is not an acceptable fix for the React Hooks rules. `react-hooks/set-state-in-effect`
   in particular is pointing at a real hydration problem: restructure the component instead. See
   `docs/adr/0006-hydration-safe-client-state.md` and `apps/web/src/hooks/use-is-hydrated.ts`.
-- Dependabot runs weekly for npm and github-actions, minor and patch grouped.
+- Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
+  grouped into one pull request and open npm pull requests are capped at five; github-actions bumps
+  are not grouped.
 
 ## Conventions
 
 - Conventional commits, enforced by `commitlint.config.mjs` (`@commitlint/config-conventional`).
-  Branch prefixes match the commit type: `feat/`, `fix/`, `chore/`, `docs/`.
+  Branch prefixes match the commit type: `feat/`, `fix/`, `chore/`, `docs/`, `test/`, `ci/`.
 - Formatting comes only from `packages/prettier-config`: semicolons, single quotes, trailing commas,
   two-space indent, 100 columns, LF, plus `prettier-plugin-tailwindcss`. Do not add local overrides.
 - Data lives in `apps/web/src/data`. `case-studies.ts` is the single source of truth for project
@@ -79,8 +91,13 @@ back to `https://miloscvetkovic.dev`.
   actually needed.
 - Tailwind v4 is CSS-first: the theme is declared in `apps/web/src/app/globals.css` and compiled by
   `@tailwindcss/postcss`. There is no `tailwind.config.js` and there should not be one.
-- Components live in `apps/web/src/components` with `index.ts` re-exporting them; the hero and its
-  phases are in `components/animated-hero`.
+- Components live in `apps/web/src/components`. `index.ts` is a barrel for the page-level ones
+  (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `Highlights`, `FeaturedWork`, `TechStack`,
+  `CTA`, `PersonJsonLd`, `WebsiteJsonLd`). The hero and its phases live in
+  `components/animated-hero` and are imported from there directly, not through the barrel.
+- `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
+  `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
+  keep relative imports for siblings inside one folder.
 
 ## Testing
 
@@ -94,29 +111,48 @@ back to `https://miloscvetkovic.dev`.
   `e2e/hero.spec.ts` waits for the `System Boot` loader to be hidden, and also asserts the page title
   to catch a stray dev server on port 3000.
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build
-  with `pnpm start` inside `apps/web`, retries twice, uses one worker and a 10s expect timeout. Locally it reuses a
-  running dev server on port 3000.
+  with `pnpm start` inside `apps/web`, sets `forbidOnly`, retries twice, uses one worker and a 10s
+  expect timeout. Locally it reuses a running dev server on port 3000.
 
 ## Working with this repo in Claude Code
 
-- `.claude/settings.json` PreToolUse hooks block writes to `.env*` (except `.env.example`),
-  `pnpm-lock.yaml`, `node_modules`, `.next` and `dist`, both through Edit/Write and through Bash
-  commands that would redirect into or rewrite those paths. Both hooks require `jq` and fail closed
-  without it.
-- A PostToolUse hook runs `pnpm exec prettier --write` on every file written inside the project, so
-  do not hand-format TS, JS, JSON, Markdown, CSS or YAML.
+- `.claude/settings.json` wires two PreToolUse guards, and they are not equivalent. The `Edit|Write`
+  guard blocks writes to `.env*` (except `.env.example`), `pnpm-lock.yaml`, `node_modules/`,
+  `.next/` and `dist/`, and fails closed (`exit 2`) when `jq` is missing. The `Bash` guard is
+  narrower: it blocks only shell commands that redirect into or rewrite `.env*` or
+  `pnpm-lock.yaml`, and it exits 0, allowing the command, when `jq` is missing. Nothing stops a
+  shell command from writing into `node_modules/`, `.next/` or `dist/`. Treat the Gotchas list below
+  as the rule; the hooks are a partial backstop, not the boundary.
+- A PostToolUse hook runs `pnpm exec prettier --write` on files written inside `$CLAUDE_PROJECT_DIR`
+  whose extension is `.ts .tsx .js .jsx .mjs .cjs .json .md .css .yml .yaml`, so do not hand-format
+  those. Other extensions, `.mdx` and `.svg` among them, are left exactly as written. The
+  Prettier call ends in `|| true`, so a formatting failure is silent and only surfaces at
+  `pnpm format:check`.
 - `.claude/agents/ui-reviewer.md` is a read-only review agent for `apps/web/src/components`: visual
   quality, GSAP cleanup and reduced motion, accessibility, component structure. Run it after
   changing a component.
-- A change is reviewed by someone other than its author before it is opened for review, and the
-  findings are written down rather than asserted.
+- Before opening a pull request, work the checklist in `.github/pull_request_template.md`:
+  `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, plus
+  `pnpm --filter web test:e2e` when the UI changed. Paste the commands and their real output into
+  the Verification section; "seems fine" is not evidence.
+- A reviewer other than the author reads the diff before it is merged: a person, or a review agent
+  such as `ui-reviewer` for components. Findings go in the Review section of the pull request,
+  written down rather than asserted.
+- UI changes also get Playwright screenshots of the affected section in light, dark and mobile
+  viewports before the pull request is opened.
+- Merge to `main` by squash.
 
 ## Documentation
 
-- `docs/plans` — designs and implementation plans, dated filenames, tasks as `- [ ]` checkboxes.
-  Tick the boxes in the same commit as the work they describe.
-- `docs/adr` — numbered architecture decision records.
-- `docs/runbooks` — operational procedures, including deployment.
+- `docs/plans` — `YYYY-MM-DD-topic-design.md` (what is being built and why) and
+  `YYYY-MM-DD-topic-plan.md` (the ordered task list derived from it), indexed with status in
+  `docs/plans/README.md`. Tasks are `- [ ]` checkboxes; tick them in the same commit as the work
+  they describe.
+- `docs/adr` — numbered architecture decision records, indexed in `docs/adr/README.md`. Naming is
+  `NNNN-kebab-title.md`, numbers are never reused, and the section order is Status, Date, Context,
+  Decision, Consequences, Alternatives considered. An accepted record is not edited: supersede it
+  with a new number and set the old status to `Superseded by NNNN`.
+- `docs/runbooks` — operational procedures. `docs/runbooks/deploy.md` is the deployment procedure.
 - `README.md` addresses a reader landing on GitHub; this file addresses an agent about to change
   code. Keep them consistent without duplicating each other.
 
@@ -127,5 +163,13 @@ back to `https://miloscvetkovic.dev`.
 - A fresh clone or git worktree has no git hooks until `pnpm install` has run `prepare`.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm.
+- `apps/web/README.md` is untouched `create-next-app` boilerplate: it says `npm run dev` and
+  `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
+  authoritative documents.
+- To reproduce the CI e2e run locally:
+  `pnpm --filter web build && CI=true pnpm --filter web test:e2e`. `pnpm --filter web start` serves
+  the production build on port 3000 on its own.
+- To point the site at a non-default origin locally, copy the root `.env.example` to
+  `apps/web/.env.local` yourself; the PreToolUse guard blocks agent writes to `.env*`.
 - The site is not deployed yet. `miloscvetkovic.dev` still points at a registrar parking page, and
   no Vercel project has been created.
