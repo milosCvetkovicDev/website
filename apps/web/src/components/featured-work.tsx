@@ -50,7 +50,7 @@ function ProjectCard({ project, index, isActive, onActivate, onDeactivate }: Pro
       onMouseLeave={onDeactivate}
       onFocus={onActivate}
       onBlur={onDeactivate}
-      className={`group relative block rounded border bg-black/40 p-6 backdrop-blur-md transition-all duration-500 focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:outline-none ${
+      className={`group relative block rounded border bg-[var(--card)]/75 p-6 backdrop-blur-md transition-all duration-500 focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:outline-none ${
         isActive
           ? 'border-[var(--accent)]/50 shadow-[0_0_30px_rgba(139,92,246,0.1)]'
           : 'border-[var(--tmux-border)]/30 hover:bg-[var(--accent)]/5'
@@ -176,21 +176,21 @@ export function FeaturedWork() {
               />
               <h2
                 id="featured-work-heading"
-                className="font-mono text-xs tracking-widest text-[var(--tmux-pane-title-text)] uppercase"
+                className="font-mono text-xs tracking-widest whitespace-nowrap text-[var(--tmux-pane-title-text)] uppercase"
               >
                 Featured Work
               </h2>
             </div>
             <div
               aria-hidden="true"
-              className="h-px w-24 bg-gradient-to-r from-[var(--tmux-border)]/50 to-transparent"
+              className="hidden h-px w-24 bg-gradient-to-r from-[var(--tmux-border)]/50 to-transparent sm:block"
             />
           </div>
           <Link
             href="/work"
             className="group flex items-center gap-2 font-mono text-xs text-[var(--tmux-bar-text)] transition-colors hover:text-[var(--tmux-bar-text-bright)]"
           >
-            <span>VIEW ARCHIVE</span>
+            <span className="whitespace-nowrap">VIEW ARCHIVE</span>
             <svg
               aria-hidden="true"
               className="h-4 w-4 transition-transform group-hover:translate-x-1"
@@ -222,7 +222,7 @@ export function FeaturedWork() {
           </p>
           <Link
             href="/work"
-            className="inline-flex items-center gap-2 rounded border border-[var(--tmux-border)] bg-black/40 px-8 py-4 font-mono text-sm text-[var(--tmux-bar-text-bright)] backdrop-blur-md transition-all duration-300 hover:border-[var(--accent)] hover:text-[var(--tmux-pane-title-text)] hover:shadow-[0_0_20px_rgba(139,92,246,0.1)]"
+            className="inline-flex items-center gap-2 rounded border border-[var(--tmux-border)] bg-[var(--card)]/75 px-8 py-4 font-mono text-sm text-[var(--tmux-bar-text-bright)] backdrop-blur-md transition-all duration-300 hover:border-[var(--accent)] hover:text-[var(--tmux-pane-title-text)] hover:shadow-[0_0_20px_rgba(139,92,246,0.1)]"
           >
             <span>Explore All Projects</span>
             <svg

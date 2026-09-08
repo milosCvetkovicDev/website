@@ -46,7 +46,7 @@ export function MetricCounter({
 
   return (
     <div
-      className={`shrink-0 rounded border border-[var(--tmux-border)]/50 bg-black/40 p-4 text-center backdrop-blur-md transition-all duration-300 lg:w-40 ${
+      className={`shrink-0 rounded border border-[var(--tmux-border)]/50 bg-[var(--background)]/70 p-4 text-center backdrop-blur-md transition-all duration-300 lg:w-40 ${
         active ? 'border-[var(--accent)] shadow-[0_0_15px_rgba(139,92,246,0.15)]' : ''
       }`}
     >
