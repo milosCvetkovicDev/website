@@ -49,13 +49,13 @@ Expected: one commit containing exactly two new files.
 - Modify: `package.json` (`engines`)
 - Modify: `pnpm-lock.yaml` (already regenerated with pnpm 10.33 on 2026-03-29; verify it is consistent)
 
-- [ ] **Step 1: Create `.nvmrc`**
+- [x] **Step 1: Create `.nvmrc`**
 
 ```
 22
 ```
 
-- [ ] **Step 2: Raise the engines floor to the pinned major**
+- [x] **Step 2: Raise the engines floor to the pinned major**
 
 In `package.json`, change
 
@@ -75,12 +75,12 @@ to
 
 `packageManager` stays `"pnpm@10.33.0"` (the March bump; matches `pnpm --version` locally).
 
-- [ ] **Step 3: Verify the lockfile matches the manifests**
+- [x] **Step 3: Verify the lockfile matches the manifests**
 
 Run: `pnpm install --frozen-lockfile`
 Expected: exit 0 and `Lockfile is up to date, resolution step is skipped` (or `Already up to date`). If it fails, run `pnpm install` and include the lockfile in the commit.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .nvmrc package.json pnpm-lock.yaml
@@ -101,7 +101,7 @@ git commit -m "build: pin node 22 and pnpm 10.33 for local, ci and vercel"
 - Modify: `package.json` (devDependencies, `format` scripts)
 - Modify: `apps/web/package.json` (devDependencies)
 
-- [ ] **Step 1: Make the shared config self-contained**
+- [x] **Step 1: Make the shared config self-contained**
 
 Replace `packages/prettier-config/index.js` with:
 
@@ -128,7 +128,7 @@ export default config;
 
 Why `fileURLToPath(import.meta.resolve(...))`: Prettier resolves plugin _names_ relative to the config file that lists them. With pnpm's strict `node_modules`, `apps/web` cannot see a plugin that only `packages/prettier-config` depends on. An absolute path sidesteps that.
 
-- [ ] **Step 2: Bump the plugin in `packages/prettier-config/package.json`**
+- [x] **Step 2: Bump the plugin in `packages/prettier-config/package.json`**
 
 ```json
 {
@@ -150,7 +150,7 @@ Why `fileURLToPath(import.meta.resolve(...))`: Prettier resolves plugin _names_ 
 }
 ```
 
-- [ ] **Step 3: Create the root `prettier.config.mjs`**
+- [x] **Step 3: Create the root `prettier.config.mjs`**
 
 ```js
 import config from '@repo/prettier-config';
@@ -158,7 +158,7 @@ import config from '@repo/prettier-config';
 export default config;
 ```
 
-- [ ] **Step 4: Create `apps/web/prettier.config.mjs`** (adds the Tailwind v4 entry point so class sorting knows the theme and custom variants)
+- [x] **Step 4: Create `apps/web/prettier.config.mjs`** (adds the Tailwind v4 entry point so class sorting knows the theme and custom variants)
 
 ```js
 import config from '@repo/prettier-config';
@@ -170,7 +170,7 @@ export default {
 };
 ```
 
-- [ ] **Step 5: Create `.prettierignore`**
+- [x] **Step 5: Create `.prettierignore`**
 
 ```
 # Dependencies and build output
@@ -190,7 +190,7 @@ next-env.d.ts
 *.tsbuildinfo
 ```
 
-- [ ] **Step 6: Reference the package and simplify the root scripts**
+- [x] **Step 6: Reference the package and simplify the root scripts**
 
 In root `package.json`:
 
@@ -214,7 +214,7 @@ In `apps/web/package.json` `devDependencies` add
     "@repo/prettier-config": "workspace:*",
 ```
 
-- [ ] **Step 7: Install and verify config resolution**
+- [x] **Step 7: Install and verify config resolution**
 
 Run: `pnpm install`
 Run: `pnpm exec prettier --find-config-path apps/web/src/app/page.tsx`
@@ -222,12 +222,12 @@ Expected: `apps/web/prettier.config.mjs`
 Run: `pnpm exec prettier --find-config-path apps/playground/src/App.tsx`
 Expected: `prettier.config.mjs`
 
-- [ ] **Step 8: Verify the plugin loads and sorts classes**
+- [x] **Step 8: Verify the plugin loads and sorts classes**
 
 Run: `printf '<div className="p-4 flex" />;\n' | pnpm exec prettier --stdin-filepath apps/web/src/probe.tsx`
 Expected output: `<div className="flex p-4" />;` (Tailwind order puts `flex` before `p-4`; double quotes stay in JSX because `jsxSingleQuote` is off).
 
-- [ ] **Step 9: Commit** (config only; no reformatting yet)
+- [x] **Step 9: Commit** (config only; no reformatting yet)
 
 ```bash
 git add packages/prettier-config prettier.config.mjs apps/web/prettier.config.mjs .prettierignore package.json apps/web/package.json pnpm-lock.yaml
@@ -243,7 +243,7 @@ git commit -m "build: wire shared prettier config with tailwind class sorting"
 - Modify (already modified in the working tree): `apps/web/src/app/globals.css`, `apps/web/src/components/animated-hero/tmux-background.tsx`
 - Modify: every file `pnpm format` touches
 
-- [ ] **Step 1: Format only the two files that carry real changes and commit them on their own**
+- [x] **Step 1: Format only the two files that carry real changes and commit them on their own**
 
 ```bash
 pnpm exec prettier --write apps/web/src/app/globals.css apps/web/src/components/animated-hero/tmux-background.tsx
@@ -253,20 +253,20 @@ git commit -m "perf(web): start tmux log animation at idle time and trim theme t
 
 Expected diff content: the `requestIdleCallback` deferral in `AnimatedPane` and the shorter transition selector list in `globals.css`, plus formatting.
 
-- [ ] **Step 2: Reformat the repository**
+- [x] **Step 2: Reformat the repository**
 
 Run: `pnpm format`
 Run: `pnpm format:check`
 Expected: `All matched files use Prettier code style!`
 
-- [ ] **Step 3: Prove nothing else changed**
+- [x] **Step 3: Prove nothing else changed**
 
 Run: `pnpm build`
 Expected: both apps build (`Tasks: 2 successful`).
 Run: `git diff --stat | tail -1`
 Expected: only formatting churn (quotes, wrapping, class order); spot-check `git diff apps/web/src/components/index.ts`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -284,7 +284,7 @@ git commit -m "style: format repository with the shared prettier config"
 - Modify: `apps/web/package.json` (scripts)
 - Modify: `apps/playground/package.json` (scripts)
 
-- [ ] **Step 1: Replace `turbo.json`**
+- [x] **Step 1: Replace `turbo.json`**
 
 ```json
 {
@@ -321,7 +321,7 @@ git commit -m "style: format repository with the shared prettier config"
 }
 ```
 
-- [ ] **Step 2: Root scripts** (`package.json`), final shape:
+- [x] **Step 2: Root scripts** (`package.json`), final shape:
 
 ```json
   "scripts": {
@@ -341,7 +341,7 @@ git commit -m "style: format repository with the shared prettier config"
   },
 ```
 
-- [ ] **Step 3: Web scripts** (`apps/web/package.json`):
+- [x] **Step 3: Web scripts** (`apps/web/package.json`):
 
 ```json
   "scripts": {
@@ -360,7 +360,7 @@ git commit -m "style: format repository with the shared prettier config"
 
 `next typegen` (Next ≥ 15.5) writes `next-env.d.ts` and the route types without a build, so `tsc --noEmit` is meaningful on a clean checkout.
 
-- [ ] **Step 4: Playground scripts** (`apps/playground/package.json`):
+- [x] **Step 4: Playground scripts** (`apps/playground/package.json`):
 
 ```json
   "scripts": {
@@ -376,7 +376,7 @@ git commit -m "style: format repository with the shared prettier config"
 
 (`tsc -b` with `noEmit: true` in both referenced tsconfigs only type-checks.)
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `pnpm typecheck`
 Expected: `Tasks: 2 successful, 2 total`.
@@ -385,7 +385,7 @@ Expected: a line per package per task (proves the tasks resolve; nothing execute
 Run: `pnpm lint`
 Expected: still fails with 10 errors (fixed in Task 8) — confirm the failure is lint findings, not "Missing tasks".
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add turbo.json package.json apps/web/package.json apps/playground/package.json
