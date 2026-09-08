@@ -1,24 +1,23 @@
 'use client';
 
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useSyncExternalStore, type ReactNode } from 'react';
 
 const TmuxBackground = lazy(() =>
   import('./tmux-background').then((m) => ({ default: m.TmuxBackground })),
 );
 
+const SCROLL_THRESHOLD_PX = 100;
+const subscribeToScroll = (onChange: () => void) => {
+  window.addEventListener('scroll', onChange, { passive: true });
+  return () => window.removeEventListener('scroll', onChange);
+};
+const getScrolled = () => window.scrollY > SCROLL_THRESHOLD_PX;
+const getServerScrolled = () => false;
+
 export function HeroSection({ children }: { children?: ReactNode }) {
-  const [showScrollIndicator, setShowScrollIndicator] = useState(true);
-
-  // Hide scroll indicator when user starts scrolling
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrolled = window.scrollY > 100;
-      setShowScrollIndicator(!scrolled);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  // Hidden once the user has scrolled past the top; correct on reload with a restored position too.
+  const scrolled = useSyncExternalStore(subscribeToScroll, getScrolled, getServerScrolled);
+  const showScrollIndicator = !scrolled;
 
   return (
     <section
