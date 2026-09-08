@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import { ThemeProvider, Navigation, Footer, PersonJsonLd, WebsiteJsonLd } from '@/components';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
@@ -14,10 +15,6 @@ const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
 });
-
-// Runs before React hydrates so the first paint already has the right theme (no light-to-dark flash).
-const themeInitScript =
-  "(function(){try{var s=localStorage.getItem('theme');var d=s==='dark'||(s!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.add(d?'dark':'light')}catch(e){var f=false;try{f=matchMedia('(prefers-color-scheme: dark)').matches}catch(_){}document.documentElement.classList.add(f?'dark':'light')}})()";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -84,7 +81,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <PersonJsonLd />
         <WebsiteJsonLd />
       </head>

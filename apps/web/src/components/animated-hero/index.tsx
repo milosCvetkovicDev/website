@@ -43,7 +43,8 @@ const bootMessages = [
 
 // HUD-styled bootstrap loader with progress and boot sequence
 function BootstrapLoader({ visible }: { visible: boolean }) {
-  const [shouldRender, setShouldRender] = useState(true);
+  // Never mount an already-finished loader: a client-side navigation back to / arrives hydrated.
+  const [shouldRender, setShouldRender] = useState(() => visible);
   const [progress, setProgress] = useState(0);
   const [currentMessage, setCurrentMessage] = useState(0);
   // Derived, not stored: the loader is complete exactly when the hero is ready.

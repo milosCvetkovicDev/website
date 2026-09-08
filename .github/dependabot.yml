@@ -6,6 +6,7 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
     groups:
       minor-and-patch:
         update-types: [minor, patch]

@@ -9,11 +9,12 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useIsHydrated } from '@/hooks/use-is-hydrated';
+import { DARK_COLOR_SCHEME_QUERY, THEME_STORAGE_KEY } from '@/lib/theme';
 
 type Theme = 'light' | 'dark';
 
-export const THEME_STORAGE_KEY = 'theme';
-const DARK_QUERY = '(prefers-color-scheme: dark)';
+export { THEME_STORAGE_KEY };
+const DARK_QUERY = DARK_COLOR_SCHEME_QUERY;
 
 interface ThemeContextType {
   theme: Theme;

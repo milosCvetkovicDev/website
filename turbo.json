@@ -23,7 +23,9 @@
       "dependsOn": ["^build"]
     },
     "test:e2e": {
-      "cache": false
+      "dependsOn": ["build"],
+      "cache": false,
+      "env": ["CI"]
     },
     "clean": {
       "cache": false
