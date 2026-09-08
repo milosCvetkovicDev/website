@@ -15,9 +15,10 @@ test.describe('Hero Section', () => {
   });
 
   test('renders player card with CV data', async ({ page }) => {
-    await expect(page.getByText('Milos Cvetkovic')).toBeVisible();
-    await expect(page.getByText('Full Stack Engineer & Architect')).toBeVisible();
-    await expect(page.getByText('AI-Native Development')).toBeVisible();
+    // exact: true — the sr-only SEO paragraph and the footer also contain the name.
+    await expect(page.getByText('Milos Cvetkovic', { exact: true })).toBeVisible();
+    await expect(page.getByText('Full Stack Engineer & Architect', { exact: true })).toBeVisible();
+    await expect(page.getByText('AI-Native Development', { exact: true })).toBeVisible();
   });
 
   test('renders all skill tags', async ({ page }) => {
@@ -45,21 +46,23 @@ test.describe('Hero Section', () => {
   });
 
   test('tmux log lines animate into panes', async ({ page }) => {
-    // Wait for actual log content to appear instead of arbitrary timeout
-    await expect(page.getByText('OOMKilled', { exact: false }).first()).toBeVisible({
-      timeout: 10000,
+    // The kubectl pane always starts with the same entries; later ones arrive every ~650 ms.
+    await expect(page.getByText('$ kubectl get pods -n production -w').first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText('api-server-6d7f4c8b9-x2k9p').first()).toBeVisible({
+      timeout: 15_000,
     });
   });
 
   test('scroll indicator fades on scroll', async ({ page }) => {
-    const scrollIndicator = page.getByText('Scroll', { exact: true }).first();
-    await expect(scrollIndicator).toBeVisible();
+    const indicator = page.getByText('Scroll', { exact: true }).first().locator('..');
+    await expect(indicator).toHaveCSS('opacity', '1');
 
     await page.evaluate(() => window.scrollTo(0, 500));
-    await page.waitForTimeout(500);
 
-    // Should be hidden after scrolling
-    await expect(scrollIndicator).toBeHidden();
+    // Playwright counts opacity:0 elements as visible, so assert the computed style the fade produces.
+    await expect(indicator).toHaveCSS('opacity', '0');
   });
 
   test('dark mode toggles hero appearance', async ({ page }) => {

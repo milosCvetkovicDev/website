@@ -1169,7 +1169,7 @@ git commit -m "fix(web): remove unused imports and variables"
 - Modify: `apps/web/e2e/hero.spec.ts` (three tests)
 - Modify: `apps/web/playwright.config.ts`
 
-- [ ] **Step 1: Replace the three failing tests**
+- [x] **Step 1: Replace the three failing tests**
 
 ```ts
 test('renders player card with CV data', async ({ page }) => {
@@ -1204,7 +1204,7 @@ test('scroll indicator fades on scroll', async ({ page }) => {
 });
 ```
 
-- [ ] **Step 2: Replace `playwright.config.ts`**
+- [x] **Step 2: Replace `playwright.config.ts`**
 
 ```ts
 import { defineConfig, devices } from '@playwright/test';
@@ -1232,14 +1232,14 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 3: Verify locally in both modes**
+- [x] **Step 3: Verify locally in both modes**
 
 Run: `pnpm --filter web test:e2e`
 Expected: `9 passed`.
 Run: `pnpm --filter web build && CI=1 pnpm --filter web test:e2e`
 Expected: `9 passed` against `next start`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/web/e2e/hero.spec.ts apps/web/playwright.config.ts
