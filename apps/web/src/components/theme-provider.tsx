@@ -1,8 +1,19 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useSyncExternalStore,
+} from 'react';
+import { useIsHydrated } from '@/hooks/use-is-hydrated';
 
 type Theme = 'light' | 'dark';
+
+export const THEME_STORAGE_KEY = 'theme';
+const DARK_QUERY = '(prefers-color-scheme: dark)';
 
 interface ThemeContextType {
   theme: Theme;
@@ -16,39 +27,54 @@ const ThemeContext = createContext<ThemeContextType>({
   mounted: false,
 });
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
-  const [mounted, setMounted] = useState(false);
+// The theme lives outside React (localStorage + OS preference); React subscribes to it.
+const listeners = new Set<() => void>();
 
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  const mediaQueryList = window.matchMedia(DARK_QUERY);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === THEME_STORAGE_KEY) onChange();
+  };
+  mediaQueryList.addEventListener('change', onChange);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    listeners.delete(onChange);
+    mediaQueryList.removeEventListener('change', onChange);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
+function readTheme(): Theme {
+  const stored = localStorage.getItem(THEME_STORAGE_KEY);
+  if (stored === 'light' || stored === 'dark') return stored;
+  return window.matchMedia(DARK_QUERY).matches ? 'dark' : 'light';
+}
+
+const getServerTheme = (): Theme => 'dark';
+
+function writeTheme(next: Theme) {
+  localStorage.setItem(THEME_STORAGE_KEY, next);
+  listeners.forEach((listener) => listener());
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const theme = useSyncExternalStore(subscribe, readTheme, getServerTheme);
+  const mounted = useIsHydrated();
+
+  // Mirror the theme onto <html>. The inline script in layout.tsx does the same before first paint.
   useEffect(() => {
-    const stored = localStorage.getItem('theme') as Theme | null;
-    if (stored) {
-      setTheme(stored);
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
-    } else {
-      setTheme('light');
-    }
-    setMounted(true);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+    document.documentElement.classList.toggle('light', theme === 'light');
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    writeTheme(readTheme() === 'dark' ? 'light' : 'dark');
   }, []);
 
-  useEffect(() => {
-    if (mounted) {
-      document.documentElement.classList.remove('light', 'dark');
-      document.documentElement.classList.add(theme);
-      localStorage.setItem('theme', theme);
-    }
-  }, [theme, mounted]);
+  const value = useMemo(() => ({ theme, toggleTheme, mounted }), [theme, toggleTheme, mounted]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  };
-
-  return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, mounted }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

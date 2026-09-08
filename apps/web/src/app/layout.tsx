@@ -15,6 +15,10 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+// Runs before React hydrates so the first paint already has the right theme (no light-to-dark flash).
+const themeInitScript =
+  "(function(){try{var s=localStorage.getItem('theme');var d=s==='dark'||(s!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.add(d?'dark':'light')}catch(e){document.documentElement.classList.add('dark')}})()";
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
@@ -80,6 +84,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <PersonJsonLd />
         <WebsiteJsonLd />
       </head>
