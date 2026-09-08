@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PATH=\"/usr/local/bin:/opt/homebrew/bin:$PATH\"; f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in */.env|*/.env.local|*/.env.*.local|*/.env.production|*/.env.development|*pnpm-lock.yaml|*/node_modules/*|*/.next/*|*/dist/*) echo \"BLOCK: $f is a protected file\" >&2; exit 2;; esac; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PATH=\"/usr/local/bin:/opt/homebrew/bin:$PATH\"; [ -s \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\" >/dev/null 2>&1; f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.json|*.md|*.css|*.yml|*.yaml) pnpm exec prettier --write \"$f\" >/dev/null 2>&1 || true;; esac; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

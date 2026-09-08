@@ -578,7 +578,7 @@ git commit -m "chore: add editorconfig, vscode recommendations and ignore rules"
 
 Both existing local hooks relied on `$CLAUDE_FILE_PATH`, which hooks do not receive, and used `exit 1`, which does not block. Hooks receive JSON on stdin and block with exit code 2.
 
-- [ ] **Step 1: `.claude/settings.json`**
+- [x] **Step 1: `.claude/settings.json`**
 
 ```json
 {
@@ -610,7 +610,7 @@ Both existing local hooks relied on `$CLAUDE_FILE_PATH`, which hooks do not rece
 }
 ```
 
-- [ ] **Step 2: Pipe-test both commands with synthetic hook input**
+- [x] **Step 2: Pipe-test both commands with synthetic hook input**
 
 ```bash
 echo '{"tool_name":"Edit","tool_input":{"file_path":"/Users/milos/projects/personal/portfolio/apps/web/.env.local"}}' | sh -c "$(jq -r '.hooks.PreToolUse[0].hooks[0].command' .claude/settings.json)"; echo "exit=$?"
@@ -631,9 +631,9 @@ echo '{"tool_name":"Write","tool_input":{"file_path":"/tmp/claude-hook-probe.ts"
 
 Expected: `const x = 1;` (prettier ran).
 
-- [ ] **Step 3: Remove the `hooks` key from `.claude/settings.local.json`** (keep `permissions`, `enableAllProjectMcpServers`, `enabledMcpjsonServers`). Validate: `jq -e 'has("hooks") | not' .claude/settings.local.json` → `true`.
+- [x] **Step 3: Remove the `hooks` key from `.claude/settings.local.json`** (keep `permissions`, `enableAllProjectMcpServers`, `enabledMcpjsonServers`). Validate: `jq -e 'has("hooks") | not' .claude/settings.local.json` → `true`.
 
-- [ ] **Step 4: Validate schema shape and commit**
+- [x] **Step 4: Validate schema shape and commit**
 
 Run: `jq -e '.hooks.PreToolUse[] | select(.matcher == "Edit|Write") | .hooks[] | select(.type == "command") | .command' .claude/settings.json`
 Expected: prints the command, exit 0.
