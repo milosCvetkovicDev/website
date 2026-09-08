@@ -5,7 +5,7 @@ import gsap from 'gsap';
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 import { DrawSVGPlugin } from 'gsap/DrawSVGPlugin';
 import { circuitPaths, circuitNodes, particleRoutes } from './circuit-data';
-import { usePrefersReducedMotion } from './use-gsap-scroll';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(MotionPathPlugin, DrawSVGPlugin);

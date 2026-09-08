@@ -1,5 +1,6 @@
 'use client';
 
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -542,7 +543,7 @@ function AnimatedPane({
       if (fallbackTimer !== undefined) clearTimeout(fallbackTimer);
       clearTimeout(timerRef.current);
     };
-  }, [addLine, config.speed]);
+  }, [addLine, config.speed, isVisibleRef]);
 
   return (
     <div
@@ -569,7 +570,7 @@ export function TmuxBackground() {
     clock: '03:14:07',
     status: 'Sat Feb 22 03:14',
   });
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isVisibleRef = useRef(true);
@@ -586,19 +587,6 @@ export function TmuxBackground() {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
-
-  // Detect reduced motion preference
-  useEffect(() => {
-    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setPrefersReducedMotion(mql.matches);
-
-    function handleChange(e: MediaQueryListEvent) {
-      setPrefersReducedMotion(e.matches);
-    }
-
-    mql.addEventListener('change', handleChange);
-    return () => mql.removeEventListener('change', handleChange);
   }, []);
 
   // Tick clock every second (pauses when off-screen)
