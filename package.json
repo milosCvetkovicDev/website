@@ -30,6 +30,7 @@
     "node": ">=22"
   },
   "lint-staged": {
+    "*.{js,jsx,mjs,cjs,ts,tsx}": "prettier --write",
     "*.{json,md,mdx,yml,yaml,css}": "prettier --write"
   }
 }
