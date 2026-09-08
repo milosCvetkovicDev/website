@@ -55,9 +55,7 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
 
         // Responsive particle count
         const isMobile = window.innerWidth < 768;
-        const activeCount = isMobile
-          ? Math.min(8, particles.length)
-          : particles.length;
+        const activeCount = isMobile ? Math.min(8, particles.length) : particles.length;
 
         // Particle motion along paths
         for (let i = 0; i < activeCount; i++) {
@@ -92,22 +90,18 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
 
         // Periodic energy pulse every ~8 seconds
         if (energyPulse) {
-          const pulseTimeline = gsap
-            .timeline({ repeat: -1, repeatDelay: 8 })
-            .fromTo(
-              energyPulse,
-              { attr: { r: 0 }, opacity: 0.15 },
-              {
-                attr: { r: 800 },
-                opacity: 0,
-                duration: 3,
-                ease: 'power2.out',
-              },
-            );
-          // Timeline extends Tween in GSAP's type hierarchy; cast for storage
-          idleTweensRef.current.push(
-            pulseTimeline as unknown as gsap.core.Tween,
+          const pulseTimeline = gsap.timeline({ repeat: -1, repeatDelay: 8 }).fromTo(
+            energyPulse,
+            { attr: { r: 0 }, opacity: 0.15 },
+            {
+              attr: { r: 800 },
+              opacity: 0,
+              duration: 3,
+              ease: 'power2.out',
+            },
           );
+          // Timeline extends Tween in GSAP's type hierarchy; cast for storage
+          idleTweensRef.current.push(pulseTimeline as unknown as gsap.core.Tween);
         }
 
         // Store a dummy timeline ref to prevent re-entry
@@ -151,82 +145,122 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
       const master = gsap.timeline({ paused: true });
 
       // Phase 1 (0-0.3): Trunk paths trace — main data highways
-      master.to(trunkPaths, {
-        drawSVG: '100%',
-        duration: 0.3,
-        stagger: 0.03,
-        ease: 'power2.out',
-      }, 0);
+      master.to(
+        trunkPaths,
+        {
+          drawSVG: '100%',
+          duration: 0.3,
+          stagger: 0.03,
+          ease: 'power2.out',
+        },
+        0,
+      );
 
       // Phase 2 (0.25-0.55): IC nodes + labels, branch paths, via nodes + labels
-      master.to(icNodes, {
-        opacity: 1,
-        scale: 1,
-        duration: 0.15,
-        stagger: 0.02,
-        ease: 'back.out(1.7)',
-      }, 0.25);
+      master.to(
+        icNodes,
+        {
+          opacity: 1,
+          scale: 1,
+          duration: 0.15,
+          stagger: 0.02,
+          ease: 'back.out(1.7)',
+        },
+        0.25,
+      );
 
       // IC labels fade in just after their nodes
-      master.to(icLabels, {
-        opacity: 1,
-        duration: 0.12,
-        stagger: 0.03,
-        ease: 'power2.out',
-      }, 0.3);
+      master.to(
+        icLabels,
+        {
+          opacity: 1,
+          duration: 0.12,
+          stagger: 0.03,
+          ease: 'power2.out',
+        },
+        0.3,
+      );
 
-      master.to(branchPaths, {
-        drawSVG: '100%',
-        duration: 0.3,
-        stagger: 0.02,
-        ease: 'power1.out',
-      }, 0.3);
+      master.to(
+        branchPaths,
+        {
+          drawSVG: '100%',
+          duration: 0.3,
+          stagger: 0.02,
+          ease: 'power1.out',
+        },
+        0.3,
+      );
 
-      master.to(viaNodes, {
-        opacity: 1,
-        scale: 1,
-        duration: 0.15,
-        stagger: 0.01,
-        ease: 'back.out(1.4)',
-      }, 0.4);
+      master.to(
+        viaNodes,
+        {
+          opacity: 1,
+          scale: 1,
+          duration: 0.15,
+          stagger: 0.01,
+          ease: 'back.out(1.4)',
+        },
+        0.4,
+      );
 
       // Via labels fade in with their nodes
-      master.to(viaLabels, {
-        opacity: 1,
-        duration: 0.1,
-        stagger: 0.02,
-        ease: 'power2.out',
-      }, 0.45);
+      master.to(
+        viaLabels,
+        {
+          opacity: 1,
+          duration: 0.1,
+          stagger: 0.02,
+          ease: 'power2.out',
+        },
+        0.45,
+      );
 
       // Phase 3 (0.6-0.9): Tertiary traces, solder nodes + labels, particles
-      master.to(tracePaths, {
-        drawSVG: '100%',
-        duration: 0.2,
-        stagger: 0.015,
-        ease: 'power1.out',
-      }, 0.6);
+      master.to(
+        tracePaths,
+        {
+          drawSVG: '100%',
+          duration: 0.2,
+          stagger: 0.015,
+          ease: 'power1.out',
+        },
+        0.6,
+      );
 
-      master.to(solderNodes, {
-        opacity: 1,
-        scale: 1,
-        duration: 0.1,
-        stagger: 0.01,
-        ease: 'power2.out',
-      }, 0.7);
+      master.to(
+        solderNodes,
+        {
+          opacity: 1,
+          scale: 1,
+          duration: 0.1,
+          stagger: 0.01,
+          ease: 'power2.out',
+        },
+        0.7,
+      );
 
       // Solder labels (faintest)
-      master.to(solderLabels, {
-        opacity: 1,
-        duration: 0.1,
-        stagger: 0.01,
-        ease: 'power2.out',
-      }, 0.75);
+      master.to(
+        solderLabels,
+        {
+          opacity: 1,
+          duration: 0.1,
+          stagger: 0.01,
+          ease: 'power2.out',
+        },
+        0.75,
+      );
 
-      master.to(particles, {
-        opacity: 1,
-        duration: 0.1,
-        stagger: 0.02,
-      }, 0.75);
+      master.to(
+        particles,
+        {
+          opacity: 1,
+          duration: 0.1,
+          stagger: 0.02,
+        },
+        0.75,
+      );
 
       // Phase 4 (0.9-1.0): Energy pulse
       if (energyPulse) {
@@ -271,9 +305,7 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
       const observer = new IntersectionObserver(
         (entries) => {
           const isVisible = entries[0]?.isIntersecting ?? false;
-          idleTweensRef.current.forEach((t) =>
-            isVisible ? t.play() : t.pause(),
-          );
+          idleTweensRef.current.forEach((t) => (isVisible ? t.play() : t.pause()));
         },
         { threshold: 0 },
       );
@@ -286,12 +318,12 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
     const staticOpacity = prefersReducedMotion ? 1 : 0;
 
     return (
-      <div className="fixed inset-0 pointer-events-none z-[1] overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden">
         <svg
           ref={svgRef}
           viewBox="0 0 1920 1080"
           preserveAspectRatio="xMidYMid slice"
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 h-full w-full"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
@@ -397,5 +429,5 @@ export const CircuitBackground = forwardRef<CircuitBackgroundHandle, CircuitBack
         </svg>
       </div>
     );
-  }
+  },
 );

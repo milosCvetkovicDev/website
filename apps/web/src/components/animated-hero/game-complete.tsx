@@ -15,9 +15,7 @@ export function GameComplete() {
 
     gsap.registerPlugin(ScrollTrigger);
 
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (prefersReducedMotion) return;
 
@@ -34,7 +32,7 @@ export function GameComplete() {
       tl.fromTo(
         terminalRef.current,
         { opacity: 0, scale: 0.95 },
-        { opacity: 1, scale: 1, duration: 0.6, ease: 'power2.out' }
+        { opacity: 1, scale: 1, duration: 0.6, ease: 'power2.out' },
       );
 
       // CTA pulses
@@ -42,7 +40,7 @@ export function GameComplete() {
         ctaRef.current,
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.3'
+        '+=0.3',
       );
 
       // Add subtle pulse to CTA
@@ -55,7 +53,7 @@ export function GameComplete() {
           yoyo: true,
           ease: 'power1.inOut',
         },
-        '+=0.2'
+        '+=0.2',
       );
     }, sectionRef);
 
@@ -63,15 +61,12 @@ export function GameComplete() {
   }, []);
 
   return (
-    <section
-      ref={sectionRef}
-      className="min-h-screen flex items-center justify-center px-6 py-24"
-    >
+    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
       <div className="w-full max-w-xl text-center">
         <div ref={terminalRef}>
           <Terminal className="text-left">
             <div className="space-y-4">
-              <div className="text-center py-4 border-b border-[#30363d]">
+              <div className="border-b border-[#30363d] py-4 text-center">
                 <span className="text-lg font-bold text-green-400">
                   <AnimatedText animation="scramble">SESSION COMPLETE</AnimatedText>
                 </span>
@@ -92,12 +87,16 @@ export function GameComplete() {
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-[#30363d] text-center space-y-4">
+              <div className="space-y-4 border-t border-[#30363d] pt-4 text-center">
                 <p className="text-xl font-semibold">
-                  <AnimatedText animation="perspective">This is how I work. Every time.</AnimatedText>
+                  <AnimatedText animation="perspective">
+                    This is how I work. Every time.
+                  </AnimatedText>
                 </p>
                 <p className="text-[var(--muted)]">
-                  <AnimatedText animation="magnetic">Follow along for more engineering deep dives.</AnimatedText>
+                  <AnimatedText animation="magnetic">
+                    Follow along for more engineering deep dives.
+                  </AnimatedText>
                 </p>
               </div>
             </div>
@@ -109,13 +108,13 @@ export function GameComplete() {
           href="https://www.linkedin.com/in/milos-cvetkovic-dev"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center px-8 py-4 mt-8 bg-[var(--accent)] text-white font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-all text-lg"
+          className="mt-8 inline-flex items-center justify-center rounded-lg bg-[var(--accent)] px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-[var(--accent-hover)]"
         >
           Connect on LinkedIn
         </a>
 
         {/* Scroll indicator to continue to rest of site */}
-        <div className="mt-16 text-[var(--muted)] text-sm">
+        <div className="mt-16 text-sm text-[var(--muted)]">
           <p>Or scroll down to see more of my work</p>
           <div className="mt-4 animate-bounce">
             <svg

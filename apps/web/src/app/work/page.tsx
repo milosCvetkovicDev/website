@@ -13,7 +13,10 @@ export const metadata: Metadata = {
 };
 
 // Project metadata for enhanced display
-const projectMeta: Record<string, { category: string; status: string; metric: { value: string; label: string } }> = {
+const projectMeta: Record<
+  string,
+  { category: string; status: string; metric: { value: string; label: string } }
+> = {
   'self-healing-agent': {
     category: 'AI AGENT',
     status: 'LIVE',
@@ -34,16 +37,28 @@ const projectMeta: Record<string, { category: string; status: string; metric: { 
 function CornerBrackets() {
   return (
     <>
-      <svg className="absolute -top-px -left-px w-3 h-3 text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300" viewBox="0 0 12 12">
+      <svg
+        className="absolute -top-px -left-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        viewBox="0 0 12 12"
+      >
         <path d="M0 6 L0 0 L6 0" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
-      <svg className="absolute -top-px -right-px w-3 h-3 text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300" viewBox="0 0 12 12">
+      <svg
+        className="absolute -top-px -right-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        viewBox="0 0 12 12"
+      >
         <path d="M6 0 L12 0 L12 6" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
-      <svg className="absolute -bottom-px -left-px w-3 h-3 text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300" viewBox="0 0 12 12">
+      <svg
+        className="absolute -bottom-px -left-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        viewBox="0 0 12 12"
+      >
         <path d="M0 6 L0 12 L6 12" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
-      <svg className="absolute -bottom-px -right-px w-3 h-3 text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300" viewBox="0 0 12 12">
+      <svg
+        className="absolute -right-px -bottom-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        viewBox="0 0 12 12"
+      >
         <path d="M6 12 L12 12 L12 6" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
     </>
@@ -57,75 +72,86 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
   return (
     <Link
       href={`/work/${project.slug}`}
-      className={`group relative block rounded-lg border border-[var(--border)] bg-[var(--card)]/50 backdrop-blur-sm hover:bg-[var(--accent)]/5 hover:border-[var(--accent)]/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)] ${
+      className={`group relative block rounded-lg border border-[var(--border)] bg-[var(--card)]/50 backdrop-blur-sm transition-all duration-300 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/5 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)] ${
         isFirst ? 'p-8' : 'p-6'
       }`}
     >
       <CornerBrackets />
 
       {/* Header row */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className={`font-mono font-bold text-[var(--accent)]/30 group-hover:text-[var(--accent)]/60 transition-colors ${
-            isFirst ? 'text-3xl' : 'text-2xl'
-          }`}>
+          <span
+            className={`font-mono font-bold text-[var(--accent)]/30 transition-colors group-hover:text-[var(--accent)]/60 ${
+              isFirst ? 'text-3xl' : 'text-2xl'
+            }`}
+          >
             {String(index + 1).padStart(2, '0')}
           </span>
           {meta && (
-            <span className="px-2 py-0.5 text-[10px] font-mono tracking-wider text-[var(--muted)] border border-[var(--border)] rounded group-hover:border-[var(--accent)]/30 group-hover:text-[var(--accent)] transition-colors">
+            <span className="rounded border border-[var(--border)] px-2 py-0.5 font-mono text-[10px] tracking-wider text-[var(--muted)] transition-colors group-hover:border-[var(--accent)]/30 group-hover:text-[var(--accent)]">
               {meta.category}
             </span>
           )}
         </div>
         {meta && (
           <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[10px] font-mono text-green-500/80">{meta.status}</span>
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+            <span className="font-mono text-[10px] text-green-500/80">{meta.status}</span>
           </div>
         )}
       </div>
 
       {/* Main content */}
       <div className={`flex flex-col ${isFirst ? 'lg:flex-row lg:gap-8' : 'gap-4'}`}>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           {/* Title */}
-          <h2 className={`font-semibold mb-3 group-hover:text-[var(--accent)] transition-colors flex items-center gap-2 ${
-            isFirst ? 'text-2xl md:text-3xl' : 'text-xl'
-          }`}>
+          <h2
+            className={`mb-3 flex items-center gap-2 font-semibold transition-colors group-hover:text-[var(--accent)] ${
+              isFirst ? 'text-2xl md:text-3xl' : 'text-xl'
+            }`}
+          >
             {project.title}
             <svg
-              className="w-5 h-5 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300"
+              className="h-5 w-5 -translate-x-2 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 8l4 4m0 0l-4 4m4-4H3"
+              />
             </svg>
           </h2>
 
           {/* Description */}
-          <p className={`text-[var(--muted)] mb-4 ${isFirst ? 'text-lg' : 'text-sm'}`}>
+          <p className={`mb-4 text-[var(--muted)] ${isFirst ? 'text-lg' : 'text-sm'}`}>
             {project.description}
           </p>
 
           {/* Challenge teaser - only for first/featured */}
           {isFirst && (
-            <div className="mb-4 p-4 rounded-lg border border-[var(--border)] bg-[var(--background)]/50">
-              <p className="text-xs font-mono text-[var(--accent)] uppercase tracking-wider mb-2">The Challenge</p>
-              <p className="text-sm text-[var(--muted)] line-clamp-2">
-                {project.challenge}
+            <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--background)]/50 p-4">
+              <p className="mb-2 font-mono text-xs tracking-wider text-[var(--accent)] uppercase">
+                The Challenge
               </p>
+              <p className="line-clamp-2 text-sm text-[var(--muted)]">{project.challenge}</p>
             </div>
           )}
 
           {/* Impact preview */}
           {isFirst && (
             <div className="mb-4">
-              <p className="text-xs font-mono text-[var(--accent)] uppercase tracking-wider mb-2">Key Outcomes</p>
+              <p className="mb-2 font-mono text-xs tracking-wider text-[var(--accent)] uppercase">
+                Key Outcomes
+              </p>
               <ul className="space-y-1">
                 {project.impact.slice(0, 3).map((item, i) => (
-                  <li key={i} className="text-sm text-[var(--muted)] flex items-start gap-2">
-                    <span className="text-green-400 mt-0.5">✓</span>
+                  <li key={i} className="flex items-start gap-2 text-sm text-[var(--muted)]">
+                    <span className="mt-0.5 text-green-400">✓</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -138,7 +164,7 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
             {project.tags.slice(0, isFirst ? 6 : 4).map((tag) => (
               <span
                 key={tag}
-                className="px-2 py-1 text-xs font-mono rounded bg-[var(--accent)]/10 text-[var(--accent)]/80 group-hover:bg-[var(--accent)]/20 transition-colors"
+                className="rounded bg-[var(--accent)]/10 px-2 py-1 font-mono text-xs text-[var(--accent)]/80 transition-colors group-hover:bg-[var(--accent)]/20"
               >
                 {tag}
               </span>
@@ -148,13 +174,17 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
 
         {/* Metric highlight */}
         {meta && (
-          <div className={`shrink-0 p-4 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 text-center group-hover:border-[var(--accent)]/40 group-hover:bg-[var(--accent)]/10 transition-colors ${
-            isFirst ? 'lg:w-40 lg:self-start mt-4 lg:mt-0' : 'w-full mt-4'
-          }`}>
-            <div className={`font-bold text-[var(--accent)] mb-1 font-mono ${isFirst ? 'text-4xl' : 'text-2xl'}`}>
+          <div
+            className={`shrink-0 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-4 text-center transition-colors group-hover:border-[var(--accent)]/40 group-hover:bg-[var(--accent)]/10 ${
+              isFirst ? 'mt-4 lg:mt-0 lg:w-40 lg:self-start' : 'mt-4 w-full'
+            }`}
+          >
+            <div
+              className={`mb-1 font-mono font-bold text-[var(--accent)] ${isFirst ? 'text-4xl' : 'text-2xl'}`}
+            >
               {meta.metric.value}
             </div>
-            <div className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-wider">
+            <div className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
               {meta.metric.label}
             </div>
           </div>
@@ -162,22 +192,27 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
       </div>
 
       {/* Read more indicator */}
-      <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center justify-between">
-        <span className="text-sm text-[var(--muted)] group-hover:text-[var(--accent)] transition-colors">
+      <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-4">
+        <span className="text-sm text-[var(--muted)] transition-colors group-hover:text-[var(--accent)]">
           Read full case study
         </span>
         <svg
-          className="w-4 h-4 text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all"
+          className="h-4 w-4 text-[var(--muted)] transition-all group-hover:translate-x-1 group-hover:text-[var(--accent)]"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M14 5l7 7m0 0l-7 7m7-7H3"
+          />
         </svg>
       </div>
 
       {/* Scan line effect */}
-      <div className="absolute inset-0 overflow-hidden rounded-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg opacity-0 transition-opacity group-hover:opacity-100">
         <div
           className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/20 to-transparent"
           style={{ animation: 'scan-down 2s linear infinite' }}
@@ -189,12 +224,13 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
 
 export default function WorkPage() {
   return (
-    <div className="py-16 md:py-24 relative overflow-hidden">
+    <div className="relative overflow-hidden py-16 md:py-24">
       {/* Subtle grid background */}
       <div
         className="absolute inset-0 opacity-[0.02]"
         style={{
-          backgroundImage: 'linear-gradient(rgba(139, 92, 246, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.5) 1px, transparent 1px)',
+          backgroundImage:
+            'linear-gradient(rgba(139, 92, 246, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.5) 1px, transparent 1px)',
           backgroundSize: '60px 60px',
         }}
       />
@@ -202,36 +238,40 @@ export default function WorkPage() {
       <div className="relative mx-auto max-w-5xl px-6">
         {/* Header */}
         <div className="mb-12">
-          <div className="flex items-center gap-4 mb-4">
+          <div className="mb-4 flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
-              <p className="text-xs font-mono text-[var(--accent)] uppercase tracking-widest">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
+              <p className="font-mono text-xs tracking-widest text-[var(--accent)] uppercase">
                 Case Studies
               </p>
             </div>
             <div className="h-px flex-1 bg-gradient-to-r from-[var(--accent)]/50 to-transparent" />
           </div>
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
+          <h1 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
             Problems solved. Systems shipped.
           </h1>
-          <p className="text-xl text-[var(--muted)] max-w-2xl">
+          <p className="max-w-2xl text-xl text-[var(--muted)]">
             Real projects with real constraints. Each one pushed boundaries—and delivered results.
           </p>
         </div>
 
         {/* Stats bar */}
-        <div className="mb-12 p-4 rounded-lg border border-[var(--border)] bg-[var(--card)]/50 flex flex-wrap justify-center gap-8 md:gap-16">
+        <div className="mb-12 flex flex-wrap justify-center gap-8 rounded-lg border border-[var(--border)] bg-[var(--card)]/50 p-4 md:gap-16">
           <div className="text-center">
             <div className="text-2xl font-bold text-[var(--accent)]">{caseStudies.length}</div>
-            <div className="text-xs text-[var(--muted)] uppercase tracking-wider">Projects</div>
+            <div className="text-xs tracking-wider text-[var(--muted)] uppercase">Projects</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-[var(--accent)]">100%</div>
-            <div className="text-xs text-[var(--muted)] uppercase tracking-wider">In Production</div>
+            <div className="text-xs tracking-wider text-[var(--muted)] uppercase">
+              In Production
+            </div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-[var(--accent)]">0</div>
-            <div className="text-xs text-[var(--muted)] uppercase tracking-wider">Left Unfinished</div>
+            <div className="text-xs tracking-wider text-[var(--muted)] uppercase">
+              Left Unfinished
+            </div>
           </div>
         </div>
 
@@ -243,20 +283,26 @@ export default function WorkPage() {
         </div>
 
         {/* CTA */}
-        <div className="mt-16 text-center p-8 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5">
-          <h2 className="text-2xl font-bold mb-4">Like what you see?</h2>
-          <p className="text-[var(--muted)] mb-6 max-w-lg mx-auto">
-            I share engineering deep dives, project updates, and lessons learned. Connect with me to follow along.
+        <div className="mt-16 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-8 text-center">
+          <h2 className="mb-4 text-2xl font-bold">Like what you see?</h2>
+          <p className="mx-auto mb-6 max-w-lg text-[var(--muted)]">
+            I share engineering deep dives, project updates, and lessons learned. Connect with me to
+            follow along.
           </p>
           <a
             href="https://www.linkedin.com/in/milos-cvetkovic-dev"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--accent)] text-white font-semibold rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-6 py-3 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
           >
             <span>Connect on LinkedIn</span>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M14 5l7 7m0 0l-7 7m7-7H3"
+              />
             </svg>
           </a>
         </div>

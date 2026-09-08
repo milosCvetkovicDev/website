@@ -51,7 +51,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
         {/* Back link */}
         <Link
           href="/work"
-          className="inline-flex items-center gap-2 text-[var(--muted)] hover:text-[var(--foreground)] mb-8 transition-colors"
+          className="mb-8 inline-flex items-center gap-2 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -72,20 +72,16 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
         {/* Header */}
         <header className="mb-12">
-          <p className="text-sm font-medium text-[var(--accent)] uppercase tracking-wider mb-4">
+          <p className="mb-4 text-sm font-medium tracking-wider text-[var(--accent)] uppercase">
             Case Study
           </p>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            {caseStudy.title}
-          </h1>
-          <p className="text-xl text-[var(--muted)] mb-6">
-            {caseStudy.description}
-          </p>
+          <h1 className="mb-4 text-4xl font-bold md:text-5xl">{caseStudy.title}</h1>
+          <p className="mb-6 text-xl text-[var(--muted)]">{caseStudy.description}</p>
           <div className="flex flex-wrap gap-2">
             {caseStudy.tags.map((tag) => (
               <span
                 key={tag}
-                className="px-3 py-1 text-sm font-medium rounded-full bg-[var(--accent)]/10 text-[var(--accent)]"
+                className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-sm font-medium text-[var(--accent)]"
               >
                 {tag}
               </span>
@@ -95,7 +91,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
         {/* The Challenge */}
         <section className="mb-12">
-          <h2 className="text-sm font-medium text-[var(--muted)] uppercase tracking-wider mb-4">
+          <h2 className="mb-4 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
             The Challenge
           </h2>
           <p className="text-lg leading-relaxed">{caseStudy.challenge}</p>
@@ -103,7 +99,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
         {/* My Approach */}
         <section className="mb-12">
-          <h2 className="text-sm font-medium text-[var(--muted)] uppercase tracking-wider mb-4">
+          <h2 className="mb-4 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
             My Approach
           </h2>
           <p className="text-lg leading-relaxed">{caseStudy.approach}</p>
@@ -111,13 +107,13 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
         {/* Key Contributions */}
         <section className="mb-12">
-          <h2 className="text-sm font-medium text-[var(--muted)] uppercase tracking-wider mb-4">
+          <h2 className="mb-4 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
             Key Contributions
           </h2>
           <ul className="space-y-3">
             {caseStudy.contributions.map((contribution, index) => (
               <li key={index} className="flex gap-3">
-                <span className="text-[var(--accent)] mt-1.5">
+                <span className="mt-1.5 text-[var(--accent)]">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"
@@ -140,13 +136,13 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
         {/* Impact */}
         <section className="mb-12">
-          <h2 className="text-sm font-medium text-[var(--muted)] uppercase tracking-wider mb-4">
+          <h2 className="mb-4 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
             Impact
           </h2>
           <ul className="space-y-3">
             {caseStudy.impact.map((item, index) => (
               <li key={index} className="flex gap-3">
-                <span className="text-green-500 mt-1.5">
+                <span className="mt-1.5 text-green-500">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"
@@ -170,23 +166,23 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
         {/* Tech Stack */}
         <section className="mb-12">
-          <h2 className="text-sm font-medium text-[var(--muted)] uppercase tracking-wider mb-6">
+          <h2 className="mb-6 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
             Tech Stack
           </h2>
           <div className="grid gap-4">
             {caseStudy.techStack.map((category) => (
               <div
                 key={category.category}
-                className="p-4 rounded-lg border border-[var(--border)] bg-[var(--card)]"
+                className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4"
               >
-                <h3 className="text-sm font-medium text-[var(--muted)] mb-3">
+                <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">
                   {category.category}
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {category.items.map((item) => (
                     <span
                       key={item}
-                      className="px-3 py-1 text-sm rounded-lg border border-[var(--border)] bg-[var(--background)]"
+                      className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1 text-sm"
                     >
                       {item}
                     </span>
@@ -198,15 +194,15 @@ export default async function CaseStudyPage({ params }: PageProps) {
         </section>
 
         {/* CTA */}
-        <section className="pt-8 border-t border-[var(--border)]">
-          <p className="text-[var(--muted)] mb-4">
+        <section className="border-t border-[var(--border)] pt-8">
+          <p className="mb-4 text-[var(--muted)]">
             Want to see more projects like this? Connect with me on social media.
           </p>
           <a
             href="https://www.linkedin.com/in/milos-cvetkovic-dev"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center px-6 py-3 bg-[var(--accent)] text-white font-medium rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
+            className="inline-flex items-center justify-center rounded-lg bg-[var(--accent)] px-6 py-3 font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
           >
             Connect on LinkedIn
           </a>

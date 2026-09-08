@@ -46,7 +46,9 @@ test.describe('Hero Section', () => {
 
   test('tmux log lines animate into panes', async ({ page }) => {
     // Wait for actual log content to appear instead of arbitrary timeout
-    await expect(page.getByText('OOMKilled', { exact: false }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('OOMKilled', { exact: false }).first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('scroll indicator fades on scroll', async ({ page }) => {
@@ -62,7 +64,9 @@ test.describe('Hero Section', () => {
 
   test('dark mode toggles hero appearance', async ({ page }) => {
     // Find and click the theme toggle
-    const themeToggle = page.getByRole('button', { name: /switch to light mode/i });
+    const themeToggle = page.getByRole('button', {
+      name: /switch to light mode/i,
+    });
     await themeToggle.click();
 
     // Verify the page switched (html should not have .dark class)
@@ -70,7 +74,9 @@ test.describe('Hero Section', () => {
     expect(htmlClass).not.toContain('dark');
 
     // Toggle back
-    const darkToggle = page.getByRole('button', { name: /switch to dark mode/i });
+    const darkToggle = page.getByRole('button', {
+      name: /switch to dark mode/i,
+    });
     await darkToggle.click();
 
     const htmlClass2 = await page.evaluate(() => document.documentElement.className);

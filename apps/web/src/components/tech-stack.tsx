@@ -21,28 +21,25 @@ const techCategories = [
 
 export function TechStack() {
   return (
-    <section className="py-16 border-t border-[var(--border)]">
+    <section className="border-t border-[var(--border)] py-16">
       <div className="mx-auto max-w-5xl px-6">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-sm font-medium text-[var(--muted)] uppercase tracking-wider">
+        <div className="mb-8 flex items-center justify-between">
+          <h2 className="text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
             Tech Stack
           </h2>
-          <Link
-            href="/skills"
-            className="text-sm text-[var(--accent)] hover:underline"
-          >
+          <Link href="/skills" className="text-sm text-[var(--accent)] hover:underline">
             View all skills →
           </Link>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {techCategories.map((category) => (
             <div key={category.name}>
-              <h3 className="text-sm font-medium mb-3">{category.name}</h3>
+              <h3 className="mb-3 text-sm font-medium">{category.name}</h3>
               <div className="flex flex-wrap gap-2">
                 {category.techs.map((tech) => (
                   <span
                     key={tech}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border)] bg-[var(--card)] hover:border-[var(--accent)]/50 transition-colors cursor-default"
+                    className="cursor-default rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm transition-colors hover:border-[var(--accent)]/50"
                   >
                     {tech}
                   </span>

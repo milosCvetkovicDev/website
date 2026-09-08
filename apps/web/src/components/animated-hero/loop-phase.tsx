@@ -6,9 +6,17 @@ import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 
 const healingTimeline = [
-  { time: '03:14 AM', event: 'NullPointerException in /api/orders', type: 'error' },
+  {
+    time: '03:14 AM',
+    event: 'NullPointerException in /api/orders',
+    type: 'error',
+  },
   { time: '03:14 AM', event: 'Agent activated', type: 'info' },
-  { time: '03:15 AM', event: 'Root cause identified: missing null check', type: 'info' },
+  {
+    time: '03:15 AM',
+    event: 'Root cause identified: missing null check',
+    type: 'info',
+  },
   { time: '03:16 AM', event: 'Fix generated', type: 'success' },
   { time: '03:16 AM', event: 'PR #847 opened', type: 'success' },
   { time: '03:17 AM', event: 'Tests passing', type: 'success' },
@@ -32,9 +40,7 @@ export function LoopPhase() {
 
     gsap.registerPlugin(ScrollTrigger);
 
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (prefersReducedMotion) {
       setVisibleEvents(healingTimeline.length);
@@ -62,7 +68,7 @@ export function LoopPhase() {
             trigger: sectionRef.current,
             start: 'top center',
           },
-        }
+        },
       );
     }, sectionRef);
 
@@ -75,39 +81,42 @@ export function LoopPhase() {
       gsap.fromTo(
         alertRef.current,
         { opacity: 0, scale: 0.9 },
-        { opacity: 1, scale: 1, duration: 0.3 }
+        { opacity: 1, scale: 1, duration: 0.3 },
       );
     }, 500);
 
     // Timeline events appear one by one
     healingTimeline.forEach((_, index) => {
-      setTimeout(() => {
-        setVisibleEvents(index + 1);
+      setTimeout(
+        () => {
+          setVisibleEvents(index + 1);
 
-        // Resolve alert when we hit the success events
-        if (index === healingTimeline.length - 1) {
-          setTimeout(() => {
-            setAlertStatus('resolved');
-
-            // Show protocol notification
+          // Resolve alert when we hit the success events
+          if (index === healingTimeline.length - 1) {
             setTimeout(() => {
-              setShowProtocol(true);
-              gsap.fromTo(
-                protocolRef.current,
-                { opacity: 0, y: 20 },
-                { opacity: 1, y: 0, duration: 0.5, ease: 'back.out(1.7)' }
-              );
+              setAlertStatus('resolved');
 
-              // Headline
-              gsap.fromTo(
-                headlineRef.current,
-                { opacity: 0, y: 20 },
-                { opacity: 1, y: 0, duration: 0.5 }
-              );
+              // Show protocol notification
+              setTimeout(() => {
+                setShowProtocol(true);
+                gsap.fromTo(
+                  protocolRef.current,
+                  { opacity: 0, y: 20 },
+                  { opacity: 1, y: 0, duration: 0.5, ease: 'back.out(1.7)' },
+                );
+
+                // Headline
+                gsap.fromTo(
+                  headlineRef.current,
+                  { opacity: 0, y: 20 },
+                  { opacity: 1, y: 0, duration: 0.5 },
+                );
+              }, 500);
             }, 500);
-          }, 500);
-        }
-      }, 800 + index * 400);
+          }
+        },
+        800 + index * 400,
+      );
     });
   };
 
@@ -123,17 +132,14 @@ export function LoopPhase() {
   };
 
   return (
-    <section
-      ref={sectionRef}
-      className="min-h-screen flex items-center justify-center px-6 py-24"
-    >
+    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
       <div className="w-full max-w-3xl">
         {/* Phase Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <span className="px-3 py-1 bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-mono rounded-full">
+        <div className="mb-8 flex items-center gap-3">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
             <AnimatedText animation="elastic">PHASE 5</AnimatedText>
           </span>
-          <AnimatedText animation="wave" className="text-sm font-mono text-[var(--muted)]">
+          <AnimatedText animation="wave" className="font-mono text-sm text-[var(--muted)]">
             THE LOOP
           </AnimatedText>
         </div>
@@ -141,16 +147,16 @@ export function LoopPhase() {
         {/* Dashboard */}
         <div ref={dashboardRef}>
           <HudPanel title="MONITORING DASHBOARD">
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="text-center p-3 rounded-lg bg-[var(--background)]">
+            <div className="mb-6 grid grid-cols-3 gap-4">
+              <div className="rounded-lg bg-[var(--background)] p-3 text-center">
                 <div className="text-2xl font-bold text-green-400">99.9%</div>
                 <div className="text-xs text-[var(--muted)]">UPTIME</div>
               </div>
-              <div className="text-center p-3 rounded-lg bg-[var(--background)]">
+              <div className="rounded-lg bg-[var(--background)] p-3 text-center">
                 <div className="text-2xl font-bold text-[var(--accent)]">47ms</div>
                 <div className="text-xs text-[var(--muted)]">AVG LATENCY</div>
               </div>
-              <div className="text-center p-3 rounded-lg bg-[var(--background)]">
+              <div className="rounded-lg bg-[var(--background)] p-3 text-center">
                 <div className="text-2xl font-bold text-yellow-400">3</div>
                 <div className="text-xs text-[var(--muted)]">AUTO-FIXES TODAY</div>
               </div>
@@ -159,7 +165,7 @@ export function LoopPhase() {
             {/* Alert */}
             <div
               ref={alertRef}
-              className={`p-4 rounded-lg border transition-all duration-500 ${
+              className={`rounded-lg border p-4 transition-all duration-500 ${
                 alertStatus === 'error'
                   ? 'border-red-500/50 bg-red-500/10'
                   : 'border-green-500/50 bg-green-500/10'
@@ -167,10 +173,8 @@ export function LoopPhase() {
             >
               <div className="flex items-center gap-3">
                 <span
-                  className={`w-3 h-3 rounded-full ${
-                    alertStatus === 'error'
-                      ? 'bg-red-500 animate-pulse'
-                      : 'bg-green-500'
+                  className={`h-3 w-3 rounded-full ${
+                    alertStatus === 'error' ? 'animate-pulse bg-red-500' : 'bg-green-500'
                   }`}
                 />
                 <span
@@ -190,18 +194,15 @@ export function LoopPhase() {
           <HudPanel title="SELF-HEALING LOG">
             <div className="space-y-2 font-mono text-sm">
               {healingTimeline.slice(0, visibleEvents).map((event, index) => (
-                <div
-                  key={index}
-                  className="flex items-start gap-3 animate-fade-in"
-                >
-                  <span className="text-[var(--muted)] shrink-0">{event.time}</span>
+                <div key={index} className="animate-fade-in flex items-start gap-3">
+                  <span className="shrink-0 text-[var(--muted)]">{event.time}</span>
                   <span className="text-[var(--muted)]">—</span>
                   <span className={getEventColor(event.type)}>{event.event}</span>
                 </div>
               ))}
               {visibleEvents > 0 && visibleEvents < healingTimeline.length && (
                 <div className="flex items-center gap-2 text-[var(--muted)]">
-                  <span className="w-2 h-2 bg-[var(--accent)] rounded-full animate-pulse" />
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
                   <span>Processing...</span>
                 </div>
               )}
@@ -225,18 +226,16 @@ export function LoopPhase() {
         </div>
 
         {/* Headline */}
-        <div
-          ref={headlineRef}
-          className={`mt-16 text-center ${showProtocol ? '' : 'opacity-0'}`}
-        >
-          <h2 className="text-2xl md:text-4xl font-bold mb-3">
+        <div ref={headlineRef} className={`mt-16 text-center ${showProtocol ? '' : 'opacity-0'}`}>
+          <h2 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="morse">
               This happened at 3:14am. Nobody got paged.
             </AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
             <AnimatedText animation="stagger-up">
-              The system diagnosed itself, wrote a fix, and waited for a human to approve. That&apos;s the future I build.
+              The system diagnosed itself, wrote a fix, and waited for a human to approve.
+              That&apos;s the future I build.
             </AnimatedText>
           </p>
         </div>

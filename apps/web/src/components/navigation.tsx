@@ -23,7 +23,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="p-2 rounded-lg hover:bg-[var(--card-hover)] transition-colors"
+      className="rounded-lg p-2 transition-colors hover:bg-[var(--card-hover)]"
       aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
     >
       {isDark ? (
@@ -75,12 +75,8 @@ function MobileMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
   return (
     <div className="fixed inset-0 z-50 md:hidden">
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-64 bg-[var(--background)] border-l border-[var(--border)] p-6">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2"
-          aria-label="Close menu"
-        >
+      <div className="fixed top-0 right-0 h-full w-64 border-l border-[var(--border)] bg-[var(--background)] p-6">
+        <button onClick={onClose} className="absolute top-4 right-4 p-2" aria-label="Close menu">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"
@@ -123,13 +119,16 @@ export function Navigation() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm">
-      <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="font-semibold text-lg hover:text-[var(--accent)] transition-colors">
+      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+        <Link
+          href="/"
+          className="text-lg font-semibold transition-colors hover:text-[var(--accent)]"
+        >
           MC
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="hidden items-center gap-6 md:flex">
           {navLinks.slice(1).map((link) => (
             <Link
               key={link.href}
@@ -149,11 +148,7 @@ export function Navigation() {
         {/* Mobile Navigation */}
         <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="p-2"
-            aria-label="Open menu"
-          >
+          <button onClick={() => setMobileMenuOpen(true)} className="p-2" aria-label="Open menu">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"

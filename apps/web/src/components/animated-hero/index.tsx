@@ -8,12 +8,22 @@ import { SectionProgress } from './section-progress';
 const MemoizedHeroSection = memo(HeroSection);
 
 // Lazy load heavy components that are below the fold
-const DiscoveryPhase = lazy(() => import('./discovery-phase').then(m => ({ default: m.DiscoveryPhase })));
-const StrategyPhase = lazy(() => import('./strategy-phase').then(m => ({ default: m.StrategyPhase })));
-const ExecutionPhase = lazy(() => import('./execution-phase').then(m => ({ default: m.ExecutionPhase })));
-const GauntletPhase = lazy(() => import('./gauntlet-phase').then(m => ({ default: m.GauntletPhase })));
-const LoopPhase = lazy(() => import('./loop-phase').then(m => ({ default: m.LoopPhase })));
-const GameComplete = lazy(() => import('./game-complete').then(m => ({ default: m.GameComplete })));
+const DiscoveryPhase = lazy(() =>
+  import('./discovery-phase').then((m) => ({ default: m.DiscoveryPhase })),
+);
+const StrategyPhase = lazy(() =>
+  import('./strategy-phase').then((m) => ({ default: m.StrategyPhase })),
+);
+const ExecutionPhase = lazy(() =>
+  import('./execution-phase').then((m) => ({ default: m.ExecutionPhase })),
+);
+const GauntletPhase = lazy(() =>
+  import('./gauntlet-phase').then((m) => ({ default: m.GauntletPhase })),
+);
+const LoopPhase = lazy(() => import('./loop-phase').then((m) => ({ default: m.LoopPhase })));
+const GameComplete = lazy(() =>
+  import('./game-complete').then((m) => ({ default: m.GameComplete })),
+);
 
 const MemoizedSectionProgress = memo(SectionProgress);
 
@@ -47,7 +57,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
     // Animate progress bar
     const progressInterval = setInterval(() => {
-      setProgress(prev => {
+      setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(progressInterval);
           return 100;
@@ -60,7 +70,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
     // Cycle through boot messages
     const messageTimers = bootMessages.map((msg, i) =>
-      setTimeout(() => setCurrentMessage(i), msg.delay)
+      setTimeout(() => setCurrentMessage(i), msg.delay),
     );
 
     return () => {
@@ -80,15 +90,16 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
   return (
     <div
-      className={`fixed inset-0 z-[1] bg-[var(--background)] flex items-center justify-center transition-opacity duration-500 ${
-        isComplete ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      className={`fixed inset-0 z-[1] flex items-center justify-center bg-[var(--background)] transition-opacity duration-500 ${
+        isComplete ? 'pointer-events-none opacity-0' : 'opacity-100'
       }`}
     >
       {/* Subtle grid background */}
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
-          backgroundImage: 'linear-gradient(rgba(139, 92, 246, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.5) 1px, transparent 1px)',
+          backgroundImage:
+            'linear-gradient(rgba(139, 92, 246, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.5) 1px, transparent 1px)',
           backgroundSize: '40px 40px',
         }}
       />
@@ -96,56 +107,62 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
       {/* Main loader container */}
       <div className="relative w-80 max-w-[90vw]">
         {/* Corner brackets */}
-        <svg className="absolute -top-2 -left-2 w-4 h-4 text-[var(--accent)]" viewBox="0 0 16 16">
+        <svg className="absolute -top-2 -left-2 h-4 w-4 text-[var(--accent)]" viewBox="0 0 16 16">
           <path d="M0 8 L0 0 L8 0" fill="none" stroke="currentColor" strokeWidth="2" />
         </svg>
-        <svg className="absolute -top-2 -right-2 w-4 h-4 text-[var(--accent)]" viewBox="0 0 16 16">
+        <svg className="absolute -top-2 -right-2 h-4 w-4 text-[var(--accent)]" viewBox="0 0 16 16">
           <path d="M8 0 L16 0 L16 8" fill="none" stroke="currentColor" strokeWidth="2" />
         </svg>
-        <svg className="absolute -bottom-2 -left-2 w-4 h-4 text-[var(--accent)]" viewBox="0 0 16 16">
+        <svg
+          className="absolute -bottom-2 -left-2 h-4 w-4 text-[var(--accent)]"
+          viewBox="0 0 16 16"
+        >
           <path d="M0 8 L0 16 L8 16" fill="none" stroke="currentColor" strokeWidth="2" />
         </svg>
-        <svg className="absolute -bottom-2 -right-2 w-4 h-4 text-[var(--accent)]" viewBox="0 0 16 16">
+        <svg
+          className="absolute -right-2 -bottom-2 h-4 w-4 text-[var(--accent)]"
+          viewBox="0 0 16 16"
+        >
           <path d="M8 16 L16 16 L16 8" fill="none" stroke="currentColor" strokeWidth="2" />
         </svg>
 
         {/* Content */}
-        <div className="p-6 border border-[var(--accent)]/20 rounded-lg bg-[var(--accent)]/5 backdrop-blur-sm">
+        <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-6 backdrop-blur-sm">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-mono text-[var(--accent)] uppercase tracking-wider">
+          <div className="mb-4 flex items-center justify-between">
+            <span className="font-mono text-xs tracking-wider text-[var(--accent)] uppercase">
               System Boot
             </span>
             <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
-              <span className="text-[10px] font-mono text-[var(--accent)]/60">ACTIVE</span>
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
+              <span className="font-mono text-[10px] text-[var(--accent)]/60">ACTIVE</span>
             </div>
           </div>
 
           {/* Progress bar */}
           <div className="mb-4">
-            <div className="h-2 bg-[var(--border)] rounded-full overflow-hidden">
+            <div className="h-2 overflow-hidden rounded-full bg-[var(--border)]">
               <div
-                className="h-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/70 rounded-full transition-all duration-150 ease-out"
+                className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/70 transition-all duration-150 ease-out"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <div className="flex justify-between mt-1.5">
-              <span className="text-[10px] font-mono text-[var(--muted)] tabular-nums">
+            <div className="mt-1.5 flex justify-between">
+              <span className="font-mono text-[10px] text-[var(--muted)] tabular-nums">
                 {progress}%
               </span>
-              <span className="text-[10px] font-mono text-[var(--muted)]">
+              <span className="font-mono text-[10px] text-[var(--muted)]">
                 {progress === 100 ? 'COMPLETE' : 'LOADING'}
               </span>
             </div>
           </div>
 
           {/* Boot messages */}
-          <div className="space-y-1 min-h-[60px]">
+          <div className="min-h-[60px] space-y-1">
             {bootMessages.slice(0, currentMessage + 1).map((msg, i) => (
               <div
                 key={i}
-                className={`flex items-center gap-2 text-xs font-mono transition-opacity duration-200 ${
+                className={`flex items-center gap-2 font-mono text-xs transition-opacity duration-200 ${
                   i === currentMessage ? 'text-[var(--foreground)]' : 'text-[var(--muted)]/50'
                 }`}
               >
@@ -154,7 +171,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
                 </span>
                 <span>{msg.text}</span>
                 {i === currentMessage && i < bootMessages.length - 1 && (
-                  <span className="inline-block w-1.5 h-3 bg-[var(--accent)] animate-pulse ml-0.5" />
+                  <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-[var(--accent)]" />
                 )}
               </div>
             ))}
@@ -162,9 +179,9 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
         </div>
 
         {/* Decorative scan line */}
-        <div className="absolute inset-0 overflow-hidden rounded-lg pointer-events-none">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg">
           <div
-            className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent animate-scan-down"
+            className="animate-scan-down absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent"
             style={{ animation: 'scan-down 2s linear infinite' }}
           />
         </div>
@@ -172,7 +189,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
       {/* Version tag */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-        <span className="text-[10px] font-mono text-[var(--muted)]/30">v2.0.26</span>
+        <span className="font-mono text-[10px] text-[var(--muted)]/30">v2.0.26</span>
       </div>
     </div>
   );

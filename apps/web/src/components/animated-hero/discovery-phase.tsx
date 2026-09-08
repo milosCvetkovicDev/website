@@ -24,9 +24,7 @@ export function DiscoveryPhase() {
 
     gsap.registerPlugin(ScrollTrigger);
 
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (prefersReducedMotion) return;
 
@@ -41,11 +39,7 @@ export function DiscoveryPhase() {
       });
 
       // Chat message types in
-      tl.fromTo(
-        chatRef.current,
-        { opacity: 0, y: 30 },
-        { opacity: 1, y: 0, duration: 0.5 }
-      );
+      tl.fromTo(chatRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5 });
 
       // Tags extract and float
       const tagElements = tagsRef.current?.querySelectorAll('.requirement-tag');
@@ -61,7 +55,7 @@ export function DiscoveryPhase() {
             stagger: 0.15,
             ease: 'back.out(1.7)',
           },
-          '+=0.3'
+          '+=0.3',
         );
       }
 
@@ -76,7 +70,7 @@ export function DiscoveryPhase() {
             duration: 0.3,
             stagger: 0.2,
           },
-          '+=0.2'
+          '+=0.2',
         );
       }
 
@@ -85,7 +79,7 @@ export function DiscoveryPhase() {
         headlineRef.current,
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.2'
+        '+=0.2',
       );
     }, sectionRef);
 
@@ -93,22 +87,19 @@ export function DiscoveryPhase() {
   }, []);
 
   return (
-    <section
-      ref={sectionRef}
-      className="min-h-screen flex items-center justify-center px-6 py-24"
-    >
+    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
       <div className="w-full max-w-5xl">
         {/* Phase Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <span className="px-3 py-1 bg-[var(--accent)]/20 text-[var(--accent)] text-xs font-mono rounded-full">
+        <div className="mb-8 flex items-center gap-3">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
             <AnimatedText animation="morse">PHASE 1</AnimatedText>
           </span>
-          <AnimatedText animation="highlight" className="text-sm font-mono text-[var(--muted)]">
+          <AnimatedText animation="highlight" className="font-mono text-sm text-[var(--muted)]">
             DISCOVERY
           </AnimatedText>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid gap-8 md:grid-cols-2">
           {/* Chat Interface */}
           <div ref={chatRef}>
             <Terminal>
@@ -146,12 +137,15 @@ export function DiscoveryPhase() {
 
           {/* Mind Map / Tags */}
           <div className="space-y-6">
-            <HudPanel title={<AnimatedText animation="scatter">EXTRACTED REQUIREMENTS</AnimatedText>} glow>
+            <HudPanel
+              title={<AnimatedText animation="scatter">EXTRACTED REQUIREMENTS</AnimatedText>}
+              glow
+            >
               <div ref={tagsRef} className="flex flex-wrap gap-2">
                 {requirements.map((req, index) => (
                   <span
                     key={req.id}
-                    className="requirement-tag px-3 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 text-[var(--accent)] text-sm font-mono rounded-lg transition-all duration-300 hover:bg-[var(--accent)]/20 hover:scale-105 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] cursor-default"
+                    className="requirement-tag cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]"
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
                     <span className="mr-1 opacity-50">#{index + 1}</span>
@@ -182,7 +176,7 @@ export function DiscoveryPhase() {
 
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
-          <h2 className="text-2xl md:text-4xl font-bold mb-3">
+          <h2 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="wave">
               Most bugs live in the gap between what you asked for and what you meant.
             </AnimatedText>

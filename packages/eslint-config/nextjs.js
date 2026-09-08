@@ -1,4 +1,4 @@
-import react from "./react.js";
+import react from './react.js';
 
 /** @type {import("eslint").Linter.Config[]} */
 export default [
@@ -6,10 +6,10 @@ export default [
   {
     rules: {
       // Next.js specific rules
-      "react/no-unknown-property": ["error", { ignore: ["jsx", "global"] }],
+      'react/no-unknown-property': ['error', { ignore: ['jsx', 'global'] }],
     },
   },
   {
-    ignores: [".next/**", "out/**", "build/**"],
+    ignores: ['.next/**', 'out/**', 'build/**'],
   },
 ];

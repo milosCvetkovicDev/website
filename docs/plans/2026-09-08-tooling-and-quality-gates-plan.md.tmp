@@ -243,7 +243,7 @@ git commit -m "build: wire shared prettier config with tailwind class sorting"
 - Modify (already modified in the working tree): `apps/web/src/app/globals.css`, `apps/web/src/components/animated-hero/tmux-background.tsx`
 - Modify: every file `pnpm format` touches
 
-- [ ] **Step 1: Format only the two files that carry real changes and commit them on their own**
+- [x] **Step 1: Format only the two files that carry real changes and commit them on their own**
 
 ```bash
 pnpm exec prettier --write apps/web/src/app/globals.css apps/web/src/components/animated-hero/tmux-background.tsx
@@ -253,20 +253,20 @@ git commit -m "perf(web): start tmux log animation at idle time and trim theme t
 
 Expected diff content: the `requestIdleCallback` deferral in `AnimatedPane` and the shorter transition selector list in `globals.css`, plus formatting.
 
-- [ ] **Step 2: Reformat the repository**
+- [x] **Step 2: Reformat the repository**
 
 Run: `pnpm format`
 Run: `pnpm format:check`
 Expected: `All matched files use Prettier code style!`
 
-- [ ] **Step 3: Prove nothing else changed**
+- [x] **Step 3: Prove nothing else changed**
 
 Run: `pnpm build`
 Expected: both apps build (`Tasks: 2 successful`).
 Run: `git diff --stat | tail -1`
 Expected: only formatting churn (quotes, wrapping, class order); spot-check `git diff apps/web/src/components/index.ts`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A

@@ -7,10 +7,7 @@ const mockObserve = vi.fn();
 const mockDisconnect = vi.fn();
 
 class MockIntersectionObserver {
-  constructor(
-    _callback: IntersectionObserverCallback,
-    _options?: IntersectionObserverInit,
-  ) {}
+  constructor(_callback: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
   observe = mockObserve;
   disconnect = mockDisconnect;
   unobserve = vi.fn();

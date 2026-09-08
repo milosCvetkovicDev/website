@@ -6,7 +6,6 @@ const TmuxBackground = lazy(() =>
   import('./tmux-background').then((m) => ({ default: m.TmuxBackground })),
 );
 
-
 export function HeroSection({ children }: { children?: ReactNode }) {
   const [showScrollIndicator, setShowScrollIndicator] = useState(true);
 
@@ -24,7 +23,7 @@ export function HeroSection({ children }: { children?: ReactNode }) {
   return (
     <section
       aria-label="Hero - Milos Cvetkovic, Senior Full Stack Engineer"
-      className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden"
+      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6"
     >
       {/* 1. TmuxBackground -- absolute-positioned background (lazy loaded) */}
       <Suspense fallback={null}>
@@ -34,7 +33,7 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       {/* 2. Overlay layers (decorative) */}
       {/* Glow */}
       <div
-        className="absolute inset-0 pointer-events-none z-[2]"
+        className="pointer-events-none absolute inset-0 z-[2]"
         aria-hidden="true"
         style={{
           background:
@@ -44,7 +43,7 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       />
       {/* Vignette - light */}
       <div
-        className="absolute inset-0 pointer-events-none z-[3] block dark:hidden"
+        className="pointer-events-none absolute inset-0 z-[3] block dark:hidden"
         aria-hidden="true"
         style={{
           background:
@@ -53,7 +52,7 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       />
       {/* Vignette - dark */}
       <div
-        className="absolute inset-0 pointer-events-none z-[3] hidden dark:block"
+        className="pointer-events-none absolute inset-0 z-[3] hidden dark:block"
         aria-hidden="true"
         style={{
           background:
@@ -62,7 +61,7 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       />
       {/* Top fade - light */}
       <div
-        className="absolute top-0 left-0 right-0 pointer-events-none z-[4] block dark:hidden"
+        className="pointer-events-none absolute top-0 right-0 left-0 z-[4] block dark:hidden"
         aria-hidden="true"
         style={{
           height: '8%',
@@ -71,7 +70,7 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       />
       {/* Top fade - dark */}
       <div
-        className="absolute top-0 left-0 right-0 pointer-events-none z-[4] hidden dark:block"
+        className="pointer-events-none absolute top-0 right-0 left-0 z-[4] hidden dark:block"
         aria-hidden="true"
         style={{
           height: '8%',
@@ -80,7 +79,7 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       />
       {/* Bottom fade */}
       <div
-        className="absolute bottom-0 left-0 right-0 pointer-events-none z-[4]"
+        className="pointer-events-none absolute right-0 bottom-0 left-0 z-[4]"
         aria-hidden="true"
         style={{
           height: '15%',
@@ -94,12 +93,12 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       {/* 4. Scroll indicator -- fixed, bottom-11, z-20 */}
       <div
         aria-hidden="true"
-        className={`fixed bottom-11 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 z-20 transition-opacity duration-300 ${
-          showScrollIndicator ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        className={`fixed bottom-11 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1.5 transition-opacity duration-300 ${
+          showScrollIndicator ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >
         <span
-          className="font-mono uppercase tracking-[0.2em]"
+          className="font-mono tracking-[0.2em] uppercase"
           style={{
             fontSize: '9px',
             color: 'rgba(139, 92, 246, 0.7)',
@@ -108,12 +107,13 @@ export function HeroSection({ children }: { children?: ReactNode }) {
         >
           Scroll
         </span>
-        <div
-          className="relative w-[22px] h-[36px] rounded-[11px] border-[1.5px] border-[rgba(99,102,241,0.3)] dark:border-[rgba(139,92,246,0.35)] bg-white/60 dark:bg-[rgba(10,10,10,0.6)]"
-        >
+        <div className="relative h-[36px] w-[22px] rounded-[11px] border-[1.5px] border-[rgba(99,102,241,0.3)] bg-white/60 dark:border-[rgba(139,92,246,0.35)] dark:bg-[rgba(10,10,10,0.6)]">
           <div
-            className="absolute left-1/2 -translate-x-1/2 w-[5px] h-[5px] bg-[var(--accent)] rounded-full"
-            style={{ animation: 'hero-scroll-bounce 1.5s ease-in-out infinite', top: '7px' }}
+            className="absolute left-1/2 h-[5px] w-[5px] -translate-x-1/2 rounded-full bg-[var(--accent)]"
+            style={{
+              animation: 'hero-scroll-bounce 1.5s ease-in-out infinite',
+              top: '7px',
+            }}
           />
         </div>
       </div>

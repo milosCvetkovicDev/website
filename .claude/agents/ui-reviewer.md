@@ -12,6 +12,7 @@ tools:
 You are reviewing a Next.js 16 + React 19 + Tailwind v4 + GSAP portfolio site. Check the recently modified component files for these issues:
 
 ## Visual Quality
+
 - No default Tailwind colors used raw (blue-500, gray-100, etc.) — should use custom palette or CSS variables
 - Typography hierarchy: headings should have distinct sizes, weights, and line-heights
 - Spacing consistency: use Tailwind spacing scale, no arbitrary px values
@@ -19,6 +20,7 @@ You are reviewing a Next.js 16 + React 19 + Tailwind v4 + GSAP portfolio site. C
 - Responsive: mobile-first, check for sm:/md:/lg: breakpoints
 
 ## GSAP Animation Quality
+
 - ScrollTrigger animations should have `scrub` or proper `start`/`end` values
 - useGSAP hook usage (not raw useEffect for GSAP)
 - Cleanup: GSAP context or timeline.kill() in cleanup function
@@ -26,6 +28,7 @@ You are reviewing a Next.js 16 + React 19 + Tailwind v4 + GSAP portfolio site. C
 - Reduced motion: check for `prefers-reduced-motion` media query support
 
 ## Accessibility
+
 - All images have meaningful alt text (not empty or "image")
 - Interactive elements are keyboard-focusable
 - Color contrast: text over backgrounds should be readable
@@ -33,12 +36,15 @@ You are reviewing a Next.js 16 + React 19 + Tailwind v4 + GSAP portfolio site. C
 - Semantic HTML: section, article, nav, main — not just div
 
 ## Portfolio-Specific Patterns
+
 - Components in `src/components/` should be modular and reusable
 - Data files in `src/data/` — no hardcoded content in components
 - App Router patterns: use server components by default, 'use client' only when needed
 
 ## Output Format
+
 For each issue found:
+
 1. File and line number
 2. What's wrong
 3. Suggested fix (code snippet)

@@ -46,7 +46,7 @@ export function SectionProgress() {
       // Calculate active section based on scroll position
       const sectionIndex = Math.min(
         Math.floor((scrollTop / docHeight) * sections.length),
-        sections.length - 1
+        sections.length - 1,
       );
 
       // Update progress line directly
@@ -55,16 +55,14 @@ export function SectionProgress() {
       }
 
       // Only trigger React re-render when section actually changes
-      setActiveSection((prev) => prev !== sectionIndex ? sectionIndex : prev);
+      setActiveSection((prev) => (prev !== sectionIndex ? sectionIndex : prev));
 
       rafRef.current = null;
     });
   }, []);
 
   useEffect(() => {
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (prefersReducedMotion) return;
 
@@ -78,7 +76,7 @@ export function SectionProgress() {
   return (
     <>
       {/* Vertical progress bar on the right */}
-      <div className="fixed right-6 top-1/2 -translate-y-1/2 z-50 hidden lg:flex flex-col items-center gap-2">
+      <div className="fixed top-1/2 right-6 z-50 hidden -translate-y-1/2 flex-col items-center gap-2 lg:flex">
         {/* Section dots */}
         <div className="flex flex-col gap-3">
           {sections.map((section, index) => (
@@ -94,10 +92,8 @@ export function SectionProgress() {
             >
               {/* Dot */}
               <div
-                className={`relative w-3 h-3 rounded-full transition-all duration-300 ${
-                  index <= activeSection
-                    ? 'bg-[var(--accent)]'
-                    : 'bg-[var(--border)]'
+                className={`relative h-3 w-3 rounded-full transition-all duration-300 ${
+                  index <= activeSection ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'
                 } ${index === activeSection ? 'shadow-[0_0_8px_rgba(139,92,246,0.6)]' : ''}`}
               />
 
@@ -105,8 +101,8 @@ export function SectionProgress() {
               <span
                 className={`font-mono text-[10px] tracking-wider transition-all duration-300 ${
                   index === activeSection
-                    ? 'opacity-100 text-[var(--accent)]'
-                    : 'opacity-0 group-hover:opacity-100 text-[var(--muted)]'
+                    ? 'text-[var(--accent)] opacity-100'
+                    : 'text-[var(--muted)] opacity-0 group-hover:opacity-100'
                 }`}
               >
                 {section.label}
@@ -116,18 +112,21 @@ export function SectionProgress() {
         </div>
 
         {/* Connecting line */}
-        <div className="absolute top-0 left-1.5 w-[1px] h-full -z-10">
-          <div className="w-full h-full bg-[var(--border)]" />
+        <div className="absolute top-0 left-1.5 -z-10 h-full w-[1px]">
+          <div className="h-full w-full bg-[var(--border)]" />
           <div
             ref={progressLineRef}
             className="absolute top-0 w-full bg-[var(--accent)] will-change-[height]"
-            style={{ height: `${(activeSection / (sections.length - 1)) * 100}%`, transition: 'none' }}
+            style={{
+              height: `${(activeSection / (sections.length - 1)) * 100}%`,
+              transition: 'none',
+            }}
           />
         </div>
       </div>
 
       {/* Mobile progress bar at top */}
-      <div className="fixed top-0 left-0 right-0 z-50 lg:hidden">
+      <div className="fixed top-0 right-0 left-0 z-50 lg:hidden">
         <div className="h-1 bg-[var(--border)]">
           <div
             ref={mobileProgressRef}
@@ -138,7 +137,7 @@ export function SectionProgress() {
       </div>
 
       {/* Corner frame elements */}
-      <div className="fixed inset-0 pointer-events-none z-40">
+      <div className="pointer-events-none fixed inset-0 z-40">
         {/* Top-left corner */}
         <div className="absolute top-4 left-4">
           <svg width="40" height="40" viewBox="0 0 40 40" className="text-[var(--accent)]/30">
@@ -161,15 +160,16 @@ export function SectionProgress() {
         </div>
 
         {/* Bottom-right corner */}
-        <div className="absolute bottom-4 right-4">
+        <div className="absolute right-4 bottom-4">
           <svg width="40" height="40" viewBox="0 0 40 40" className="text-[var(--accent)]/30">
             <path d="M20 40 L40 40 L40 20" fill="none" stroke="currentColor" strokeWidth="1" />
           </svg>
         </div>
 
         {/* Current section indicator - positioned bottom-left to avoid overlap with scroll indicator */}
-        <div className="absolute bottom-4 left-16 font-mono text-[10px] text-[var(--accent)]/50 tracking-widest">
-          [{String(activeSection + 1).padStart(2, '0')}/{String(sections.length).padStart(2, '0')}] {sections[activeSection]?.label}
+        <div className="absolute bottom-4 left-16 font-mono text-[10px] tracking-widest text-[var(--accent)]/50">
+          [{String(activeSection + 1).padStart(2, '0')}/{String(sections.length).padStart(2, '0')}]{' '}
+          {sections[activeSection]?.label}
         </div>
       </div>
     </>
