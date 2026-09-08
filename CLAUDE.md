@@ -94,7 +94,7 @@ back to `https://miloscvetkovic.dev`.
   `e2e/hero.spec.ts` waits for the `System Boot` loader to be hidden, and also asserts the page title
   to catch a stray dev server on port 3000.
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build
-  with `pnpm start`, retries twice, uses one worker and a 10s expect timeout. Locally it reuses a
+  with `pnpm start` inside `apps/web`, retries twice, uses one worker and a 10s expect timeout. Locally it reuses a
   running dev server on port 3000.
 
 ## Working with this repo in Claude Code
