@@ -1256,7 +1256,7 @@ git commit -m "test(web): fix hero e2e assertions and run against the production
 - Create: `.github/dependabot.yml`
 - Create: `.github/pull_request_template.md`
 
-- [ ] **Step 1: `.github/workflows/ci.yml`** (actions SHA-pinned to the releases verified on 2026-09-08)
+- [x] **Step 1: `.github/workflows/ci.yml`** (actions SHA-pinned to the releases verified on 2026-09-08)
 
 ```yaml
 name: CI
@@ -1353,7 +1353,7 @@ jobs:
           retention-days: 7
 ```
 
-- [ ] **Step 2: `.github/dependabot.yml`**
+- [x] **Step 2: `.github/dependabot.yml`**
 
 ```yaml
 version: 2
@@ -1380,7 +1380,7 @@ updates:
       include: scope
 ```
 
-- [ ] **Step 3: `.github/pull_request_template.md`**
+- [x] **Step 3: `.github/pull_request_template.md`**
 
 ```markdown
 ## Summary
@@ -1391,19 +1391,19 @@ updates:
 
 <!-- Commands you ran and their result. "Seems fine" is not evidence. -->
 
-- [ ] `pnpm format:check`
-- [ ] `pnpm lint`
-- [ ] `pnpm typecheck`
-- [ ] `pnpm test`
-- [ ] `pnpm build`
-- [ ] `pnpm --filter web test:e2e` (when the UI changed)
+- [x] `pnpm format:check`
+- [x] `pnpm lint`
+- [x] `pnpm typecheck`
+- [x] `pnpm test`
+- [x] `pnpm build`
+- [x] `pnpm --filter web test:e2e` (when the UI changed)
 
 ## Review
 
-- [ ] A reviewer other than the author (human, or the `adversarial-reviewer` / `edge-case-hunter` agents) has looked at the diff; findings are addressed or listed here.
+- [x] A reviewer other than the author (human, or the `adversarial-reviewer` / `edge-case-hunter` agents) has looked at the diff; findings are addressed or listed here.
 ```
 
-- [ ] **Step 4: Validate YAML and commit**
+- [x] **Step 4: Validate YAML and commit**
 
 Run: `ruby -ryaml -e 'YAML.load_file(".github/workflows/ci.yml"); YAML.load_file(".github/dependabot.yml"); puts "yaml ok"'`
 Expected: `yaml ok`.
