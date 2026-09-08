@@ -3,6 +3,7 @@
 import { useEffect, useState, lazy, Suspense, memo, type ReactNode } from 'react';
 import { HeroSection } from './hero-section';
 import { SectionProgress } from './section-progress';
+import { useIsHydrated } from '@/hooks/use-is-hydrated';
 
 // Memoize hero section to prevent re-renders
 const MemoizedHeroSection = memo(HeroSection);
@@ -45,11 +46,12 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
   const [shouldRender, setShouldRender] = useState(true);
   const [progress, setProgress] = useState(0);
   const [currentMessage, setCurrentMessage] = useState(0);
-  const [isComplete, setIsComplete] = useState(false);
+  // Derived, not stored: the loader is complete exactly when the hero is ready.
+  const isComplete = !visible;
+  const displayProgress = visible ? progress : 100;
 
   useEffect(() => {
     if (!visible) {
-      setIsComplete(true);
       // Remove from DOM after fade-out animation completes
       const timer = setTimeout(() => setShouldRender(false), 600);
       return () => clearTimeout(timer);
@@ -78,13 +80,6 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
       messageTimers.forEach(clearTimeout);
     };
   }, [visible]);
-
-  // Complete progress when content is ready
-  useEffect(() => {
-    if (!visible && progress < 100) {
-      setProgress(100);
-    }
-  }, [visible, progress]);
 
   if (!shouldRender) return null;
 
@@ -144,15 +139,15 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
             <div className="h-2 overflow-hidden rounded-full bg-[var(--border)]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/70 transition-all duration-150 ease-out"
-                style={{ width: `${progress}%` }}
+                style={{ width: `${displayProgress}%` }}
               />
             </div>
             <div className="mt-1.5 flex justify-between">
               <span className="font-mono text-[10px] text-[var(--muted)] tabular-nums">
-                {progress}%
+                {displayProgress}%
               </span>
               <span className="font-mono text-[10px] text-[var(--muted)]">
-                {progress === 100 ? 'COMPLETE' : 'LOADING'}
+                {displayProgress === 100 ? 'COMPLETE' : 'LOADING'}
               </span>
             </div>
           </div>
@@ -196,11 +191,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 }
 
 export function AnimatedHero({ children }: { children?: ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useIsHydrated();
 
   return (
     <div className="relative">
