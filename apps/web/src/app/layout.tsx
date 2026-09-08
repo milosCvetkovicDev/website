@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 // Runs before React hydrates so the first paint already has the right theme (no light-to-dark flash).
 const themeInitScript =
-  "(function(){try{var s=localStorage.getItem('theme');var d=s==='dark'||(s!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.add(d?'dark':'light')}catch(e){document.documentElement.classList.add('dark')}})()";
+  "(function(){try{var s=localStorage.getItem('theme');var d=s==='dark'||(s!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.add(d?'dark':'light')}catch(e){var f=false;try{f=matchMedia('(prefers-color-scheme: dark)').matches}catch(_){}document.documentElement.classList.add(f?'dark':'light')}})()";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
