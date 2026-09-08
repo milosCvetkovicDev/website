@@ -9,7 +9,7 @@
     ".": "./index.js"
   },
   "dependencies": {
-    "prettier-plugin-tailwindcss": "^0.6.9"
+    "prettier-plugin-tailwindcss": "^0.8.1"
   },
   "peerDependencies": {
     "prettier": "^3.0.0"

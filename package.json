@@ -6,8 +6,8 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "lint:fix": "turbo lint:fix",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,md,css}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mjs,cjs,json,md,css}\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "turbo typecheck",
     "clean": "turbo clean && rm -rf node_modules",
     "dev:web": "turbo dev --filter=web",
@@ -20,8 +20,9 @@
     "@commitlint/config-conventional": "^19.6.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.3.0",
-    "prettier": "^3.4.2",
-    "turbo": "^2.3.3"
+    "prettier": "^3.9.6",
+    "turbo": "^2.3.3",
+    "@repo/prettier-config": "workspace:*"
   },
   "packageManager": "pnpm@10.33.0",
   "engines": {

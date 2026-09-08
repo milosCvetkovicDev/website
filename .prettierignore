@@ -1,0 +1,15 @@
+# Dependencies and build output
+node_modules
+.pnpm-store
+.next
+.turbo
+dist
+out
+coverage
+test-results
+playwright-report
+
+# Generated
+pnpm-lock.yaml
+next-env.d.ts
+*.tsbuildinfo
