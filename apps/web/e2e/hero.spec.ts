@@ -6,6 +6,8 @@ test.describe('Hero Section', () => {
     await page.goto('/');
     // Wait for hero content to be visible instead of arbitrary timeout
     await page.waitForSelector('h1', { state: 'visible' });
+    // The boot loader is removed once React has hydrated; interactions before that are lost.
+    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
   });
 
   test('renders the headline', async ({ page }) => {
