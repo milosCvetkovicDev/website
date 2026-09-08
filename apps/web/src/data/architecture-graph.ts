@@ -65,6 +65,9 @@ function connect(
   };
 }
 
+/** Vertical nudge so a second edge into the same node does not overlap the first. */
+const EDGE_OFFSET = 20;
+
 export const CONNECTIONS: readonly Connection[] = [
   connect('client', 'gateway'),
   connect('gateway', 'auth'),
@@ -74,8 +77,11 @@ export const CONNECTIONS: readonly Connection[] = [
   connect('backend', 'db'),
   connect('worker', 'db'),
   connect('worker', 'storage'),
-  // Slightly offset so it does not overlap backend -> db at the database node.
-  connect('auth', 'db', 'horizontal', { x: 750, y: 280 }),
+  // Offset so it does not overlap backend -> db where both arrive at the database.
+  connect('auth', 'db', 'horizontal', {
+    x: position('db').x,
+    y: position('db').y - EDGE_OFFSET,
+  }),
   connect('backend', 'worker', 'vertical'),
   connect('worker', 'ai'),
   connect('backend', 'ai'),

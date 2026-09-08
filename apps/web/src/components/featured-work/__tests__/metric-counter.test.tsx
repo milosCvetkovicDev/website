@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MetricCounter } from '../metric-counter';
 
@@ -10,15 +10,33 @@ function stubMatchMedia(matches: boolean) {
   });
 }
 
-describe('MetricCounter', () => {
-  beforeEach(() => {
-    // Run the whole animation in one frame so the test is deterministic.
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      callback(performance.now() + 10_000);
-      return 1;
-    });
-    vi.stubGlobal('cancelAnimationFrame', () => {});
+/** Queues rAF callbacks instead of running them, so a test drives the animation frame by frame. */
+function stubAnimationFrames() {
+  const pending = new Map<number, FrameRequestCallback>();
+  let nextHandle = 1;
+  const cancel = vi.fn((handle: number) => pending.delete(handle));
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    const handle = nextHandle++;
+    pending.set(handle, callback);
+    return handle;
   });
+  vi.stubGlobal('cancelAnimationFrame', cancel);
+  return {
+    cancel,
+    pendingCount: () => pending.size,
+    /** Runs every queued callback once with the given timestamp, flushing the resulting render. */
+    advance(timestamp: number) {
+      const due = [...pending.entries()];
+      pending.clear();
+      act(() => {
+        for (const [, callback] of due) callback(timestamp);
+      });
+    },
+  };
+}
+
+describe('MetricCounter', () => {
+  beforeEach(() => stubMatchMedia(false));
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -26,23 +44,56 @@ describe('MetricCounter', () => {
   });
 
   it('shows the final value when idle', () => {
-    stubMatchMedia(false);
+    stubAnimationFrames();
     render(<MetricCounter value={73} suffix="%" label="faster resolution" active={false} />);
     expect(screen.getByText('73%')).toBeInTheDocument();
   });
 
-  it('counts up to the real value when active', () => {
-    stubMatchMedia(false);
+  it('starts at zero, passes through a partial value, and lands on the real one', () => {
+    const frames = stubAnimationFrames();
     render(<MetricCounter value={73} suffix="%" label="faster resolution" active />);
+    expect(screen.getByText('0%')).toBeInTheDocument();
+
+    frames.advance(0);
+    frames.advance(450);
+    const midway = Number(screen.getByText(/%$/).textContent?.replace('%', ''));
+    expect(midway).toBeGreaterThan(0);
+    expect(midway).toBeLessThan(73);
+
+    frames.advance(2000);
     expect(screen.getByText('73%')).toBeInTheDocument();
+  });
+
+  it('honours prefix and decimals', () => {
+    stubAnimationFrames();
+    render(
+      <MetricCounter
+        value={1.5}
+        prefix="~"
+        suffix="x"
+        decimals={1}
+        label="throughput"
+        active={false}
+      />,
+    );
+    expect(screen.getByText('~1.5x')).toBeInTheDocument();
+  });
+
+  it('cancels its pending frame on unmount', () => {
+    const frames = stubAnimationFrames();
+    const { unmount } = render(
+      <MetricCounter value={73} suffix="%" label="faster resolution" active />,
+    );
+    frames.advance(0);
+    unmount();
+    expect(frames.cancel).toHaveBeenCalled();
   });
 
   it('never animates under reduced motion', () => {
     stubMatchMedia(true);
-    const raf = vi.fn();
-    vi.stubGlobal('requestAnimationFrame', raf);
+    const frames = stubAnimationFrames();
     render(<MetricCounter value={5} suffix="×" label="faster builds" active />);
     expect(screen.getByText('5×')).toBeInTheDocument();
-    expect(raf).not.toHaveBeenCalled();
+    expect(frames.pendingCount()).toBe(0);
   });
 });

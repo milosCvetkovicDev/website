@@ -9,8 +9,10 @@ import { MetricCounter } from './featured-work/metric-counter';
 
 const ARROW = 'M17 8l4 4m0 0l-4 4m4-4H3';
 const NO_ACTIVE_NODES: readonly ArchitectureNode[] = [];
+// An outline (not a ring) so the indicator survives Windows High Contrast / forced-colors mode,
+// where box-shadow is not painted.
 const FOCUS_RING =
-  'focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:outline-none';
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]';
 
 function CornerBrackets() {
   const corners = [
@@ -39,11 +41,11 @@ interface ProjectCardProps {
   project: FeaturedProject;
   index: number;
   isActive: boolean;
-  onActivate: () => void;
-  onDeactivate: () => void;
+  onHoverChange: (hovered: boolean) => void;
+  onFocusChange: (focused: boolean) => void;
 }
 
-function ProjectCard({ project, index, isActive, onActivate, onDeactivate }: ProjectCardProps) {
+function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }: ProjectCardProps) {
   const titleId = `featured-${project.slug}-title`;
   const descriptionId = `featured-${project.slug}-description`;
 
@@ -53,14 +55,14 @@ function ProjectCard({ project, index, isActive, onActivate, onDeactivate }: Pro
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       data-active={isActive}
-      onMouseEnter={onActivate}
-      onMouseLeave={onDeactivate}
-      onFocus={onActivate}
-      onBlur={onDeactivate}
+      onMouseEnter={() => onHoverChange(true)}
+      onMouseLeave={() => onHoverChange(false)}
+      onFocus={() => onFocusChange(true)}
+      onBlur={() => onFocusChange(false)}
       className={`group relative block rounded border bg-[var(--card)]/75 p-6 backdrop-blur-md transition-all duration-500 ${FOCUS_RING} ${
         isActive
           ? 'border-[var(--accent)]/50 shadow-[0_0_30px_rgba(139,92,246,0.1)]'
-          : 'border-[var(--tmux-border)]/30 hover:bg-[var(--accent)]/5'
+          : 'border-[var(--tmux-border)]/30'
       }`}
     >
       <CornerBrackets />
@@ -121,7 +123,7 @@ function ProjectCard({ project, index, isActive, onActivate, onDeactivate }: Pro
           >
             {project.description}
           </p>
-          <ul className="flex flex-wrap gap-2" aria-label="Technologies">
+          <ul role="list" className="flex flex-wrap gap-2" aria-label="Technologies">
             {project.tags.map((tag) => (
               <li
                 key={tag}
@@ -137,7 +139,7 @@ function ProjectCard({ project, index, isActive, onActivate, onDeactivate }: Pro
           </ul>
         </div>
 
-        <MetricCounter key={isActive ? 'counting' : 'idle'} {...project.metric} active={isActive} />
+        <MetricCounter {...project.metric} active={isActive} />
       </div>
 
       <div
@@ -157,9 +159,18 @@ interface FeaturedWorkProps {
 }
 
 export function FeaturedWork({ projects }: FeaturedWorkProps) {
-  const [activeSlug, setActiveSlug] = useState<string | null>(null);
+  // Two independent sources of activation. Pointer wins while it is over a card, so moving the
+  // mouse away from one card cannot switch off another card that still holds keyboard focus.
+  const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
+  const [focusedSlug, setFocusedSlug] = useState<string | null>(null);
+  const activeSlug = hoveredSlug ?? focusedSlug;
   const activeNodes =
     projects.find((project) => project.slug === activeSlug)?.activeNodes ?? NO_ACTIVE_NODES;
+
+  const setSlugIf = (setter: typeof setHoveredSlug, slug: string) => (on: boolean) =>
+    setter((current) => (on ? slug : current === slug ? null : current));
+
+  if (projects.length === 0) return null;
 
   return (
     <section
@@ -213,17 +224,15 @@ export function FeaturedWork({ projects }: FeaturedWorkProps) {
           </Link>
         </div>
 
-        <ul className="grid list-none gap-6 p-0">
+        <ul role="list" className="grid list-none gap-6 p-0">
           {projects.map((project, index) => (
             <li key={project.slug}>
               <ProjectCard
                 project={project}
                 index={index}
                 isActive={activeSlug === project.slug}
-                onActivate={() => setActiveSlug(project.slug)}
-                onDeactivate={() =>
-                  setActiveSlug((current) => (current === project.slug ? null : current))
-                }
+                onHoverChange={setSlugIf(setHoveredSlug, project.slug)}
+                onFocusChange={setSlugIf(setFocusedSlug, project.slug)}
               />
             </li>
           ))}

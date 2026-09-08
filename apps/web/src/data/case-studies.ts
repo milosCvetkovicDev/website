@@ -13,8 +13,15 @@ export interface CaseStudyHighlight {
   metric: CaseStudyMetric;
 }
 
+/**
+ * Renders a metric for display. Total by construction: a value that is not a finite number has no
+ * honest rendering, so it becomes an em dash rather than "NaN%", and the digit count is clamped to
+ * the range toFixed accepts so a data edit cannot throw during server rendering.
+ */
 export function formatMetric(metric: CaseStudyMetric): string {
-  return `${metric.prefix ?? ''}${metric.value.toFixed(metric.decimals ?? 0)}${metric.suffix ?? ''}`;
+  if (!Number.isFinite(metric.value)) return '—';
+  const decimals = Math.min(20, Math.max(0, Math.trunc(metric.decimals ?? 0)));
+  return `${metric.prefix ?? ''}${metric.value.toFixed(decimals)}${metric.suffix ?? ''}`;
 }
 
 export interface CaseStudy {

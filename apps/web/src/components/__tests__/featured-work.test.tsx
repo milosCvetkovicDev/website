@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeaturedWork } from '../featured-work';
+import { getActiveConnections } from '@/data/architecture-graph';
 import { featuredProjects } from '@/data/featured-projects';
 
 function stubMatchMedia(matches: boolean) {
@@ -31,6 +32,8 @@ function stubIntersectionObserver() {
 
 const renderFeaturedWork = () => render(<FeaturedWork projects={featuredProjects} />);
 const linkFor = (title: string) => screen.getByRole('link', { name: title });
+const litConnections = (project: (typeof featuredProjects)[number]) =>
+  getActiveConnections(project.activeNodes).filter((connection) => connection.active).length;
 
 describe('FeaturedWork', () => {
   afterEach(() => {
@@ -46,6 +49,12 @@ describe('FeaturedWork', () => {
     }
   });
 
+  it('renders nothing when there are no projects', () => {
+    stubMatchMedia(true);
+    const { container } = render(<FeaturedWork projects={[]} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('activates a project and its architecture nodes on keyboard focus', () => {
     stubMatchMedia(true);
     const { container } = renderFeaturedWork();
@@ -54,7 +63,9 @@ describe('FeaturedWork', () => {
 
     fireEvent.focus(secondCard);
     expect(secondCard).toHaveAttribute('data-active', 'true');
-    expect(container.querySelectorAll('path[data-active="true"]')).toHaveLength(3);
+    expect(container.querySelectorAll('path[data-active="true"]')).toHaveLength(
+      litConnections(second),
+    );
 
     fireEvent.blur(secondCard);
     expect(secondCard).toHaveAttribute('data-active', 'false');
@@ -76,6 +87,33 @@ describe('FeaturedWork', () => {
     fireEvent.mouseLeave(linkFor(first.title));
 
     expect(linkFor(second.title)).toHaveAttribute('data-active', 'true');
+  });
+
+  it('keeps the focused card active when the mouse only passes over another card', () => {
+    stubMatchMedia(true);
+    renderFeaturedWork();
+    const [first, second] = featuredProjects;
+
+    // Focus first, then hover elsewhere and leave: the keyboard focus must survive.
+    fireEvent.focus(linkFor(second.title));
+    fireEvent.mouseEnter(linkFor(first.title));
+    expect(linkFor(first.title)).toHaveAttribute('data-active', 'true');
+
+    fireEvent.mouseLeave(linkFor(first.title));
+    expect(linkFor(second.title)).toHaveAttribute('data-active', 'true');
+    expect(linkFor(first.title)).toHaveAttribute('data-active', 'false');
+  });
+
+  it('keeps the hovered card active when focus moves away', () => {
+    stubMatchMedia(true);
+    renderFeaturedWork();
+    const [first, second] = featuredProjects;
+
+    fireEvent.mouseEnter(linkFor(first.title));
+    fireEvent.focus(linkFor(second.title));
+    fireEvent.blur(linkFor(second.title));
+
+    expect(linkFor(first.title)).toHaveAttribute('data-active', 'true');
   });
 
   it('runs packet animations only while the section is on screen', () => {
@@ -100,9 +138,10 @@ describe('FeaturedWork', () => {
     expect(container.querySelectorAll('animateMotion, animate')).toHaveLength(0);
   });
 
-  it('is labelled as a landmark region', () => {
+  it('exposes the section and both lists to assistive technology', () => {
     stubMatchMedia(true);
     renderFeaturedWork();
     expect(screen.getByRole('region', { name: /featured work/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('list').length).toBeGreaterThanOrEqual(featuredProjects.length + 1);
   });
 });

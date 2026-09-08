@@ -49,10 +49,17 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
 
   useEffect(() => {
     const element = containerRef.current;
+    // Without an observer the packets simply never start. That is the safe direction: the diagram
+    // is decorative, and animating it unconditionally would run SMIL loops off-screen forever.
     if (!element || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(([entry]) => setIsVisible(entry.isIntersecting), {
-      rootMargin: '100px',
-    });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Entries can be batched; only the most recent one describes the current state.
+        const latest = entries[entries.length - 1];
+        if (latest) setIsVisible(latest.isIntersecting);
+      },
+      { rootMargin: '100px' },
+    );
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -70,7 +77,7 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
       <svg
         viewBox={`0 0 ${VIEW_BOX.width} ${VIEW_BOX.height}`}
         preserveAspectRatio="xMidYMid meet"
-        className="h-full w-full"
+        className="h-full w-full select-none"
       >
         <defs>
           <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
