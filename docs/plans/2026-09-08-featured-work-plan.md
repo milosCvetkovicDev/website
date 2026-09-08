@@ -24,7 +24,7 @@ pnpm --filter web test:e2e                                                     #
 
 ### Task B0: Commit this plan
 
-- [ ] `git add docs/plans/2026-09-08-featured-work-plan.md && git commit -m "docs(plans): add featured work implementation plan"`
+- [x] `git add docs/plans/2026-09-08-featured-work-plan.md && git commit -m "docs(plans): add featured work implementation plan"`
 
 ---
 
@@ -35,7 +35,7 @@ pnpm --filter web test:e2e                                                     #
 - Create: `apps/web/src/data/architecture-graph.ts`
 - Test: `apps/web/src/data/__tests__/architecture-graph.test.ts`
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -70,7 +70,7 @@ describe('architecture graph', () => {
 
 Run: `pnpm --filter web exec vitest run src/data` → fails (`Failed to resolve import "../architecture-graph"`).
 
-- [ ] **Step 2: Implementation**
+- [x] **Step 2: Implementation**
 
 ```ts
 export type ArchitectureNode =
@@ -170,7 +170,7 @@ export function getActiveConnections(active: readonly ArchitectureNode[]): Conne
 }
 ```
 
-- [ ] **Step 3:** `pnpm --filter web exec vitest run src/data` → 4 passed. Commit: `git add apps/web/src/data && git commit -m "feat(web): add architecture graph data with active-connection rule"`
+- [x] **Step 3:** `pnpm --filter web exec vitest run src/data` → 4 passed. Commit: `git add apps/web/src/data && git commit -m "feat(web): add architecture graph data with active-connection rule"`
 
 ---
 
@@ -181,7 +181,7 @@ export function getActiveConnections(active: readonly ArchitectureNode[]): Conne
 - Create: `apps/web/src/data/featured-projects.ts`
 - Test: `apps/web/src/data/__tests__/featured-projects.test.ts`
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -215,7 +215,7 @@ describe('featuredProjects', () => {
 });
 ```
 
-- [ ] **Step 2: Implementation**
+- [x] **Step 2: Implementation**
 
 ```ts
 import type { ArchitectureNode } from './architecture-graph';
@@ -279,7 +279,7 @@ export const featuredProjects: FeaturedProject[] = Object.entries(highlights).ma
 );
 ```
 
-- [ ] **Step 3:** tests green → `git commit -m "feat(web): add featured projects data derived from case studies"`
+- [x] **Step 3:** tests green → `git commit -m "feat(web): add featured projects data derived from case studies"`
 
 ---
 
@@ -290,7 +290,7 @@ export const featuredProjects: FeaturedProject[] = Object.entries(highlights).ma
 - Create: `apps/web/src/components/featured-work/metric-counter.tsx`
 - Test: `apps/web/src/components/featured-work/__tests__/metric-counter.test.tsx`
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 
 ```tsx
 import { render, screen } from '@testing-library/react';
@@ -343,7 +343,7 @@ describe('MetricCounter', () => {
 });
 ```
 
-- [ ] **Step 2: Implementation**
+- [x] **Step 2: Implementation**
 
 ```tsx
 'use client';
@@ -423,7 +423,7 @@ export function MetricCounter({
 
 `setProgress` runs inside the animation-frame callback, not synchronously in the effect body, so react-hooks/set-state-in-effect is satisfied.
 
-- [ ] **Step 3:** tests green → `git commit -m "feat(web): add deterministic metric counter"`
+- [x] **Step 3:** tests green → `git commit -m "feat(web): add deterministic metric counter"`
 
 ---
 
@@ -433,7 +433,7 @@ export function MetricCounter({
 
 - Rewrite: `apps/web/src/components/featured-work/architecture-background.tsx` (starting from the March draft)
 
-- [ ] **Step 1: Replace the file**
+- [x] **Step 1: Replace the file**
 
 ```tsx
 'use client';
@@ -609,7 +609,7 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
 }
 ```
 
-- [ ] **Step 2:** `pnpm --filter web exec eslint --max-warnings 0 src/components/featured-work` → clean. Commit: `git add apps/web/src/components/featured-work/architecture-background.tsx && git commit -m "feat(web): decorative architecture diagram driven by graph data"`
+- [x] **Step 2:** `pnpm --filter web exec eslint --max-warnings 0 src/components/featured-work` → clean. Commit: `git add apps/web/src/components/featured-work/architecture-background.tsx && git commit -m "feat(web): decorative architecture diagram driven by graph data"`
 
 ---
 
@@ -620,7 +620,7 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
 - Rewrite: `apps/web/src/components/featured-work.tsx`
 - Test: `apps/web/src/components/__tests__/featured-work.test.tsx`
 
-- [ ] **Step 1: Failing test**
+- [x] **Step 1: Failing test**
 
 ```tsx
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -673,7 +673,7 @@ describe('FeaturedWork', () => {
 });
 ```
 
-- [ ] **Step 2: Implementation**
+- [x] **Step 2: Implementation**
 
 ```tsx
 'use client';
@@ -923,7 +923,7 @@ export function FeaturedWork() {
 }
 ```
 
-- [ ] **Step 3:** `pnpm --filter web test` → all green; `pnpm --filter web exec eslint --max-warnings 0 src/components` → clean. Commit: `git add apps/web/src/components/featured-work.tsx apps/web/src/components/__tests__/featured-work.test.tsx && git commit -m "feat(web): featured work cards drive the architecture diagram on hover and focus"`
+- [x] **Step 3:** `pnpm --filter web test` → all green; `pnpm --filter web exec eslint --max-warnings 0 src/components` → clean. Commit: `git add apps/web/src/components/featured-work.tsx apps/web/src/components/__tests__/featured-work.test.tsx && git commit -m "feat(web): featured work cards drive the architecture diagram on hover and focus"`
 
 ---
 
@@ -933,7 +933,7 @@ export function FeaturedWork() {
 
 - Create: `apps/web/e2e/featured-work.spec.ts`
 
-- [ ] **Step 1:**
+- [x] **Step 1:**
 
 ```ts
 import { expect, test } from '@playwright/test';
@@ -961,7 +961,7 @@ test.describe('Featured Work', () => {
 });
 ```
 
-- [ ] **Step 2:** `pnpm --filter web test:e2e` → all passed (10). Commit: `git commit -m "test(web): e2e smoke test for featured work interactions"`
+- [x] **Step 2:** `pnpm --filter web test:e2e` → all passed (10). Commit: `git commit -m "test(web): e2e smoke test for featured work interactions"`
 
 ---
 
