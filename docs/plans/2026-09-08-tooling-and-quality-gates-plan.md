@@ -405,7 +405,7 @@ git commit -m "build: add typecheck, lint:fix, clean and e2e tasks to turbo"
 - Modify: `apps/web/package.json` (`lint-staged`)
 - Modify: `apps/playground/package.json` (`lint-staged`)
 
-- [ ] **Step 1: Hook scripts** (Husky 9 format: plain shell, no shebang, no `husky.sh` sourcing)
+- [x] **Step 1: Hook scripts** (Husky 9 format: plain shell, no shebang, no `husky.sh` sourcing)
 
 `.husky/pre-commit`:
 
@@ -419,13 +419,13 @@ pnpm exec lint-staged
 pnpm exec commitlint --edit "$1"
 ```
 
-- [ ] **Step 2: `commitlint.config.mjs`**
+- [x] **Step 2: `commitlint.config.mjs`**
 
 ```js
 export default { extends: ['@commitlint/config-conventional'] };
 ```
 
-- [ ] **Step 3: lint-staged configs** — nearest config wins and tasks run from its directory, which is what makes ESLint's flat config resolve.
+- [x] **Step 3: lint-staged configs** — nearest config wins and tasks run from its directory, which is what makes ESLint's flat config resolve.
 
 Root `package.json` — replace the existing `lint-staged` block with:
 
@@ -444,7 +444,7 @@ Root `package.json` — replace the existing `lint-staged` block with:
   },
 ```
 
-- [ ] **Step 4: Bump the hook toolchain in root `devDependencies`**
+- [x] **Step 4: Bump the hook toolchain in root `devDependencies`**
 
 ```json
     "@commitlint/cli": "^21.2.2",
@@ -458,14 +458,14 @@ Run: `pnpm install` (the `prepare` script re-runs `husky`, which sets `core.hook
 Run: `git config core.hooksPath`
 Expected: `.husky/_`
 
-- [ ] **Step 5: Verify commitlint rejects and accepts correctly**
+- [x] **Step 5: Verify commitlint rejects and accepts correctly**
 
 Run: `printf 'fixed stuff' | pnpm exec commitlint`
 Expected: exit 1 with `subject may not be empty` and `type may not be empty`.
 Run: `printf 'build: enforce conventional commits' | pnpm exec commitlint`
 Expected: exit 0, no output.
 
-- [ ] **Step 6: Commit through the hooks** (this commit is the live proof: lint-staged runs on the staged JSON/MJS files, commitlint validates the message)
+- [x] **Step 6: Commit through the hooks** (this commit is the live proof: lint-staged runs on the staged JSON/MJS files, commitlint validates the message)
 
 ```bash
 git add .husky/pre-commit .husky/commit-msg commitlint.config.mjs package.json apps/web/package.json apps/playground/package.json pnpm-lock.yaml
@@ -474,7 +474,7 @@ git commit -m "build: enforce conventional commits and lint-staged via husky hoo
 
 Expected output includes `✔ Running tasks for staged files...` from lint-staged.
 
-- [ ] **Step 7: Negative proof**
+- [x] **Step 7: Negative proof**
 
 Run: `git commit --allow-empty -m "bad message"`
 Expected: rejected by commit-msg (exit 1, commitlint errors). No commit is created — confirm with `git log -1 --format=%s`.
