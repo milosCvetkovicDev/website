@@ -6,6 +6,8 @@ test.describe('Hero Section', () => {
     await page.goto('/');
     // Wait for hero content to be visible instead of arbitrary timeout
     await page.waitForSelector('h1', { state: 'visible' });
+    // Guard against reuseExistingServer attaching to some other project's dev server on :3000.
+    await expect(page).toHaveTitle(/Milos Cvetkovic/);
     // The boot loader is removed once React has hydrated; interactions before that are lost.
     await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
   });
@@ -75,8 +77,7 @@ test.describe('Hero Section', () => {
     await themeToggle.click();
 
     // Verify the page switched (html should not have .dark class)
-    const htmlClass = await page.evaluate(() => document.documentElement.className);
-    expect(htmlClass).not.toContain('dark');
+    await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
 
     // Toggle back
     const darkToggle = page.getByRole('button', {
@@ -84,8 +85,7 @@ test.describe('Hero Section', () => {
     });
     await darkToggle.click();
 
-    const htmlClass2 = await page.evaluate(() => document.documentElement.className);
-    expect(htmlClass2).toContain('dark');
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/);
   });
 
   test('hero content is SSR-rendered (SEO)', async ({ page }) => {
