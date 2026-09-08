@@ -578,7 +578,7 @@ export function TmuxBackground() {
   // Track visibility with IntersectionObserver
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(
       ([entry]) => {
         isVisibleRef.current = entry.isIntersecting;
@@ -598,8 +598,10 @@ export function TmuxBackground() {
       if (!isVisibleRef.current) return;
       seconds++;
       const s = String(seconds % 60).padStart(2, '0');
-      const m = String(14 + Math.floor(seconds / 60)).padStart(2, '0');
-      setClocks({ clock: `03:${m}:${s}`, status: `Sat Feb 22 03:${m}` });
+      const totalMinutes = 14 + Math.floor(seconds / 60);
+      const h = String(3 + Math.floor(totalMinutes / 60)).padStart(2, '0');
+      const m = String(totalMinutes % 60).padStart(2, '0');
+      setClocks({ clock: `${h}:${m}:${s}`, status: `Sat Feb 22 ${h}:${m}` });
     }, 1000);
 
     return () => clearInterval(interval);
