@@ -490,7 +490,7 @@ Expected: rejected by commit-msg (exit 1, commitlint errors). No commit is creat
 - Create: `.vscode/extensions.json`
 - Modify: `.gitignore`
 
-- [ ] **Step 1: `.editorconfig`**
+- [x] **Step 1: `.editorconfig`**
 
 ```
 root = true
@@ -507,7 +507,7 @@ trim_trailing_whitespace = true
 trim_trailing_whitespace = false
 ```
 
-- [ ] **Step 2: `.vscode/settings.json`**
+- [x] **Step 2: `.vscode/settings.json`**
 
 ```json
 {
@@ -523,7 +523,7 @@ trim_trailing_whitespace = false
 }
 ```
 
-- [ ] **Step 3: `.vscode/extensions.json`**
+- [x] **Step 3: `.vscode/extensions.json`**
 
 ```json
 {
@@ -536,7 +536,7 @@ trim_trailing_whitespace = false
 }
 ```
 
-- [ ] **Step 4: `.gitignore`** — replace the single `.vscode` line under `# IDE` with
+- [x] **Step 4: `.gitignore`** — replace the single `.vscode` line under `# IDE` with
 
 ```
 .vscode/*
@@ -557,7 +557,7 @@ and next to `.worktrees`:
 .claude/worktrees
 ```
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: `git status --short .vscode` — expected: the two files show as untracked (not ignored).
 Run: `git check-ignore -v .claude/worktrees apps/web/test-results` — expected: both matched by `.gitignore`.
