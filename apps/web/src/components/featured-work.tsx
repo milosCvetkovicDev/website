@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import type { ArchitectureNode } from '@/data/architecture-graph';
-import { featuredProjects, type FeaturedProject } from '@/data/featured-projects';
+import type { FeaturedProject } from '@/data/featured-projects';
 import { ArchitectureBackground } from './featured-work/architecture-background';
 import { MetricCounter } from './featured-work/metric-counter';
 
 const ARROW = 'M17 8l4 4m0 0l-4 4m4-4H3';
 const NO_ACTIVE_NODES: readonly ArchitectureNode[] = [];
+const FOCUS_RING =
+  'focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:outline-none';
 
 function CornerBrackets() {
   const corners = [
@@ -24,7 +26,7 @@ function CornerBrackets() {
           key={corner.d}
           aria-hidden="true"
           viewBox="0 0 12 12"
-          className={`absolute h-3 w-3 text-[var(--tmux-border)] opacity-50 transition-colors duration-300 group-hover:text-[var(--accent)] group-hover:opacity-100 group-focus-visible:text-[var(--accent)] ${corner.className}`}
+          className={`absolute h-3 w-3 text-[var(--tmux-border)] opacity-50 transition-colors duration-300 group-hover:text-[var(--accent)] group-hover:opacity-100 group-focus-visible:text-[var(--accent)] group-focus-visible:opacity-100 ${corner.className}`}
         >
           <path d={corner.d} fill="none" stroke="currentColor" strokeWidth="2" />
         </svg>
@@ -42,15 +44,20 @@ interface ProjectCardProps {
 }
 
 function ProjectCard({ project, index, isActive, onActivate, onDeactivate }: ProjectCardProps) {
+  const titleId = `featured-${project.slug}-title`;
+  const descriptionId = `featured-${project.slug}-description`;
+
   return (
     <Link
       href={`/work/${project.slug}`}
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
       data-active={isActive}
       onMouseEnter={onActivate}
       onMouseLeave={onDeactivate}
       onFocus={onActivate}
       onBlur={onDeactivate}
-      className={`group relative block rounded border bg-[var(--card)]/75 p-6 backdrop-blur-md transition-all duration-500 focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:outline-none ${
+      className={`group relative block rounded border bg-[var(--card)]/75 p-6 backdrop-blur-md transition-all duration-500 ${FOCUS_RING} ${
         isActive
           ? 'border-[var(--accent)]/50 shadow-[0_0_30px_rgba(139,92,246,0.1)]'
           : 'border-[var(--tmux-border)]/30 hover:bg-[var(--accent)]/5'
@@ -83,15 +90,14 @@ function ProjectCard({ project, index, isActive, onActivate, onDeactivate }: Pro
             aria-hidden="true"
             className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--tmux-status-ok)]"
           />
-          <span className="font-mono text-[10px] text-[var(--tmux-status-ok)] opacity-80">
-            {project.status}
-          </span>
+          <span className="font-mono text-xs text-[var(--tmux-status-ok)]">{project.status}</span>
         </div>
       </div>
 
       <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
           <h3
+            id={titleId}
             className={`mb-2 flex items-center gap-2 text-xl font-semibold transition-colors duration-300 ${
               isActive ? 'text-[var(--tmux-pane-title-text)]' : 'text-[var(--tmux-bar-text-bright)]'
             }`}
@@ -109,7 +115,10 @@ function ProjectCard({ project, index, isActive, onActivate, onDeactivate }: Pro
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ARROW} />
             </svg>
           </h3>
-          <p className="mb-4 text-sm leading-relaxed text-[var(--tmux-bar-text)]">
+          <p
+            id={descriptionId}
+            className="mb-4 text-sm leading-relaxed text-[var(--tmux-bar-text)]"
+          >
             {project.description}
           </p>
           <ul className="flex flex-wrap gap-2" aria-label="Technologies">
@@ -137,19 +146,20 @@ function ProjectCard({ project, index, isActive, onActivate, onDeactivate }: Pro
           isActive ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <div
-          className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent"
-          style={{ animation: 'scan-down 2.5s linear infinite', top: '0%' }}
-        />
+        <div className="animate-scan-down absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent" />
       </div>
     </Link>
   );
 }
 
-export function FeaturedWork() {
+interface FeaturedWorkProps {
+  projects: readonly FeaturedProject[];
+}
+
+export function FeaturedWork({ projects }: FeaturedWorkProps) {
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const activeNodes =
-    featuredProjects.find((project) => project.slug === activeSlug)?.activeNodes ?? NO_ACTIVE_NODES;
+    projects.find((project) => project.slug === activeSlug)?.activeNodes ?? NO_ACTIVE_NODES;
 
   return (
     <section
@@ -176,7 +186,7 @@ export function FeaturedWork() {
               />
               <h2
                 id="featured-work-heading"
-                className="font-mono text-xs tracking-widest whitespace-nowrap text-[var(--tmux-pane-title-text)] uppercase"
+                className="font-mono text-xs tracking-widest whitespace-nowrap text-[var(--accent-hover)] uppercase dark:text-[var(--tmux-pane-title-text)]"
               >
                 Featured Work
               </h2>
@@ -188,7 +198,7 @@ export function FeaturedWork() {
           </div>
           <Link
             href="/work"
-            className="group flex items-center gap-2 font-mono text-xs text-[var(--tmux-bar-text)] transition-colors hover:text-[var(--tmux-bar-text-bright)]"
+            className={`group flex items-center gap-2 rounded font-mono text-xs text-[var(--tmux-bar-text)] transition-colors hover:text-[var(--tmux-bar-text-bright)] ${FOCUS_RING}`}
           >
             <span className="whitespace-nowrap">VIEW ARCHIVE</span>
             <svg
@@ -203,18 +213,21 @@ export function FeaturedWork() {
           </Link>
         </div>
 
-        <div className="grid gap-6">
-          {featuredProjects.map((project, index) => (
-            <ProjectCard
-              key={project.slug}
-              project={project}
-              index={index}
-              isActive={activeSlug === project.slug}
-              onActivate={() => setActiveSlug(project.slug)}
-              onDeactivate={() => setActiveSlug(null)}
-            />
+        <ul className="grid list-none gap-6 p-0">
+          {projects.map((project, index) => (
+            <li key={project.slug}>
+              <ProjectCard
+                project={project}
+                index={index}
+                isActive={activeSlug === project.slug}
+                onActivate={() => setActiveSlug(project.slug)}
+                onDeactivate={() =>
+                  setActiveSlug((current) => (current === project.slug ? null : current))
+                }
+              />
+            </li>
           ))}
-        </div>
+        </ul>
 
         <div className="mt-16 text-center">
           <p className="mb-6 font-mono text-sm text-[var(--tmux-bar-text)]">
@@ -222,7 +235,7 @@ export function FeaturedWork() {
           </p>
           <Link
             href="/work"
-            className="inline-flex items-center gap-2 rounded border border-[var(--tmux-border)] bg-[var(--card)]/75 px-8 py-4 font-mono text-sm text-[var(--tmux-bar-text-bright)] backdrop-blur-md transition-all duration-300 hover:border-[var(--accent)] hover:text-[var(--tmux-pane-title-text)] hover:shadow-[0_0_20px_rgba(139,92,246,0.1)]"
+            className={`inline-flex items-center gap-2 rounded border border-[var(--tmux-border)] bg-[var(--card)]/75 px-8 py-4 font-mono text-sm text-[var(--tmux-bar-text-bright)] backdrop-blur-md transition-all duration-300 hover:border-[var(--accent)] hover:text-[var(--tmux-pane-title-text)] hover:shadow-[0_0_20px_rgba(139,92,246,0.1)] ${FOCUS_RING}`}
           >
             <span>Explore All Projects</span>
             <svg
@@ -232,12 +245,7 @@ export function FeaturedWork() {
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M14 5l7 7m0 0l-7 7m7-7H3"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ARROW} />
             </svg>
           </Link>
         </div>

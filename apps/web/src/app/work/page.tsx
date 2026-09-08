@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { caseStudies, type CaseStudy } from '@/data/case-studies';
+import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
 
 export const metadata: Metadata = {
   title: 'Work',
@@ -9,28 +9,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Work & Case Studies',
     description: 'What happens when you point me at a hard problem.',
-  },
-};
-
-// Project metadata for enhanced display
-const projectMeta: Record<
-  string,
-  { category: string; status: string; metric: { value: string; label: string } }
-> = {
-  'self-healing-agent': {
-    category: 'AI AGENT',
-    status: 'LIVE',
-    metric: { value: '73%', label: 'auto-resolved' },
-  },
-  'enterprise-b2b-platform': {
-    category: 'PLATFORM',
-    status: 'PRODUCTION',
-    metric: { value: '40%', label: 'fewer bugs' },
-  },
-  'nx-remote-cache': {
-    category: 'DEVOPS',
-    status: 'PRODUCTION',
-    metric: { value: '5x', label: 'faster builds' },
   },
 };
 
@@ -66,7 +44,7 @@ function CornerBrackets() {
 }
 
 function ProjectCard({ project, index }: { project: CaseStudy; index: number }) {
-  const meta = projectMeta[project.slug];
+  const meta = project.highlight;
   const isFirst = index === 0;
 
   return (
@@ -182,7 +160,7 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
             <div
               className={`mb-1 font-mono font-bold text-[var(--accent)] ${isFirst ? 'text-4xl' : 'text-2xl'}`}
             >
-              {meta.metric.value}
+              {formatMetric(meta.metric)}
             </div>
             <div className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
               {meta.metric.label}

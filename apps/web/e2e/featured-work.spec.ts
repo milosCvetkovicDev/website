@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test';
 
+const CARD_TITLES = /Self-Healing Agent|Enterprise B2B Platform|Nx Remote Cache/;
+
 test.describe('Featured Work', () => {
   test('cards light up the architecture diagram on hover and keyboard focus', async ({ page }) => {
     await page.goto('/');
     const section = page.getByRole('region', { name: /featured work/i });
     await section.scrollIntoViewIfNeeded();
 
-    const cards = section.getByRole('link', {
-      name: /Self-Healing Agent|Enterprise B2B Platform|Nx Remote Cache/,
-    });
+    const cards = section.getByRole('link', { name: CARD_TITLES });
     await expect(cards).toHaveCount(3);
     await expect(section.locator('path[data-active="true"]')).toHaveCount(0);
 
@@ -19,5 +19,14 @@ test.describe('Featured Work', () => {
     await cards.nth(1).focus();
     await expect(cards.nth(1)).toHaveAttribute('data-active', 'true');
     await expect(section.locator('path[data-active="true"]')).toHaveCount(3);
+  });
+
+  test('renders no SMIL animations under reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    const section = page.getByRole('region', { name: /featured work/i });
+    await section.scrollIntoViewIfNeeded();
+    await section.getByRole('link', { name: 'Enterprise B2B Platform' }).hover();
+    await expect(section.locator('animateMotion, animate')).toHaveCount(0);
   });
 });

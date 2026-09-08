@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import {
   NODES,
@@ -36,13 +36,17 @@ function NodeShape({ kind, active }: { kind: NodeKind; active: boolean }) {
   return <rect x={-24} y={-16} width={48} height={32} rx={6} {...common} />;
 }
 
-/** Decorative system diagram behind the featured work cards. Purely visual: hidden from AT. */
+/**
+ * Decorative system diagram behind the featured work cards. Purely visual: hidden from assistive
+ * technology, hidden on small screens (it would be magnified behind the stacked cards), and its
+ * packet animations only run while the section is on screen and motion is allowed.
+ */
 export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgroundProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const [isVisible, setIsVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const glowId = `architecture-glow-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
-  // Only run the SMIL packet animations while the section is on screen.
   useEffect(() => {
     const element = containerRef.current;
     if (!element || typeof IntersectionObserver === 'undefined') return;
@@ -61,16 +65,15 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
     <div
       ref={containerRef}
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 z-0 overflow-hidden opacity-40 transition-opacity duration-700 dark:opacity-60"
+      className="pointer-events-none absolute inset-0 z-0 hidden overflow-hidden opacity-40 transition-opacity duration-700 md:block dark:opacity-60"
     >
       <svg
         viewBox={`0 0 ${VIEW_BOX.width} ${VIEW_BOX.height}`}
-        preserveAspectRatio="xMidYMid slice"
+        preserveAspectRatio="xMidYMid meet"
         className="h-full w-full"
-        data-testid="architecture-diagram"
       >
         <defs>
-          <filter id="architecture-glow" x="-20%" y="-20%" width="140%" height="140%">
+          <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="4" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
@@ -97,11 +100,12 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
                     stroke="var(--accent)"
                     strokeWidth={4}
                     opacity={0.3}
-                    filter="url(#architecture-glow)"
+                    filter={`url(#${glowId})`}
                   />
                 )}
                 {animatePackets && (!hasActive || connection.active) && (
                   <circle
+                    key={connection.active ? 'active' : 'idle'}
                     r={2}
                     fill={connection.active ? 'var(--tmux-status-ok)' : 'var(--tmux-bar-text)'}
                     opacity={connection.active ? 1 : 0.4}
@@ -156,7 +160,7 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
                   y={38}
                   textAnchor="middle"
                   fontSize={10}
-                  fontFamily="monospace"
+                  className="font-mono"
                   fill={active ? 'var(--tmux-bar-text-bright)' : 'var(--tmux-bar-text)'}
                 >
                   {node.label}
