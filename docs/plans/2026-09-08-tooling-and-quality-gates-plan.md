@@ -658,7 +658,7 @@ Baseline on `main`: 7 errors, 8 warnings (`react-hooks/set-state-in-effect` ×6,
 - Test: `apps/web/src/hooks/__tests__/use-is-hydrated.test.tsx`
 - Test: `apps/web/src/hooks/__tests__/use-prefers-reduced-motion.test.tsx`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `apps/web/src/hooks/__tests__/use-is-hydrated.test.tsx`:
 
@@ -741,12 +741,12 @@ describe('usePrefersReducedMotion', () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter web exec vitest run src/hooks`
 Expected: both files fail with `Failed to resolve import "../use-is-hydrated"` / `"../use-prefers-reduced-motion"`.
 
-- [ ] **Step 3: Implement the hooks**
+- [x] **Step 3: Implement the hooks**
 
 `apps/web/src/hooks/use-is-hydrated.ts`:
 
@@ -793,12 +793,12 @@ export function usePrefersReducedMotion(): boolean {
 }
 ```
 
-- [ ] **Step 4: Run the tests again**
+- [x] **Step 4: Run the tests again**
 
 Run: `pnpm --filter web exec vitest run src/hooks`
 Expected: 4 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/hooks
@@ -813,7 +813,7 @@ git commit -m "feat(web): add hydration and reduced-motion hooks backed by useSy
 - Modify: `apps/web/src/app/layout.tsx` (inline init script in `<head>`)
 - Test: `apps/web/src/components/__tests__/theme-provider.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 import { act, render, screen } from '@testing-library/react';
@@ -875,7 +875,7 @@ describe('ThemeProvider', () => {
 Run: `pnpm --filter web exec vitest run src/components/__tests__/theme-provider.test.tsx`
 Expected: fails (`THEME_STORAGE_KEY` is not exported; second test fails on `light:mounted` because the current provider starts as `dark`).
 
-- [ ] **Step 2: Rewrite `theme-provider.tsx`**
+- [x] **Step 2: Rewrite `theme-provider.tsx`**
 
 ```tsx
 'use client';
@@ -962,7 +962,7 @@ export function useTheme() {
 }
 ```
 
-- [ ] **Step 3: Set the class before first paint** — in `apps/web/src/app/layout.tsx` add above `export const metadata`:
+- [x] **Step 3: Set the class before first paint** — in `apps/web/src/app/layout.tsx` add above `export const metadata`:
 
 ```tsx
 // Runs before React hydrates so the first paint already has the right theme (no light-to-dark flash).
@@ -977,14 +977,14 @@ and inside `<head>` (before the JSON-LD components):
 
 `<html suppressHydrationWarning>` is already present and covers the class the script adds.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `pnpm --filter web exec vitest run src/components/__tests__/theme-provider.test.tsx`
 Expected: 2 passed.
 Run: `pnpm --filter web exec eslint src/components/theme-provider.tsx src/app/layout.tsx`
 Expected: no output (clean).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/components/theme-provider.tsx apps/web/src/components/__tests__/theme-provider.test.tsx apps/web/src/app/layout.tsx
@@ -997,7 +997,7 @@ git commit -m "fix(web): make the theme provider an external store and apply the
 
 - Modify: `apps/web/src/components/animated-hero/index.tsx`
 
-- [ ] **Step 1: In `BootstrapLoader`** replace the state block and the two effects with:
+- [x] **Step 1: In `BootstrapLoader`** replace the state block and the two effects with:
 
 ```tsx
 function BootstrapLoader({ visible }: { visible: boolean }) {
@@ -1044,7 +1044,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
 then replace the three JSX usages of `progress` (`width: \`${progress}%\``, `{progress}%`, `progress === 100 ? 'COMPLETE' : 'LOADING'`) with `displayProgress`.
 
-- [ ] **Step 2: In `AnimatedHero`** replace
+- [x] **Step 2: In `AnimatedHero`** replace
 
 ```tsx
 const [mounted, setMounted] = useState(false);
@@ -1062,14 +1062,14 @@ const mounted = useIsHydrated();
 
 and add `import { useIsHydrated } from '@/hooks/use-is-hydrated';`. `useState`/`useEffect` stay imported (still used by `BootstrapLoader`).
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `pnpm --filter web exec eslint src/components/animated-hero/index.tsx`
 Expected: clean.
 Run: `pnpm --filter web test`
 Expected: all green (the boot loader has no unit test; the e2e suite in Task 9 covers it).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/web/src/components/animated-hero/index.tsx
@@ -1082,7 +1082,7 @@ git commit -m "fix(web): derive boot loader completion state instead of setting 
 
 - Modify: `apps/web/src/components/animated-hero/loop-phase.tsx`
 
-- [ ] **Step 1:** change the React import to `import { useCallback, useEffect, useRef, useState } from 'react';`, move the whole `const animateHealing = () => { ... };` block _above_ the `useEffect`, wrap it as
+- [x] **Step 1:** change the React import to `import { useCallback, useEffect, useRef, useState } from 'react';`, move the whole `const animateHealing = () => { ... };` block _above_ the `useEffect`, wrap it as
 
 ```tsx
 const animateHealing = useCallback(() => {
@@ -1092,7 +1092,7 @@ const animateHealing = useCallback(() => {
 
 (the body only uses state setters, refs, `gsap` and the module constant `healingTimeline`, all stable), and change the effect's dependency array from `[]` to `[animateHealing]` and `onEnter: () => animateHealing()` to `onEnter: animateHealing`.
 
-- [ ] **Step 2: Verify and commit**
+- [x] **Step 2: Verify and commit**
 
 Run: `pnpm --filter web exec eslint src/components/animated-hero/loop-phase.tsx` → clean.
 
@@ -1109,13 +1109,13 @@ git commit -m "fix(web): stabilise the loop phase animation callback ordering"
 - Modify: `apps/web/src/components/animated-hero/use-gsap-scroll.ts`
 - Modify: `apps/web/src/components/animated-hero/circuit-background.tsx`
 
-- [ ] **Step 1: `tmux-background.tsx`** — add `import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';`; in `TmuxBackground` replace `const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);` with `const prefersReducedMotion = usePrefersReducedMotion();` and delete the whole `// Detect reduced motion preference` effect. In `AnimatedPane`, change the effect dependency array `[addLine, config.speed]` to `[addLine, config.speed, isVisibleRef]`.
+- [x] **Step 1: `tmux-background.tsx`** — add `import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';`; in `TmuxBackground` replace `const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);` with `const prefersReducedMotion = usePrefersReducedMotion();` and delete the whole `// Detect reduced motion preference` effect. In `AnimatedPane`, change the effect dependency array `[addLine, config.speed]` to `[addLine, config.speed, isVisibleRef]`.
 
-- [ ] **Step 2: `use-gsap-scroll.ts`** — delete the `usePrefersReducedMotion` function and drop `useState` from the React import (keep `useEffect`, `useRef`).
+- [x] **Step 2: `use-gsap-scroll.ts`** — delete the `usePrefersReducedMotion` function and drop `useState` from the React import (keep `useEffect`, `useRef`).
 
-- [ ] **Step 3: `circuit-background.tsx`** — change `import { usePrefersReducedMotion } from './use-gsap-scroll';` to `import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';`.
+- [x] **Step 3: `circuit-background.tsx`** — change `import { usePrefersReducedMotion } from './use-gsap-scroll';` to `import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';`.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `pnpm --filter web exec eslint src/components/animated-hero` → clean apart from the unused-var warnings handled in 8g.
 Run: `pnpm --filter web test` → green (the tmux tests mock `matchMedia`).
@@ -1132,9 +1132,9 @@ git commit -m "refactor(web): read reduced-motion preference through the shared 
 - Delete: `apps/web/src/components/hero.tsx` (only referenced by the barrel export; `app/page.tsx` renders `AnimatedHero`)
 - Modify: `apps/web/src/components/index.ts` (remove `export { Hero } from './hero';`)
 
-- [ ] **Step 1:** `git rm apps/web/src/components/hero.tsx`, remove the export line.
-- [ ] **Step 2:** Run `grep -rn "components'" apps/web/src | grep -c Hero` → `0`; `pnpm --filter web build` → green.
-- [ ] **Step 3:** Commit: `git commit -am "refactor(web): remove unused Hero component"`
+- [x] **Step 1:** `git rm apps/web/src/components/hero.tsx`, remove the export line.
+- [x] **Step 2:** Run `grep -rn "components'" apps/web/src | grep -c Hero` → `0`; `pnpm --filter web build` → green.
+- [x] **Step 3:** Commit: `git commit -am "refactor(web): remove unused Hero component"`
 
 #### 8g. Unused imports and variables
 
@@ -1146,14 +1146,14 @@ git commit -m "refactor(web): read reduced-motion preference through the shared 
 - `apps/web/src/components/animated-hero/section-progress.tsx`: remove `memo` from the React import
 - `apps/web/src/components/animated-hero/strategy-phase.tsx` line 167: `techChoices.map((tech, index) => (` → `techChoices.map((tech) => (`
 
-- [ ] **Step 1: Apply the edits, then run the full gate**
+- [x] **Step 1: Apply the edits, then run the full gate**
 
 Run: `pnpm lint`
 Expected: `Tasks: 2 successful` and no `✖` lines (0 errors, 0 warnings under `--max-warnings 0`).
 Run: `pnpm test && pnpm typecheck && pnpm build`
 Expected: all green.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add -A apps/web/src
