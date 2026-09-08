@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const healingTimeline = [
   {
@@ -34,48 +35,9 @@ export function LoopPhase() {
   const [visibleEvents, setVisibleEvents] = useState(0);
   const [alertStatus, setAlertStatus] = useState<'error' | 'resolved'>('error');
   const [showProtocol, setShowProtocol] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    gsap.registerPlugin(ScrollTrigger);
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (prefersReducedMotion) {
-      setVisibleEvents(healingTimeline.length);
-      setAlertStatus('resolved');
-      setShowProtocol(true);
-      return;
-    }
-
-    const ctx = gsap.context(() => {
-      ScrollTrigger.create({
-        trigger: sectionRef.current,
-        start: 'top center',
-        onEnter: () => animateHealing(),
-      });
-
-      // Dashboard fades in
-      gsap.fromTo(
-        dashboardRef.current,
-        { opacity: 0, y: 30 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.5,
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: 'top center',
-          },
-        },
-      );
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
-
-  const animateHealing = () => {
+  const animateHealing = useCallback(() => {
     // Alert pulses
     setTimeout(() => {
       gsap.fromTo(
@@ -118,7 +80,44 @@ export function LoopPhase() {
         800 + index * 400,
       );
     });
-  };
+  }, []);
+
+  useEffect(() => {
+    // Reduced motion: the final state is rendered directly via the derived values below.
+    if (prefersReducedMotion) return;
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    const ctx = gsap.context(() => {
+      ScrollTrigger.create({
+        trigger: sectionRef.current,
+        start: 'top center',
+        onEnter: animateHealing,
+      });
+
+      // Dashboard fades in
+      gsap.fromTo(
+        dashboardRef.current,
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.5,
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: 'top center',
+          },
+        },
+      );
+    }, sectionRef);
+
+    return () => ctx.revert();
+  }, [animateHealing, prefersReducedMotion]);
+
+  // With reduced motion the timeline is shown complete instead of animating in.
+  const shownEvents = prefersReducedMotion ? healingTimeline.length : visibleEvents;
+  const shownAlertStatus = prefersReducedMotion ? 'resolved' : alertStatus;
+  const protocolVisible = prefersReducedMotion || showProtocol;
 
   const getEventColor = (type: string) => {
     switch (type) {
@@ -166,7 +165,7 @@ export function LoopPhase() {
             <div
               ref={alertRef}
               className={`rounded-lg border p-4 transition-all duration-500 ${
-                alertStatus === 'error'
+                shownAlertStatus === 'error'
                   ? 'border-red-500/50 bg-red-500/10'
                   : 'border-green-500/50 bg-green-500/10'
               }`}
@@ -174,15 +173,15 @@ export function LoopPhase() {
               <div className="flex items-center gap-3">
                 <span
                   className={`h-3 w-3 rounded-full ${
-                    alertStatus === 'error' ? 'animate-pulse bg-red-500' : 'bg-green-500'
+                    shownAlertStatus === 'error' ? 'animate-pulse bg-red-500' : 'bg-green-500'
                   }`}
                 />
                 <span
                   className={`font-mono text-sm ${
-                    alertStatus === 'error' ? 'text-red-400' : 'text-green-400'
+                    shownAlertStatus === 'error' ? 'text-red-400' : 'text-green-400'
                   }`}
                 >
-                  {alertStatus === 'error' ? 'ERROR DETECTED' : 'RESOLVED'}
+                  {shownAlertStatus === 'error' ? 'ERROR DETECTED' : 'RESOLVED'}
                 </span>
               </div>
             </div>
@@ -193,14 +192,14 @@ export function LoopPhase() {
         <div ref={timelineRef} className="mt-6">
           <HudPanel title="SELF-HEALING LOG">
             <div className="space-y-2 font-mono text-sm">
-              {healingTimeline.slice(0, visibleEvents).map((event, index) => (
+              {healingTimeline.slice(0, shownEvents).map((event, index) => (
                 <div key={index} className="animate-fade-in flex items-start gap-3">
                   <span className="shrink-0 text-[var(--muted)]">{event.time}</span>
                   <span className="text-[var(--muted)]">—</span>
                   <span className={getEventColor(event.type)}>{event.event}</span>
                 </div>
               ))}
-              {visibleEvents > 0 && visibleEvents < healingTimeline.length && (
+              {shownEvents > 0 && shownEvents < healingTimeline.length && (
                 <div className="flex items-center gap-2 text-[var(--muted)]">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
                   <span>Processing...</span>
@@ -211,7 +210,7 @@ export function LoopPhase() {
         </div>
 
         {/* Protocol Active */}
-        <div ref={protocolRef} className={`mt-6 ${showProtocol ? '' : 'opacity-0'}`}>
+        <div ref={protocolRef} className={`mt-6 ${protocolVisible ? '' : 'opacity-0'}`}>
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
               <span className="text-xl">🔄</span>
@@ -226,7 +225,10 @@ export function LoopPhase() {
         </div>
 
         {/* Headline */}
-        <div ref={headlineRef} className={`mt-16 text-center ${showProtocol ? '' : 'opacity-0'}`}>
+        <div
+          ref={headlineRef}
+          className={`mt-16 text-center ${protocolVisible ? '' : 'opacity-0'}`}
+        >
           <h2 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="morse">
               This happened at 3:14am. Nobody got paged.
