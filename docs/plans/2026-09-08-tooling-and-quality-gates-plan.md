@@ -1417,8 +1417,8 @@ git commit -m "ci: add github actions quality and e2e workflows with sha-pinned 
 
 ### Task 11: Open the pull request and get it green
 
-- [ ] **Step 1: Update the checkboxes in this plan** and commit: `git commit -am "docs(plans): mark tooling plan tasks complete"`.
-- [ ] **Step 2: Push and open the PR**
+- [x] **Step 1: Update the checkboxes in this plan** and commit: `git commit -am "docs(plans): mark tooling plan tasks complete"`.
+- [x] **Step 2: Push and open the PR**
 
 ```bash
 git push -u origin chore/tooling-and-quality-gates
