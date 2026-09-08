@@ -1,8 +1,35 @@
+export interface CaseStudyMetric {
+  value: number;
+  label: string;
+  prefix?: string;
+  suffix?: string;
+  decimals?: number;
+}
+
+/** Short facts shown on project cards (home page and /work). One source, so they cannot contradict. */
+export interface CaseStudyHighlight {
+  category: string;
+  status: 'LIVE' | 'PRODUCTION';
+  metric: CaseStudyMetric;
+}
+
+/**
+ * Renders a metric for display. Total by construction: a value that is not a finite number has no
+ * honest rendering, so it becomes an em dash rather than "NaN%", and the digit count is clamped to
+ * the range toFixed accepts so a data edit cannot throw during server rendering.
+ */
+export function formatMetric(metric: CaseStudyMetric): string {
+  if (!Number.isFinite(metric.value)) return '—';
+  const decimals = Math.min(20, Math.max(0, Math.trunc(metric.decimals ?? 0)));
+  return `${metric.prefix ?? ''}${metric.value.toFixed(decimals)}${metric.suffix ?? ''}`;
+}
+
 export interface CaseStudy {
   slug: string;
   title: string;
   description: string;
   tags: string[];
+  highlight: CaseStudyHighlight;
   challenge: string;
   approach: string;
   contributions: string[];
@@ -16,6 +43,11 @@ export interface CaseStudy {
 export const caseStudies: CaseStudy[] = [
   {
     slug: 'self-healing-agent',
+    highlight: {
+      category: 'AI AGENT',
+      status: 'LIVE',
+      metric: { value: 73, suffix: '%', label: 'faster resolution' },
+    },
     title: 'Self-Healing Agent',
     description:
       'An AI agent that wakes up before you do. It monitors production, diagnoses errors, and opens PRs with fixes—all autonomously.',
@@ -50,6 +82,11 @@ export const caseStudies: CaseStudy[] = [
   },
   {
     slug: 'enterprise-b2b-platform',
+    highlight: {
+      category: 'PLATFORM',
+      status: 'PRODUCTION',
+      metric: { value: 40, suffix: '%', label: 'less complexity' },
+    },
     title: 'Enterprise B2B Platform',
     description:
       'Took a legacy codebase everyone was afraid to touch and turned it into a system the team actually enjoys working on.',
@@ -94,6 +131,11 @@ export const caseStudies: CaseStudy[] = [
   },
   {
     slug: 'nx-remote-cache',
+    highlight: {
+      category: 'DEVOPS',
+      status: 'PRODUCTION',
+      metric: { value: 5, suffix: '×', label: 'faster builds' },
+    },
     title: 'Nx Remote Cache Server',
     description:
       "Why rebuild what hasn't changed? A custom cache server that slashed CI times and gave developers their coffee breaks back.",
