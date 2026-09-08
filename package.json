@@ -3,16 +3,17 @@
   "private": true,
   "scripts": {
     "dev": "turbo dev",
+    "dev:web": "turbo dev --filter=web",
+    "dev:playground": "turbo dev --filter=playground",
     "build": "turbo build",
     "lint": "turbo lint",
     "lint:fix": "turbo lint:fix",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:e2e": "turbo test:e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "turbo typecheck",
     "clean": "turbo clean && rm -rf node_modules",
-    "dev:web": "turbo dev --filter=web",
-    "dev:playground": "turbo dev --filter=playground",
-    "test": "turbo test",
     "prepare": "husky"
   },
   "devDependencies": {

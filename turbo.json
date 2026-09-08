@@ -3,6 +3,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["NEXT_PUBLIC_SITE_URL"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": {
@@ -12,8 +13,20 @@
     "lint": {
       "dependsOn": ["^lint"]
     },
+    "lint:fix": {
+      "cache": false
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
     "test": {
       "dependsOn": ["^build"]
+    },
+    "test:e2e": {
+      "cache": false
+    },
+    "clean": {
+      "cache": false
     }
   }
 }
