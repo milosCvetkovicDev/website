@@ -37,9 +37,15 @@ export function LoopPhase() {
   const [showProtocol, setShowProtocol] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
 
+  // Every timer is tracked so unmounting (or a reduced-motion switch) cancels the sequence.
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const later = useCallback((callback: () => void, delayMs: number) => {
+    timersRef.current.push(setTimeout(callback, delayMs));
+  }, []);
+
   const animateHealing = useCallback(() => {
     // Alert pulses
-    setTimeout(() => {
+    later(() => {
       gsap.fromTo(
         alertRef.current,
         { opacity: 0, scale: 0.9 },
@@ -49,17 +55,17 @@ export function LoopPhase() {
 
     // Timeline events appear one by one
     healingTimeline.forEach((_, index) => {
-      setTimeout(
+      later(
         () => {
           setVisibleEvents(index + 1);
 
           // Resolve alert when we hit the success events
           if (index === healingTimeline.length - 1) {
-            setTimeout(() => {
+            later(() => {
               setAlertStatus('resolved');
 
               // Show protocol notification
-              setTimeout(() => {
+              later(() => {
                 setShowProtocol(true);
                 gsap.fromTo(
                   protocolRef.current,
@@ -80,7 +86,7 @@ export function LoopPhase() {
         800 + index * 400,
       );
     });
-  }, []);
+  }, [later]);
 
   useEffect(() => {
     // Reduced motion: the final state is rendered directly via the derived values below.
@@ -92,6 +98,7 @@ export function LoopPhase() {
       ScrollTrigger.create({
         trigger: sectionRef.current,
         start: 'top center',
+        once: true,
         onEnter: animateHealing,
       });
 
@@ -111,7 +118,11 @@ export function LoopPhase() {
       );
     }, sectionRef);
 
-    return () => ctx.revert();
+    return () => {
+      ctx.revert();
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    };
   }, [animateHealing, prefersReducedMotion]);
 
   // With reduced motion the timeline is shown complete instead of animating in.
