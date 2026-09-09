@@ -2,17 +2,19 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
-# pnpm 10 runs no dependency lifecycle scripts unless the package is allowed below, and with
-# strictDepBuilds a package that has a script but no entry fails the install instead of printing a
-# warning. Read docs/adr/0007-dependency-build-scripts.md before adding or flipping an entry.
+# pnpm 10 runs no dependency lifecycle scripts unless the package is listed in
+# onlyBuiltDependencies, and with strictDepBuilds a package that has a script but appears in neither
+# list fails the install instead of printing a warning. These are the pnpm 10 lists rather than the
+# newer allowBuilds map because Vercel builds with its own pnpm 10.x release, which predates
+# allowBuilds. Read docs/adr/0007-dependency-build-scripts.md before adding or moving an entry.
 strictDepBuilds: true
-allowBuilds:
+ignoredBuiltDependencies:
   # Checks the @esbuild/<platform> binary pnpm already installed and downloads one only if it is
   # missing. Reviewed at 0.27.2.
-  esbuild: false
+  - esbuild
   # No-op unless a global libvips is found, in which case it compiles from source. Optional
   # dependency of next for next/image. Reviewed at 0.34.5.
-  sharp: false
+  - sharp
   # Checks the @unrs/resolver-binding-<platform> binary and downloads one only if it is missing.
   # Reviewed at 1.11.1.
-  unrs-resolver: false
+  - unrs-resolver
