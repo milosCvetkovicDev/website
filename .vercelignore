@@ -1,0 +1,19 @@
+# Read only by Vercel CLI uploads (`vercel deploy`, Path B in docs/runbooks/deploy.md).
+# Git-triggered deployments clone the repository and never consult this file.
+# The CLI skips node_modules, .next and .git on its own but not .turbo, whose cache
+# tarballs exceed Vercel's 100 MB per-file upload limit. Keep this aligned with .gitignore.
+.turbo
+.pnpm-store
+dist
+out
+coverage
+test-results
+playwright-report
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+.claude/settings.local.json
+.worktrees
+.claude/worktrees
+.playwright-mcp

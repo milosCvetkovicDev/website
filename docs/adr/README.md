@@ -28,8 +28,8 @@ operation.
 | 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)           | Accepted | 2026-09-08 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
-choice; the site is not deployed and `miloscvetkovic.dev` still resolves to the Namecheap parking
-page. The steps that would change that are in [docs/runbooks/deploy.md](../runbooks/deploy.md).
+choice; the Vercel project exists and builds `main` since 2026-09-09, and the `miloscvetkovic.dev`
+cutover is tracked in [docs/runbooks/deploy.md](../runbooks/deploy.md).
 
 ## Writing a new ADR
 
