@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TmuxBackground } from '../tmux-background';
 
 // Mock IntersectionObserver as a proper class
@@ -7,7 +7,10 @@ const mockObserve = vi.fn();
 const mockDisconnect = vi.fn();
 
 class MockIntersectionObserver {
-  constructor() {}
+  static lastCallback: IntersectionObserverCallback | undefined;
+  constructor(callback: IntersectionObserverCallback) {
+    MockIntersectionObserver.lastCallback = callback;
+  }
   observe = mockObserve;
   disconnect = mockDisconnect;
   unobserve = vi.fn();
@@ -123,5 +126,72 @@ describe('TmuxBackground', () => {
   it('sets up IntersectionObserver for visibility tracking', () => {
     render(<TmuxBackground />);
     expect(mockObserve).toHaveBeenCalled();
+  });
+});
+
+describe('AnimatedPane log slots', () => {
+  const PANE_HEIGHT = 300; // usable 288px -> 13 slots of 23.1px, the first clipped above the pane
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    class ImmediateResizeObserver {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        this.callback(
+          [{ target, contentRect: { height: PANE_HEIGHT } } as unknown as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        );
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', ImmediateResizeObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  function kubectlSlots() {
+    const pane = screen.getByText(/kubectl \u2014 pods/).closest('.flex-col');
+    const slots = pane?.querySelector('.whitespace-nowrap');
+    if (!(slots instanceof HTMLElement)) throw new Error('slot container not rendered');
+    return slots;
+  }
+
+  it('rotates lines through a fixed set of slots instead of appending elements', () => {
+    render(<TmuxBackground />);
+    const slots = kubectlSlots();
+    expect(slots.children).toHaveLength(13);
+    expect(parseFloat(slots.style.top)).toBeCloseTo(288 - 13 * 23.1, 3);
+
+    // No requestIdleCallback in jsdom: the fallback waits 1200ms, then a random (mocked 0.5) 0-2s delay.
+    act(() => vi.advanceTimersByTime(1200 + 1000));
+    expect(slots.children).toHaveLength(13);
+    expect(slots.lastElementChild?.textContent).toBe('$ kubectl get pods -n production -w');
+
+    // The kubectl pane ticks every 650ms (jitter is zero with Math.random mocked to 0.5).
+    act(() => vi.advanceTimersByTime(650));
+    expect(slots.children).toHaveLength(13);
+    expect(slots.children[11].textContent).toBe('$ kubectl get pods -n production -w');
+    expect(slots.lastElementChild?.textContent).toMatch(/^NAME\s+READY/);
+    expect(slots.children[0].textContent).toBe('\u00A0');
+  });
+
+  it('skips ticks while the background is off screen', () => {
+    render(<TmuxBackground />);
+    const observerCallback = MockIntersectionObserver.lastCallback;
+    const slots = kubectlSlots();
+    act(() =>
+      observerCallback?.(
+        [{ isIntersecting: false } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      ),
+    );
+    act(() => vi.advanceTimersByTime(1200 + 1000 + 650));
+    expect(slots.lastElementChild?.textContent).toBe('\u00A0');
   });
 });

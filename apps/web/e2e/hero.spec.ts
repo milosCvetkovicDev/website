@@ -59,6 +59,33 @@ test.describe('Hero Section', () => {
     });
   });
 
+  test('tmux log lines do not shift layout', async ({ page }) => {
+    // Lines start arriving after an idle callback plus up to two seconds; the kubectl pane always
+    // opens with the same command, so its arrival marks the point where the panes are ticking.
+    await expect(page.getByText('$ kubectl get pods -n production -w').first()).toBeVisible({
+      timeout: 15_000,
+    });
+    const shiftScore = await page.evaluate(
+      () =>
+        new Promise<number>((resolve) => {
+          let total = 0;
+          const observer = new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+              const shift = entry as PerformanceEntry & { value: number; hadRecentInput: boolean };
+              if (!shift.hadRecentInput) total += shift.value;
+            }
+          });
+          observer.observe({ type: 'layout-shift' });
+          // Roughly thirty more lines land across the five panes in this window.
+          setTimeout(() => {
+            observer.disconnect();
+            resolve(total);
+          }, 4_000);
+        }),
+    );
+    expect(shiftScore).toBeLessThan(0.005);
+  });
+
   test('scroll indicator fades on scroll', async ({ page }) => {
     const indicator = page.getByText('Scroll', { exact: true }).first().locator('..');
     await expect(indicator).toHaveCSS('opacity', '1');

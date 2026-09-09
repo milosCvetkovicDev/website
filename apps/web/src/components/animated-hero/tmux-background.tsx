@@ -1,7 +1,7 @@
 'use client';
 
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -481,6 +481,19 @@ function StaticPane({ config }: { config: PaneConfig }) {
 
 // ─── Animated Pane ───────────────────────────────────────────────────────────
 
+// The log lines are 14px text at line-height 1.65; both values are set inline on the slot container
+// below and the arithmetic here must stay in step with them.
+const LINE_HEIGHT_PX = 14 * 1.65;
+const PANE_PADDING_Y_PX = 6;
+const LINE_APPEAR_MS = 250;
+
+/**
+ * A pane keeps a fixed grid of line slots and rotates text through them, newest at the bottom.
+ * Appending a line to a bottom-anchored container instead moves every existing line up, and each
+ * of those moves is a layout shift; over a long enough session they added up to most of the home
+ * page's CLS. Text changes inside boxes that never move do not count as shifts, and neither does the
+ * transform-based appear animation on the newest slot.
+ */
 function AnimatedPane({
   config,
   isVisibleRef,
@@ -488,39 +501,76 @@ function AnimatedPane({
   config: PaneConfig;
   isVisibleRef: React.RefObject<boolean>;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const indexRef = useRef(0);
-  const lineCountRef = useRef(0);
-
-  const addLine = useCallback(() => {
-    const scrollEl = scrollRef.current;
-    if (!scrollEl) return;
-
-    const entry = config.seq[indexRef.current % config.seq.length];
-    indexRef.current++;
-
-    const line = document.createElement('div');
-    line.style.color = LOG_COLORS[entry.cls];
-    line.style.opacity = '0';
-    line.style.animation = 'log-appear 0.25s ease forwards';
-    line.textContent = entry.text || '\u00A0';
-    scrollEl.appendChild(line);
-    lineCountRef.current++;
-
-    if (lineCountRef.current > MAX_LINES && scrollEl.firstChild) {
-      scrollEl.removeChild(scrollEl.firstChild);
-      lineCountRef.current--;
-    }
-  }, [config.seq]);
-
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const slotsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const viewport = viewportRef.current;
+    const slots = slotsRef.current;
+    if (!viewport || !slots) return;
+
+    let nextIndex = 0;
+    const history: LogEntry[] = [];
+
+    // Write the newest lines into the slots. Skipping unchanged slots keeps the DOM churn down.
+    const paint = () => {
+      const count = slots.children.length;
+      for (let i = 0; i < count; i++) {
+        const slot = slots.children[i] as HTMLElement;
+        const entry = history[history.length - count + i];
+        const text = entry?.text || '\u00A0';
+        if (slot.textContent !== text) slot.textContent = text;
+        const color = entry ? LOG_COLORS[entry.cls] : '';
+        if (slot.style.color !== color) slot.style.color = color;
+      }
+    };
+
+    // Size the grid to the pane: as many lines as fit (the first may be clipped at the top) with
+    // the last one flush against the bottom padding. Slots are only ever added or removed at the
+    // end, so no existing slot moves when the pane resizes.
+    const fit = (height: number) => {
+      const usable = height - PANE_PADDING_Y_PX * 2;
+      const count = Math.min(MAX_LINES, Math.max(0, Math.ceil(usable / LINE_HEIGHT_PX)));
+      slots.style.top = `${usable - count * LINE_HEIGHT_PX}px`;
+      while (slots.children.length < count) slots.appendChild(document.createElement('div'));
+      while (slots.children.length > count && slots.lastChild) slots.removeChild(slots.lastChild);
+      paint();
+    };
+
+    const addLine = () => {
+      history.push(config.seq[nextIndex % config.seq.length]);
+      nextIndex++;
+      if (history.length > MAX_LINES) history.shift();
+      paint();
+      const newest = slots.lastElementChild;
+      if (newest instanceof HTMLElement && typeof newest.animate === 'function') {
+        newest.animate(
+          [
+            { opacity: 0, transform: 'translateY(3px)' },
+            { opacity: 1, transform: 'none' },
+          ],
+          { duration: LINE_APPEAR_MS, easing: 'ease' },
+        );
+      }
+    };
+
+    let resizeObserver: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver((entries) => {
+        const latest = entries[entries.length - 1];
+        if (latest) fit(latest.contentRect.height);
+      });
+      resizeObserver.observe(viewport);
+    } else {
+      fit(viewport.clientHeight);
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
     function tick() {
       if (isVisibleRef.current) addLine();
       const jitter = config.speed * 0.3;
       const delay = config.speed + (Math.random() - 0.5) * jitter;
-      timerRef.current = setTimeout(tick, delay);
+      timer = setTimeout(tick, delay);
     }
 
     // Defer animation start until the browser is idle so we don't
@@ -530,20 +580,21 @@ function AnimatedPane({
 
     if ('requestIdleCallback' in window) {
       idleHandle = requestIdleCallback(() => {
-        timerRef.current = setTimeout(tick, Math.random() * 2000);
+        timer = setTimeout(tick, Math.random() * 2000);
       });
     } else {
       fallbackTimer = setTimeout(() => {
-        timerRef.current = setTimeout(tick, Math.random() * 2000);
+        timer = setTimeout(tick, Math.random() * 2000);
       }, 1200);
     }
 
     return () => {
+      resizeObserver?.disconnect();
       if (idleHandle !== undefined) cancelIdleCallback(idleHandle);
       if (fallbackTimer !== undefined) clearTimeout(fallbackTimer);
-      clearTimeout(timerRef.current);
+      clearTimeout(timer);
     };
-  }, [addLine, config.speed, isVisibleRef]);
+  }, [config, isVisibleRef]);
 
   return (
     <div
@@ -551,11 +602,11 @@ function AnimatedPane({
       style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
     >
       <PaneTitle title={config.title} host={config.host} />
-      <div className="relative flex-1 overflow-hidden">
+      <div ref={viewportRef} className="relative flex-1 overflow-hidden">
         <div
-          ref={scrollRef}
-          className="absolute right-0 bottom-0 left-0 font-mono whitespace-nowrap"
-          style={{ padding: '6px 10px', fontSize: '14px', lineHeight: '1.65' }}
+          ref={slotsRef}
+          className="absolute right-0 left-0 font-mono whitespace-nowrap"
+          style={{ padding: `${PANE_PADDING_Y_PX}px 10px`, fontSize: '14px', lineHeight: '1.65' }}
         />
       </div>
       <PaneStatus statusLeft={config.statusLeft} statusRight={config.statusRight} />
