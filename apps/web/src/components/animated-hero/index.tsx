@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, lazy, Suspense, memo, type ReactNode } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense, memo, type ReactNode } from 'react';
 import { HeroSection } from './hero-section';
 import { SectionProgress } from './section-progress';
 import { useIsHydrated } from '@/hooks/use-is-hydrated';
@@ -8,29 +8,104 @@ import { useIsHydrated } from '@/hooks/use-is-hydrated';
 // Memoize hero section to prevent re-renders
 const MemoizedHeroSection = memo(HeroSection);
 
-// Lazy load heavy components that are below the fold
+// The story sections live in their own chunks. Each is mounted by DeferredSection when its
+// placeholder approaches the viewport, so none of their render or GSAP work lands at page load; the
+// loaders are also called once during idle time so the chunks are cached before the first scroll.
+const loadDiscoveryPhase = () => import('./discovery-phase');
+const loadStrategyPhase = () => import('./strategy-phase');
+const loadExecutionPhase = () => import('./execution-phase');
+const loadGauntletPhase = () => import('./gauntlet-phase');
+const loadLoopPhase = () => import('./loop-phase');
+const loadGameComplete = () => import('./game-complete');
+const phaseLoaders = [
+  loadDiscoveryPhase,
+  loadStrategyPhase,
+  loadExecutionPhase,
+  loadGauntletPhase,
+  loadLoopPhase,
+  loadGameComplete,
+];
+
 const DiscoveryPhase = lazy(() =>
-  import('./discovery-phase').then((m) => ({ default: m.DiscoveryPhase })),
+  loadDiscoveryPhase().then((m) => ({ default: m.DiscoveryPhase })),
 );
-const StrategyPhase = lazy(() =>
-  import('./strategy-phase').then((m) => ({ default: m.StrategyPhase })),
-);
+const StrategyPhase = lazy(() => loadStrategyPhase().then((m) => ({ default: m.StrategyPhase })));
 const ExecutionPhase = lazy(() =>
-  import('./execution-phase').then((m) => ({ default: m.ExecutionPhase })),
+  loadExecutionPhase().then((m) => ({ default: m.ExecutionPhase })),
 );
-const GauntletPhase = lazy(() =>
-  import('./gauntlet-phase').then((m) => ({ default: m.GauntletPhase })),
-);
-const LoopPhase = lazy(() => import('./loop-phase').then((m) => ({ default: m.LoopPhase })));
-const GameComplete = lazy(() =>
-  import('./game-complete').then((m) => ({ default: m.GameComplete })),
-);
+const GauntletPhase = lazy(() => loadGauntletPhase().then((m) => ({ default: m.GauntletPhase })));
+const LoopPhase = lazy(() => loadLoopPhase().then((m) => ({ default: m.LoopPhase })));
+const GameComplete = lazy(() => loadGameComplete().then((m) => ({ default: m.GameComplete })));
 
 const MemoizedSectionProgress = memo(SectionProgress);
 
 // Minimal loading placeholder for lazy sections
 function SectionPlaceholder() {
   return <div className="min-h-screen" />;
+}
+
+/**
+ * Renders the placeholder until it is about to scroll into view, then the real section. The first
+ * section starts one navigation-bar height below the fold, so a zero root margin is what keeps
+ * every section out of the page-load work; the sections' own scroll-triggered entrances still
+ * begin half a viewport later. Browsers without IntersectionObserver mount everything once hydrated.
+ */
+function DeferredSection({ children }: { children: ReactNode }) {
+  const placeholderRef = useRef<HTMLDivElement>(null);
+  const [approached, setApproached] = useState(false);
+  const hydrated = useIsHydrated();
+
+  useEffect(() => {
+    const placeholder = placeholderRef.current;
+    if (!placeholder || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      setApproached(true);
+    });
+    observer.observe(placeholder);
+    return () => observer.disconnect();
+  }, []);
+
+  const mount = approached || (hydrated && typeof IntersectionObserver === 'undefined');
+  if (!mount) return <div ref={placeholderRef} className="min-h-screen" />;
+  return <Suspense fallback={<SectionPlaceholder />}>{children}</Suspense>;
+}
+
+// Warm the section chunks without mounting anything, but not during the first seconds: the shared
+// GSAP chunk takes about 30 ms to evaluate on a laptop and four times that on the phones Lighthouse
+// models, and nothing below the hero can be seen before the visitor scrolls. The prefetch waits for
+// the first sign of intent (pointer, touch, key or scroll) or for a few idle seconds.
+const PREFETCH_DELAY_MS = 3000;
+const INTENT_EVENTS = ['pointerdown', 'pointermove', 'touchstart', 'keydown', 'wheel', 'scroll'];
+
+function usePrefetchPhases() {
+  useEffect(() => {
+    let done = false;
+    let idleHandle: number | undefined;
+    const removeListeners = () =>
+      INTENT_EVENTS.forEach((type) => window.removeEventListener(type, prefetch));
+    function prefetch() {
+      if (done) return;
+      done = true;
+      removeListeners();
+      for (const load of phaseLoaders) load().catch(() => {});
+    }
+    INTENT_EVENTS.forEach((type) => window.addEventListener(type, prefetch, { passive: true }));
+    const timer = setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        idleHandle = requestIdleCallback(prefetch, { timeout: 2000 });
+      } else {
+        prefetch();
+      }
+    }, PREFETCH_DELAY_MS);
+    return () => {
+      done = true;
+      removeListeners();
+      clearTimeout(timer);
+      if (idleHandle !== undefined) cancelIdleCallback(idleHandle);
+    };
+  }, []);
 }
 
 // Boot sequence messages for immersive loading
@@ -176,10 +251,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
         {/* Decorative scan line */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg">
-          <div
-            className="animate-scan-down absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent"
-            style={{ animation: 'scan-down 2s linear infinite' }}
-          />
+          <div className="scan-line" />
         </div>
       </div>
 
@@ -193,6 +265,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
 export function AnimatedHero({ children }: { children?: ReactNode }) {
   const mounted = useIsHydrated();
+  usePrefetchPhases();
 
   return (
     <div className="relative">
@@ -207,30 +280,30 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
         {/* Section 1: Hero - server-rendered children passed through */}
         <MemoizedHeroSection>{children}</MemoizedHeroSection>
 
-        {/* Lazy loaded sections below the fold */}
-        <Suspense fallback={<SectionPlaceholder />}>
+        {/* Story sections, each mounted when it approaches the viewport */}
+        <DeferredSection>
           <DiscoveryPhase />
-        </Suspense>
+        </DeferredSection>
 
-        <Suspense fallback={<SectionPlaceholder />}>
+        <DeferredSection>
           <StrategyPhase />
-        </Suspense>
+        </DeferredSection>
 
-        <Suspense fallback={<SectionPlaceholder />}>
+        <DeferredSection>
           <ExecutionPhase />
-        </Suspense>
+        </DeferredSection>
 
-        <Suspense fallback={<SectionPlaceholder />}>
+        <DeferredSection>
           <GauntletPhase />
-        </Suspense>
+        </DeferredSection>
 
-        <Suspense fallback={<SectionPlaceholder />}>
+        <DeferredSection>
           <LoopPhase />
-        </Suspense>
+        </DeferredSection>
 
-        <Suspense fallback={<SectionPlaceholder />}>
+        <DeferredSection>
           <GameComplete />
-        </Suspense>
+        </DeferredSection>
       </div>
     </div>
   );
