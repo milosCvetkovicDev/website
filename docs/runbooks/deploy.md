@@ -369,6 +369,16 @@ static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
 - [ ] Lighthouse spot check on `/` and one case study page in an incognito window; note the scores
       somewhere rather than acting on them immediately
 
+Lighthouse baseline, recorded on 2026-09-09 against the first production build (Lighthouse 13.4.1
+CLI, default mobile emulation with simulated throttling and a 4× CPU slowdown): `/` scored
+performance 24, accessibility 96, best practices 100, SEO 100, with LCP 4.6 s, CLS 0.35 and TBT
+2,160 ms; the shift comes from the absolutely positioned layer inside the hero and the blocking time
+from evaluating the main client chunk, since the whole page transfers only 318 KiB.
+`/work/self-healing-agent` scored 75, 96, 100, 100 with LCP 2.6 s, CLS 0 and TBT 990 ms.
+Accessibility loses points to a colour-contrast failure on both pages and, on `/`, a visible label
+that its accessible name does not contain. Recorded, not acted on: the home page numbers are a
+follow-up, not a launch blocker.
+
 ## Routine deployments
 
 - **Production**: merging a pull request into `main` triggers a production deployment. There is no
