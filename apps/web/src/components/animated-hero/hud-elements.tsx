@@ -48,14 +48,18 @@ function GlowBorder() {
   );
 }
 
-// Terminal-style container with enhanced styling
+// Terminal-style container with enhanced styling.
+// The window is always dark (#0d1117), so it carries the `dark` class to scope the dark theme
+// tokens to its subtree: in the light theme the page's --foreground and --muted are dark greys
+// that would be invisible on it. Inside it, `dark:` variants and the `.dark` scrollbar rules apply
+// in both page themes, so children style themselves with the tokens rather than `dark:` overrides.
 export const Terminal = forwardRef<
   HTMLDivElement,
   { children: React.ReactNode; className?: string; title?: string }
 >(({ children, className = '', title }, ref) => (
   <div
     ref={ref}
-    className={`group relative overflow-hidden rounded-lg border border-[#30363d] bg-[#0d1117] font-mono text-sm transition-all duration-300 hover:border-[var(--accent)]/50 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)] ${className}`}
+    className={`dark group relative overflow-hidden rounded-lg border border-[#30363d] bg-[#0d1117] font-mono text-sm transition-all duration-300 hover:border-[var(--accent)]/50 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)] ${className}`}
   >
     <CornerBrackets className="opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
     <GlowBorder />
@@ -92,12 +96,12 @@ export const HudPanel = forwardRef<
     <GlowBorder />
     {title && (
       <div className="flex items-center justify-between border-b border-[var(--accent)]/30 px-4 py-2">
-        <span className="font-mono text-xs tracking-wider text-[var(--accent)] uppercase">
+        <span className="font-mono text-xs tracking-wider text-[var(--accent-text)] uppercase">
           {title}
         </span>
         <div className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-          <span className="font-mono text-[10px] text-[var(--accent)]/60">ACTIVE</span>
+          <span className="font-mono text-[10px] text-[var(--accent-text)]">ACTIVE</span>
         </div>
       </div>
     )}
@@ -198,7 +202,9 @@ export function StatDisplay({
       <span
         ref={valueRef}
         className={`inline-block font-mono transition-all ${
-          highlight ? 'animate-pulse font-bold text-[var(--accent)]' : 'text-[var(--accent)]'
+          highlight
+            ? 'animate-pulse font-bold text-[var(--accent-text)]'
+            : 'text-[var(--accent-text)]'
         }`}
       >
         {value}
@@ -215,7 +221,7 @@ export const NotificationToast = forwardRef<
   const colors = {
     success: 'border-green-500/50 bg-green-500/10 text-green-400',
     warning: 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400',
-    info: 'border-[var(--accent)]/50 bg-[var(--accent)]/10 text-[var(--accent)]',
+    info: 'border-[var(--accent)]/50 bg-[var(--accent)]/10 text-[var(--accent-text)]',
     error: 'border-red-500/50 bg-red-500/10 text-red-400',
   };
 
@@ -251,7 +257,7 @@ export function QuestItem({
         className={`transition-all duration-300 ${
           completed
             ? 'scale-110 text-green-400'
-            : 'text-[var(--muted)] group-hover:text-[var(--accent)]'
+            : 'text-[var(--muted)] group-hover:text-[var(--accent-text)]'
         }`}
       >
         {completed ? '✓' : '○'}
@@ -415,7 +421,7 @@ export function DataStream({ className = '' }: { className?: string }) {
 
   return (
     <div className={`pointer-events-none absolute inset-0 overflow-hidden opacity-10 ${className}`}>
-      <div className="animate-scroll-up absolute inset-0 font-mono text-[8px] leading-tight whitespace-pre text-[var(--accent)]">
+      <div className="animate-scroll-up absolute inset-0 font-mono text-[8px] leading-tight whitespace-pre text-[var(--accent-text)]">
         {lines}
       </div>
     </div>

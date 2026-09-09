@@ -294,6 +294,31 @@ static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
 - [ ] Lighthouse spot check on `/` and one case study page in an incognito window; note the scores
       somewhere rather than acting on them immediately
 
+Lighthouse baseline, recorded on 2026-09-09 against the first production build (Lighthouse 13.4.1
+CLI, default mobile emulation with simulated throttling and a 4× CPU slowdown): `/` scored
+performance 24, accessibility 96, best practices 100, SEO 100, with LCP 4.6 s, CLS 0.35 and TBT
+2,160 ms; the shift comes from the absolutely positioned layer inside the hero and the blocking time
+from evaluating the main client chunk, since the whole page transfers only 318 KiB.
+`/work/self-healing-agent` scored 75, 96, 100, 100 with LCP 2.6 s, CLS 0 and TBT 990 ms. The
+accessibility points were lost to colour contrast on both pages (the accent used as text, labels
+dimmed with opacity modifiers, a scroll reveal that parks the quest log at 30% opacity) and, on
+`/`, to Featured Work cards whose `aria-labelledby` name did not contain their visible text. Both
+were fixed the same day by splitting the accent into `--accent` and `--accent-text` and restructuring
+the cards ([ADR 0008](../adr/0008-accent-colour-roles.md)); re-run with the same CLI against the
+local production build, both pages score accessibility 100 with `color-contrast` passing and
+`label-content-name-mismatch` not applicable. The command that reproduces the accessibility run is
+
+```bash
+CHROME_PATH="$(node -e "console.log(require('@playwright/test').chromium.executablePath())")" \
+  pnpm dlx lighthouse http://localhost:3000/ --only-categories=accessibility --output=json \
+  --output-path=/tmp/lh-a11y-home.json --chrome-flags="--headless=new"
+```
+
+from `apps/web` with `pnpm start` serving the build. Note that `--headless=new` follows the
+machine's appearance setting for `prefers-color-scheme`, so on a Mac in dark mode this is a
+dark-theme audit; the light theme is checked with Playwright and axe-core instead. The home page
+performance numbers remain a follow-up, not a launch blocker.
+
 ## Routine deployments
 
 - **Production**: merging a pull request into `main` triggers a production deployment. There is no

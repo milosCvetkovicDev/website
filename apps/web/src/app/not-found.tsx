@@ -5,7 +5,12 @@ export default function NotFound() {
     <div className="flex min-h-[60vh] items-center justify-center px-6">
       <div className="max-w-md text-center">
         <div className="mb-6">
-          <span className="font-mono text-8xl font-bold text-[var(--accent)]/30">404</span>
+          <span
+            aria-hidden="true"
+            className="font-mono text-8xl font-bold text-[var(--accent-text)]"
+          >
+            404
+          </span>
         </div>
         <h1 className="mb-4 text-2xl font-bold">Page not found</h1>
         <p className="mb-8 text-[var(--muted)]">

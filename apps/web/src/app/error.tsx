@@ -19,7 +19,12 @@ export default function Error({
     <div className="flex min-h-[60vh] items-center justify-center px-6">
       <div className="max-w-md text-center">
         <div className="mb-6">
-          <span className="font-mono text-6xl font-bold text-[var(--accent)]/30">!</span>
+          <span
+            aria-hidden="true"
+            className="font-mono text-6xl font-bold text-[var(--accent-text)]"
+          >
+            !
+          </span>
         </div>
         <h1 className="mb-4 text-2xl font-bold">Something went wrong</h1>
         <p className="mb-8 text-[var(--muted)]">

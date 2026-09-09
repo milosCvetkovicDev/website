@@ -14,7 +14,7 @@ const NO_ACTIVE_NODES: readonly ArchitectureNode[] = [];
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]';
 
-function CornerBrackets() {
+function CornerBrackets({ active }: { active: boolean }) {
   const corners = [
     { className: '-top-px -left-px', d: 'M0 6 L0 0 L6 0' },
     { className: '-top-px -right-px', d: 'M6 0 L12 0 L12 6' },
@@ -28,7 +28,9 @@ function CornerBrackets() {
           key={corner.d}
           aria-hidden="true"
           viewBox="0 0 12 12"
-          className={`absolute h-3 w-3 text-[var(--tmux-border)] opacity-50 transition-colors duration-300 group-hover:text-[var(--accent)] group-hover:opacity-100 group-focus-visible:text-[var(--accent)] group-focus-visible:opacity-100 ${corner.className}`}
+          className={`absolute h-3 w-3 transition-colors duration-300 ${
+            active ? 'text-[var(--accent)] opacity-100' : 'text-[var(--tmux-border)] opacity-50'
+          } ${corner.className}`}
         >
           <path d={corner.d} fill="none" stroke="currentColor" strokeWidth="2" />
         </svg>
@@ -45,34 +47,37 @@ interface ProjectCardProps {
   onFocusChange: (focused: boolean) => void;
 }
 
+// The title link is stretched over the whole card by its ::after pseudo-element, so the card stays
+// a single click, hover and focus target while the link's accessible name is exactly its visible
+// text, as WCAG 2.5.3 (Label in Name) requires. Everything else on the card is ordinary content for
+// assistive technology, and the description is attached to the link with aria-describedby. The
+// overlay reaches 1px past the padding box so the border ring is part of the hit area too. The
+// focus outline is drawn on the overlay so it frames the card, and it is an outline rather than a
+// ring so it survives forced-colors mode, where box-shadow is not painted.
+// Constraint: the overlay is the pointer target for the whole card, so nothing else inside the
+// card may be interactive, and text inside it cannot be selected with the mouse.
+const CARD_LINK =
+  'rounded after:absolute after:-inset-px after:z-10 after:rounded focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[var(--accent)]';
+
 function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }: ProjectCardProps) {
-  const titleId = `featured-${project.slug}-title`;
   const descriptionId = `featured-${project.slug}-description`;
 
   return (
-    <Link
-      href={`/work/${project.slug}`}
-      aria-labelledby={titleId}
-      aria-describedby={descriptionId}
-      data-active={isActive}
-      onMouseEnter={() => onHoverChange(true)}
-      onMouseLeave={() => onHoverChange(false)}
-      onFocus={() => onFocusChange(true)}
-      onBlur={() => onFocusChange(false)}
-      className={`group relative block rounded border bg-[var(--card)]/75 p-6 backdrop-blur-md transition-all duration-500 ${FOCUS_RING} ${
+    <div
+      className={`relative isolate rounded border bg-[var(--card)]/75 p-6 backdrop-blur-md transition-all duration-500 ${
         isActive
           ? 'border-[var(--accent)]/50 shadow-[0_0_30px_rgba(139,92,246,0.1)]'
           : 'border-[var(--tmux-border)]/30'
       }`}
     >
-      <CornerBrackets />
+      <CornerBrackets active={isActive} />
 
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span
             aria-hidden="true"
             className={`font-mono text-2xl font-bold transition-colors duration-300 ${
-              isActive ? 'text-[var(--accent)]/80' : 'text-[var(--tmux-bar-text)]/40'
+              isActive ? 'text-[var(--accent-text)]' : 'text-[var(--muted)]'
             }`}
           >
             {String(index + 1).padStart(2, '0')}
@@ -80,7 +85,7 @@ function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }:
           <span
             className={`rounded border px-2 py-0.5 font-mono text-[10px] tracking-wider transition-colors duration-300 ${
               isActive
-                ? 'border-[var(--accent)]/50 text-[var(--accent)]'
+                ? 'border-[var(--accent)]/50 text-[var(--accent-text)]'
                 : 'border-[var(--tmux-border)] text-[var(--tmux-bar-text)]'
             }`}
           >
@@ -96,15 +101,25 @@ function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }:
         </div>
       </div>
 
-      <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
           <h3
-            id={titleId}
             className={`mb-2 flex items-center gap-2 text-xl font-semibold transition-colors duration-300 ${
               isActive ? 'text-[var(--tmux-pane-title-text)]' : 'text-[var(--tmux-bar-text-bright)]'
             }`}
           >
-            {project.title}
+            <Link
+              href={`/work/${project.slug}`}
+              aria-describedby={descriptionId}
+              data-active={isActive}
+              onMouseEnter={() => onHoverChange(true)}
+              onMouseLeave={() => onHoverChange(false)}
+              onFocus={() => onFocusChange(true)}
+              onBlur={() => onFocusChange(false)}
+              className={CARD_LINK}
+            >
+              {project.title}
+            </Link>
             <svg
               aria-hidden="true"
               className={`h-4 w-4 transition-all duration-300 ${
@@ -129,7 +144,7 @@ function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }:
                 key={tag}
                 className={`rounded px-2 py-1 font-mono text-xs transition-colors duration-300 ${
                   isActive
-                    ? 'bg-[var(--accent)]/20 text-[var(--accent)]'
+                    ? 'bg-[var(--accent)]/20 text-[var(--accent-text)]'
                     : 'bg-[var(--tmux-pane-title)]/40 text-[var(--tmux-bar-text)]'
                 }`}
               >
@@ -142,15 +157,16 @@ function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }:
         <MetricCounter {...project.metric} active={isActive} />
       </div>
 
+      {/* Scan line, painted between the card background and its content. */}
       <div
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 overflow-hidden rounded transition-opacity duration-500 ${
+        className={`pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded transition-opacity duration-500 ${
           isActive ? 'opacity-100' : 'opacity-0'
         }`}
       >
         <div className="animate-scan-down absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent" />
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -197,7 +213,7 @@ export function FeaturedWork({ projects }: FeaturedWorkProps) {
               />
               <h2
                 id="featured-work-heading"
-                className="font-mono text-xs tracking-widest whitespace-nowrap text-[var(--accent-hover)] uppercase dark:text-[var(--tmux-pane-title-text)]"
+                className="font-mono text-xs tracking-widest whitespace-nowrap text-[var(--accent-text)] uppercase dark:text-[var(--tmux-pane-title-text)]"
               >
                 Featured Work
               </h2>

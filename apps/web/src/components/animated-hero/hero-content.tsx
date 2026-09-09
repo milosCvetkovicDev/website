@@ -48,7 +48,7 @@ function PlayerCard() {
             >
               {stat.label}
             </dt>
-            <dd className="font-mono" style={{ fontSize: '12px', color: 'var(--accent)' }}>
+            <dd className="font-mono" style={{ fontSize: '12px', color: 'var(--accent-text)' }}>
               {stat.value}
             </dd>
           </div>

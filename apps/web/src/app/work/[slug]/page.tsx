@@ -51,7 +51,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
         {/* Back link */}
         <Link
           href="/work"
-          className="mb-8 inline-flex items-center gap-2 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
+          className="mb-8 flex w-fit items-center gap-2 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -72,7 +72,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
         {/* Header */}
         <header className="mb-12">
-          <p className="mb-4 text-sm font-medium tracking-wider text-[var(--accent)] uppercase">
+          <p className="mb-4 text-sm font-medium tracking-wider text-[var(--accent-text)] uppercase">
             Case Study
           </p>
           <h1 className="mb-4 text-4xl font-bold md:text-5xl">{caseStudy.title}</h1>
@@ -81,7 +81,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
             {caseStudy.tags.map((tag) => (
               <span
                 key={tag}
-                className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-sm font-medium text-[var(--accent)]"
+                className="rounded-full bg-[var(--accent)]/10 px-3 py-1 text-sm font-medium text-[var(--accent-text)]"
               >
                 {tag}
               </span>
@@ -113,7 +113,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
           <ul className="space-y-3">
             {caseStudy.contributions.map((contribution, index) => (
               <li key={index} className="flex gap-3">
-                <span className="mt-1.5 text-[var(--accent)]">
+                <span className="mt-1.5 text-[var(--accent-text)]">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"

@@ -126,12 +126,12 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
         <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-6 backdrop-blur-sm">
           {/* Header */}
           <div className="mb-4 flex items-center justify-between">
-            <span className="font-mono text-xs tracking-wider text-[var(--accent)] uppercase">
+            <span className="font-mono text-xs tracking-wider text-[var(--accent-text)] uppercase">
               System Boot
             </span>
             <div className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
-              <span className="font-mono text-[10px] text-[var(--accent)]/60">ACTIVE</span>
+              <span className="font-mono text-[10px] text-[var(--accent-text)]">ACTIVE</span>
             </div>
           </div>
 

@@ -98,9 +98,10 @@ function MobileMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
               key={link.href}
               href={link.href}
               onClick={onClose}
+              aria-current={pathname === link.href ? 'page' : undefined}
               className={`text-lg transition-colors ${
                 pathname === link.href
-                  ? 'text-[var(--accent)]'
+                  ? 'text-[var(--accent-text)]'
                   : 'text-[var(--muted)] hover:text-[var(--foreground)]'
               }`}
             >
@@ -122,7 +123,7 @@ export function Navigation() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
         <Link
           href="/"
-          className="text-lg font-semibold transition-colors hover:text-[var(--accent)]"
+          className="text-lg font-semibold transition-colors hover:text-[var(--accent-text)]"
         >
           MC
         </Link>
@@ -133,9 +134,10 @@ export function Navigation() {
             <Link
               key={link.href}
               href={link.href}
+              aria-current={pathname === link.href ? 'page' : undefined}
               className={`text-sm transition-colors ${
                 pathname === link.href
-                  ? 'text-[var(--accent)]'
+                  ? 'text-[var(--accent-text)]'
                   : 'text-[var(--muted)] hover:text-[var(--foreground)]'
               }`}
             >

@@ -26,6 +26,7 @@ operation.
 | 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)       | Accepted | 2026-09-08 |
 | 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                               | Accepted | 2026-09-08 |
 | 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)           | Accepted | 2026-09-08 |
+| 0008 | [Accent colour roles](0008-accent-colour-roles.md)                           | Accepted | 2026-09-09 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; the site is not deployed and `miloscvetkovic.dev` still resolves to the Namecheap parking
