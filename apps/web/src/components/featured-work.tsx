@@ -148,7 +148,7 @@ function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }:
           isActive ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <div className="animate-scan-down absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent" />
+        <div className="scan-line" />
       </div>
     </Link>
   );
