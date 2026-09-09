@@ -71,9 +71,9 @@ function PlayerCard() {
           >
             STATUS
           </dt>
-          <dd className="font-mono text-[#16a34a] dark:text-[#4ade80]" style={{ fontSize: '12px' }}>
+          <dd className="font-mono text-[var(--status-ok)]" style={{ fontSize: '12px' }}>
             <span
-              className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-[#16a34a] dark:bg-[#4ade80]"
+              className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-[var(--status-ok)]"
               style={{
                 animation: 'hero-status-pulse 2s ease-in-out infinite',
               }}

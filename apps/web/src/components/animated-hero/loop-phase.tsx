@@ -133,9 +133,9 @@ export function LoopPhase() {
   const getEventColor = (type: string) => {
     switch (type) {
       case 'error':
-        return 'text-red-400';
+        return 'text-[var(--status-err)]';
       case 'success':
-        return 'text-green-400';
+        return 'text-[var(--status-ok)]';
       default:
         return 'text-[var(--muted)]';
     }
@@ -159,7 +159,7 @@ export function LoopPhase() {
           <HudPanel title="MONITORING DASHBOARD">
             <div className="mb-6 grid grid-cols-3 gap-4">
               <div className="rounded-lg bg-[var(--background)] p-3 text-center">
-                <div className="text-2xl font-bold text-green-400">99.9%</div>
+                <div className="text-2xl font-bold text-[var(--status-ok)]">99.9%</div>
                 <div className="text-xs text-[var(--muted)]">UPTIME</div>
               </div>
               <div className="rounded-lg bg-[var(--background)] p-3 text-center">
@@ -167,7 +167,7 @@ export function LoopPhase() {
                 <div className="text-xs text-[var(--muted)]">AVG LATENCY</div>
               </div>
               <div className="rounded-lg bg-[var(--background)] p-3 text-center">
-                <div className="text-2xl font-bold text-yellow-400">3</div>
+                <div className="text-2xl font-bold text-[var(--status-warn)]">3</div>
                 <div className="text-xs text-[var(--muted)]">AUTO-FIXES TODAY</div>
               </div>
             </div>
@@ -177,19 +177,23 @@ export function LoopPhase() {
               ref={alertRef}
               className={`rounded-lg border p-4 transition-all duration-500 ${
                 shownAlertStatus === 'error'
-                  ? 'border-red-500/50 bg-red-500/10'
-                  : 'border-green-500/50 bg-green-500/10'
+                  ? 'border-[var(--status-err)]/50 bg-[var(--status-err)]/10'
+                  : 'border-[var(--status-ok)]/50 bg-[var(--status-ok)]/10'
               }`}
             >
               <div className="flex items-center gap-3">
                 <span
                   className={`h-3 w-3 rounded-full ${
-                    shownAlertStatus === 'error' ? 'animate-pulse bg-red-500' : 'bg-green-500'
+                    shownAlertStatus === 'error'
+                      ? 'animate-pulse bg-[var(--status-err)]'
+                      : 'bg-[var(--status-ok)]'
                   }`}
                 />
                 <span
                   className={`font-mono text-sm ${
-                    shownAlertStatus === 'error' ? 'text-red-400' : 'text-green-400'
+                    shownAlertStatus === 'error'
+                      ? 'text-[var(--status-err)]'
+                      : 'text-[var(--status-ok)]'
                   }`}
                 >
                   {shownAlertStatus === 'error' ? 'ERROR DETECTED' : 'RESOLVED'}
@@ -227,9 +231,7 @@ export function LoopPhase() {
               <span className="text-xl">🔄</span>
               <div>
                 <div className="font-semibold">SELF-HEALING PROTOCOL ACTIVE</div>
-                <div className="text-sm opacity-80">
-                  System diagnosed and fixed the issue autonomously
-                </div>
+                <div className="text-sm">System diagnosed and fixed the issue autonomously</div>
               </div>
             </div>
           </NotificationToast>

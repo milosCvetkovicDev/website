@@ -287,12 +287,12 @@ export function ExecutionPhase() {
             {/* Combo Counter */}
             <div
               ref={comboRef}
-              className="flex items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4"
+              className="flex items-center justify-center gap-2 rounded-lg border border-[var(--status-warn)]/30 bg-[var(--status-warn)]/10 p-4"
             >
-              <span ref={comboCountRef} className="text-3xl font-bold text-yellow-400">
+              <span ref={comboCountRef} className="text-3xl font-bold text-[var(--status-warn)]">
                 {animationComplete ? 'x12' : 'x0'}
               </span>
-              <span className="font-mono text-sm text-yellow-400/80">COMMIT STREAK</span>
+              <span className="font-mono text-sm text-[var(--status-warn)]">COMMIT STREAK</span>
             </div>
           </div>
         </div>

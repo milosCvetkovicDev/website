@@ -142,7 +142,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
           <ul className="space-y-3">
             {caseStudy.impact.map((item, index) => (
               <li key={index} className="flex gap-3">
-                <span className="mt-1.5 text-green-500">
+                <span className="mt-1.5 text-[var(--status-ok)]">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"

@@ -12,6 +12,12 @@
  *   text colour: in the dark theme it is 3.5:1 on the background and 3.2:1 on the card.
  * - --muted is secondary text; the light value is set so it still passes on the /5 and /10
  *   accent tints it sits on (the HUD panels and tag pills).
+ * - --status-ok, --status-warn and --status-err are the status colours of the hero, the HUD elements
+ *   and the work pages (ADR 0010): one token per role for text, icons, borders, tints, bars, dots
+ *   and glows. The dark values are the shades the status text always used (green-400, yellow-400,
+ *   red-400), so dark text is unchanged; the light values (green-800, amber-800, red-700) are the
+ *   first shades that reach 4.5:1 on the HUD panels and on their own /10 tints. Never dim status
+ *   text with an opacity modifier: even green-800 at /70 is 3.2:1 on its tint.
  */
 :root {
   --background: #fafafa;
@@ -23,6 +29,9 @@
   --border: #e5e5e5;
   --card: #ffffff;
   --card-hover: #f5f5f5;
+  --status-ok: theme(--color-green-800);
+  --status-warn: theme(--color-amber-800);
+  --status-err: theme(--color-red-700);
   --tmux-border: #d0d0d8;
   --tmux-bar: #e4e4e8;
   --tmux-bg: #fafafa;
@@ -55,6 +64,9 @@
   --border: #262626;
   --card: #171717;
   --card-hover: #262626;
+  --status-ok: theme(--color-green-400);
+  --status-warn: theme(--color-yellow-400);
+  --status-err: theme(--color-red-400);
   --tmux-border: #5a6190;
   --tmux-bar: #282d45;
   --tmux-bg: #0d1017;
@@ -84,6 +96,9 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-text: var(--accent-text);
   --color-muted: var(--muted);
+  --color-status-ok: var(--status-ok);
+  --color-status-warn: var(--status-warn);
+  --color-status-err: var(--status-err);
   --color-border: var(--border);
   --color-card: var(--card);
   --color-card-hover: var(--card-hover);
