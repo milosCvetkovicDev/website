@@ -511,13 +511,25 @@ all_except_custom_domains`. Observed on 2026-09-09: the per-deployment URL
   `portfolio-theta-gold-77.vercel.app` answers `200` to anyone, as the custom domains will once they
   resolve (that is what `all_except_custom_domains` means). Pull request previews are therefore
   private to the project owner, which is a wall for any reviewer without a Vercel login. The same
-  command also lists `protectionBypass`: the first `vercel curl` on the project (2026-09-09) created
-  an `automation-bypass` secret, which Vercel injects into deployments as
-  `VERCEL_AUTOMATION_BYPASS_SECRET` and which lets anyone holding it past the login on every
-  deployment until it is revoked. Decide deliberately under **Settings → Deployment Protection**:
-  keep the secret for automated checks, or revoke it with
-  `vercel project protection disable portfolio --protection-bypass --protection-bypass-secret <secret> --yes`
-  and use a browser session instead. This runbook changes neither.
+  command also lists `protectionBypass`. Beware that `vercel curl` **creates** an
+  `automation-bypass` secret on first use, without prompting: Vercel injects it into deployments as
+  `VERCEL_AUTOMATION_BYPASS_SECRET`, and anyone holding it gets past the login on every deployment
+  until it is revoked. One was created that way on 2026-09-09 and revoked the same day, because
+  nothing in this repository uses it and the end-to-end job runs against a local `next start`
+  rather than a preview. To revoke one:
+
+  ```bash
+  vercel project protection disable portfolio --protection-bypass \
+    --protection-bypass-secret "$(vercel project protection portfolio \
+      | sed -n '/^{/,$p' | jq -r '.protectionBypass | keys[0]')"
+  ```
+
+  Confirm with `vercel project protection portfolio`, whose `protectionBypass` must come back empty.
+  There is no `--yes` on this subcommand, and passing one is worse than useless: the CLI prints
+  `unknown or unexpected option` **and still exits 0**, so a wrapper that trusts the exit code
+  reports success while nothing changed. Check the state, not the exit code, after any
+  `vercel project protection` call.
+
 - **No staging environment, no custom domains for previews, no `vercel.json`.** Redirects, headers
   and rewrites are whatever Next.js does by default.
 - **No uptime monitoring or alerting.** Nothing will tell you the site is down.
