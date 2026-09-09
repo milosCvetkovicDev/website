@@ -62,12 +62,16 @@ test.describe('Hero Section', () => {
   test('tmux log lines do not shift layout', async ({ page }) => {
     // Lines start arriving after an idle callback plus up to two seconds; the kubectl pane always
     // opens with the same command, so its arrival marks the point where the panes are ticking.
-    await expect(page.getByText('$ kubectl get pods -n production -w').first()).toBeVisible({
-      timeout: 15_000,
-    });
+    const firstLine = page.getByText('$ kubectl get pods -n production -w').first();
+    await expect(firstLine).toBeVisible({ timeout: 15_000 });
+    const slotsBefore = await firstLine.locator('..').innerText();
     const shiftScore = await page.evaluate(
       () =>
-        new Promise<number>((resolve) => {
+        new Promise<number>((resolve, reject) => {
+          if (!PerformanceObserver.supportedEntryTypes.includes('layout-shift')) {
+            reject(new Error('layout-shift entries are not supported in this browser'));
+            return;
+          }
           let total = 0;
           const observer = new PerformanceObserver((list) => {
             for (const entry of list.getEntries()) {
@@ -83,7 +87,42 @@ test.describe('Hero Section', () => {
           }, 4_000);
         }),
     );
+    // The window measured something: the pane's text moved on.
+    expect(await firstLine.locator('..').innerText()).not.toBe(slotsBefore);
     expect(shiftScore).toBeLessThan(0.005);
+  });
+
+  test('story sections are server-rendered', async ({ page }) => {
+    const response = await page.goto('/');
+    const html = (await response?.text()) ?? '';
+    // Plain text from four of the six sections (the headlines are split into per-character spans).
+    for (const copy of ['TECH TREE', 'CI/CD PIPELINE', 'SELF-HEALING LOG', 'Connect on LinkedIn']) {
+      expect(html).toContain(copy);
+    }
+  });
+
+  test('scrolling through the story does not shift visible layout', async ({ page }) => {
+    // Programmatic scrolling is not user input, so anything that moves while the sections hydrate
+    // on approach counts here.
+    const shiftScore = await page.evaluate(async () => {
+      let total = 0;
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          const shift = entry as PerformanceEntry & { value: number; hadRecentInput: boolean };
+          if (!shift.hadRecentInput) total += shift.value;
+        }
+      });
+      observer.observe({ type: 'layout-shift' });
+      const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      for (let y = 0; y <= document.documentElement.scrollHeight; y += 400) {
+        window.scrollTo(0, y);
+        await wait(150);
+      }
+      await wait(1_000);
+      observer.disconnect();
+      return total;
+    });
+    expect(shiftScore).toBeLessThan(0.02);
   });
 
   test('scroll indicator fades on scroll', async ({ page }) => {
