@@ -335,17 +335,19 @@ main {
 }
 
 .scan-line {
+  --scan-line-color: color-mix(in oklab, var(--accent) 30%, transparent);
+  pointer-events: none;
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(
-    to right,
-    transparent,
-    color-mix(in oklab, var(--accent) 30%, transparent),
-    transparent
-  );
+  background-image: linear-gradient(to right, transparent, var(--scan-line-color), transparent);
   background-size: 100% 1px;
   background-repeat: no-repeat;
   animation: scan-down 2s linear infinite;
+}
+
+/* A sweep nobody can see should not run: the featured work cards expose data-active. */
+[data-active='false'] .scan-line {
+  animation-play-state: paused;
 }
 
 /* Scanline overlay for retro effect */

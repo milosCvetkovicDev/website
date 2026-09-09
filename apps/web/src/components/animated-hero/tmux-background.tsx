@@ -481,18 +481,22 @@ function StaticPane({ config }: { config: PaneConfig }) {
 
 // ─── Animated Pane ───────────────────────────────────────────────────────────
 
-// The log lines are 14px text at line-height 1.65; both values are set inline on the slot container
-// below and the arithmetic here must stay in step with them.
-const LINE_HEIGHT_PX = 14 * 1.65;
+const LINE_FONT_PX = 14;
+const LINE_HEIGHT_RATIO = 1.65;
+const LINE_HEIGHT_PX = LINE_FONT_PX * LINE_HEIGHT_RATIO;
 const PANE_PADDING_Y_PX = 6;
+const PANE_PADDING_X_PX = 10;
 const LINE_APPEAR_MS = 250;
 
 /**
- * A pane keeps a fixed grid of line slots and rotates text through them, newest at the bottom.
- * Appending a line to a bottom-anchored container instead moves every existing line up, and each
- * of those moves is a layout shift; over a long enough session they added up to most of the home
- * page's CLS. Text changes inside boxes that never move do not count as shifts, and neither does the
- * transform-based appear animation on the newest slot.
+ * A pane keeps a fixed grid of line slots in a bottom-anchored container and rotates text through
+ * them, newest at the bottom. Appending a line to that container used to move every existing line
+ * up one row, and each of those moves was a layout shift; text changes inside boxes that stay put
+ * are not, and neither is the transform-based appear animation on the newest slot. Slots are only
+ * ever added or removed at the front: with the container anchored to the pane's bottom edge that
+ * leaves every other slot exactly where it was, and the first slot is clipped at the top as before.
+ * Each slot's height is pinned so a taller fallback glyph cannot grow a line and shift the rest. The
+ * container still moves when the pane itself is resized, like any bottom-anchored content.
  */
 function AnimatedPane({
   config,
@@ -507,12 +511,13 @@ function AnimatedPane({
   useEffect(() => {
     const viewport = viewportRef.current;
     const slots = slotsRef.current;
-    if (!viewport || !slots) return;
+    if (!viewport || !slots || config.seq.length === 0) return;
 
     let nextIndex = 0;
     const history: LogEntry[] = [];
+    const shownLevel = new WeakMap<Element, LogLevel>();
 
-    // Write the newest lines into the slots. Skipping unchanged slots keeps the DOM churn down.
+    // Write the newest lines into the slots, touching only what changed.
     const paint = () => {
       const count = slots.children.length;
       for (let i = 0; i < count; i++) {
@@ -520,20 +525,32 @@ function AnimatedPane({
         const entry = history[history.length - count + i];
         const text = entry?.text || '\u00A0';
         if (slot.textContent !== text) slot.textContent = text;
-        const color = entry ? LOG_COLORS[entry.cls] : '';
-        if (slot.style.color !== color) slot.style.color = color;
+        if (shownLevel.get(slot) !== entry?.cls) {
+          slot.style.color = entry ? LOG_COLORS[entry.cls] : '';
+          if (entry) shownLevel.set(slot, entry.cls);
+          else shownLevel.delete(slot);
+        }
       }
     };
 
-    // Size the grid to the pane: as many lines as fit (the first may be clipped at the top) with
-    // the last one flush against the bottom padding. Slots are only ever added or removed at the
-    // end, so no existing slot moves when the pane resizes.
+    const createSlot = () => {
+      const slot = document.createElement('div');
+      slot.style.height = `${LINE_HEIGHT_PX}px`;
+      slot.style.overflow = 'hidden';
+      return slot;
+    };
+
+    // Enough slots to reach the top of the pane, the first one partly clipped, capped at the
+    // history size. Adding or removing at the front never moves the slots that remain.
     const fit = (height: number) => {
-      const usable = height - PANE_PADDING_Y_PX * 2;
-      const count = Math.min(MAX_LINES, Math.max(0, Math.ceil(usable / LINE_HEIGHT_PX)));
-      slots.style.top = `${usable - count * LINE_HEIGHT_PX}px`;
-      while (slots.children.length < count) slots.appendChild(document.createElement('div'));
-      while (slots.children.length > count && slots.lastChild) slots.removeChild(slots.lastChild);
+      const count = Math.min(
+        MAX_LINES,
+        Math.max(0, Math.ceil((height - PANE_PADDING_Y_PX) / LINE_HEIGHT_PX)),
+      );
+      while (slots.children.length < count) slots.insertBefore(createSlot(), slots.firstChild);
+      while (slots.children.length > count && slots.firstChild) {
+        slots.removeChild(slots.firstChild);
+      }
       paint();
     };
 
@@ -555,6 +572,7 @@ function AnimatedPane({
     };
 
     let resizeObserver: ResizeObserver | undefined;
+    let onWindowResize: (() => void) | undefined;
     if (typeof ResizeObserver !== 'undefined') {
       resizeObserver = new ResizeObserver((entries) => {
         const latest = entries[entries.length - 1];
@@ -562,7 +580,9 @@ function AnimatedPane({
       });
       resizeObserver.observe(viewport);
     } else {
-      fit(viewport.clientHeight);
+      onWindowResize = () => fit(viewport.clientHeight);
+      onWindowResize();
+      window.addEventListener('resize', onWindowResize);
     }
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -578,8 +598,8 @@ function AnimatedPane({
     let idleHandle: number | undefined;
     let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
 
-    if ('requestIdleCallback' in window) {
-      idleHandle = requestIdleCallback(() => {
+    if (typeof window.requestIdleCallback === 'function') {
+      idleHandle = window.requestIdleCallback(() => {
         timer = setTimeout(tick, Math.random() * 2000);
       });
     } else {
@@ -590,7 +610,10 @@ function AnimatedPane({
 
     return () => {
       resizeObserver?.disconnect();
-      if (idleHandle !== undefined) cancelIdleCallback(idleHandle);
+      if (onWindowResize) window.removeEventListener('resize', onWindowResize);
+      if (idleHandle !== undefined && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleHandle);
+      }
       if (fallbackTimer !== undefined) clearTimeout(fallbackTimer);
       clearTimeout(timer);
     };
@@ -605,8 +628,12 @@ function AnimatedPane({
       <div ref={viewportRef} className="relative flex-1 overflow-hidden">
         <div
           ref={slotsRef}
-          className="absolute right-0 left-0 font-mono whitespace-nowrap"
-          style={{ padding: `${PANE_PADDING_Y_PX}px 10px`, fontSize: '14px', lineHeight: '1.65' }}
+          className="absolute right-0 bottom-0 left-0 font-mono whitespace-nowrap"
+          style={{
+            padding: `${PANE_PADDING_Y_PX}px ${PANE_PADDING_X_PX}px`,
+            fontSize: `${LINE_FONT_PX}px`,
+            lineHeight: LINE_HEIGHT_RATIO,
+          }}
         />
       </div>
       <PaneStatus statusLeft={config.statusLeft} statusRight={config.statusRight} />
