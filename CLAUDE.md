@@ -97,7 +97,7 @@ is there so that a future buildable package is compiled before the apps typechec
   `components/animated-hero` and are imported from there directly, not through the barrel.
   `app/layout.tsx` also imports from the component modules directly: every client module reachable
   from a server component's imports lands in that layout's client chunk, so a barrel import there
-  would ship `FeaturedWork` to every route (see ADR 0007).
+  would ship `FeaturedWork` to every route (see ADR 0009).
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
   keep relative imports for siblings inside one folder.
