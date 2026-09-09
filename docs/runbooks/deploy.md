@@ -374,14 +374,17 @@ static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
       somewhere rather than acting on them immediately
 
 Lighthouse baseline, recorded on 2026-09-09 against the first production build (Lighthouse 13.4.1
-CLI, default mobile emulation with simulated throttling and a 4× CPU slowdown): `/` scored
-performance 24, accessibility 96, best practices 100, SEO 100, with LCP 4.6 s, CLS 0.35 and TBT
-2,160 ms; the shift comes from the absolutely positioned layer inside the hero and the blocking time
-from evaluating the main client chunk, since the whole page transfers only 318 KiB.
-`/work/self-healing-agent` scored 75, 96, 100, 100 with LCP 2.6 s, CLS 0 and TBT 990 ms.
-Accessibility loses points to a colour-contrast failure on both pages and, on `/`, a visible label
-that its accessible name does not contain. Recorded, not acted on: the home page numbers are a
-follow-up, not a launch blocker.
+CLI, default mobile emulation with simulated throttling and a 4× CPU slowdown). Performance scores
+depend on the machine running the audit: in the JSON, `environment.benchmarkIndex` should be above
+about 1,500 and `runWarnings` empty, otherwise the numbers describe a loaded laptop, not the site.
+A first run at benchmarkIndex 711, carrying Lighthouse's "slower CPU than expected" warning, scored
+`/` at 24 and was discarded. Clean runs: `/` performance 93, accessibility 96, best practices 100,
+SEO 100, with LCP 2.2 s, CLS 0.001 and TBT 280 ms (benchmarkIndex 1,632; a run at 1,102 gave 81
+with TBT 650 ms); `/work/self-healing-agent` 100, 96, 100, 100 with LCP 1.7 s, CLS 0 and TBT 40 ms.
+The home page transfers 318 KiB. Accessibility loses points to a colour-contrast failure on both
+pages and, on `/`, to the three Featured Work cards whose `aria-labelledby` name does not contain
+their visible text. Recorded, not acted on: the accessibility items are a follow-up, not a launch
+blocker.
 
 ## Routine deployments
 
