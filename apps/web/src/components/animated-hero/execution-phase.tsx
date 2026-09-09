@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { Terminal, HudPanel, ActivityEntry } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const codeLines = [
   { type: 'keyword', content: 'export class', delay: 0 },
@@ -58,18 +59,17 @@ export function ExecutionPhase() {
 
   // Single state update at the end of animation for final render
   const [animationComplete, setAnimationComplete] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  // The stats tween starts from a ScrollTrigger callback, outside the GSAP context, so it is
+  // tracked here and reverted alongside the context instead of outliving the component.
+  const tweensRef = useRef<gsap.core.Tween[]>([]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // Reduced motion: the finished build is rendered directly via `complete` below.
+    if (prefersReducedMotion) return;
 
     gsap.registerPlugin(ScrollTrigger);
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (prefersReducedMotion) {
-      setAnimationComplete(true);
-      return;
-    }
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -80,7 +80,7 @@ export function ExecutionPhase() {
           toggleActions: 'play none none reverse',
           onEnter: () => {
             // Animate stats using direct DOM manipulation (no React re-renders)
-            gsap.to(
+            const statsTween = gsap.to(
               {},
               {
                 duration: 3,
@@ -115,6 +115,7 @@ export function ExecutionPhase() {
                 onComplete: () => setAnimationComplete(true),
               },
             );
+            tweensRef.current.push(statsTween);
           },
         },
       });
@@ -155,8 +156,15 @@ export function ExecutionPhase() {
       );
     }, sectionRef);
 
-    return () => ctx.revert();
-  }, []);
+    return () => {
+      ctx.revert();
+      tweensRef.current.forEach((tween) => tween.revert());
+      tweensRef.current = [];
+    };
+  }, [prefersReducedMotion]);
+
+  // With reduced motion the finished build is shown instead of counting up to it.
+  const complete = prefersReducedMotion || animationComplete;
 
   function formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60);
@@ -201,14 +209,14 @@ export function ExecutionPhase() {
         <div
           ref={progressRef}
           className="h-full rounded-full bg-[var(--accent)] transition-none"
-          style={{ width: animationComplete ? '100%' : '0%' }}
+          style={{ width: complete ? '100%' : '0%' }}
         />
       </div>
       <span
         ref={textRef}
         className="w-12 text-right font-mono text-xs text-[var(--muted)] tabular-nums"
       >
-        {animationComplete ? '100%' : '0%'}
+        {complete ? '100%' : '0%'}
       </span>
     </div>
   );
@@ -240,7 +248,7 @@ export function ExecutionPhase() {
                       }}
                       className={getTokenColor(line.type)}
                       style={{
-                        opacity: animationComplete ? 1 : 0,
+                        opacity: complete ? 1 : 0,
                         transition: 'none',
                       }}
                     >
@@ -278,7 +286,7 @@ export function ExecutionPhase() {
                 <div className="flex items-center justify-between border-t border-[var(--accent)]/20 pt-2">
                   <span className="font-mono text-xs text-[var(--muted)]">TIME ELAPSED</span>
                   <span ref={timeRef} className="font-mono text-[var(--accent)]">
-                    {animationComplete ? '00:14:32' : '00:00:00'}
+                    {complete ? '00:14:32' : '00:00:00'}
                   </span>
                 </div>
               </div>
@@ -290,7 +298,7 @@ export function ExecutionPhase() {
               className="flex items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4"
             >
               <span ref={comboCountRef} className="text-3xl font-bold text-yellow-400">
-                {animationComplete ? 'x12' : 'x0'}
+                {complete ? 'x12' : 'x0'}
               </span>
               <span className="font-mono text-sm text-yellow-400/80">COMMIT STREAK</span>
             </div>
