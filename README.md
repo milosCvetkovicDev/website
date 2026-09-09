@@ -55,7 +55,7 @@ pnpm dev:web
 
 The site runs on `http://localhost:3000`. `pnpm dev:playground` starts the sandbox.
 
-`pnpm install` runs no dependency build scripts: the packages pnpm 10 would ask about ship prebuilt binaries and are denied in `pnpm-workspace.yaml` ([ADR 0007](docs/adr/0007-dependency-build-scripts.md)).
+`pnpm install` runs no dependency build scripts: the packages pnpm 10 would ask about ship prebuilt binaries and are denied in `pnpm-workspace.yaml`, and a new package with an install script fails the install until it gets an entry there ([ADR 0007](docs/adr/0007-dependency-build-scripts.md)).
 
 ## Quality gates
 
