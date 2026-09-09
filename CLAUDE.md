@@ -169,15 +169,15 @@ is there so that a future buildable package is compiled before the apps typechec
 - A fresh clone or git worktree has no git hooks until `pnpm install` has run `prepare`.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm.
-- `pnpm install` runs no dependency lifecycle scripts, and `strictDepBuilds` in
-  `pnpm-workspace.yaml` fails the install with `ERR_PNPM_IGNORED_BUILDS` when a package has a script
-  but no `allowBuilds` entry (both settings need pnpm 10.26 or newer; the pin is 10.33). esbuild,
-  sharp and unrs-resolver are denied there because their scripts only check the prebuilt platform
-  binaries the lockfile already installs, and download or compile one only when none is present.
-  When the error appears, run `pnpm ignored-builds` and `pnpm why -r <name>`, read the package's
-  `scripts` under `node_modules/.pnpm/<name>@<version>/node_modules/<name>/`, then add it to
-  `allowBuilds` as `true` or `false` with a comment saying why. Do not run
-  `pnpm approve-builds --all`. See `docs/adr/0007-dependency-build-scripts.md`.
+- `pnpm install` runs no dependency lifecycle scripts. `strictDepBuilds` in `pnpm-workspace.yaml`
+  fails the install with `ERR_PNPM_IGNORED_BUILDS` for a package that has a script but sits in
+  neither `ignoredBuiltDependencies` nor `onlyBuiltDependencies`; esbuild, sharp and unrs-resolver
+  are ignored there because their scripts only check prebuilt binaries the lockfile already
+  installs. On that error, run `pnpm ignored-builds` and `pnpm why -r <name>`, read the package's
+  `scripts` under `node_modules/.pnpm/<name>@<version>/node_modules/<name>/`, and add it to one of
+  the two lists with a comment. Do not use `pnpm approve-builds --all`, and do not switch to
+  `allowBuilds` while Vercel builds with its own pnpm 10.x, which predates it. See
+  `docs/adr/0007-dependency-build-scripts.md`.
 - `apps/web/README.md` is untouched `create-next-app` boilerplate: it says `npm run dev` and
   `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
   authoritative documents.
