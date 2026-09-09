@@ -155,7 +155,7 @@ export function GauntletPhase() {
       <div className="w-full max-w-3xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">
-          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="rainbow">PHASE 4</AnimatedText>
           </span>
           <AnimatedText animation="gravity" className="font-mono text-sm text-[var(--muted)]">

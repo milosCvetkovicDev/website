@@ -146,7 +146,7 @@ export function LoopPhase() {
       <div className="w-full max-w-3xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">
-          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="elastic">PHASE 5</AnimatedText>
           </span>
           <AnimatedText animation="wave" className="font-mono text-sm text-[var(--muted)]">
@@ -163,7 +163,7 @@ export function LoopPhase() {
                 <div className="text-xs text-[var(--muted)]">UPTIME</div>
               </div>
               <div className="rounded-lg bg-[var(--background)] p-3 text-center">
-                <div className="text-2xl font-bold text-[var(--accent)]">47ms</div>
+                <div className="text-2xl font-bold text-[var(--accent-text)]">47ms</div>
                 <div className="text-xs text-[var(--muted)]">AVG LATENCY</div>
               </div>
               <div className="rounded-lg bg-[var(--background)] p-3 text-center">

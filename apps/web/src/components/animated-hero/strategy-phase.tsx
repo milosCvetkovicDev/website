@@ -137,7 +137,7 @@ export function StrategyPhase() {
       <div className="w-full max-w-5xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">
-          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="perspective">PHASE 2</AnimatedText>
           </span>
           <AnimatedText animation="scramble" className="font-mono text-sm text-[var(--muted)]">
@@ -167,7 +167,7 @@ export function StrategyPhase() {
                     <span className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
                       {tech.category}
                     </span>
-                    <span className="text-[var(--accent)] transition-transform duration-300 group-hover:translate-x-1">
+                    <span className="text-[var(--accent-text)] transition-transform duration-300 group-hover:translate-x-1">
                       →
                     </span>
                     <span className="font-semibold">{tech.choice}</span>

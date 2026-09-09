@@ -76,15 +76,15 @@ export function GameComplete() {
               <div className="space-y-2 py-4">
                 <div className="flex items-center justify-center gap-2 text-[var(--muted)]">
                   <span>Ideas</span>
-                  <span className="text-[var(--accent)]">→</span>
+                  <span className="text-[var(--accent-text)]">→</span>
                   <span>Architecture</span>
-                  <span className="text-[var(--accent)]">→</span>
+                  <span className="text-[var(--accent-text)]">→</span>
                   <span>Code</span>
-                  <span className="text-[var(--accent)]">→</span>
+                  <span className="text-[var(--accent-text)]">→</span>
                   <span>Production</span>
                 </div>
                 <div className="text-center text-sm text-[var(--muted)]">
-                  Time: <span className="text-[var(--accent)]">1 conversation</span>
+                  Time: <span className="text-[var(--accent-text)]">1 conversation</span>
                 </div>
               </div>
 

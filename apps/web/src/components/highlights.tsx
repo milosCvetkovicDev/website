@@ -84,7 +84,7 @@ export function Highlights() {
               key={item.title}
               className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 transition-colors hover:bg-[var(--card-hover)]"
             >
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent)]/10 text-[var(--accent)]">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent)]/10 text-[var(--accent-text)]">
                 {item.icon}
               </div>
               <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
