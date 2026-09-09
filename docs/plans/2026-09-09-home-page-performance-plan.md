@@ -94,7 +94,7 @@ every per-frame cost. The causes are the same in every trace, and they are what 
 ### Task 6: Verification and review
 
 - [x] Playwright screenshots of the hero in light, dark and mobile (375×812) before and after; visually identical.
-- [ ] `ui-reviewer` on the changed components, `adversarial-reviewer` on the diff, `edge-case-hunter` on the changed files; findings triaged in the PR.
+- [x] `ui-reviewer` on the changed components, `adversarial-reviewer` on the diff, `edge-case-hunter` on the changed files; 38 findings triaged in the PR as fixed, rejected with the reason, or deferred. The largest one, the sections leaving the server HTML, reshaped D4.
 - [x] Full gate: `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build` and `pnpm --filter web test:e2e`, run with `--force` so Turbo does not replay another checkout's cache.
 
 ### Task 7: Documentation
@@ -104,7 +104,7 @@ every per-frame cost. The causes are the same in every trace, and they are what 
 
 ### Task 8: Pull request
 
-- [ ] Conventional commits on `perf/home-page-cls-and-tbt`, PR against `main` using the template with the real command output, squash merge.
+- [x] Conventional commits on `perf/home-page-cls-and-tbt`, PR #15 against `main` using the template with the real command output; squash merge is the remaining step.
 
 ## Ledger
 
