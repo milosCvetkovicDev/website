@@ -175,10 +175,12 @@ is there so that a future buildable package is compiled before the apps typechec
   2026-09-09) but `miloscvetkovic.dev` keeps pointing at the registrar's parking page until the
   Namecheap records in `docs/runbooks/deploy.md` are entered. Check `dig +short A miloscvetkovic.dev`
   before treating the domain as live.
-- `vercel deploy` from the repository root uploads the working tree as filtered by `.vercelignore`,
-  not `.gitignore`. Keep the two aligned; without it the 1.9 GB `.turbo` cache goes up and the upload
-  fails. Generated `*.vercel.app` URLs need a Vercel login; fetch them with
-  `vercel curl <path> --deployment <url>`.
+- `vercel deploy` from the repository root uploads the working tree as filtered by `.vercelignore`
+  plus the CLI's built-in list, never `.gitignore`. Mirror new `.gitignore` entries there; without it
+  the 1.9 GB `.turbo` cache goes up and the upload fails. Per-deployment and branch `*.vercel.app`
+  URLs redirect to a Vercel login; the production alias `portfolio-theta-gold-77.vercel.app` is
+  public. `vercel curl <path> --deployment <url>` fetches the protected ones but creates a
+  project-wide protection-bypass secret on first use, see `docs/runbooks/deploy.md`.
 - Claude Code's in-app Browser pane logs React error #418 (hydration mismatch) on every page of the
   deployed site, while an unmodified headless Chromium (Playwright from `apps/web`) reports none
   across schemes, viewports and reduced motion. Judge console cleanliness with Playwright, not the

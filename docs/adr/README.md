@@ -29,7 +29,8 @@ operation.
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; the Vercel project exists and builds `main` since 2026-09-09, and the `miloscvetkovic.dev`
-cutover is tracked in [docs/runbooks/deploy.md](../runbooks/deploy.md).
+cutover is tracked in [docs/runbooks/deploy.md](../runbooks/deploy.md). The bodies of 0002 and 0005
+still describe the state on 2026-09-08, when they were accepted; records are not edited afterwards.
 
 ## Writing a new ADR
 

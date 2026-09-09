@@ -24,14 +24,14 @@ routine deploys, rollback and the failures worth knowing about in advance.
 
 ## Prerequisites
 
-| Requirement       | Detail                                                                                                                                                                                                                                                                             |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Vercel account    | Hobby is sufficient. The account must be able to add a custom domain.                                                                                                                                                                                                              |
-| Domain control    | Namecheap account that owns `miloscvetkovic.dev`, with access to **Domain List → Manage**.                                                                                                                                                                                         |
-| GitHub repository | `github.com/milosCvetkovicDev/website`, with the Vercel GitHub app authorised for it.                                                                                                                                                                                              |
-| Node 22           | Matches `.nvmrc` (`22`) and `engines.node` (`>=22`) in the root `package.json`. `nvm use`.                                                                                                                                                                                         |
-| pnpm 10.33.0      | Pinned by `packageManager` in the root `package.json`. Use corepack rather than a global pnpm.                                                                                                                                                                                     |
-| Vercel CLI        | `npm i -g vercel`, version 59 or newer: Path B relies on `vercel project update`, `vercel api`, `vercel deploy-hooks` and `vercel curl`, which older releases lack. Also used for `vercel rollback` and for inspecting deployments (`vercel ls`, `vercel inspect`, `vercel logs`). |
+| Requirement       | Detail                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vercel account    | Hobby is sufficient. The account must be able to add a custom domain.                                                                                                                                                                                                                                                                                                                   |
+| Domain control    | Namecheap account that owns `miloscvetkovic.dev`, with access to **Domain List → Manage**.                                                                                                                                                                                                                                                                                              |
+| GitHub repository | `github.com/milosCvetkovicDev/website`, with the Vercel GitHub app authorised for it.                                                                                                                                                                                                                                                                                                   |
+| Node 22           | Matches `.nvmrc` (`22`) and `engines.node` (`>=22`) in the root `package.json`. `nvm use`.                                                                                                                                                                                                                                                                                              |
+| pnpm 10.33.0      | Pinned by `packageManager` in the root `package.json`. Use corepack rather than a global pnpm.                                                                                                                                                                                                                                                                                          |
+| Vercel CLI        | `npm i -g vercel`. Path B was run with 59.13.1 and uses `vercel project update` (54.21 or newer; its `--root-directory` and `--node-version` flags are in `--help` but not yet on the docs page), `vercel api`, `vercel deploy-hooks` and `vercel curl` (48.8 or newer). Also used for `vercel rollback` and for inspecting deployments (`vercel ls`, `vercel inspect`, `vercel logs`). |
 
 `vercel login` opens a browser and completes an interactive email or OAuth confirmation. It cannot
 be run by an agent or in a non-interactive shell. Milos must run it himself, once, before any other
@@ -57,7 +57,8 @@ These are every gate in `.github/workflows/ci.yml`. The first six commands are t
 the last two are the `e2e` job, which on CI runs Playwright against the production build
 (`next start`) while the same command locally reuses or starts the dev server. Both jobs must be
 green before a pull request can merge, and merging to `main` is what deploys. Vercel runs none of
-them: it runs the install command and `next build`, nothing else.
+them: it runs the install command and `turbo run build`, which is `next build` for `web`, and
+nothing else.
 
 ## One-time project setup
 
@@ -160,8 +161,9 @@ Three things about these commands are not obvious:
   2026-09-09 even though the link had been recorded. Trust the `link` field in the `vercel api`
   output, not the message. A missing `link` means the Vercel GitHub App is not installed for the
   `milosCvetkovicDev` account; install it from **Project Settings → Git** and run the command again.
-- `vercel deploy` uploads the working tree filtered by `.vercelignore` and a short built-in list
-  (`node_modules`, `.next`, `.git`), not by `.gitignore`. Without `.vercelignore` the first attempt
+- `vercel deploy` uploads the working tree filtered by `.vercelignore` and the CLI's built-in list of
+  about two dozen names (`node_modules`, `.next`, `.git` and `.env.local` among them, not `.turbo`),
+  never by `.gitignore`. Without `.vercelignore` the first attempt
   uploaded 1.9 GB of `.turbo` cache and failed with `File size limit exceeded (100 MB)`. The file is
   committed for that reason; keep it aligned with `.gitignore`.
 
@@ -172,15 +174,15 @@ proves that the Git connection can clone the repository. A deploy hook does that
 ```bash
 vercel deploy-hooks create bootstrap-main --ref main   # prints a URL; treat it as a secret
 curl -X POST "<hook url>"                              # returns {"job":{"state":"PENDING",...}}
-vercel ls                                              # the new deployment: source git, Production
+vercel ls                                              # the new deployment, Environment: Production
 vercel inspect <deployment-url> --wait --timeout 5m    # blocks until READY or ERROR
-vercel inspect <deployment-url> --logs                 # confirm the install command and "turbo run build"
-vercel deploy-hooks remove <hook-id>                   # anyone holding the URL can start builds
+vercel inspect <deployment-url> --logs 2>&1 | grep -E 'Cloning|install|turbo run'   # log is on stderr
+vercel deploy-hooks remove <hook-id> --yes             # anyone holding the URL can start builds
 ```
 
 On 2026-09-09 this built `a8b4a91` in 38 seconds. Fetch pages from the deployment with
-`vercel curl <path> --deployment <deployment-url>`, which handles deployment protection (see **Not
-covered**).
+`vercel curl <path> --deployment <deployment-url>`, which gets through deployment protection by
+creating a project-wide bypass secret on first use (see **Not covered**).
 
 ### Notes
 
@@ -252,8 +254,9 @@ two `A` records on the apex and one project-specific `CNAME` on `www`:
 | A Record     | `@`   | `64.29.17.1`                           | Automatic |
 | CNAME Record | `www` | `30c6e6551c22e39e.vercel-dns-017.com.` | Automatic |
 
-Confirm those values against `vercel domains verify` or the dashboard before typing them. Vercel has
-changed its apex address before (`76.76.21.21` is now its second-ranked option, as is
+Confirm those values against `vercel domains verify` or the dashboard before typing them, and do not
+take them from `vercel domains inspect`, which recommends the second-ranked `76.76.21.21`. Vercel
+has changed its apex address before (`76.76.21.21` is now its second-ranked option, as is
 `cname.vercel-dns.com` for `www`) and the CNAME target is issued per project, so a value copied from
 an older document can leave both domains permanently in **Invalid Configuration**. If the values have
 moved on, record the ones actually entered in the pull request that follows the cutover, and update
@@ -334,9 +337,10 @@ curl -sS https://miloscvetkovic.dev/robots.txt
 Before DNS exists, the same checks run against the production deployment itself. The production
 alias `https://portfolio-theta-gold-77.vercel.app` answers plain `curl`, while the per-deployment
 and branch URLs redirect to a Vercel login (see **Not covered**);
-`vercel curl <path> --deployment <deployment-url>` fetches those. On 2026-09-09 the first
-production build passed all of it: the `<title>`, the nine sitemap entries, `robots.txt`, both
-JSON-LD `url` fields and both not-found pages were correct and emitted the apex origin; a headless
+`vercel curl <path> --deployment <deployment-url>` fetches those, with the side effect noted under
+**Not covered**. On 2026-09-09 the first production build passed all of it: the `<title>`, the nine
+sitemap entries, `robots.txt` and both JSON-LD `url` fields carried the apex origin and both
+not-found pages rendered; a headless
 Chromium (Playwright, which `apps/web` already has) loaded all nine routes without a console error or
 page error, in light and dark schemes, with reduced motion, at 800×453 and 375×812, and with a
 stored theme; the toggle switched to light, persisted across a reload, and the `<html>` class was
@@ -394,7 +398,8 @@ follow-up, not a launch blocker.
 
   ```bash
   vercel ls                      # recent deployments, newest first
-  vercel inspect <deployment-url># shows the commit, branch, environment and build state
+  vercel inspect <deployment-url>                  # environment, build state and aliases; no commit
+  vercel inspect <deployment-url> --logs 2>&1 | grep Cloning   # the branch and commit that were built
   vercel logs <deployment-url>   # runtime logs for that deployment
   ```
 
@@ -446,7 +451,7 @@ the branch and the live site agree.
 | Domain is **Valid Configuration** but HTTPS fails and the site is unreachable            | Certificate has not issued                               | `dig +short CAA miloscvetkovic.dev`; remove or widen a `CAA` record that excludes `letsencrypt.org`, then Refresh                           |
 | `www` returns 200 instead of a redirect                                                  | `www` added as a serving domain, not a redirect          | Settings → Domains: apex primary, `www` redirects to it with 308                                                                            |
 | Previews emit apex URLs in sitemap, robots and JSON-LD                                   | Expected: Preview uses the same value as Production      | No fix needed. To make previews self-identify, give Preview a different `NEXT_PUBLIC_SITE_URL` and redeploy                                 |
-| A page 404s in production but works locally                                              | Live deployment predates the new case study slug         | `vercel inspect <url>` to check the commit, then redeploy `main`                                                                            |
+| A page 404s in production but works locally                                              | Live deployment predates the new case study slug         | `vercel inspect <url> --logs 2>&1 \| grep Cloning` to check the commit, then redeploy `main`                                                |
 | `vercel deploy` uploads gigabytes, then fails with `File size limit exceeded (100 MB)`   | `.vercelignore` missing or out of step with `.gitignore` | Restore `.vercelignore` (it must list `.turbo`), or deploy from Git instead                                                                 |
 | `vercel git connect` prints `Failed to connect`                                          | Often spurious                                           | `vercel api /v9/projects/<id> --raw \| jq .link`; if `link` is set the connection exists, otherwise install the Vercel GitHub App and retry |
 | Install log warns `Ignored build scripts: esbuild, sharp, unrs-resolver`                 | pnpm 10 blocks dependency scripts by default             | Harmless, the packages ship prebuilt binaries. Silence it deliberately with `pnpm approve-builds` in its own pull request                   |
@@ -488,14 +493,21 @@ This runbook deliberately stops short of the following. None of it exists yet; d
   which goes nowhere you can see. The site is fully prerendered, so there is little server runtime
   and `vercel logs` shows little beyond request-level information. In practice a client-side
   production failure is invisible until someone reports it.
-- **Deployment protection is left at Vercel's default.** `vercel project protection portfolio`
-  reports `ssoProtection.deploymentType: all_except_custom_domains`. Observed on 2026-09-09: the
-  per-deployment URL (`portfolio-<hash>-<team>.vercel.app`), the branch URL
-  (`portfolio-git-main-<team>.vercel.app`) and the team URL answer `302` to a Vercel login, while the
-  production alias `portfolio-theta-gold-77.vercel.app` and the custom domains answer `200` to
-  anyone. Pull request previews are therefore private to the project owner, which is a wall for any
-  reviewer without a Vercel login. Decide deliberately under **Settings → Deployment Protection**;
-  this runbook does not change it.
+- **Deployment protection is Vercel's default, plus one bypass secret.**
+  `vercel project protection portfolio` reports `ssoProtection.deploymentType:
+all_except_custom_domains`. Observed on 2026-09-09: the per-deployment URL
+  (`portfolio-<hash>-<team>.vercel.app`), the branch URL (`portfolio-git-main-<team>.vercel.app`) and
+  the team URL answer `302` to a Vercel login, while the production alias
+  `portfolio-theta-gold-77.vercel.app` answers `200` to anyone, as the custom domains will once they
+  resolve (that is what `all_except_custom_domains` means). Pull request previews are therefore
+  private to the project owner, which is a wall for any reviewer without a Vercel login. The same
+  command also lists `protectionBypass`: the first `vercel curl` on the project (2026-09-09) created
+  an `automation-bypass` secret, which Vercel injects into deployments as
+  `VERCEL_AUTOMATION_BYPASS_SECRET` and which lets anyone holding it past the login on every
+  deployment until it is revoked. Decide deliberately under **Settings → Deployment Protection**:
+  keep the secret for automated checks, or revoke it with
+  `vercel project protection disable portfolio --protection-bypass --protection-bypass-secret <secret> --yes`
+  and use a browser session instead. This runbook changes neither.
 - **No staging environment, no custom domains for previews, no `vercel.json`.** Redirects, headers
   and rewrites are whatever Next.js does by default.
 - **No uptime monitoring or alerting.** Nothing will tell you the site is down.

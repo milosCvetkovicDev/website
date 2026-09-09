@@ -1,7 +1,9 @@
 # Documentation & Deployment Plan (PR C)
 
 **Status:** Shipped in PR #5. The boxes below were ticked retroactively on 2026-09-09, in the pull
-request that recorded the deployment this plan only prepared (see `docs/runbooks/deploy.md`).
+request that recorded the deployment this plan only prepared (see `docs/runbooks/deploy.md`). PR #5
+was opened against `chore/tooling-and-quality-gates` as Task C6 says, retargeted to `main` by GitHub
+when PR #3 was squash-merged, and merged into `main`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This plan produces documentation, so the content is authored directly in the target files; each task lists the sections the file must contain and how it is verified.
 
