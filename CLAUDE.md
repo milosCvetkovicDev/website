@@ -179,3 +179,7 @@ is there so that a future buildable package is compiled before the apps typechec
   not `.gitignore`. Keep the two aligned; without it the 1.9 GB `.turbo` cache goes up and the upload
   fails. Generated `*.vercel.app` URLs need a Vercel login; fetch them with
   `vercel curl <path> --deployment <url>`.
+- Claude Code's in-app Browser pane logs React error #418 (hydration mismatch) on every page of the
+  deployed site, while an unmodified headless Chromium (Playwright from `apps/web`) reports none
+  across schemes, viewports and reduced motion. Judge console cleanliness with Playwright, not the
+  pane.

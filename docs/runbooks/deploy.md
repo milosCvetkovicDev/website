@@ -332,11 +332,17 @@ curl -sS https://miloscvetkovic.dev/robots.txt
 ```
 
 Before DNS exists, the same checks run against the production deployment itself. The production
-alias `https://portfolio-theta-gold-77.vercel.app` answers plain `curl`, while the per-deployment and
-branch URLs redirect to a Vercel login (see **Not covered**), and
-`vercel curl <path> --deployment <deployment-url>` fetches those. On 2026-09-09 the `<title>`, the nine sitemap entries, `robots.txt`,
-both JSON-LD `url` fields and both not-found pages were correct on the first production build, all
-emitting the apex origin.
+alias `https://portfolio-theta-gold-77.vercel.app` answers plain `curl`, while the per-deployment
+and branch URLs redirect to a Vercel login (see **Not covered**);
+`vercel curl <path> --deployment <deployment-url>` fetches those. On 2026-09-09 the first
+production build passed all of it: the `<title>`, the nine sitemap entries, `robots.txt`, both
+JSON-LD `url` fields and both not-found pages were correct and emitted the apex origin; a headless
+Chromium (Playwright, which `apps/web` already has) loaded all nine routes without a console error or
+page error, in light and dark schemes, with reduced motion, at 800×453 and 375×812, and with a
+stored theme; the toggle switched to light, persisted across a reload, and the `<html>` class was
+already `light` when navigation committed, so there was no flash. Claude Code's in-app Browser
+pane logs React error #418 on these pages while an unmodified Chromium does not, so use a real
+browser or Playwright for the console check.
 
 Then walk the site by hand. The App Router serves nine pages; `sitemap.ts` lists all nine, six
 static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
