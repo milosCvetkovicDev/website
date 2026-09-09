@@ -169,6 +169,12 @@ is there so that a future buildable package is compiled before the apps typechec
 - A fresh clone or git worktree has no git hooks until `pnpm install` has run `prepare`.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm.
+- `pnpm install` runs no dependency build scripts. `allowBuilds` in `pnpm-workspace.yaml` denies the
+  three packages pnpm 10 would otherwise warn about (esbuild, sharp, unrs-resolver): their scripts
+  only validate or replace prebuilt binaries the lockfile already installs, and `apps/web` never
+  loads sharp because nothing uses `next/image` (ADR 0007). A new `Ignored build scripts` warning
+  means a new native dependency: read its script and add it to `allowBuilds` as `true` or `false`;
+  do not run `pnpm approve-builds --all`.
 - `apps/web/README.md` is untouched `create-next-app` boilerplate: it says `npm run dev` and
   `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
   authoritative documents.
