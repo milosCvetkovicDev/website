@@ -2,11 +2,17 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
-# pnpm 10 refuses dependency install scripts by default and warns about the ones it skipped.
-# These three ship prebuilt binaries as optional platform packages, so their scripts are only
-# fallbacks (validate the binary, or compile from source when no binary matched). Denying them
-# keeps `pnpm install` script-free and silences the warning. See docs/adr/0007.
+# pnpm 10 runs no dependency lifecycle scripts unless the package is allowed below, and with
+# strictDepBuilds a package that has a script but no entry fails the install instead of printing a
+# warning. Read docs/adr/0007-dependency-build-scripts.md before adding or flipping an entry.
+strictDepBuilds: true
 allowBuilds:
+  # Checks the @esbuild/<platform> binary pnpm already installed and downloads one only if it is
+  # missing. Reviewed at 0.27.2.
   esbuild: false
+  # No-op unless a global libvips is found, in which case it compiles from source. Optional
+  # dependency of next for next/image. Reviewed at 0.34.5.
   sharp: false
+  # Checks the @unrs/resolver-binding-<platform> binary and downloads one only if it is missing.
+  # Reviewed at 1.11.1.
   unrs-resolver: false
