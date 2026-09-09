@@ -51,12 +51,18 @@ Animated and lazy-loaded UI in `apps/web` follows five rules.
 3. **No static `will-change`.** GSAP promotes elements for the duration of a tween on its own, and a
    compositing layer per element is paid on every frame the main thread produces. `will-change` is
    acceptable only on a handful of elements and only while they are about to animate.
-4. **Sections below the fold mount when they approach the viewport, not at load.** `DeferredSection`
-   in `apps/web/src/components/animated-hero/index.tsx` renders the placeholder until an
-   `IntersectionObserver` reports the section near the viewport, then the lazy component. Their
-   chunks are prefetched after the first sign of intent (pointer, touch, key or scroll) or a few idle
-   seconds, never during the first paint's window. An animation that repeats forever pauses while
-   its section is scrolled past (`toggleActions: 'play pause resume reverse'`).
+4. **Sections below the fold stay server-rendered but hydrate only when they approach the
+   viewport.** `DeferredSection` in `apps/web/src/components/animated-hero/deferred-section.tsx`
+   suspends its Suspense boundary during hydration until an `IntersectionObserver` reports the
+   section near the viewport (or already scrolled past), so React leaves the server HTML in place:
+   the copy is there for crawlers, assistive technology, find-in-page and print from the first
+   byte, and the chunk, hydration and GSAP work all wait. Removing the markup from the HTML instead
+   was tried first and rejected in review. The chunks are prefetched by `use-prefetch-phases.ts`
+   after the first sign of intent (pointer, touch, key or scroll, armed one second after hydration)
+   or a few idle seconds, never under Data Saver and never during the first paint's window. A chunk
+   that fails to load falls back to the section placeholder instead of the route's error page. An
+   animation that repeats forever pauses while its section is scrolled past
+   (`toggleActions: 'play pause resume reverse'`; `[data-active='false'] .scan-line`).
 5. **Server components import client components from their own modules.** `app/layout.tsx` does
    not import from the `@/components` barrel; pages may, because a page's chunk is only paid for by
    that page. The barrel stays for the page-level components it lists.
@@ -73,11 +79,11 @@ main thread go quiet between tmux ticks.
 
 ### Positive
 
-- CLS on `/` is 0 in every trace taken after the change; the tmux containers no longer appear in
-  `LayoutShift` events at all. The only remaining shift in some Lighthouse runs is the centred boot
-  loader re-centering when Lighthouse itself changes the emulated viewport size at about 0.9 s,
-  which Lighthouse counts by design within 500 ms of that event; it is worth at most 0.06 and does
-  not happen to visitors.
+- The tmux pane containers no longer appear in `LayoutShift` events at all, and the e2e guard that
+  sums shifts while lines arrive reads 0 on this branch against 0.03 on `main`. The one shift
+  Lighthouse still reports on `/` (0.034) is the centred boot loader re-centering when Lighthouse
+  itself changes the emulated viewport size at about 0.9 s, which it counts by design within 500 ms
+  of that event; it does not happen to visitors.
 - The 135 ms phase-mount task is gone from the load trace. Per-frame `Layout` events dropped from
   30 per 500 ms to the tmux tick rate, and `Layerize` from 40 ms per 500 ms to about 1.5 ms.
 - `/work/[slug]` and every other non-home route stopped loading the 27.7 KB FeaturedWork chunk.
@@ -87,10 +93,13 @@ main thread go quiet between tmux ticks.
 
 ### Trade-offs
 
-- A section now mounts when its top edge reaches the viewport, and its GSAP entrance still starts
-  half a viewport later. On a slow connection with no earlier intent signal the first section's chunk
-  may still be downloading when it is reached; the placeholder is the same blank `min-h-screen` block
-  it always was, and the entrance animation masks a late mount because its elements start at opacity 0. This is the accepted cost of not paying for six sections at load.
+- A section hydrates when its top edge reaches the viewport, and its GSAP entrance sets the
+  animated elements to opacity 0 at that moment, exactly as it did at 0.7 s before this change. On a
+  slow connection with no earlier intent signal the chunk may still be downloading when the section
+  is reached, and a fast flick can show its static server-rendered content for a frame or two before
+  the entrance takes over; the 96 px of top padding and the unanimated phase header absorb most of
+  that. This is the accepted cost of not paying for six sections at load, and it is bounded: nothing
+  is ever missing from the page, only late to animate.
 - Visitors who never scroll never load GSAP. Visitors who move the pointer load it within a second,
   as before.
 - The slot grid rotates text through up to 40 slots per pane on every tick, about 240 text node
@@ -103,13 +112,23 @@ main thread go quiet between tmux ticks.
   Moving the keyframes from `top` to `transform` still removed the layout and paint from each of
   those frames.
 - `DeferredSection` holds one `IntersectionObserver` per section until it fires; browsers without
-  the API mount everything once hydrated.
+  the API hydrate everything once the page has hydrated. The gate relies on React keeping a
+  dehydrated Suspense boundary's server HTML while a component inside it suspends during hydration,
+  the same contract `React.lazy` depends on.
+- The hover text effects and any other interactivity inside a section are inert until it hydrates.
+  The six sections hold one interactive element, the LinkedIn link, and it is a plain anchor that
+  works without hydration.
 
 ## Alternatives considered
 
 - **Keep appending log lines but stop the shift with a top-anchored, transform-scrolled container.**
   Rejected: removing the oldest line to cap the DOM still moves every sibling, so the cap would have
   had to go, and the container would have grown without bound.
+- **Render placeholders instead of the sections until they approach.** Implemented first, then
+  rejected in review: it removed the six sections and the LinkedIn call to action from the server
+  HTML, which cost crawlers, no-JS readers, reader mode, find-in-page, print and keyboard
+  reachability, and it swapped a 100vh placeholder for content of a different height. The hydration
+  gate keeps every byte of markup and defers exactly the same client work.
 - **Mount the story sections after `requestIdleCallback` instead of on approach.** Rejected: idle
   arrives about a second after load, inside the window Lighthouse measures and inside the time a real
   visitor is still looking at the hero. The work moved but was not removed.

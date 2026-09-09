@@ -303,8 +303,9 @@ Clean runs of the same command against the same build (`environment.benchmarkInd
 `/work/self-healing-agent` 97 to 98 with TBT 58 to 65 ms. After the home page performance work
 ([plan](../plans/2026-09-09-home-page-performance-plan.md), [ADR 0009](../adr/0009-animation-performance-rules.md)),
 five runs interleaved with that baseline on the same machine give `/` 96 in every run with LCP
-2.6 s, CLS 0 and TBT 70 to 76 ms, and `/work/self-healing-agent` 98 with TBT 57 to 58 ms; the
-case-study route also stopped loading the 27.7 KB FeaturedWork chunk. Before comparing a future run
+2.6 s, CLS 0.034 (all of it the boot-loader artifact described below) and TBT 86 to 87 ms, and
+`/work/self-healing-agent` 98 with TBT 53 to 54 ms; the case-study route also stopped loading the
+27.7 KB FeaturedWork chunk. Before comparing a future run
 with these, check `.environment.benchmarkIndex` and `.runWarnings` in its JSON and discard a flagged
 run. A CLS of 0.03 to 0.06 attributed to the boot loader is Lighthouse re-centering it when it
 changes the emulated viewport at about 0.9 s, which it counts by design within 500 ms of that event;
