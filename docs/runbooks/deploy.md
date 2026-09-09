@@ -9,18 +9,20 @@ environment variable is documented in [`.env.example`](../../.env.example).
 
 ## Status
 
-As of 2026-09-09 the site is **deployed on Vercel and waiting for DNS**. The Vercel project is
+As of 2026-09-09 the site is **live at `https://miloscvetkovic.dev`**. The Vercel project is
 `portfolio` in the team `cvetkovicmilosgmailcoms-projects`, linked to
 `github.com/milosCvetkovicDev/website` with production branch `main`, Root Directory `apps/web`,
 Node 22.x and `pnpm install --frozen-lockfile` as the install command. Its first production
-deployment was built from commit `a8b4a91` and passed the `curl` checks under **Verify** that do not
-need the domain. `miloscvetkovic.dev` and `www.miloscvetkovic.dev` are attached to the project, with
-`www` redirecting to the apex with a 308, but both still resolve to the Namecheap parking page (apex
-`A 162.255.119.232`, `www CNAME parkingpage.namecheap.com`, Namecheap BasicDNS on
-`dns1.registrar-servers.com` and `dns2.registrar-servers.com`) until the records under **Domain and
-DNS** are entered at Namecheap. There is still no `vercel.json`; the only Vercel-specific file in the
-repository is `.vercelignore`, explained under Path B. The rest of this runbook covers the cutover,
-routine deploys, rollback and the failures worth knowing about in advance.
+deployment was built from commit `a8b4a91` and passed every check under **Verify**. The Namecheap
+records were switched the same day: the apex resolves to `216.198.79.1` and `64.29.17.1`, `www` is
+a `CNAME` to `30c6e6551c22e39e.vercel-dns-017.com.` and redirects to the apex with a 308, Namecheap
+BasicDNS (`dns1.registrar-servers.com`, `dns2.registrar-servers.com`) stays authoritative, the mail
+records were untouched, and the certificate was created with `vercel certs issue` after automatic
+issuance had not happened within ten minutes. What the domain looked like
+before, and how to put it back, is under **Reverting the DNS change**. There is still no
+`vercel.json`; the only Vercel-specific file in the repository is `.vercelignore`, explained under
+Path B. The rest of this runbook covers routine deploys, rollback and the failures worth knowing
+about in advance.
 
 ## Prerequisites
 
@@ -236,13 +238,14 @@ dig +short TXT miloscvetkovic.dev
 dig +short NS miloscvetkovic.dev
 ```
 
-Remove:
+Remove. This is what the Advanced DNS tab actually showed on 2026-09-09: the parking
+`A 162.255.119.232` that `dig` reports is not listed as an `A` record, Namecheap serves it from the
+URL Redirect Record.
 
-| Type                | Host  | Current value                | Action            |
-| ------------------- | ----- | ---------------------------- | ----------------- |
-| A Record            | `@`   | `162.255.119.232`            | Delete            |
-| CNAME Record        | `www` | `parkingpage.namecheap.com.` | Delete            |
-| URL Redirect Record | any   | any                          | Delete if present |
+| Type                | Host  | Value                                      | Action |
+| ------------------- | ----- | ------------------------------------------ | ------ |
+| URL Redirect Record | `@`   | `http://www.miloscvetkovic.dev` (Unmasked) | Delete |
+| CNAME Record        | `www` | `parkingpage.namecheap.com.`               | Delete |
 
 Add the records Vercel lists for these domains (`vercel domains verify <domain>`, or **Project
 Settings → Domains**), with TTL `Automatic`. On 2026-09-09 Vercel's first-ranked recommendation was
@@ -270,7 +273,10 @@ Configuration** but the certificate does not issue within a few minutes, check f
 blocking Vercel's certificate authority with `dig +short CAA miloscvetkovic.dev` (empty today, and
 anything else must permit `letsencrypt.org`). `.dev` is on the HSTS preload list, so browsers refuse
 plain HTTP: until the certificate issues the site is unreachable everywhere, with no HTTP fallback.
-Work the certificate problem rather than changing the DNS records again.
+Work the certificate problem rather than changing the DNS records again. On 2026-09-09 nothing had
+been issued ten minutes after both domains verified, with `CAA` empty;
+`vercel certs issue miloscvetkovic.dev www.miloscvetkovic.dev` created the certificate in 12 seconds
+and the apex answered over HTTPS immediately.
 
 ### Cautions
 
@@ -293,11 +299,12 @@ Work the certificate problem rather than changing the DNS records again.
 
 ### Reverting the DNS change
 
-Delete the `A` record on `@` and the `CNAME` on `www` that point at Vercel, restore
-`A @ 162.255.119.232` and `CNAME www parkingpage.namecheap.com.`, then re-enable the parking page on
-the Domain tab. Expect the same propagation delay as the cutover, and re-check the `MX` and `TXT`
-records afterwards. Leave the Vercel project in place: a domain sitting in **Invalid Configuration**
-costs nothing.
+Delete the two `A` records on `@` and the `CNAME` on `www` that point at Vercel, then add back what
+was there before 2026-09-09: a **URL Redirect Record** on `@` to `http://www.miloscvetkovic.dev`
+(Unmasked; Namecheap serves it as `A 162.255.119.232`) and `CNAME www parkingpage.namecheap.com.`,
+or re-enable the parking page on the Domain tab, which creates the same records. Expect the same
+propagation delay as the cutover, and re-check the `MX` and `TXT` records afterwards. Leave the
+Vercel project in place: a domain sitting in **Invalid Configuration** costs nothing.
 
 ## Verify
 
@@ -444,20 +451,20 @@ the branch and the live site agree.
 
 ## Troubleshooting
 
-| Symptom                                                                                  | Cause                                                    | Fix                                                                                                                                         |
-| ---------------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Install fails, `ERR_PNPM_NO_LOCKFILE` or `@repo/prettier-config` is not in the workspace | Workspace root not available to the build                | Settings → General → enable **Include source files outside of the Root Directory in the Build Step**, redeploy                              |
-| Install fails, `ERR_PNPM_OUTDATED_LOCKFILE`                                              | Lockfile does not match a `package.json`                 | `pnpm install` locally, commit `pnpm-lock.yaml`, push                                                                                       |
-| Build fails, `next: command not found`                                                   | Root Directory is not `apps/web`                         | Settings → General → Root Directory: `apps/web`, redeploy                                                                                   |
-| Build or runtime behaves as if on an older Node                                          | Node version not set; `.nvmrc` is not read               | Settings → General → Node.js Version: 22.x, redeploy                                                                                        |
-| Domain stuck on **Invalid Configuration**                                                | Records not propagated, or parking records remain        | Delete leftover records, disable parking page, wait, Refresh                                                                                |
-| Domain is **Valid Configuration** but HTTPS fails and the site is unreachable            | Certificate has not issued                               | `dig +short CAA miloscvetkovic.dev`; remove or widen a `CAA` record that excludes `letsencrypt.org`, then Refresh                           |
-| `www` returns 200 instead of a redirect                                                  | `www` added as a serving domain, not a redirect          | Settings → Domains: apex primary, `www` redirects to it with 308                                                                            |
-| Previews emit apex URLs in sitemap, robots and JSON-LD                                   | Expected: Preview uses the same value as Production      | No fix needed. To make previews self-identify, give Preview a different `NEXT_PUBLIC_SITE_URL` and redeploy                                 |
-| A page 404s in production but works locally                                              | Live deployment predates the new case study slug         | `vercel inspect <url> --logs 2>&1 \| grep Cloning` to check the commit, then redeploy `main`                                                |
-| `vercel deploy` uploads gigabytes, then fails with `File size limit exceeded (100 MB)`   | `.vercelignore` missing or out of step with `.gitignore` | Restore `.vercelignore` (it must list `.turbo`), or deploy from Git instead                                                                 |
-| `vercel git connect` prints `Failed to connect`                                          | Often spurious                                           | `vercel api /v9/projects/<id> --raw \| jq .link`; if `link` is set the connection exists, otherwise install the Vercel GitHub App and retry |
-| Install log warns `Ignored build scripts: esbuild, sharp, unrs-resolver`                 | pnpm 10 blocks dependency scripts by default             | Harmless, the packages ship prebuilt binaries. Silence it deliberately with `pnpm approve-builds` in its own pull request                   |
+| Symptom                                                                                  | Cause                                                    | Fix                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install fails, `ERR_PNPM_NO_LOCKFILE` or `@repo/prettier-config` is not in the workspace | Workspace root not available to the build                | Settings → General → enable **Include source files outside of the Root Directory in the Build Step**, redeploy                                                                                       |
+| Install fails, `ERR_PNPM_OUTDATED_LOCKFILE`                                              | Lockfile does not match a `package.json`                 | `pnpm install` locally, commit `pnpm-lock.yaml`, push                                                                                                                                                |
+| Build fails, `next: command not found`                                                   | Root Directory is not `apps/web`                         | Settings → General → Root Directory: `apps/web`, redeploy                                                                                                                                            |
+| Build or runtime behaves as if on an older Node                                          | Node version not set; `.nvmrc` is not read               | Settings → General → Node.js Version: 22.x, redeploy                                                                                                                                                 |
+| Domain stuck on **Invalid Configuration**                                                | Records not propagated, or parking records remain        | Delete leftover records, disable parking page, wait, Refresh                                                                                                                                         |
+| Domain is **Valid Configuration** but HTTPS fails and the site is unreachable            | Certificate has not issued                               | `dig +short CAA miloscvetkovic.dev`; remove or widen a `CAA` record that excludes `letsencrypt.org`, then Refresh; if `CAA` is empty, `vercel certs issue miloscvetkovic.dev www.miloscvetkovic.dev` |
+| `www` returns 200 instead of a redirect                                                  | `www` added as a serving domain, not a redirect          | Settings → Domains: apex primary, `www` redirects to it with 308                                                                                                                                     |
+| Previews emit apex URLs in sitemap, robots and JSON-LD                                   | Expected: Preview uses the same value as Production      | No fix needed. To make previews self-identify, give Preview a different `NEXT_PUBLIC_SITE_URL` and redeploy                                                                                          |
+| A page 404s in production but works locally                                              | Live deployment predates the new case study slug         | `vercel inspect <url> --logs 2>&1 \| grep Cloning` to check the commit, then redeploy `main`                                                                                                         |
+| `vercel deploy` uploads gigabytes, then fails with `File size limit exceeded (100 MB)`   | `.vercelignore` missing or out of step with `.gitignore` | Restore `.vercelignore` (it must list `.turbo`), or deploy from Git instead                                                                                                                          |
+| `vercel git connect` prints `Failed to connect`                                          | Often spurious                                           | `vercel api /v9/projects/<id> --raw \| jq .link`; if `link` is set the connection exists, otherwise install the Vercel GitHub App and retry                                                          |
+| Install log warns `Ignored build scripts: esbuild, sharp, unrs-resolver`                 | pnpm 10 blocks dependency scripts by default             | Harmless, the packages ship prebuilt binaries. Silence it deliberately with `pnpm approve-builds` in its own pull request                                                                            |
 
 Detail on the less obvious rows:
 

@@ -10,7 +10,7 @@ Personal site of Milos Cvetkovic, Senior Full-Stack Engineer. An interactive, an
 
 ## Live site
 
-The site is deployed on Vercel from `main`; `https://miloscvetkovic.dev` still points at the registrar's parking page until its DNS records are switched (state as of 2026-09-09). The exact steps, DNS records and verification checks are in [docs/runbooks/deploy.md](docs/runbooks/deploy.md).
+[https://miloscvetkovic.dev](https://miloscvetkovic.dev), deployed on Vercel from `main` and live since 2026-09-09. The exact steps, DNS records and verification checks are in [docs/runbooks/deploy.md](docs/runbooks/deploy.md).
 
 ## Stack
 

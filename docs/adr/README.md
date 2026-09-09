@@ -28,8 +28,8 @@ operation.
 | 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)           | Accepted | 2026-09-08 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
-choice; the Vercel project exists and builds `main` since 2026-09-09, and the `miloscvetkovic.dev`
-cutover is tracked in [docs/runbooks/deploy.md](../runbooks/deploy.md). The bodies of 0002 and 0005
+choice; it was carried out on 2026-09-09 and the site is live, see
+[docs/runbooks/deploy.md](../runbooks/deploy.md). The bodies of 0002 and 0005
 still describe the state on 2026-09-08, when they were accepted; records are not edited afterwards.
 
 ## Writing a new ADR

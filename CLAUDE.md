@@ -171,10 +171,9 @@ is there so that a future buildable package is compiled before the apps typechec
   the production build on port 3000 on its own.
 - To point the site at a non-default origin locally, copy the root `.env.example` to
   `apps/web/.env.local` yourself; the PreToolUse guard blocks agent writes to `.env*`.
-- The site is deployed on Vercel (project `portfolio`, production from `main`, first build
-  2026-09-09) but `miloscvetkovic.dev` keeps pointing at the registrar's parking page until the
-  Namecheap records in `docs/runbooks/deploy.md` are entered. Check `dig +short A miloscvetkovic.dev`
-  before treating the domain as live.
+- The site is live at `https://miloscvetkovic.dev` since 2026-09-09: Vercel project `portfolio`,
+  production from `main`, DNS at Namecheap (`docs/runbooks/deploy.md` has the records and the
+  rollback). Merging to `main` deploys; there is no manual step.
 - `vercel deploy` from the repository root uploads the working tree as filtered by `.vercelignore`
   plus the CLI's built-in list, never `.gitignore`. Mirror new `.gitignore` entries there; without it
   the 1.9 GB `.turbo` cache goes up and the upload fails. Per-deployment and branch `*.vercel.app`
