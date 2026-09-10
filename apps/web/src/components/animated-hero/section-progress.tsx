@@ -50,7 +50,7 @@ export function SectionProgress({
 
   // Throttled scroll handler using RAF for smooth updates
   const handleScroll = useCallback(() => {
-    if (rafRef.current) return; // Skip if already scheduled
+    if (rafRef.current !== null) return; // Skip if already scheduled
 
     rafRef.current = requestAnimationFrame(() => {
       const now = performance.now();
@@ -93,7 +93,13 @@ export function SectionProgress({
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      // Clearing the id matters as much as cancelling the frame: the cancelled callback never
+      // runs, so a surviving id would leave the guard in handleScroll returning early for good
+      // and freeze the indicator if this effect ever re-ran.
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
   }, [handleScroll]);
 
@@ -123,7 +129,7 @@ export function SectionProgress({
               <div
                 className={`relative h-3 w-3 rounded-full transition-all duration-300 ${
                   index <= activeSection ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'
-                } ${index === activeSection ? 'shadow-[0_0_8px_rgba(139,92,246,0.6)]' : ''}`}
+                } ${index === activeSection ? 'shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_60%,transparent)]' : ''}`}
               />
 
               {/* Label (shows on hover) */}
@@ -141,7 +147,7 @@ export function SectionProgress({
         </div>
 
         {/* Connecting line */}
-        <div className="absolute top-0 left-1.5 -z-10 h-full w-[1px]">
+        <div className="absolute top-0 left-1.5 -z-10 h-full w-px">
           <div className="h-full w-full bg-[var(--border)]" />
           <div
             ref={progressLineRef}
