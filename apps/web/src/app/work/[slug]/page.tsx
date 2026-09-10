@@ -7,6 +7,15 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+// `case-studies.ts` enumerates every slug, so generateStaticParams below is exhaustive and an
+// unknown slug can only be a bad URL. Refusing dynamic params turns that into a routing-level 404,
+// the same one `/no-such-page` gets, instead of a render-time notFound(). That matters beyond
+// tidiness: notFound() throws, React error boundaries do not run during SSR, so the throw unwinds
+// past the root layout and Next serves its bare `<html id="__next_error__">` recovery shell. The
+// layout's <head> — the theme init script included — never reaches the HTML, leaving the client to
+// re-create it. See docs/adr/0015-static-case-study-params.md.
+export const dynamicParams = false;
+
 export async function generateStaticParams() {
   return caseStudies.map((cs) => ({
     slug: cs.slug,
