@@ -26,6 +26,7 @@ operation.
 | 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)               | Accepted | 2026-09-08 |
 | 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                                       | Accepted | 2026-09-08 |
 | 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)                   | Accepted | 2026-09-08 |
+| 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)           | Accepted | 2026-09-09 |
 | 0008 | [Accent colour roles](0008-accent-colour-roles.md)                                   | Accepted | 2026-09-09 |
 | 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md) | Accepted | 2026-09-09 |
 | 0010 | [Status colour tokens](0010-status-colour-tokens.md)                                 | Accepted | 2026-09-09 |

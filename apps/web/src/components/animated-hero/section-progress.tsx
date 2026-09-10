@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const sections = [
   { id: 'loading', label: 'INIT' },
@@ -12,8 +13,13 @@ const sections = [
   { id: 'complete', label: 'CTA' },
 ];
 
+/** Pixels the page can scroll; 0 when the content fits the viewport. */
+const getScrollRange = () =>
+  Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+
 export function SectionProgress() {
   const [activeSection, setActiveSection] = useState(0);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const rafRef = useRef<number | null>(null);
   const lastUpdateRef = useRef(0);
 
@@ -34,20 +40,18 @@ export function SectionProgress() {
       }
       lastUpdateRef.current = now;
 
-      const scrollTop = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = (scrollTop / docHeight) * 100;
+      // Overscroll (rubber-banding) reports a negative scrollY, and a page that fits the
+      // viewport has no range to divide by; both read as the top of the page.
+      const scrollRange = getScrollRange();
+      const progress = scrollRange > 0 ? Math.min(1, Math.max(0, window.scrollY) / scrollRange) : 0;
 
       // Direct DOM manipulation for progress bars (no React re-render)
       if (mobileProgressRef.current) {
-        mobileProgressRef.current.style.width = `${progress}%`;
+        mobileProgressRef.current.style.width = `${progress * 100}%`;
       }
 
       // Calculate active section based on scroll position
-      const sectionIndex = Math.min(
-        Math.floor((scrollTop / docHeight) * sections.length),
-        sections.length - 1,
-      );
+      const sectionIndex = Math.min(Math.floor(progress * sections.length), sections.length - 1);
 
       // Update progress line directly
       if (progressLineRef.current) {
@@ -61,11 +65,8 @@ export function SectionProgress() {
     });
   }, []);
 
+  // Position tracking is not motion, so the listener is attached whatever the preference is.
   useEffect(() => {
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (prefersReducedMotion) return;
-
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', handleScroll);
@@ -83,9 +84,12 @@ export function SectionProgress() {
             <button
               key={section.id}
               onClick={() => {
-                const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-                const targetScroll = (index / (sections.length - 1)) * docHeight;
-                window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+                const targetScroll = (index / (sections.length - 1)) * getScrollRange();
+                // Smooth scrolling is motion; jump straight there when the user has opted out.
+                window.scrollTo({
+                  top: targetScroll,
+                  behavior: prefersReducedMotion ? 'auto' : 'smooth',
+                });
               }}
               className="group flex items-center gap-2"
               aria-label={`Go to ${section.label} section`}
