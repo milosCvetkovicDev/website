@@ -37,6 +37,22 @@ test.describe('Section progress', () => {
     }
   });
 
+  test('reads the restored position after a reload part-way down the story', async ({ page }) => {
+    await page.getByRole('button', { name: 'Go to BUILD section' }).click();
+    await expect(page.getByText('[04/07] BUILD')).toBeVisible();
+    const scrolled = await page.evaluate(() => window.scrollY);
+
+    await page.reload();
+    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
+
+    // The browser puts the page back where it was and tells nobody: scroll restoration dispatches
+    // no scroll event the indicator could listen for. Asserting the position first keeps the test
+    // honest — a browser that stopped restoring would leave it passing against a page at the top.
+    const restored = await page.evaluate(() => window.scrollY);
+    expect(Math.abs(restored - scrolled)).toBeLessThan(5);
+    await expect(page.getByText('[04/07] BUILD')).toBeVisible();
+  });
+
   test('reads the closing section while it is the section on screen', async ({ page }) => {
     const cta = page.getByRole('link', { name: 'Connect on LinkedIn' });
     // Scrolled to, rather than jumped to. Measured against the document this sits about three

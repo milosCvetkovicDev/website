@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { StrictMode, useRef } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SectionProgress } from '../section-progress';
@@ -65,15 +65,49 @@ function Story({ top = STORY_TOP, height = STORY_HEIGHT }: { top?: number; heigh
   );
 }
 
-/** Moves the window to `y` and runs the animation frame the scroll handler schedules. */
-function scrollWindowTo(y: number) {
+function setScrollY(y: number) {
   Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: y });
+}
+
+/** Runs a single animation frame, which is where the component takes its measurements. */
+function runFrame() {
   act(() => {
-    // The handler drops frames within 33ms of the last update, so let that much pass first.
-    vi.advanceTimersByTime(34);
-    window.dispatchEvent(new Event('scroll'));
     vi.advanceTimersToNextFrame();
   });
+}
+
+/**
+ * Runs frames until everything the component has scheduled has been applied. A measurement that
+ * lands inside the throttle window waits the window out a frame at a time rather than dropping, so
+ * the indicator settles within a window plus a frame at worst. 200ms is well past that.
+ */
+function settle() {
+  act(() => {
+    vi.advanceTimersByTime(200);
+  });
+}
+
+/** Moves the window to `y` and dispatches the scroll event, leaving the frames to the caller. */
+function dispatchScrollTo(y: number) {
+  setScrollY(y);
+  act(() => {
+    window.dispatchEvent(new Event('scroll'));
+  });
+}
+
+/** Moves the window to `y` and lets the indicator catch up. */
+function scrollWindowTo(y: number) {
+  dispatchScrollTo(y);
+  settle();
+}
+
+/** Rotates or resizes the viewport to `height` and lets the indicator catch up. */
+function resizeViewportTo(height: number) {
+  window.innerHeight = height;
+  act(() => {
+    window.dispatchEvent(new Event('resize'));
+  });
+  settle();
 }
 
 const mobileBar = () => document.querySelector<HTMLElement>('.will-change-\\[width\\]');
@@ -119,6 +153,75 @@ describe('SectionProgress', () => {
 
     expect(readout).toHaveTextContent('[04/07] BUILD');
     expect(mobileBar()?.style.width).toBe('50%');
+  });
+
+  it('measures the restored scroll position on mount, before any scroll event', () => {
+    // A reload part-way down the story, and a back-navigation to it, both arrive already scrolled:
+    // the browser restores the position and dispatches nothing to announce it.
+    setScrollY(STORY_TOP + STORY_RANGE / 2);
+    render(<Story />);
+    settle();
+
+    expect(screen.getByText('[04/07] BUILD')).toBeInTheDocument();
+    expect(dot('BUILD')).toHaveClass('bg-[var(--accent)]');
+    expect(mobileBar()?.style.width).toBe('50%');
+    expect(progressLine()?.style.height).toBe('50%');
+  });
+
+  it('applies the last update of a scroll stream that ends inside the throttle window', () => {
+    render(<Story />);
+    const readout = screen.getByText('[01/07] INIT');
+    settle();
+
+    // One update, which opens a throttle window the next one has to wait out.
+    dispatchScrollTo(STORY_TOP + STORY_RANGE / 4);
+    runFrame();
+    expect(readout).toHaveTextContent('[02/07] DISCOVER');
+
+    // The frame right after an update falls inside that window. Nothing follows this event —
+    // momentum has settled, or `scrollTo({ behavior: 'instant' })` dispatched its single event —
+    // so an update deferred here is the last chance to be right.
+    dispatchScrollTo(STORY_TOP + STORY_RANGE);
+    runFrame();
+    settle();
+
+    expect(readout).toHaveTextContent('[07/07] CTA');
+    expect(mobileBar()?.style.width).toBe('100%');
+  });
+
+  it('keeps measuring after a re-run of the effect, as StrictMode does in development', () => {
+    // StrictMode mounts, tears down and mounts again, which `next dev` turns on for every page. A
+    // teardown that cancels the pending frame without clearing the handle leaves the guard in
+    // `scheduleMeasure` looking at a cancelled one: it would return early for the rest of the
+    // component's life and never schedule another frame.
+    render(
+      <StrictMode>
+        <Story />
+      </StrictMode>,
+    );
+    const readout = screen.getByText('[01/07] INIT');
+
+    scrollWindowTo(STORY_TOP + STORY_RANGE);
+
+    expect(readout).toHaveTextContent('[07/07] CTA');
+    expect(mobileBar()?.style.width).toBe('100%');
+  });
+
+  it('re-measures the story when the viewport is resized', () => {
+    render(<Story />);
+    const readout = screen.getByText('[01/07] INIT');
+
+    scrollWindowTo(STORY_TOP + STORY_RANGE / 2);
+
+    expect(readout).toHaveTextContent('[04/07] BUILD');
+    expect(mobileBar()?.style.width).toBe('50%');
+
+    // A viewport twice as tall leaves 5,000px of story to scroll rather than 6,000, so the same
+    // position is 60% of the way through it instead of half way.
+    resizeViewportTo(VIEWPORT_HEIGHT * 2);
+
+    expect(readout).toHaveTextContent('[05/07] TEST');
+    expect(mobileBar()?.style.width).toBe('60%');
   });
 
   it('tracks the scroll position in a browser without window.matchMedia', () => {

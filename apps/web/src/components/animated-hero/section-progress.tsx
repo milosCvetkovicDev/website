@@ -3,6 +3,9 @@
 import { useEffect, useState, useRef, useCallback, type RefObject } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
+/** Smallest gap between two measurements, ~30fps. The dots move a whole step at a time. */
+const MEASURE_THROTTLE_MS = 33;
+
 const sections = [
   { id: 'loading', label: 'INIT' },
   { id: 'discovery', label: 'DISCOVER' },
@@ -42,24 +45,35 @@ export function SectionProgress({
   const [activeSection, setActiveSection] = useState(0);
   const prefersReducedMotion = usePrefersReducedMotion();
   const rafRef = useRef<number | null>(null);
-  const lastUpdateRef = useRef(0);
+  // No measurement has been taken yet, so the first one is never throttled: the pass scheduled when
+  // the listeners are attached has to land on the frame it asked for.
+  const lastMeasureRef = useRef(Number.NEGATIVE_INFINITY);
 
   // Refs for direct DOM manipulation (avoid React re-renders during scroll)
   const progressLineRef = useRef<HTMLDivElement>(null);
   const mobileProgressRef = useRef<HTMLDivElement>(null);
 
-  // Throttled scroll handler using RAF for smooth updates
-  const handleScroll = useCallback(() => {
-    if (rafRef.current !== null) return; // Skip if already scheduled
+  /**
+   * Reads the position and paints it, on an animation frame and at most every
+   * `MEASURE_THROTTLE_MS`. A frame that arrives inside the throttle window comes back on the next
+   * one rather than returning: the event that scheduled it may well be the last one there is —
+   * momentum settling, or the single `scroll` event that an `instant` `window.scrollTo` dispatches
+   * under reduced motion — and dropping it would leave the dots, the readout and both bars showing
+   * the previous position for as long as the visitor stays there. Deferring costs a frame callback
+   * that compares two numbers; dropping costs a wrong indicator at rest.
+   */
+  const scheduleMeasure = useCallback(() => {
+    // A pass is already pending, and it will read the position as it is when it runs.
+    if (rafRef.current !== null) return;
 
-    rafRef.current = requestAnimationFrame(() => {
+    const measure = () => {
       const now = performance.now();
-      // Throttle to ~30fps to reduce work
-      if (now - lastUpdateRef.current < 33) {
-        rafRef.current = null;
+      if (now - lastMeasureRef.current < MEASURE_THROTTLE_MS) {
+        rafRef.current = requestAnimationFrame(measure);
         return;
       }
-      lastUpdateRef.current = now;
+      lastMeasureRef.current = now;
+      rafRef.current = null;
 
       // Everything above the story, rubber-band overscroll and the pages of content below the story
       // all fall outside its range, and a story that fits the viewport has no range to divide by:
@@ -83,25 +97,37 @@ export function SectionProgress({
 
       // Only trigger React re-render when section actually changes
       setActiveSection((prev) => (prev !== sectionIndex ? sectionIndex : prev));
+    };
 
-      rafRef.current = null;
-    });
+    rafRef.current = requestAnimationFrame(measure);
   }, [storyRef]);
 
-  // Position tracking is not motion, so the listener is attached whatever the preference is.
+  // Position tracking is not motion, so the listeners are attached whatever the preference is.
   useEffect(() => {
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', scheduleMeasure, { passive: true });
+    // `measureStory` reads `innerHeight` live, so a rotation or a window drag changes how much
+    // story there is to scroll while the position itself has not moved. `resize` covers an
+    // orientation change too.
+    window.addEventListener('resize', scheduleMeasure);
+    // A scroll event announces a change, never a position, so nothing has yet said where the page
+    // is. A reload at a restored scroll position, and a back-navigation into the middle of the
+    // story, both arrive already scrolled and dispatch nothing: without this pass the indicator
+    // reads [01/07] INIT, with a 0% bar, until the visitor scrolls. It measures on an animation
+    // frame rather than here, which is also what keeps `setActiveSection` out of the effect body.
+    scheduleMeasure();
     return () => {
-      window.removeEventListener('scroll', handleScroll);
-      // Clearing the id matters as much as cancelling the frame: the cancelled callback never
-      // runs, so a surviving id would leave the guard in handleScroll returning early for good
-      // and freeze the indicator if this effect ever re-ran.
+      window.removeEventListener('scroll', scheduleMeasure);
+      window.removeEventListener('resize', scheduleMeasure);
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
+        // The handle is what `scheduleMeasure` reads to decide a pass is already pending, so a
+        // cancelled one left in place makes it return early for good. React re-runs this effect on
+        // its own — StrictMode does it on every mount in development — and there is now always a
+        // frame in flight to cancel, because attaching the listeners schedules one.
         rafRef.current = null;
       }
     };
-  }, [handleScroll]);
+  }, [scheduleMeasure]);
 
   return (
     <>
