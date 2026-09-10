@@ -3,7 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 /**
  * Accessibility regression gate: `/` and `/work/self-healing-agent` must produce zero axe-core
- * violations in both colour schemes, at rest.
+ * violations in both colour schemes, at rest, and `/` again after the whole story has been
+ * scrolled through.
  *
  * On 2026-09-09 Lighthouse scored both pages 96 on accessibility, for `color-contrast` (the accent
  * used as text, labels dimmed with opacity modifiers, a GSAP reveal parked at 30% opacity) and
@@ -24,19 +25,32 @@ import { expect, test, type Page } from '@playwright/test';
  * from a partial value.
  *
  * Each page is audited twice. At rest, which is what Lighthouse scores and what the original
- * findings were about. Then, for `/`, again after scrolling the whole story: the hero phases are
- * server-rendered but hydrate only as they approach the viewport (`DeferredSection`), and their
- * content is revealed by GSAP, so an unscrolled audit measures almost none of it. That is how the
- * light-theme contrast failures fixed by ADR 0010 stayed invisible to this gate until they were
- * found by hand: `text-green-400` on a near-white page is 1.7:1 and nothing here saw it.
+ * findings were about. Then, for `/`, again after scrolling the whole story.
+ *
+ * The second pass exists because at rest the six story sections are not in the document at all.
+ * `DeferredSection` suspends each one until it approaches the viewport, so an unscrolled `/`
+ * renders six empty placeholders: axe measures 30 text nodes there against 424 once the story has
+ * been walked. That, not a GSAP reveal, is how the light-theme contrast failures fixed by ADR 0010
+ * stayed invisible to this gate until they were found by hand. `text-green-400` on a near-white
+ * page is 1.7:1, and with the class put back the at-rest pass is still green while the scrolled
+ * pass fails.
  *
  * The scrolled pass emulates `prefers-reduced-motion: reduce`, which is what makes it a gate rather
  * than a coin flip. Every phase then renders its finished state on mount instead of on a timeline
  * (ADR 0009), so there is no window in which axe can sample text mid-tween, and no dependence on
- * pipeline timers that run for about seven seconds. It costs the two states that exist only while
- * the animation runs, the deploying panel and the loop's error alert; both use the same three
- * tokens as the states that are covered, so a palette class reintroduced in a phase still fails
- * here. What it cannot catch is a colour used *only* in a transient state.
+ * pipeline timers that run for about seven seconds. It costs the three states that exist only
+ * while the animation runs: the deploying panel, the loop's error alert box, and a pipeline stage
+ * mid-run, which `reduce` forces straight to `passed`. Their tokens are still covered elsewhere on
+ * the page, `--status-warn` by the commit streak and `--status-err` by the healing log's error
+ * line, so a palette class reintroduced in a phase still fails here. What this cannot catch is a
+ * colour used *only* in one of those three states, and it does not audit the animated path at all:
+ * `/` is measured unscrolled at `no-preference` and scrolled at `reduce`, never scrolled at
+ * `no-preference`. A scrolled `no-preference` pass is not a gate: sampled mid-tween it reports
+ * real `color-contrast` violations against text the reveal has not finished fading in.
+ *
+ * Some status colours cannot be reached by any audit, because nothing constructs them: a `failed`
+ * `PipelineStage`, the `warning` and `error` `NotificationToast` variants, and the `pending` and
+ * `error` `ActivityEntry` variants. They are unreachable, not merely uncovered.
  *
  * Both passes run at the project's desktop viewport. A mobile viewport, which is what Lighthouse
  * emulates by default, is still not covered.
@@ -106,22 +120,48 @@ const pages = ['/', '/work/self-healing-agent'];
 const colorSchemes = ['light', 'dark'] as const;
 
 /**
- * Walks the page to the bottom so every `DeferredSection` passes its IntersectionObserver and
- * hydrates. Steps rather than jumping: a single `scrollTo(0, bottom)` fires the observers for the
- * sections it lands near and leaves the ones it flew past unhydrated, because their root margin
- * only looks upward. Two animation frames per step let React commit the section before the next.
+ * Walks the page to the bottom so every `DeferredSection` hydrates. Two animation frames per step
+ * let React commit each section before the next one moves.
+ *
+ * Stepping is not what makes this work today. `DeferredSection` observes with a root margin of
+ * `10000px 0px 0px 0px`, and its own comment says so: anything already scrolled past counts as
+ * approached, so a single jump to the bottom hydrates the lot. Measured, not assumed: with the
+ * loop replaced by that one jump this spec still audits over 400 text nodes and still fails on a
+ * reintroduced palette class. The walk is kept for two reasons that outlive that margin: it bounds
+ * how far the margin would have to reach if the story grew, and it is the only form that would
+ * also drive the `ScrollTrigger`s if a `no-preference` pass is ever added. Under `reduce` no
+ * ScrollTrigger is created at all, so today the walk's shape does not affect what is measured.
+ *
+ * `behavior: 'instant'` matters: the two-argument `scrollTo(x, y)` inherits any CSS
+ * `scroll-behavior`, and under `smooth` each step would animate for hundreds of milliseconds while
+ * this loop advanced every 32 ms, so the page would still be near the top when the audit ran and
+ * the test would pass having measured nothing. Nothing sets `scroll-behavior` today; this keeps it
+ * from mattering if something does.
  */
 async function scrollThroughStory(page: Page) {
   await page.evaluate(async () => {
     const nextFrame = () =>
       new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const bottom = () => document.documentElement.scrollHeight - window.innerHeight;
-    for (let y = 0; y <= bottom(); y += Math.round(window.innerHeight * 0.75)) {
-      window.scrollTo(0, y);
+    // A step of 0 (a viewport that never applied) would spin here until the test budget ran out
+    // with nothing to show for it, and a page that cannot scroll means the story did not render.
+    const step = Math.max(1, Math.round(window.innerHeight * 0.75));
+    if (bottom() <= 0)
+      throw new Error('the page is not taller than the viewport: no story to walk');
+    // The cap turns a page that grows as fast as it is scrolled into a named failure instead of a
+    // silent timeout. The home page is about nine viewports; 200 steps is an order of magnitude
+    // more than it needs.
+    let steps = 0;
+    for (let y = 0; y <= bottom(); y += step) {
+      if (++steps > 200)
+        throw new Error('scrollThroughStory did not reach the bottom in 200 steps');
+      window.scrollTo({ top: y, behavior: 'instant' });
       await nextFrame();
     }
-    window.scrollTo(0, bottom());
+    window.scrollTo({ top: bottom(), behavior: 'instant' });
     await nextFrame();
+    if (window.scrollY <= 0)
+      throw new Error('the page did not scroll: is the scroller not the document?');
   });
 }
 
@@ -161,7 +201,9 @@ async function openPage(
   page: Page,
   path: string,
   colorScheme: (typeof colorSchemes)[number],
-  media: { reducedMotion?: 'reduce' | 'no-preference' } = {},
+  // Explicit rather than `{}`: an empty spread means "leave as configured", so a `reducedMotion`
+  // added to playwright.config.ts later would silently change what the at-rest pass measures.
+  media: { reducedMotion: 'reduce' | 'no-preference' } = { reducedMotion: 'no-preference' },
 ) {
   // Before the navigation: the theme init script in <head> reads prefers-color-scheme for the
   // first paint, so the page is audited in the scheme a visitor with that preference sees.
@@ -231,11 +273,13 @@ test.describe('Accessibility', () => {
   }
 
   test.describe('the whole story', () => {
-    // A scrolled `/` has all six phases hydrated and on screen, so axe walks several times the DOM
-    // of the at-rest pass and `runPartialRecursive` needs minutes rather than seconds on a loaded
-    // runner. Still no retries: the reduced-motion path makes the result deterministic, so a
-    // failure here is a real one and a retry could only hide it.
-    test.describe.configure({ retries: 0, timeout: 300_000 });
+    // A scrolled `/` gives axe over 400 text nodes to measure against the at-rest pass's 30. It
+    // takes 2.7 s on a CI runner and 4.5 to 6.4 s locally, so 120 s is roughly twenty times the
+    // measured cost. It is deliberately not larger: the e2e job has 20 minutes, of which the build
+    // and the browser install take about a third, and two of these tests hanging to a five-minute
+    // budget would end the job before the report is uploaded. Still no retries: the reduced-motion
+    // path makes the result deterministic, so a failure here is real and a retry could only hide it.
+    test.describe.configure({ retries: 0, timeout: 120_000 });
 
     for (const colorScheme of colorSchemes) {
       test(`/ has no axe violations after the whole story in the ${colorScheme} theme`, async ({
@@ -243,14 +287,18 @@ test.describe('Accessibility', () => {
       }) => {
         await openPage(page, '/', colorScheme, { reducedMotion: 'reduce' });
         await scrollThroughStory(page);
-        // Prove the scroll and the reduced-motion path did their job before trusting a green audit.
-        // One assertion per status token, each on content the at-rest pass never reaches:
-        // --status-ok, --status-warn and --status-err respectively.
-        await expect(page.getByText('DEPLOYMENT SUCCESSFUL')).toBeVisible();
-        await expect(page.getByText('COMMIT STREAK')).toBeVisible();
-        await expect(
-          page.getByText('NullPointerException', { exact: false }).first(),
-        ).toBeVisible();
+        // Content the at-rest pass never reaches, one element per status token: the deployment
+        // panel (--status-ok), the commit streak's count (--status-warn) and the healing log's
+        // error line (--status-err). Each is false in every intermediate state, which is the point:
+        // `usePrefersReducedMotion` returns `false` during hydration, so a phase can briefly render
+        // its animated first state even under `reduce`. In that window the streak's own "COMMIT
+        // STREAK" label is already on screen while its count still reads "x0", so the label would
+        // wave through a page that had not settled and the count will not. `.first()` on each:
+        // these are substring matches, and an ancestor containing the phrase would otherwise make
+        // the locator ambiguous and fail in strict mode for a non-accessibility reason.
+        await expect(page.getByText('DEPLOYMENT SUCCESSFUL').first()).toBeVisible();
+        await expect(page.getByText('x12').first()).toBeVisible();
+        await expect(page.getByText('NullPointerException').first()).toBeVisible();
 
         const results = await audit(page);
         await test.info().attach('axe-results', {
@@ -268,7 +316,13 @@ test.describe('Accessibility', () => {
             'docs/adr/0010-status-colour-tokens.md first: a palette class such as `text-green-400` ' +
             'is 1.7:1 on the light background.',
         ).toEqual([]);
-        expect(passingNodes(results, 'color-contrast')).toBeGreaterThan(0);
+        // The real proof that this pass measured the story and not just the shell. Visibility
+        // assertions cannot give it: every phase is server-rendered, so its markup is in the DOM
+        // and "visible" to Playwright even unhydrated and fully transparent, while axe skips
+        // anything at `opacity: 0`. Node counts do give it. Measured on this page: 30 at rest,
+        // 409 scrolled. A floor of 200 fails loudly if the walk ever stops working, and leaves
+        // room for the copy to change.
+        expect(passingNodes(results, 'color-contrast')).toBeGreaterThan(200);
       });
     }
   });
