@@ -153,17 +153,20 @@ const AT_REST_CONTRAST_FLOOR: Record<(typeof pages)[number], number> = {
 const colorSchemes = ['light', 'dark'] as const;
 
 /**
- * Walks the page to the bottom so every `DeferredSection` hydrates. Two animation frames per step
- * let React commit each section before the next one moves.
+ * Walks the page to the bottom so every phase has been through the viewport. Two animation frames
+ * per step let React commit before the next one moves.
  *
- * Stepping is not what makes this work today. `DeferredSection` observes with a root margin of
- * `10000px 0px 0px 0px`, and its own comment says so: anything already scrolled past counts as
- * approached, so a single jump to the bottom hydrates the lot. Measured, not assumed: with the
- * loop replaced by that one jump this spec still audits over 400 text nodes and still fails on a
- * reintroduced palette class. The walk is kept for two reasons that outlive that margin: it bounds
- * how far the margin would have to reach if the story grew, and it is the only form that would
- * also drive the `ScrollTrigger`s if a `no-preference` pass is ever added. Under `reduce` no
- * ScrollTrigger is created at all, so today the walk's shape does not affect what is measured.
+ * Stepping is not what makes this work today. The sections are server-rendered and stay in the
+ * document, so nothing has to be brought into being by scrolling: what the walk changes is
+ * `opacity`, since axe skips a fully transparent element and every phase starts its reveal at 0.
+ * Under `reduce` each phase renders its finished state on mount (ADR 0009) and no `ScrollTrigger`
+ * is created, so a single jump to the bottom would measure the same nodes. The walk is kept
+ * because it is the only form that would also drive the `ScrollTrigger`s if a `no-preference`
+ * pass is ever added, and because it fails loudly on a page that cannot scroll.
+ *
+ * This used to describe `DeferredSection`, a hydration gate that kept each section out of the
+ * document until it approached the viewport. PR #22 removed it; the sections have been in the DOM
+ * from the first byte since.
  *
  * `behavior: 'instant'` matters: the two-argument `scrollTo(x, y)` inherits any CSS
  * `scroll-behavior`, and under `smooth` each step would animate for hundreds of milliseconds while
@@ -356,10 +359,17 @@ test.describe('Accessibility', () => {
         // The real proof that this pass measured the story and not just the shell. Visibility
         // assertions cannot give it: every phase is server-rendered, so its markup is in the DOM
         // and "visible" to Playwright even unhydrated and fully transparent, while axe skips
-        // anything at `opacity: 0`. Node counts do give it. Measured on this page: 30 at rest,
-        // 409 scrolled. A floor of 200 fails loudly if the walk ever stops working, and leaves
-        // room for the copy to change.
-        expect(passingNodes(results, 'color-contrast')).toBeGreaterThan(200);
+        // anything at `opacity: 0`. Node counts do give it. Measured against the production build
+        // on 2026-09-10: 103 at rest, 425 scrolled, identical in both colour schemes. The floor was
+        // 200, which is under half of what the page measures: five of its nine sections could stop
+        // being revealed and the pass would still be green. 350 keeps the same headroom for copy
+        // changes that the at-rest floors have, and still fails loudly if the walk stops working.
+        expect(
+          passingNodes(results, 'color-contrast'),
+          'the scrolled pass measured far fewer colour-contrast nodes than it should: either the ' +
+            'walk stopped reaching the bottom, or content stopped being revealed. Find what left ' +
+            'the page before adjusting this floor.',
+        ).toBeGreaterThan(350);
       });
     }
   });

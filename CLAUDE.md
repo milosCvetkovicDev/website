@@ -84,7 +84,9 @@ is there so that a future buildable package is compiled before the apps typechec
   `docs/adr/0006-hydration-safe-client-state.md` and `apps/web/src/hooks/use-is-hydrated.ts`.
 - Accessibility is gated. `apps/web/e2e/accessibility.spec.ts` runs axe-core with the rule set
   behind Lighthouse's accessibility category on `/` and `/work/self-healing-agent`, in both colour
-  schemes, at the desktop viewport and unscrolled, and fails the `e2e` job on any violation. A new
+  schemes at the desktop viewport, both at rest and again on `/` after the whole story has been
+  scrolled, and fails the `e2e` job on any violation. Each pass asserts a floor on how many nodes it
+  measured, so content that stops being rendered or goes transparent fails too. A new
   `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
   Conventions and ADR 0008.
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
