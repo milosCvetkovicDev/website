@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const techChoices = [
   {
@@ -48,14 +49,13 @@ export function StrategyPhase() {
   const architectureRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLDivElement>(null);
 
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
+    if (prefersReducedMotion) return;
 
     gsap.registerPlugin(ScrollTrigger);
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (prefersReducedMotion) return;
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -130,7 +130,7 @@ export function StrategyPhase() {
     }, sectionRef);
 
     return () => ctx.revert();
-  }, []);
+  }, [prefersReducedMotion]);
 
   return (
     <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
