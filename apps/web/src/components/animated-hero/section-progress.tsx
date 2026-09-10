@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, type RefObject } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const sections = [
@@ -13,11 +13,32 @@ const sections = [
   { id: 'complete', label: 'CTA' },
 ];
 
-/** Pixels the page can scroll; 0 when the content fits the viewport. */
-const getScrollRange = () =>
-  Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+/**
+ * Where the story starts in the document, and the scroll it takes to run from its first section to
+ * its last. The dots name the seven sections of the AnimatedHero story, so they have to be measured
+ * against the story: `/` opens with a sticky nav and carries on with Featured Work, Tech Stack and
+ * the footer, so dividing the document instead started the dots above the story and sent the last
+ * one to the bottom of the page. One wrapper stands in for all seven sections, which makes the
+ * indicator proportional rather than exact: the phases are not all the same height, so a dot lights
+ * near its section rather than on its boundary. Measuring the seven separately would put that
+ * right, at seven more refs. The box is read on each use rather than cached, so nothing needs
+ * invalidating when the story or the viewport is resized, and `top` comes from the rect rather than
+ * `offsetTop`, which is measured from the nearest positioned ancestor: a `relative` appearing on a
+ * layout element above the wrapper would quietly take it off the document. `range` is 0 for a story
+ * shorter than the viewport, and before the wrapper has been laid out.
+ */
+function measureStory(wrapper: HTMLElement | null) {
+  if (!wrapper) return { top: 0, range: 0 };
+  const { top, height } = wrapper.getBoundingClientRect();
+  return { top: top + window.scrollY, range: Math.max(0, height - window.innerHeight) };
+}
 
-export function SectionProgress() {
+export function SectionProgress({
+  storyRef,
+}: {
+  /** The story's wrapper. Everything in flow inside it is a section one of the dots names. */
+  storyRef: RefObject<HTMLElement | null>;
+}) {
   const [activeSection, setActiveSection] = useState(0);
   const prefersReducedMotion = usePrefersReducedMotion();
   const rafRef = useRef<number | null>(null);
@@ -40,10 +61,12 @@ export function SectionProgress() {
       }
       lastUpdateRef.current = now;
 
-      // Rubber-band overscroll puts scrollY below zero or past the range, and a page that fits the
-      // viewport has no range to divide by: clamp to the first and last section, and to the top.
-      const scrollRange = getScrollRange();
-      const progress = scrollRange > 0 ? Math.min(1, Math.max(0, window.scrollY) / scrollRange) : 0;
+      // Everything above the story, rubber-band overscroll and the pages of content below the story
+      // all fall outside its range, and a story that fits the viewport has no range to divide by:
+      // clamp to the first and last section either way.
+      const { top, range } = measureStory(storyRef.current);
+      const scrolledIntoStory = window.scrollY - top;
+      const progress = range > 0 ? Math.min(1, Math.max(0, scrolledIntoStory) / range) : 0;
 
       // Direct DOM manipulation for progress bars (no React re-render)
       if (mobileProgressRef.current) {
@@ -63,7 +86,7 @@ export function SectionProgress() {
 
       rafRef.current = null;
     });
-  }, []);
+  }, [storyRef]);
 
   // Position tracking is not motion, so the listener is attached whatever the preference is.
   useEffect(() => {
@@ -84,7 +107,8 @@ export function SectionProgress() {
             <button
               key={section.id}
               onClick={() => {
-                const targetScroll = (index / (sections.length - 1)) * getScrollRange();
+                const { top, range } = measureStory(storyRef.current);
+                const targetScroll = top + (index / (sections.length - 1)) * range;
                 // Smooth scrolling is motion; jump straight there when the user has opted out
                 // ('auto' would defer to a CSS scroll-behavior, 'instant' does not).
                 window.scrollTo({
