@@ -328,7 +328,9 @@ CHROME_PATH="$(node -e "console.log(require('@playwright/test').chromium.executa
 
 from `apps/web` with `pnpm start` serving the build. `--headless=new` follows the machine's
 appearance setting for `prefers-color-scheme`, so on a Mac in dark mode this is a dark-theme audit;
-the light theme is checked with Playwright and axe-core instead.
+the light theme is checked with Playwright and axe-core instead. The same rule set now runs in CI on
+every pull request: `apps/web/e2e/accessibility.spec.ts` audits both pages in both colour schemes at
+the desktop viewport, at rest, and fails the `e2e` job on any violation.
 
 ## Routine deployments
 

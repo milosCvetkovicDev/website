@@ -75,6 +75,11 @@ is there so that a future buildable package is compiled before the apps typechec
 - `eslint-disable` is not an acceptable fix for the React Hooks rules. `react-hooks/set-state-in-effect`
   in particular is pointing at a real hydration problem: restructure the component instead. See
   `docs/adr/0006-hydration-safe-client-state.md` and `apps/web/src/hooks/use-is-hydrated.ts`.
+- Accessibility is gated. `apps/web/e2e/accessibility.spec.ts` runs axe-core with the rule set
+  behind Lighthouse's accessibility category on `/` and `/work/self-healing-agent`, in both colour
+  schemes, at the desktop viewport and unscrolled, and fails the `e2e` job on any violation. A new
+  `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
+  Conventions and ADR 0008.
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
   grouped into one pull request and open npm pull requests are capped at five; github-actions bumps
   are not grouped.
