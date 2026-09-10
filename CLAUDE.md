@@ -218,5 +218,16 @@ is there so that a future buildable package is compiled before the apps typechec
   the production build on port 3000 on its own.
 - To point the site at a non-default origin locally, copy the root `.env.example` to
   `apps/web/.env.local` yourself; the PreToolUse guard blocks agent writes to `.env*`.
-- The site is not deployed yet. `miloscvetkovic.dev` still points at a registrar parking page, and
-  no Vercel project has been created.
+- The site is live at `https://miloscvetkovic.dev` since 2026-09-09: Vercel project `portfolio`,
+  production from `main`, DNS at Namecheap (`docs/runbooks/deploy.md` has the records and the
+  rollback). Merging to `main` deploys; there is no manual step.
+- `vercel deploy` from the repository root uploads the working tree as filtered by `.vercelignore`
+  plus the CLI's built-in list, never `.gitignore`. Mirror new `.gitignore` entries there; without it
+  the 1.9 GB `.turbo` cache goes up and the upload fails. Per-deployment and branch `*.vercel.app`
+  URLs redirect to a Vercel login; the production alias `portfolio-theta-gold-77.vercel.app` is
+  public. `vercel curl <path> --deployment <url>` fetches the protected ones but creates a
+  project-wide protection-bypass secret on first use, see `docs/runbooks/deploy.md`.
+- Claude Code's in-app Browser pane logs React error #418 (hydration mismatch) on every page of the
+  deployed site, while an unmodified headless Chromium (Playwright from `apps/web`) reports none
+  across schemes, viewports and reduced motion. Judge console cleanliness with Playwright, not the
+  pane.

@@ -10,7 +10,7 @@ Personal site of Milos Cvetkovic, Senior Full-Stack Engineer. An interactive, an
 
 ## Live site
 
-`https://miloscvetkovic.dev` is being moved from a parked domain to Vercel. The exact steps, DNS records and verification checks are in [docs/runbooks/deploy.md](docs/runbooks/deploy.md).
+[https://miloscvetkovic.dev](https://miloscvetkovic.dev), deployed on Vercel from `main` and live since 2026-09-09. The exact steps, DNS records and verification checks are in [docs/runbooks/deploy.md](docs/runbooks/deploy.md).
 
 ## Stack
 
@@ -106,4 +106,4 @@ This repository is developed with Claude Code and keeps its configuration in the
 
 ## Deployment
 
-The `web` app deploys to Vercel from `main` with preview deployments for pull requests. Root directory `apps/web`, Node 22, one environment variable (`NEXT_PUBLIC_SITE_URL`). Full procedure: [docs/runbooks/deploy.md](docs/runbooks/deploy.md).
+The `web` app deploys to Vercel from `main` (project `portfolio`) with preview deployments for pull requests. Root directory `apps/web`, Node 22, one environment variable (`NEXT_PUBLIC_SITE_URL`), and `.vercelignore` keeps caches and local files out of CLI uploads. Full procedure: [docs/runbooks/deploy.md](docs/runbooks/deploy.md).

@@ -32,8 +32,9 @@ operation.
 | 0010 | [Status colour tokens](0010-status-colour-tokens.md)                                 | Accepted | 2026-09-09 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
-choice; the site is not deployed and `miloscvetkovic.dev` still resolves to the Namecheap parking
-page. The steps that would change that are in [docs/runbooks/deploy.md](../runbooks/deploy.md).
+choice; it was carried out on 2026-09-09 and the site is live, see
+[docs/runbooks/deploy.md](../runbooks/deploy.md). The bodies of 0002 and 0005
+still describe the state on 2026-09-08, when they were accepted; records are not edited afterwards.
 
 ## Writing a new ADR
 
