@@ -79,6 +79,9 @@ is there so that a future buildable package is compiled before the apps typechec
 - Every route must load with a clean browser console. `apps/web/e2e/console-clean.spec.ts` fails
   on any console error, console warning or page error, React hydration mismatches included, so a
   stray `console.warn` fails the `e2e` job. Case-study routes come from `src/data/case-studies.ts`.
+  `/` is also walked down through the story and back up, so the scroll-driven GSAP callbacks and the
+  timers they schedule are watched too. The reduced-motion pass cannot cover those: every phase
+  effect returns early under `reduce`.
 - `eslint-disable` is not an acceptable fix for the React Hooks rules. `react-hooks/set-state-in-effect`
   in particular is pointing at a real hydration problem: restructure the component instead. See
   `docs/adr/0006-hydration-safe-client-state.md` and `apps/web/src/hooks/use-is-hydrated.ts`.
@@ -169,6 +172,10 @@ is there so that a future buildable package is compiled before the apps typechec
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build
   with `pnpm start` inside `apps/web`, sets `forbidOnly`, retries twice, uses one worker and a 10s
   expect timeout. Locally it serves the dev server instead.
+- The two gate specs opt out of those retries: `e2e/console-clean.spec.ts` and
+  `e2e/accessibility.spec.ts` both set `test.describe.configure({ retries: 0 })`. A retry would turn
+  an intermittent console message or axe violation into a green "flaky" run, which is the one outcome
+  they exist to prevent. Do not remove those overrides to quieten a failing run.
 - Playwright always starts the server it tests. `reuseExistingServer` is `false` in both modes, so a
   port that is already taken aborts the run instead of testing whatever is answering on it. The port
   is 3210 by default, which leaves 3000 to `pnpm dev`; `.github/workflows/ci.yml` sets
