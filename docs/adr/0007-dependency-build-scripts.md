@@ -194,7 +194,7 @@ the day `next/image` is used, which the CI end-to-end job would then be the firs
 
 An independent review of the merged commit found two false claims. Both sit outside `## Decision`,
 neither changes which option the decision selects, and no new guidance is introduced by fixing them.
-Corrected under [ADR 0011](0011-correcting-accepted-records.md).
+Corrected under [ADR 0012](0012-correcting-accepted-records.md).
 
 **A mitigation that cannot fire**, in `### Trade-offs`. The record read: "The reviewed versions in
 the comments and the major-version review are the mitigation; Dependabot groups only minor and patch
@@ -222,7 +222,7 @@ than a boundary. Evidence:
 [pnpm 10.5.0](https://github.com/pnpm/pnpm/releases/tag/v10.5.0) moved the `pnpm.*` settings into
 `pnpm-workspace.yaml`, using `onlyBuiltDependencies` as its worked example.
 
-`## Decision` is left exactly as written, as ADR 0011 requires. It says "The comment is what the
+`## Decision` is left exactly as written, as ADR 0012 requires. It says "The comment is what the
 reviewer of a major-version bump compares against", which is defensible only because a parent's
 major does arrive as its own pull request; the corrected trade-off above is the accurate account of
 when a denied package's version moves.

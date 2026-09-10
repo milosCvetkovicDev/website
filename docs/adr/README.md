@@ -16,7 +16,7 @@ they state something that was false when the record was accepted, which sets the
 wrong and what replaced it. A claim that was true then and has been overtaken since is not
 corrected.
 
-The process itself is a decision. [ADR 0011](0011-correcting-accepted-records.md) is the
+The process itself is a decision. [ADR 0012](0012-correcting-accepted-records.md) is the
 authoritative statement of these rules, including the test for what counts as architecturally
 significant and the line between correcting a record and superseding it. It supersedes [ADR
 0001](0001-record-architecture-decisions.md), which remains the fuller argument for why these
@@ -26,7 +26,7 @@ perform an operation.
 
 | ADR  | Title                                                                                | Status                          | Date       |
 | ---- | ------------------------------------------------------------------------------------ | ------------------------------- | ---------- |
-| 0001 | [Record architecture decisions](0001-record-architecture-decisions.md)               | Superseded by ADR-0011          | 2026-09-08 |
+| 0001 | [Record architecture decisions](0001-record-architecture-decisions.md)               | Superseded by ADR-0012          | 2026-09-08 |
 | 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)                 | Accepted                        | 2026-09-08 |
 | 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)         | Accepted                        | 2026-09-08 |
 | 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)               | Accepted                        | 2026-09-08 |
@@ -36,7 +36,7 @@ perform an operation.
 | 0008 | [Accent colour roles](0008-accent-colour-roles.md)                                   | Accepted                        | 2026-09-09 |
 | 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md) | Accepted                        | 2026-09-09 |
 | 0010 | [Status colour tokens](0010-status-colour-tokens.md)                                 | Accepted                        | 2026-09-09 |
-| 0011 | [Correcting factual errors in accepted records](0011-correcting-accepted-records.md) | Accepted                        | 2026-09-10 |
+| 0011 | [Correcting factual errors in accepted records](0012-correcting-accepted-records.md) | Accepted                        | 2026-09-10 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
@@ -63,7 +63,7 @@ edited afterwards, and its other sections only to correct a claim that is untrue
    its text untouched.
 5. Add a row to the table above, linking the title to the new file.
 6. To correct a factual error in a record that is already accepted, rather than to change its
-   decision, follow [ADR 0011](0011-correcting-accepted-records.md): leave `## Decision` alone, add
+   decision, follow [ADR 0012](0012-correcting-accepted-records.md): leave `## Decision` alone, add
    no guidance the record did not already carry, set the status to `Accepted (corrected YYYY-MM-DD)`
    in both the record and the table, and add a dated entry under `## Corrections` that quotes the
    text that was wrong, quotes what replaced it, and cites the evidence. `## Corrections` is

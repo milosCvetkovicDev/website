@@ -2,11 +2,11 @@
 
 ## Status
 
-Superseded by ADR-0011
+Superseded by ADR-0012
 
 The immutability rule below is no longer the process: an accepted record's `## Decision` is
 immutable, and its other sections may be corrected. See
-[ADR 0011](0011-correcting-accepted-records.md). The rest of this record still stands as the
+[ADR 0012](0012-correcting-accepted-records.md). The rest of this record still stands as the
 argument for keeping these records at all.
 
 ## Date
