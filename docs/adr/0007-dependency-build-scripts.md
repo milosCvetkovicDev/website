@@ -2,7 +2,13 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0013 (corrected 2026-09-10)
+
+The decision below no longer applies: `sharp` has no `allowBuilds` entry, an entry exists only while
+its package still declares a lifecycle script, and the reviewed-version comments are enforced by
+`pnpm check:allowbuilds` rather than left to a reviewer. See
+[ADR 0013](0013-dependency-build-scripts-reviewed.md). The correction recorded at the end of this
+record still stands, and the rest is the reasoning as it was on 2026-09-09.
 
 ## Date
 
@@ -150,8 +156,10 @@ pending; neither replaces reading the script. pnpm rewrites `pnpm-workspace.yaml
 - Nothing enforces the rule for the next package: a warning in a CI log nobody reads is a weak
   signal, and `strictDepBuilds` is deferred for the reason above.
 - A denied package whose install script changes purpose in a later release produces no new signal.
-  The reviewed versions in the comments and the major-version review are the mitigation; Dependabot
-  groups only minor and patch updates, so a major arrives as its own pull request.
+  None of the three appears in a workspace manifest, so Dependabot raises no version-update pull
+  request for them; their versions move only when a parent such as `next`, `vite` or
+  `eslint-config-next` moves, whether that arrives in the `minor-and-patch` group or, for a major,
+  on its own. The reviewed versions in the comments are the only mitigation.
 - A pnpm older than 10.26 does not understand `allowBuilds`, so on such a machine the warning would
   be back and nothing else would change. `packageManager` and Corepack make that a local mistake.
 
@@ -172,8 +180,9 @@ mode fails every checkout and build cache older than the entries. Deferred until
 recreated.
 
 **The pnpm 10 lists (`ignoredBuiltDependencies`, or `pnpm.ignoredBuiltDependencies` in
-`package.json`).** Same effect in pnpm 10.33 and understood from pnpm 10.12 (10.4.1 ignores them),
-with the same stale-list behaviour. Rejected because pnpm 11 removed them in favour of
+`package.json`).** Same effect in pnpm 10.33, the `package.json` field understood from
+pnpm 10.1 and the `pnpm-workspace.yaml` list from 10.5, with the same stale-list behaviour. Rejected
+because pnpm 11 removed them in favour of
 `allowBuilds`, `pnpm approve-builds` already writes `allowBuilds` in 10.33, and `package.json`
 cannot carry the comment that explains each entry.
 
@@ -184,3 +193,42 @@ the day `next/image` is used, which the CI end-to-end job would then be the firs
 
 **Remove the packages.** Not possible without removing the tools that need them: sharp comes with
 `next`, esbuild with `vite`, unrs-resolver with `eslint-config-next`.
+
+## Corrections
+
+### 2026-09-10
+
+An independent review of the merged commit found two false claims. Both sit outside `## Decision`,
+neither changes which option the decision selects, and no new guidance is introduced by fixing them.
+Corrected under [ADR 0012](0012-correcting-accepted-records.md).
+
+**A mitigation that cannot fire**, in `### Trade-offs`. The record read: "The reviewed versions in
+the comments and the major-version review are the mitigation; Dependabot groups only minor and patch
+updates, so a major arrives as its own pull request." It now reads: "None of the three appears in a
+workspace manifest, so Dependabot raises no version-update pull request for them; their versions
+move only when a parent such as `next`, `vite` or `eslint-config-next` moves, whether that arrives
+in the `minor-and-patch` group or, for a major, on its own. The reviewed versions in the comments
+are the only mitigation." What was wrong: the grouping claim is true of Dependabot but was offered
+as
+the mechanism that surfaces a changed script _in a denied package_, and no such pull request is ever
+raised. Evidence: none of `esbuild`, `sharp` or `unrs-resolver` appears in the root,
+`apps/web`, `apps/playground` or `packages/*` manifests, and `pnpm why -r <name>` reaches each
+only through `vite`, `next` and `eslint-import-resolver-typescript` respectively; Dependabot's npm
+version updates act on manifests. Security updates are a separate path that can target a transitive
+package directly, and are not what the trade-off was describing.
+
+**A version floor that was too high**, in `## Alternatives considered`. The record read: "Same
+effect in pnpm 10.33 and understood from pnpm 10.12 (10.4.1 ignores them)". It now reads: "Same
+effect in pnpm 10.33, the `package.json` field understood from pnpm 10.1 and the
+`pnpm-workspace.yaml` list from 10.5". What was wrong: the sentence names two forms and gave one
+floor for both, and that floor was the upper bracket of a two-point test (10.4.1 and 10.12.1) rather
+than a boundary. Evidence:
+[pnpm 10.1.0](https://github.com/pnpm/pnpm/releases/tag/v10.1.0) added the
+`pnpm.ignoredBuiltDependencies` field, and
+[pnpm 10.5.0](https://github.com/pnpm/pnpm/releases/tag/v10.5.0) moved the `pnpm.*` settings into
+`pnpm-workspace.yaml`, using `onlyBuiltDependencies` as its worked example.
+
+`## Decision` is left exactly as written, as ADR 0012 requires. It says "The comment is what the
+reviewer of a major-version bump compares against", which is defensible only because a parent's
+major does arrive as its own pull request; the corrected trade-off above is the accurate account of
+when a denied package's version moves.

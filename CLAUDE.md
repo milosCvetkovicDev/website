@@ -43,6 +43,8 @@ pnpm (`pnpm@10.33.0`), not Node. CI reads Node from `.nvmrc` and pnpm from `pack
 | `pnpm test:e2e`                                                  | Playwright specs in `apps/web/e2e`                                      |
 | `pnpm format`                                                    | Prettier over the whole repo, writing changes                           |
 | `pnpm format:check`                                              | Prettier in check mode, no writes                                       |
+| `pnpm check:allowbuilds`                                         | Checks `allowBuilds` entries against the versions the lockfile resolves |
+| `pnpm test:scripts`                                              | `node:test` tests for the root `scripts/` gates                         |
 | `pnpm clean`                                                     | `turbo clean` in both apps, then `rm -rf node_modules` at the root      |
 | `pnpm prepare`                                                   | `husky`; runs on install and is what creates the git hooks              |
 | `pnpm --filter web test:e2e`                                     | Playwright without going through Turborepo                              |
@@ -67,10 +69,11 @@ is there so that a future buildable package is compiled before the apps typechec
   message if it is still not on PATH.
 - lint-staged has a config per package. The root one only runs `prettier --write`; `apps/web` and
   `apps/playground` run `eslint --fix --max-warnings 0` then `prettier --write` on TS/JS files.
-- CI is `.github/workflows/ci.yml`, two jobs. `quality`: install, `format:check`, `lint`,
-  `typecheck`, `test`, `build`. `e2e`: install chromium, build web, run the Playwright specs; the
-  report is uploaded as an artifact on failure or cancellation. Actions are SHA-pinned,
-  `permissions: contents: read`, and concurrency cancels superseded runs on pull requests only.
+- CI is `.github/workflows/ci.yml`, two jobs. `quality`: install, `check:allowbuilds`,
+  `test:scripts`, `format:check`, `lint`, `typecheck`, `test`, `build`. `e2e`: install chromium, build web, run the
+  Playwright specs; the report is uploaded as an artifact on failure or cancellation. Actions are
+  SHA-pinned, `permissions: contents: read`, and concurrency cancels superseded runs on pull
+  requests only.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
 - Every route must load with a clean browser console. `apps/web/e2e/console-clean.spec.ts` fails
   on any console error, console warning or page error, React hydration mismatches included, so a
@@ -125,9 +128,11 @@ is there so that a future buildable package is compiled before the apps typechec
   (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `Highlights`, `FeaturedWork`, `TechStack`,
   `CTA`, `PersonJsonLd`, `WebsiteJsonLd`). The hero and its phases live in
   `components/animated-hero` and are imported from there directly, not through the barrel.
-  `app/layout.tsx` also imports from the component modules directly: every client module reachable
-  from a server component's imports lands in that layout's client chunk, so a barrel import there
-  would ship `FeaturedWork` to every route (see ADR 0009).
+  Layouts import from the component modules directly, never through the barrel: every client module
+  reachable from a server component's imports lands in that layout's client chunk, so a barrel
+  import in `app/layout.tsx` would ship `FeaturedWork` to every route (see ADR 0009). A
+  `no-restricted-imports` rule in `apps/web/eslint.config.mjs`, scoped to `src/app/**/layout.tsx`,
+  fails lint on it.
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
   keep relative imports for siblings inside one folder.
@@ -196,8 +201,12 @@ is there so that a future buildable package is compiled before the apps typechec
   they describe.
 - `docs/adr` — numbered architecture decision records, indexed in `docs/adr/README.md`. Naming is
   `NNNN-kebab-title.md`, numbers are never reused, and the section order is Status, Date, Context,
-  Decision, Consequences, Alternatives considered. An accepted record is not edited: supersede it
-  with a new number and set the old status to `Superseded by NNNN`.
+  Decision, Consequences, Alternatives considered, optionally followed by Corrections. An accepted
+  record's `## Decision` is never edited: supersede it with a new number and set the old status to
+  `Superseded by ADR-NNNN`. Its other sections may be corrected when they state something that was
+  false when the record was accepted, under the rules in
+  `docs/adr/0012-correcting-accepted-records.md`, which sets the status to
+  `Accepted (corrected YYYY-MM-DD)` and adds a dated, append-only `## Corrections` entry.
 - `docs/runbooks` — operational procedures. `docs/runbooks/deploy.md` is the deployment procedure.
 - `README.md` addresses a reader landing on GitHub; this file addresses an agent about to change
   code. Keep them consistent without duplicating each other.
@@ -208,23 +217,34 @@ is there so that a future buildable package is compiled before the apps typechec
   `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"` before any node, pnpm or npx command.
 - A fresh clone or git worktree has no git hooks until `pnpm install` has run `prepare`.
 - `apps/web/next.config.ts` pins `turbopack.root` (which is also the file tracing root) to the
-  repository root, resolved from the config file's own path, and throws if `pnpm-workspace.yaml` is
-  not there. Without it Next.js takes the outermost lockfile above the app as the root, so a git
-  worktree nested under `.claude/worktrees/` was built against the parent checkout with a "multiple
-  lockfiles" warning.
+  workspace root, found by walking up from the directory Next evaluates the config in until a
+  `pnpm-workspace.yaml` appears, and left to Next's own inference when there is none. Without it
+  Next.js takes the outermost lockfile above the app as the root, so a git worktree nested under
+  `.claude/worktrees/` was built against the parent checkout with a "multiple lockfiles" warning.
+  Do not replace the search with a fixed `'..', '..'` hop: under the default loader the config is
+  evaluated as `<projectDir>/next.config.compiled.js`, so the starting directory is whatever Next
+  was invoked on, not this file, and `next info` from a subdirectory then resolves outside the
+  repository. `apps/web/src/test/next-config.test.ts` pins all of this.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm.
-- `pnpm install` runs no dependency lifecycle scripts. `allowBuilds` in `pnpm-workspace.yaml` denies the
-  three packages pnpm 10 would otherwise warn about (esbuild, sharp, unrs-resolver): their scripts
-  only check the prebuilt platform binaries the lockfile already installs, and download or compile
-  one only when none is present. An `Ignored build scripts` warning naming a package without an
-  entry is a new decision: run `pnpm ignored-builds` and `pnpm why -r <name>`, read its `scripts`
-  under `node_modules/.pnpm/<name>@<version>/node_modules/<name>/`, then add it to `allowBuilds` as
-  `true` or `false` with a comment; do not run `pnpm approve-builds --all`. A warning naming a
-  package that already has an entry means the `node_modules` predates the entry: pnpm re-reports
-  the builds recorded in `node_modules/.modules.yaml` until `pnpm clean && pnpm install`. Do not add
-  `strictDepBuilds`, which turns that stale warning into a failed install (ADR 0007,
-  `docs/adr/0007-dependency-build-scripts.md`).
+- `pnpm install` runs no dependency lifecycle scripts. `allowBuilds` in `pnpm-workspace.yaml` denies
+  the two packages pnpm 10 would otherwise warn about (esbuild, unrs-resolver): their scripts only
+  check the prebuilt platform binaries the lockfile already installs, and download one only when
+  none is present. sharp has no entry because it has had no install script since 0.35.0, and an
+  entry belongs there only while the package still declares one — an entry for a scriptless package
+  would silently deny whatever a later release adds instead of letting pnpm report it. Each entry
+  carries a `Reviewed at <version>` comment, and `pnpm check:allowbuilds` fails CI when one drifts
+  from the lockfile or outlives its script, so a Dependabot bump of a denied package means reading
+  the new script and updating the comment. That check fails closed: anything it cannot parse is an
+  error, not a skip, so a legal but unrecognised edit to the block fails CI rather than passing
+  unchecked. Its own tests are `pnpm test:scripts`. An `Ignored build scripts` warning naming a package
+  without an entry is a new decision: run `pnpm ignored-builds` and `pnpm why -r <name>`, read its
+  `scripts` under `node_modules/.pnpm/<name>@<version>/node_modules/<name>/`, then add it to
+  `allowBuilds` as `true` or `false` with a comment; do not run `pnpm approve-builds --all`. A
+  warning naming a package that already has an entry means the `node_modules` predates the entry:
+  pnpm re-reports the builds recorded in `node_modules/.modules.yaml` until
+  `pnpm clean && pnpm install`. Do not add `strictDepBuilds`, which turns that stale warning into a
+  failed install (ADR 0013, `docs/adr/0013-dependency-build-scripts-reviewed.md`, superseding 0007).
 - `apps/web/README.md` is untouched `create-next-app` boilerplate: it says `npm run dev` and
   `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
   authoritative documents.

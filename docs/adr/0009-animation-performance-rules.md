@@ -42,27 +42,28 @@ Animated and lazy-loaded UI in `apps/web` follows five rules.
    the flow of anything the visitor can see. `AnimatedPane` in
    `apps/web/src/components/animated-hero/tmux-background.tsx` is the reference implementation:
    `ResizeObserver` sizes the slot grid to the pane, text is written into existing slots, and the
-   only animation is a transform on the newest slot.
-2. **Keyframes animate `transform` and `opacity` only.** No `top`, `left`, `width`, `height`,
-   `margin`, `box-shadow` or `background-position` in `@keyframes`, in GSAP tweens that repeat, or
-   in transitions that fire continuously. A sweep that must travel a parent's height is a
+   only animation is an `element.animate` on the newest slot touching opacity and transform alone.
+2. **Repeating animations move only `transform` and `opacity`.** No `top`, `left`, `width`,
+   `height`, `margin` or `background-position` in `@keyframes`, in GSAP tweens that repeat, or in
+   transitions that fire continuously: each of those forces style, layout and paint on every frame
+   the animation runs. Paint-only properties such as `box-shadow` and `filter` cost a repaint
+   rather than a relayout, so they are allowed sparingly and only where the animation stops when
+   nothing can see it. The `GameComplete` call to action is the single instance today. A sweep that must travel a parent's height is a
    full-height element translated by its own height (`.scan-line` in `globals.css`), not a thin
    element with an animated offset.
 3. **No static `will-change`.** GSAP promotes elements for the duration of a tween on its own, and a
    compositing layer per element is paid on every frame the main thread produces. `will-change` is
    acceptable only on a handful of elements and only while they are about to animate.
-4. **Sections below the fold stay server-rendered but hydrate only when they approach the
-   viewport.** `DeferredSection` in `apps/web/src/components/animated-hero/deferred-section.tsx`
-   suspends its Suspense boundary during hydration until an `IntersectionObserver` reports the
-   section near the viewport (or already scrolled past), so React leaves the server HTML in place:
-   the copy is there for crawlers, assistive technology, find-in-page and print from the first
-   byte, and the chunk, hydration and GSAP work all wait. Removing the markup from the HTML instead
-   was tried first and rejected in review. The chunks are prefetched by `use-prefetch-phases.ts`
-   after the first sign of intent (pointer, touch, key or scroll, armed one second after hydration)
-   or a few idle seconds, never under Data Saver and never during the first paint's window. A chunk
-   that fails to load falls back to the section placeholder instead of the route's error page. An
-   animation that repeats forever pauses while its section is scrolled past
-   (`toggleActions: 'play pause resume reverse'`; `[data-active='false'] .scan-line`).
+4. **Below-the-fold sections render like everything else.** The six story phases are imported
+   directly by `apps/web/src/components/animated-hero/index.tsx`. Two attempts at deferring them
+   both cost more than they saved and are recorded under Alternatives; the rule that survives is
+   that a section's markup is in the document from the first paint and stays there. What is deferred
+   is animation, not content: an animation that repeats forever stops while nothing can see it, with
+   `toggleActions: 'play pause resume reverse'` on a GSAP timeline, `[data-active='false']` on an
+   unhovered featured-work card, and `[animation-play-state:paused]` until hover on a `/work` card.
+   An endless tween is never a child of a timeline a ScrollTrigger reverses: GSAP gives such a child
+   a total duration of 1e10 seconds, the parent inherits it, and `reverse` then rewinds every second
+   the tween has been running before the entrance itself moves.
 5. **Server components import client components from their own modules.** `app/layout.tsx` does
    not import from the `@/components` barrel; pages may, because a page's chunk is only paid for by
    that page. The barrel stays for the page-level components it lists.
@@ -93,28 +94,41 @@ main thread go quiet between tmux ticks.
 
 ### Trade-offs
 
-- A section hydrates when its top edge reaches the viewport, and its GSAP entrance sets the
-  animated elements to opacity 0 at that moment, exactly as it did at 0.7 s before this change. On a
-  slow connection with no earlier intent signal the chunk may still be downloading when the section
-  is reached, and a fast flick can show its static server-rendered content for a frame or two before
-  the entrance takes over; the 96 px of top padding and the unanimated phase header absorb most of
-  that. This is the accepted cost of not paying for six sections at load, and it is bounded: nothing
-  is ever missing from the page, only late to animate.
-- Visitors who never scroll never load GSAP. Visitors who move the pointer load it within a second,
-  as before.
+- The story sections render and hydrate at load, and that is the price of the two reverted
+  experiments. Measured on 2026-09-10, five interleaved runs per build on an idle machine
+  (`benchmarkIndex` 1,554 to 2,001, no warnings), this build against `main` carrying the hydration
+  gate: performance 92 against 96, LCP 2.77 s against 2.63 s, blocking time 234 ms against 94 ms,
+  Speed Index 1.34 s against 1.13 s. Cumulative layout shift goes the other way, 0.016 against
+  0.034, because nothing swaps a placeholder for a section any more. Against the build this whole
+  effort started from (`a8b4a91`: performance 92, CLS 0.037, blocking time 252 ms) it is level or
+  better on every metric, so what was given up is the deferral, not the work that made the page
+  faster. Deferring the animation rather than the content — each phase importing GSAP from inside an
+  approach-gated effect — is what would buy the blocking time back, and it is the open follow-up.
+- Nobody pays for GSAP during the first second: the intent listeners are armed one second after
+  hydration, so a pointer already resting over the page does not count. After that the first
+  pointer, touch, key, wheel or scroll event loads the chunks, and with no interaction at all they
+  are still warmed after three idle seconds. Only Data Saver suppresses the prefetch entirely.
 - The slot grid rotates text through up to 40 slots per pane on every tick, about 240 text node
   replacements per second across the five panes. That is cheaper than the layout shifts it replaces
   and invisible in the trace, but it is not free, and `MAX_LINES` should not grow without measuring.
-- In headless Chrome traces the scroll indicator's dot still costs a style recalculation per frame:
-  Chrome reports its transform animation as composited (`compositeFailed=0`) and yet re-resolves
-  its style every frame, and probe elements with opacity-only Web Animations eventually showed the
-  same, so the measurement is not reliable at that granularity and it was not pursued further.
-  Moving the keyframes from `top` to `transform` still removed the layout and paint from each of
-  those frames.
-- `DeferredSection` holds one `IntersectionObserver` per section until it fires; browsers without
-  the API hydrate everything once the page has hydrated. The gate relies on React keeping a
-  dehydrated Suspense boundary's server HTML while a component inside it suspends during hydration,
-  the same contract `React.lazy` depends on.
+- The scroll indicator's dot still costs a style recalculation per frame on this page, and the
+  reason is not the dot. The measurement was re-run on 2026-09-10 with the instrument validated
+  first: on a blank page the identical keyframes are fully composited (151 draw frames, no
+  main-thread frames, no style recalculations), a keyframe animation of `left` in the same harness
+  reports 60 recalculations per second, so the trace is not blind to animation-driven work, and a
+  page with nothing animating reports no frames at all, so tracing does not itself force them. On
+  the home page the site produces about 8 main-thread frames per second with every animation
+  switched off; the dot's animation raises that to about 60, one style recalculation each. Hiding
+  each structural suspect in turn changes nothing: not the tmux background, the hero content
+  island, every `backdrop-filter`, the section progress and corner frames, the header and footer,
+  everything below the hero, nor finally every element in the hero except the dot itself. So the
+  cause is document-level and still unidentified, and it is not the dot's markup, its ancestors or
+  its keyframes. Moving those keyframes from `top` to `transform` did remove the layout and the
+  paint from each of those frames, which is the part rule 2 is about. The harness is
+  `dot-bisect.mjs` and `dot-frames.mjs` in the scratch notes of that session; anyone resuming
+  should start from the frame cadence, not from the animation.
+- There is no `DeferredSection` and no prefetch hook any more; `index.tsx` renders the phases
+  directly, which is also the last of the indirection those two experiments added.
 - The hover text effects and any other interactivity inside a section are inert until it hydrates.
   The six sections hold one interactive element, the LinkedIn link, and it is a plain anchor that
   works without hydration.
@@ -127,8 +141,18 @@ main thread go quiet between tmux ticks.
 - **Render placeholders instead of the sections until they approach.** Implemented first, then
   rejected in review: it removed the six sections and the LinkedIn call to action from the server
   HTML, which cost crawlers, no-JS readers, reader mode, find-in-page, print and keyboard
-  reachability, and it swapped a 100vh placeholder for content of a different height. The hydration
-  gate keeps every byte of markup and defers exactly the same client work.
+  reachability.
+- **Hold each section's `Suspense` boundary suspended during hydration, so the server markup stays
+  and only the client work waits.** Shipped in PR #15 and reverted on 2026-09-10. It does not work:
+  React client-renders a boundary that suspends during hydration and throws the server markup away,
+  so three seconds after load the home page held six placeholders where nine sections had been, and
+  the copy came back only when the visitor scrolled to it. The HTML response was correct throughout,
+  which is why the assertion written at the time passed. `apps/web/e2e/hero.spec.ts` now reads the
+  live DOM after hydration instead.
+- **Keep the sections lazy behind `Suspense` without the gate.** Measured and rejected the same day.
+  It restores the markup, but every section shows a 100vh placeholder until its chunk arrives and
+  the swap to real content is a layout shift: CLS 0.092 against 0.034, with blocking time 281 ms.
+  Importing the phases directly gives CLS 0.016 at 234 ms.
 - **Mount the story sections after `requestIdleCallback` instead of on approach.** Rejected: idle
   arrives about a second after load, inside the window Lighthouse measures and inside the time a real
   visitor is still looking at the hero. The work moved but was not removed.

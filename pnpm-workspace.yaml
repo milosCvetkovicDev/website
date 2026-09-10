@@ -4,16 +4,20 @@ packages:
 
 # pnpm 10 runs no dependency lifecycle scripts unless the package is allowed here, and warns about
 # every package it skipped. `false` records a deliberate denial and silences that warning, `true`
-# would approve the script. Read docs/adr/0007-dependency-build-scripts.md before adding or
-# flipping an entry. A node_modules installed before an entry existed keeps reporting the package
-# until it is recreated (`pnpm clean && pnpm install`).
+# would approve the script. Read docs/adr/0013-dependency-build-scripts-reviewed.md before adding
+# or flipping an entry. A node_modules installed before an entry existed keeps reporting the
+# package until it is recreated (`pnpm clean && pnpm install`).
+#
+# An entry belongs here only while the package actually declares a preinstall, install or
+# postinstall script. One for a package with none decides nothing, and worse, it would silently
+# deny a script a later release adds rather than letting pnpm report it as a new decision.
+# `pnpm check:allowbuilds` enforces both that and the reviewed versions below; CI runs it.
 allowBuilds:
-  # Checks the @esbuild/<platform> binary pnpm already installed and downloads one only if it is
-  # missing. Reviewed at 0.27.2.
+  # `node install.js`: checks the @esbuild/<platform> binary pnpm already installed and downloads
+  # one only if it is missing. Reviewed at 0.27.2.
   esbuild: false
-  # No-op unless a global libvips is found, in which case it compiles from source. Optional
-  # dependency of next for next/image. Reviewed at 0.34.5.
-  sharp: false
-  # Checks the @unrs/resolver-binding-<platform> binary and downloads one only if it is missing.
-  # Reviewed at 1.11.1.
+  # `node postinstall.js`: calls napi-postinstall's `checkAndPreparePackage(packageJson, true)`,
+  # which checks the @unrs/resolver-binding-<platform> binary and downloads one only if it is
+  # missing. 1.11.1 reached the same function through the `napi-postinstall <name> <version> check`
+  # CLI, so the bump changed how the script is invoked, not what it does. Reviewed at 1.12.2.
   unrs-resolver: false

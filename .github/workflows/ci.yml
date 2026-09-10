@@ -39,6 +39,12 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Check allowBuilds entries against the lockfile
+        run: pnpm check:allowbuilds
+
+      - name: Root script tests
+        run: pnpm test:scripts
+
       - name: Format check
         run: pnpm format:check
 
