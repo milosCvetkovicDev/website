@@ -35,17 +35,33 @@ const linkByAccessibleName = (title: string) => screen.getByRole('link', { name:
 
 // A `name` option makes getByRole compute the accessible name of every candidate, and
 // dom-accessibility-api walking those subtrees was over a third of this file's runtime. The cards
-// are keyed list items whose attributes change in place and never remount, so the tests below that
-// only need a handle on a card resolve all three links once, with one role query and no name
-// computation at all. The two tests that are *about* the accessible name still query by it.
+// are keyed list items whose attributes change in place, so the tests below that only need a
+// handle on a card resolve every link once, with one role query and no name computation at all.
+// The two tests that are *about* the accessible name still query by it.
+//
+// Resolving once gives up two things getByRole did for free, so linkFor takes them back: it
+// normalises whitespace the way an accessible name is normalised, rather than trusting how the
+// JSX happens to wrap; and it refuses an ambiguous name instead of quietly binding to whichever
+// element came last, which matters because the section also renders "view all work" links.
 function renderFeaturedWork() {
   const utils = render(<FeaturedWork projects={featuredProjects} />);
-  const links = new Map(screen.getAllByRole('link').map((link) => [link.textContent, link]));
+  const byName = new Map<string, HTMLElement[]>();
+  for (const link of screen.getAllByRole('link')) {
+    const name = (link.textContent ?? '').replace(/\s+/g, ' ').trim();
+    byName.set(name, [...(byName.get(name) ?? []), link]);
+  }
   return {
     ...utils,
     linkFor(title: string) {
-      const link = links.get(title);
-      if (!link) throw new Error(`No featured-work card link titled "${title}"`);
+      const matches = byName.get(title) ?? [];
+      if (matches.length !== 1) {
+        throw new Error(`Expected one link named "${title}", found ${matches.length}`);
+      }
+      const [link] = matches;
+      // A handle resolved once is only good while the node stays in the tree. A card that
+      // remounted would leave these tests firing events into a detached node, where every
+      // "nothing changed" assertion passes because nothing happened at all.
+      expect(link.isConnected).toBe(true);
       return link;
     },
   };
