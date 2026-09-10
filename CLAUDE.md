@@ -72,6 +72,9 @@ is there so that a future buildable package is compiled before the apps typechec
   report is uploaded as an artifact on failure or cancellation. Actions are SHA-pinned,
   `permissions: contents: read`, and concurrency cancels superseded runs on pull requests only.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
+- Every route must load with a clean browser console. `apps/web/e2e/console-clean.spec.ts` fails
+  on any console error, console warning or page error, React hydration mismatches included, so a
+  stray `console.warn` fails the `e2e` job. Case-study routes come from `src/data/case-studies.ts`.
 - `eslint-disable` is not an acceptable fix for the React Hooks rules. `react-hooks/set-state-in-effect`
   in particular is pointing at a real hydration problem: restructure the component instead. See
   `docs/adr/0006-hydration-safe-client-state.md` and `apps/web/src/hooks/use-is-hydrated.ts`.
@@ -95,6 +98,9 @@ is there so that a future buildable package is compiled before the apps typechec
   (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `Highlights`, `FeaturedWork`, `TechStack`,
   `CTA`, `PersonJsonLd`, `WebsiteJsonLd`). The hero and its phases live in
   `components/animated-hero` and are imported from there directly, not through the barrel.
+  `app/layout.tsx` also imports from the component modules directly: every client module reachable
+  from a server component's imports lands in that layout's client chunk, so a barrel import there
+  would ship `FeaturedWork` to every route (see ADR 0009).
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
   keep relative imports for siblings inside one folder.
@@ -163,6 +169,17 @@ is there so that a future buildable package is compiled before the apps typechec
 - A fresh clone or git worktree has no git hooks until `pnpm install` has run `prepare`.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm.
+- `pnpm install` runs no dependency lifecycle scripts. `allowBuilds` in `pnpm-workspace.yaml` denies the
+  three packages pnpm 10 would otherwise warn about (esbuild, sharp, unrs-resolver): their scripts
+  only check the prebuilt platform binaries the lockfile already installs, and download or compile
+  one only when none is present. An `Ignored build scripts` warning naming a package without an
+  entry is a new decision: run `pnpm ignored-builds` and `pnpm why -r <name>`, read its `scripts`
+  under `node_modules/.pnpm/<name>@<version>/node_modules/<name>/`, then add it to `allowBuilds` as
+  `true` or `false` with a comment; do not run `pnpm approve-builds --all`. A warning naming a
+  package that already has an entry means the `node_modules` predates the entry: pnpm re-reports
+  the builds recorded in `node_modules/.modules.yaml` until `pnpm clean && pnpm install`. Do not add
+  `strictDepBuilds`, which turns that stale warning into a failed install (ADR 0007,
+  `docs/adr/0007-dependency-build-scripts.md`).
 - `apps/web/README.md` is untouched `create-next-app` boilerplate: it says `npm run dev` and
   `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
   authoritative documents.

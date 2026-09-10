@@ -104,9 +104,6 @@ function splitIntoWords(text: string) {
   return text.split(/(\s+)/).filter(Boolean);
 }
 
-// CSS for GPU-accelerated transforms
-const gpuAcceleratedStyle = { willChange: 'transform, opacity' } as const;
-
 // Wave effect - characters bob up and down in sequence
 const WaveText = memo(function WaveText({
   text,
@@ -176,7 +173,6 @@ const WaveText = memo(function WaveText({
                     charsRef.current[idx] = el;
                   }}
                   className="inline-block"
-                  style={gpuAcceleratedStyle}
                 >
                   {char}
                 </span>
@@ -239,7 +235,7 @@ const MagneticText = memo(function MagneticText({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
-      <span ref={textRef} className="inline-block" style={gpuAcceleratedStyle}>
+      <span ref={textRef} className="inline-block">
         {text}
       </span>
     </Tag>
@@ -320,7 +316,6 @@ const ScatterText = memo(function ScatterText({
                     charsRef.current[idx] = el;
                   }}
                   className="inline-block"
-                  style={gpuAcceleratedStyle}
                 >
                   {char}
                 </span>
@@ -380,7 +375,6 @@ const GlitchText = memo(function GlitchText({
       ref={containerRef as any}
       className={`relative inline-block cursor-pointer ${className || ''}`}
       onMouseEnter={handleMouseEnter}
-      style={gpuAcceleratedStyle}
     >
       <span className="relative">
         {text}
@@ -519,7 +513,7 @@ const ElasticText = memo(function ElasticText({
       className={`inline-block cursor-pointer ${className || ''}`}
       onMouseEnter={handleMouseEnter}
     >
-      <span ref={textRef} className="inline-block origin-center" style={gpuAcceleratedStyle}>
+      <span ref={textRef} className="inline-block origin-center">
         {text}
       </span>
     </Tag>
@@ -607,7 +601,6 @@ const StaggerUpText = memo(function StaggerUpText({
                     charsRef.current[idx] = el;
                   }}
                   className="inline-block"
-                  style={gpuAcceleratedStyle}
                 >
                   {char}
                 </span>
@@ -691,7 +684,6 @@ const RainbowText = memo(function RainbowText({
                     charsRef.current[idx] = el;
                   }}
                   className="inline-block"
-                  style={gpuAcceleratedStyle}
                 >
                   {char}
                 </span>
@@ -749,11 +741,7 @@ const PerspectiveText = memo(function PerspectiveText({
       style={{ perspective: '500px' }}
       onMouseEnter={handleMouseEnter}
     >
-      <span
-        ref={textRef}
-        className="inline-block"
-        style={{ transformStyle: 'preserve-3d', ...gpuAcceleratedStyle }}
-      >
+      <span ref={textRef} className="inline-block" style={{ transformStyle: 'preserve-3d' }}>
         {text}
       </span>
     </Tag>
@@ -834,7 +822,6 @@ const GravityText = memo(function GravityText({
                     charsRef.current[idx] = el;
                   }}
                   className="inline-block"
-                  style={gpuAcceleratedStyle}
                 >
                   {char}
                 </span>
@@ -891,7 +878,7 @@ const BlurRevealText = memo(function BlurRevealText({
       className={`inline-block cursor-pointer ${className || ''}`}
       onMouseEnter={handleMouseEnter}
     >
-      <span ref={textRef} className="inline-block" style={gpuAcceleratedStyle}>
+      <span ref={textRef} className="inline-block">
         {text}
       </span>
     </Tag>
@@ -1031,7 +1018,6 @@ const MorseText = memo(function MorseText({
                     charsRef.current[idx] = el;
                   }}
                   className="inline-block"
-                  style={gpuAcceleratedStyle}
                 >
                   {char}
                 </span>

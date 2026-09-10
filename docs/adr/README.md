@@ -18,14 +18,16 @@ significant. Records here sit beside [docs/plans](../plans/README.md), which say
 piece of work is executed, and [docs/runbooks](../runbooks/deploy.md), which say how to perform an
 operation.
 
-| ADR  | Title                                                                        | Status   | Date       |
-| ---- | ---------------------------------------------------------------------------- | -------- | ---------- |
-| 0001 | [Record architecture decisions](0001-record-architecture-decisions.md)       | Accepted | 2026-09-08 |
-| 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)         | Accepted | 2026-09-08 |
-| 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md) | Accepted | 2026-09-08 |
-| 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)       | Accepted | 2026-09-08 |
-| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                               | Accepted | 2026-09-08 |
-| 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)           | Accepted | 2026-09-08 |
+| ADR  | Title                                                                                | Status   | Date       |
+| ---- | ------------------------------------------------------------------------------------ | -------- | ---------- |
+| 0001 | [Record architecture decisions](0001-record-architecture-decisions.md)               | Accepted | 2026-09-08 |
+| 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)                 | Accepted | 2026-09-08 |
+| 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)         | Accepted | 2026-09-08 |
+| 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)               | Accepted | 2026-09-08 |
+| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                                       | Accepted | 2026-09-08 |
+| 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)                   | Accepted | 2026-09-08 |
+| 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)           | Accepted | 2026-09-09 |
+| 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md) | Accepted | 2026-09-09 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; the site is not deployed and `miloscvetkovic.dev` still resolves to the Namecheap parking

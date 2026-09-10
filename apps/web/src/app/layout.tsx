@@ -2,7 +2,13 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
-import { ThemeProvider, Navigation, Footer, PersonJsonLd, WebsiteJsonLd } from '@/components';
+// Imported from their own modules, not the `@/components` barrel: every client module reachable
+// from a server component's imports is bundled into that layout's client chunk whether it renders
+// or not, and through the barrel that meant FeaturedWork shipping to every route.
+import { ThemeProvider } from '@/components/theme-provider';
+import { Navigation } from '@/components/navigation';
+import { Footer } from '@/components/footer';
+import { PersonJsonLd, WebsiteJsonLd } from '@/components/json-ld';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
 
