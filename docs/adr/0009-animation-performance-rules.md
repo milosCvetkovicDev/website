@@ -107,8 +107,7 @@ main thread go quiet between tmux ticks.
 - Everyone pays for GSAP at load on `/`. `index.tsx` imports the six phases at module scope and each
   of them imports `gsap` and `ScrollTrigger` through `use-gsap-scroll.ts`, so GSAP is part of the
   route's initial client payload and evaluates during load rather than on intent or at idle. There
-  are no intent listeners, no idle warm-up and no Data Saver check. The 234 ms of blocking time
-  above is where this shows up.
+  are no intent listeners, no idle warm-up and no Data Saver check.
 - The slot grid rotates text through up to 40 slots per pane on every tick, about 240 text node
   replacements per second across the five panes. That is cheaper than the layout shifts it replaces
   and invisible in the trace, but it is not free, and `MAX_LINES` should not grow without measuring.
@@ -159,8 +158,9 @@ main thread go quiet between tmux ticks.
   visitor is still looking at the hero. The work moved but was not removed.
 - **Prefetch the section chunks at idle.** Measured and rejected: evaluating the shared GSAP chunk is
   a 33 ms task (132 ms at 4×) that landed at 0.7 s and started GSAP's frame loop for the rest of the
-  session. The intent-and-idle prefetch kept in its place was removed along with the deferral it
-  served, so nothing prefetches these chunks today.
+  session. The intent-and-idle prefetch that was kept instead was removed along with the deferral it
+  served, and the phases now ship in the route's initial payload, so there is no separate chunk left
+  to prefetch.
 - **`will-change` only on the sections' hover targets.** Rejected: GSAP already promotes during
   tweens, and the hover effects are short; there was nothing left for `will-change` to buy.
 - **A Lighthouse CI budget.** Deferred, not rejected. The numbers vary by ±100 ms TBT between runs
@@ -172,11 +172,24 @@ main thread go quiet between tmux ticks.
 
 ### 2026-09-10
 
-An independent review of the code merged as `743a860` found two false claims about prefetching, one
-of them contradicting a bullet a few lines below it in the same section. Both sit outside
-`## Decision`, neither changes which option the decision selects or the conditions under which it
-would be revisited, and neither fix introduces guidance the record did not already carry. Corrected
-under [ADR 0012](0012-correcting-accepted-records.md).
+This record was accepted on 2026-09-09. On 2026-09-10 the change merged as `743a860`
+("keep the story sections in the DOM and reverse the closing section at once", PR #22) rewrote parts
+of it in place — rule 4 inside `## Decision`, two `### Trade-offs` bullets and two entries under
+`## Alternatives considered` — and recorded nowhere that it had done so. [ADR
+0001](0001-record-architecture-decisions.md) was in force that day and did not allow it: an accepted
+record was immutable. This entry is the only account of that rewrite in the record itself.
+
+Two claims it left behind are false, and are corrected here. Neither was in the record when it was
+accepted, so neither is the case [ADR 0012](0012-correcting-accepted-records.md) describes as false
+about the world as it stood at acceptance; both entered a day later, in the same commit that made
+them false, and neither was ever true of any state of this repository. ADR 0012's other branch does
+not reach them either, because a claim that was never true has not been overtaken. What they have in
+common is that fixing them changes no part of `## Decision`, changes neither the option the decision
+selects nor the conditions under which it would be revisited, and adds no guidance, obligations or
+recommendations the record did not already carry — which is the test ADR 0012 sets for a correction.
+Supersession is the wrong instrument here: `## Decision` still selects importing the phases directly
+and is accurate as it stands, and retiring a standing decision to fix two sentences is exactly the
+outcome ADR 0012 was written to avoid.
 
 **A prefetch mechanism that does not exist**, in `### Trade-offs`. The record read: "Nobody pays for
 GSAP during the first second: the intent listeners are armed one second after hydration, so a pointer
@@ -186,30 +199,29 @@ seconds. Only Data Saver suppresses the prefetch entirely." It now reads: "Every
 load on `/`. `index.tsx` imports the six phases at module scope and each of them imports `gsap` and
 `ScrollTrigger` through `use-gsap-scroll.ts`, so GSAP is part of the route's initial client payload
 and evaluates during load rather than on intent or at idle. There are no intent listeners, no idle
-warm-up and no Data Saver check. The 234 ms of blocking time above is where this shows up." What was
-wrong: the bullet describes `use-prefetch-phases.ts` as live behaviour, and the commit that wrote the
-bullet deleted that file in the same change, leaving it contradicting "There is no `DeferredSection`
-and no prefetch hook any more" four bullets later. It was false when it entered the record rather
-than overtaken afterwards. Evidence: `git show --stat 743a860` lists
-`apps/web/src/components/animated-hero/use-prefetch-phases.ts`, `deferred-section.tsx` and both of
-their test files among the deleted files, and `git grep -n -i prefetch -- apps/web/src` returns no
-hits.
+warm-up and no Data Saver check." What was wrong: the bullet describes as live the behaviour
+`use-prefetch-phases.ts` implemented, and `743a860` deleted that file in the same change that wrote
+the bullet, leaving it contradicting the bullet four below it in the same section, "There is no
+`DeferredSection` and no prefetch hook any more". Evidence:
+`git show --name-status 743a860 -- apps/web/src/components/animated-hero/` reports `D` for
+`use-prefetch-phases.ts` and `deferred-section.tsx`, and
+`git grep -n -i prefetch -- . ':!docs' ':!pnpm-lock.yaml'` returns no hits, so nothing outside this
+directory's prose mentions prefetching at all.
 
 **A rejected alternative pointing at a design that is gone**, in `## Alternatives considered`, under
 **Prefetch the section chunks at idle**. The record read: "Waiting for intent or a few idle seconds
-keeps the same experience for anyone who scrolls." It now reads: "The intent-and-idle prefetch kept
-in its place was removed along with the deferral it served, so nothing prefetches these chunks
-today." What was wrong: that sentence is the justification for rejecting idle prefetch, and it names
-intent-or-idle prefetch as what the repository does instead, so a reader re-evaluating this
-alternative would weigh it against a mechanism that no longer exists. The measurement and the
-rejection itself are untouched, as ADR 0012 requires of a rejected alternative. Evidence: the same
-`git grep` above.
+keeps the same experience for anyone who scrolls." It now reads: "The intent-and-idle prefetch that
+was kept instead was removed along with the deferral it served, and the phases now ship in the
+route's initial payload, so there is no separate chunk left to prefetch." What was wrong: that
+sentence named intent-or-idle prefetch as what the repository does instead of prefetching at idle, so
+a reader re-evaluating this alternative would weigh it against a mechanism that no longer exists. The
+measurement and the rejection are untouched, as ADR 0012 requires of a rejected alternative, and they
+stand on their own: evaluating the shared GSAP chunk at 0.7 s was the measured reason to reject
+idle-only prefetch, independently of what was kept in its place. Evidence: the same `git grep` above,
+and `git show 743a860 -- docs/adr/0009-animation-performance-rules.md`, whose diff rewrites the
+surrounding entries while leaving this sentence untouched.
 
-That second sentence was true when this record was accepted on 2026-09-09 and was falsified by
-`743a860` the next day, which is normally the "overtaken since" case that ADR 0012 reserves for
-supersession. It is corrected in place because `743a860` had already rewritten rule 4, both
-prefetch-related trade-offs and two other entries under `## Alternatives considered` in this file,
-re-pointing the record at the world that commit created; the sentence is a straggler from that
-incomplete sweep rather than reasoning preserved from the original decision. Supersession would also
-be the wrong instrument, because `## Decision` is accurate as written and already states that the
-phases are imported directly.
+Not repaired here: the edit `743a860` made to rule 4 inside `## Decision`. Rule 4 as it now stands
+describes the code accurately, so there is no false statement for ADR 0012's annotation rule to
+attach to, and ADR 0012 forbids rewriting `## Decision` in any case. What is wrong with it is that it
+is not the text this record was accepted with, and until this entry nothing said so.
