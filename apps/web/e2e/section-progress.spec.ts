@@ -37,6 +37,27 @@ test.describe('Section progress', () => {
     }
   });
 
+  test('reads the restored position after a reload part-way down the story', async ({ page }) => {
+    await page.getByRole('button', { name: 'Go to BUILD section' }).click();
+    await expect(page.getByText('[04/07] BUILD')).toBeVisible();
+    const scrolled = await page.evaluate(() => window.scrollY);
+    // Without this the test still passes when every dot scrolls nowhere: 0 restores as 0.
+    expect(scrolled).toBeGreaterThan(0);
+
+    await page.reload();
+    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
+
+    // The browser puts the page back where it was and tells nobody: scroll restoration dispatches
+    // no scroll event the indicator could listen for. It is also not ordered against hydration, so
+    // poll for it rather than reading once — a single read is 0 on a slow machine and fails the
+    // position check for a reason that has nothing to do with the indicator. This is where the
+    // test fails, legibly, if this browser ever stops restoring the position.
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    const restored = await page.evaluate(() => window.scrollY);
+    expect(Math.abs(restored - scrolled)).toBeLessThan(5);
+    await expect(page.getByText('[04/07] BUILD')).toBeVisible();
+  });
+
   test('reads the closing section while it is the section on screen', async ({ page }) => {
     const cta = page.getByRole('link', { name: 'Connect on LinkedIn' });
     // Scrolled to, rather than jumped to. Measured against the document this sits about three
