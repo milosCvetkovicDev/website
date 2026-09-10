@@ -71,44 +71,57 @@ describe.each(phases)('$name', ({ Phase }) => {
     expect(media.listenerCount()).toBe(0);
   });
 
-  it('creates its scroll animations when motion is allowed and removes them on unmount', () => {
-    const { unmount } = render(<Phase />);
-    expect(ScrollTrigger.getAll().length).toBeGreaterThan(0);
-
-    unmount();
-
-    expect(ScrollTrigger.getAll()).toHaveLength(0);
-  });
-
   it('creates no scroll animation under reduced motion', () => {
     media.reduce = true;
     render(<Phase />);
     expect(ScrollTrigger.getAll()).toHaveLength(0);
   });
 
-  it('tears its scroll animations down when reduced motion is switched on', () => {
-    render(<Phase />);
-    expect(ScrollTrigger.getAll().length).toBeGreaterThan(0);
-
-    act(() => media.set(true));
-
+  // One mount, walked through the whole preference lifecycle, rather than four mounts asserting a
+  // step each. Building the timeline is by far the most expensive thing these tests do -- GSAP
+  // reads every tween's start value through getComputedStyle, and jsdom answers each read by
+  // matching its user-agent stylesheet against the element, because the write GSAP makes right
+  // after invalidates the document's style cache. Four mounts per phase cost five builds
+  // between them; this costs two.
+  //
+  // It swaps which unmount is covered rather than adding one: the old tests unmounted a
+  // first-generation context, this unmounts a rebuilt one. The first-generation teardown is still
+  // exercised, by the switch to reduced motion -- React calls the same effect cleanup either way.
+  //
+  // The explicit timeout is the one place in the suite the 5s default is too tight. The test
+  // itself takes ~0.5s, and 0.8s on a two-core CI runner, but it is the first GSAP mount in the
+  // file and so also pays the worker's one-off JIT warm-up of GSAP, React and jsdom's CSS
+  // cascade. On a developer machine running the suite across twelve workers, fifteen of which are
+  // importing jsdom at once, that has been measured at 5.5s. Raising the global default would hide
+  // a genuinely slow test appearing anywhere else in the suite.
+  it('builds, tears down and rebuilds its scroll animations, and removes them on unmount', () => {
+    // ScrollTrigger's registry is global, so a count only means anything from a clean start.
     expect(ScrollTrigger.getAll()).toHaveLength(0);
-  });
 
-  it('rebuilds its scroll animations when motion is allowed again', () => {
-    render(<Phase />);
+    const { unmount } = render(<Phase />);
+    const built = ScrollTrigger.getAll().length;
+    expect(built).toBeGreaterThan(0);
+
     act(() => media.set(true));
     expect(ScrollTrigger.getAll()).toHaveLength(0);
 
     act(() => media.set(false));
+    // Exactly what it built the first time. A rebuild that stacked a second context on the first
+    // would leak on every preference flip and still be "greater than zero".
+    expect(ScrollTrigger.getAll()).toHaveLength(built);
 
-    expect(ScrollTrigger.getAll().length).toBeGreaterThan(0);
-  });
+    unmount();
+    expect(ScrollTrigger.getAll()).toHaveLength(0);
+  }, 15_000);
 });
 
 describe('ExecutionPhase', () => {
   beforeEach(() => {
     media.reduce = false;
+    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom
+    // does not implement: every call builds an Error, captures a stack and prints it through the
+    // virtual console. A no-op is what ScrollTrigger already gets, without the noise.
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   });
 
   afterEach(() => {
