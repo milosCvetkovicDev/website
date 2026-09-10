@@ -13,6 +13,8 @@
     "test:e2e": "turbo test:e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "check:allowbuilds": "node scripts/check-allowbuilds-drift.mjs",
+    "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "clean": "turbo clean && rm -rf node_modules",
     "prepare": "husky"
   },

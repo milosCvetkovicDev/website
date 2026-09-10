@@ -2,7 +2,13 @@
 
 ## Status
 
-Accepted (corrected 2026-09-10)
+Superseded by ADR-0013 (corrected 2026-09-10)
+
+The decision below no longer applies: `sharp` has no `allowBuilds` entry, an entry exists only while
+its package still declares a lifecycle script, and the reviewed-version comments are enforced by
+`pnpm check:allowbuilds` rather than left to a reviewer. See
+[ADR 0013](0013-dependency-build-scripts-reviewed.md). The correction recorded at the end of this
+record still stands, and the rest is the reasoning as it was on 2026-09-09.
 
 ## Date
 
