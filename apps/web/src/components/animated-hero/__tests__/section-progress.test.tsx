@@ -2,7 +2,9 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SectionProgress } from '../section-progress';
 
-// A 7,000px document in a 1,000px viewport: 6,000px of scroll range across the seven sections.
+// A 7,000px document in a 1,000px viewport, so 6,000px of scroll range. The component maps its
+// seven dots onto the whole document rather than onto the hero alone, which is what these fixtures
+// reproduce; the page really does render Featured Work and Tech Stack after the hero.
 const SCROLL_HEIGHT = 7000;
 const VIEWPORT_HEIGHT = 1000;
 const SCROLL_RANGE = SCROLL_HEIGHT - VIEWPORT_HEIGHT;
@@ -35,6 +37,8 @@ function setScrollHeight(height: number) {
 function scrollWindowTo(y: number) {
   Object.defineProperty(window, 'scrollY', { configurable: true, writable: true, value: y });
   act(() => {
+    // The handler drops frames within 33ms of the last update, so let that much pass first.
+    vi.advanceTimersByTime(34);
     window.dispatchEvent(new Event('scroll'));
     vi.advanceTimersToNextFrame();
   });
@@ -47,10 +51,9 @@ const dot = (label: string) =>
 
 describe('SectionProgress', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
-    // The handler throttles to one update per 33ms, so make every frame look 100ms apart.
-    let clock = 0;
-    vi.spyOn(performance, 'now').mockImplementation(() => (clock += 100));
+    vi.useFakeTimers({
+      toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'],
+    });
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     setScrollHeight(SCROLL_HEIGHT);
     window.innerHeight = VIEWPORT_HEIGHT;
@@ -71,13 +74,19 @@ describe('SectionProgress', () => {
     render(<SectionProgress />);
     const readout = screen.getByText('[01/07] INIT');
 
+    // A quarter of the way down: the bar follows the scroll fraction, the line the section index.
+    scrollWindowTo(SCROLL_RANGE / 4);
+
+    expect(readout).toHaveTextContent('[02/07] DISCOVER');
+    expect(dot('DISCOVER')).toHaveClass('bg-[var(--accent)]');
+    expect(dot('PLAN')).toHaveClass('bg-[var(--border)]');
+    expect(mobileBar()?.style.width).toBe('25%');
+    expect(progressLine()?.style.height).toBe(`${(1 / 6) * 100}%`);
+
     scrollWindowTo(SCROLL_RANGE / 2);
 
     expect(readout).toHaveTextContent('[04/07] BUILD');
-    expect(dot('BUILD')).toHaveClass('bg-[var(--accent)]');
-    expect(dot('CTA')).toHaveClass('bg-[var(--border)]');
     expect(mobileBar()?.style.width).toBe('50%');
-    expect(progressLine()?.style.height).toBe('50%');
   });
 
   it('tracks the scroll position in a browser without window.matchMedia', () => {
@@ -102,6 +111,16 @@ describe('SectionProgress', () => {
     expect(mobileBar()?.style.width).toBe('0%');
   });
 
+  it('clamps a rubber-band scroll past the bottom to the last section', () => {
+    render(<SectionProgress />);
+    const readout = screen.getByText('[01/07] INIT');
+
+    scrollWindowTo(SCROLL_RANGE + 120);
+
+    expect(readout).toHaveTextContent('[07/07] CTA');
+    expect(mobileBar()?.style.width).toBe('100%');
+  });
+
   it('clamps a rubber-band scroll above the top to the first section', () => {
     render(<SectionProgress />);
     const readout = screen.getByText('[01/07] INIT');
@@ -118,7 +137,10 @@ describe('SectionProgress', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Go to TEST section' }));
 
-    expect(window.scrollTo).toHaveBeenCalledWith({ top: (4 / 6) * SCROLL_RANGE, behavior: 'auto' });
+    expect(window.scrollTo).toHaveBeenCalledWith({
+      top: (4 / 6) * SCROLL_RANGE,
+      behavior: 'instant',
+    });
   });
 
   it('scrolls smoothly to a section when motion is allowed', () => {
