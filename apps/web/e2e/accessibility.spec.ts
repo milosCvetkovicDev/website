@@ -27,13 +27,18 @@ import { expect, test, type Page } from '@playwright/test';
  * Each page is audited twice. At rest, which is what Lighthouse scores and what the original
  * findings were about. Then, for `/`, again after scrolling the whole story.
  *
- * The second pass exists because at rest the six story sections are not in the document at all.
- * `DeferredSection` suspends each one until it approaches the viewport, so an unscrolled `/`
- * renders six empty placeholders: axe measures 30 text nodes there against 424 once the story has
- * been walked. That, not a GSAP reveal, is how the light-theme contrast failures fixed by ADR 0010
- * stayed invisible to this gate until they were found by hand. `text-green-400` on a near-white
- * page is 1.7:1, and with the class put back the at-rest pass is still green while the scrolled
- * pass fails.
+ * The second pass exists because most of the story is invisible to axe until it is revealed. The
+ * six sections are in the document from the first byte, but each phase starts its GSAP reveal at
+ * `opacity: 0`, and axe skips a fully transparent element: at rest 93 elements are transparent, 58
+ * of them carrying text, so `/` measures 103 colour-contrast nodes against 425 once the story has
+ * been walked. That is how the light-theme contrast failures fixed by ADR 0010 stayed invisible to
+ * this gate until they were found by hand. `text-green-400` on a near-white page is 1.7:1, and
+ * with the class put back the at-rest pass is still green while the scrolled pass fails.
+ *
+ * An earlier version of this comment blamed `DeferredSection`, the hydration gate that kept the
+ * sections out of the document entirely and left the at-rest pass measuring 30 nodes. PR #22
+ * removed it and restored the markup; the floors below are what stop the audited surface shrinking
+ * that way again without a test failing.
  *
  * The scrolled pass emulates `prefers-reduced-motion: reduce`, which is what makes it a gate rather
  * than a coin flip. Every phase then renders its finished state on mount instead of on a timeline
@@ -133,6 +138,18 @@ const LIGHTHOUSE_AXE_OPTIONS: AxeRunOptions = {
 };
 
 const pages = ['/', '/work/self-healing-agent'];
+
+/**
+ * Fewest colour-contrast nodes each page must still measure at rest. A floor, not a target: the
+ * point is that a change which unmounts content or hides it behind `opacity: 0` fails here instead
+ * of silently shrinking the audit, which is what happened while `DeferredSection` existed. Measured
+ * against the production build on 2026-09-10: 103 on `/` and 48 on the case study, identical in
+ * both colour schemes. Set with room for ordinary copy edits; raise them if a page genuinely grows.
+ */
+const AT_REST_CONTRAST_FLOOR: Record<(typeof pages)[number], number> = {
+  '/': 80,
+  '/work/self-healing-agent': 40,
+};
 const colorSchemes = ['light', 'dark'] as const;
 
 /**
@@ -276,11 +293,15 @@ test.describe('Accessibility', () => {
         // off appears in none of the four result lists, axe only logs an unknown tag instead of
         // throwing, and a page with no text would leave `color-contrast` inapplicable. Each sentinel
         // covers one part of the options. `document-title` is selected by the `wcag2a` tag alone,
-        // `color-contrast` (with at least one measured node) by `wcag2aa` alone, and
-        // `label-content-name-mismatch` only by the rules map; that one has been inapplicable on
-        // both pages since the cards' accessible names became their visible text, so presence in
-        // the results is its only proof.
-        expect(passingNodes(results, 'color-contrast')).toBeGreaterThan(0);
+        // `color-contrast` by `wcag2aa` alone, and `label-content-name-mismatch` only by the rules
+        // map; that one has been inapplicable on both pages since the cards' accessible names became
+        // their visible text, so presence in the results is its only proof.
+        expect(
+          passingNodes(results, 'color-contrast'),
+          `${path} at rest measured far fewer colour-contrast nodes than it should. Content that ` +
+            'stopped being rendered, or became transparent, is no longer being audited: find what ' +
+            'left the page before adjusting this floor.',
+        ).toBeGreaterThan(AT_REST_CONTRAST_FLOOR[path]);
         expect(ruleIdsThatRan(results)).toEqual(
           expect.arrayContaining(['document-title', 'label-content-name-mismatch']),
         );
