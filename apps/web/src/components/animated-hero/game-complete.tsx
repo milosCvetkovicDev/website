@@ -68,7 +68,7 @@ export function GameComplete() {
           <Terminal className="text-left">
             <div className="space-y-4">
               <div className="border-b border-[#30363d] py-4 text-center">
-                <span className="text-lg font-bold text-green-400">
+                <span className="text-lg font-bold text-[var(--status-ok)]">
                   <AnimatedText animation="scramble">SESSION COMPLETE</AnimatedText>
                 </span>
               </div>

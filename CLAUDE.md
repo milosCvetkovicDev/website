@@ -106,6 +106,16 @@ is there so that a future buildable package is compiled before the apps typechec
   it look secondary, not even `aria-hidden` text (axe measures it anyway); use `--muted` instead.
   Never let a GSAP `from()`, `fromTo()` or `set()` leave text at a partial opacity: the "from"
   state renders immediately, before any scroll trigger fires.
+- Status colours come from three theme tokens (ADR 0010): `--status-ok`, `--status-warn` and
+  `--status-err`, used as `text-[var(--status-ok)]`, `bg-[var(--status-ok)]/10`,
+  `border-[var(--status-ok)]/50` and so on for text, icons, borders, tints, bars, dots and glows
+  alike, in the hero and on the work pages. Never use a palette status class such as
+  `text-green-400` or `bg-red-500` in a component, nor a hard-coded status hex with a `dark:`
+  override, and never dim status text: no alpha modifier on a status token used as a text colour
+  and no resting `opacity-*` below 100 on an element whose text carries one (a reveal from
+  `opacity-0` to full is fine). The light values are the first shades that pass AA on the HUD
+  panels and on their own tints; anything dimmer fails. Inside `Terminal` the tokens resolve to
+  their dark values in both themes.
 - Components live in `apps/web/src/components`. `index.ts` is a barrel for the page-level ones
   (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `Highlights`, `FeaturedWork`, `TechStack`,
   `CTA`, `PersonJsonLd`, `WebsiteJsonLd`). The hero and its phases live in

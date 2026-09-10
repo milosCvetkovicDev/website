@@ -179,7 +179,11 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
                   i === currentMessage ? 'text-[var(--foreground)]' : 'text-[var(--muted)]/50'
                 }`}
               >
-                <span className={i <= currentMessage ? 'text-green-400' : 'text-[var(--muted)]'}>
+                <span
+                  className={
+                    i <= currentMessage ? 'text-[var(--status-ok)]' : 'text-[var(--muted)]'
+                  }
+                >
                   {i < currentMessage ? '✓' : i === currentMessage ? '›' : '○'}
                 </span>
                 <span>{msg.text}</span>

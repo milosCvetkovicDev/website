@@ -124,9 +124,9 @@ export function ProgressBar({
 }) {
   const colors = {
     default: 'bg-[var(--accent)]',
-    success: 'bg-green-500',
-    warning: 'bg-yellow-500',
-    error: 'bg-red-500',
+    success: 'bg-[var(--status-ok)]',
+    warning: 'bg-[var(--status-warn)]',
+    error: 'bg-[var(--status-err)]',
   };
 
   return (
@@ -219,17 +219,17 @@ export const NotificationToast = forwardRef<
   { children: React.ReactNode; type?: 'success' | 'warning' | 'info' | 'error' }
 >(({ children, type = 'info' }, ref) => {
   const colors = {
-    success: 'border-green-500/50 bg-green-500/10 text-green-400',
-    warning: 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400',
+    success: 'border-[var(--status-ok)]/50 bg-[var(--status-ok)]/10 text-[var(--status-ok)]',
+    warning: 'border-[var(--status-warn)]/50 bg-[var(--status-warn)]/10 text-[var(--status-warn)]',
     info: 'border-[var(--accent)]/50 bg-[var(--accent)]/10 text-[var(--accent-text)]',
-    error: 'border-red-500/50 bg-red-500/10 text-red-400',
+    error: 'border-[var(--status-err)]/50 bg-[var(--status-err)]/10 text-[var(--status-err)]',
   };
 
   const glowColors = {
-    success: 'shadow-[0_0_20px_rgba(34,197,94,0.2)]',
-    warning: 'shadow-[0_0_20px_rgba(234,179,8,0.2)]',
+    success: 'shadow-[0_0_20px_color-mix(in_oklab,var(--status-ok)_20%,transparent)]',
+    warning: 'shadow-[0_0_20px_color-mix(in_oklab,var(--status-warn)_20%,transparent)]',
     info: 'shadow-[0_0_20px_rgba(139,92,246,0.2)]',
-    error: 'shadow-[0_0_20px_rgba(239,68,68,0.2)]',
+    error: 'shadow-[0_0_20px_color-mix(in_oklab,var(--status-err)_20%,transparent)]',
   };
 
   return (
@@ -256,7 +256,7 @@ export function QuestItem({
       <span
         className={`transition-all duration-300 ${
           completed
-            ? 'scale-110 text-green-400'
+            ? 'scale-110 text-[var(--status-ok)]'
             : 'text-[var(--muted)] group-hover:text-[var(--accent-text)]'
         }`}
       >
@@ -265,7 +265,7 @@ export function QuestItem({
       <span
         className={`transition-all duration-300 ${
           completed
-            ? 'text-[var(--foreground)] line-through decoration-green-400/50'
+            ? 'text-[var(--foreground)] line-through decoration-[var(--status-ok)]/50'
             : 'text-[var(--muted)] group-hover:text-[var(--foreground)]'
         }`}
       >
@@ -280,7 +280,7 @@ export function TypingCursor({ color = 'accent' }: { color?: 'accent' | 'white' 
   const colors = {
     accent: 'bg-[var(--accent)]',
     white: 'bg-white',
-    green: 'bg-green-400',
+    green: 'bg-[var(--status-ok)]',
   };
 
   return (
@@ -331,9 +331,9 @@ export function PipelineStage({
 }) {
   const statusColors = {
     pending: 'text-[var(--muted)]',
-    running: 'text-yellow-400',
-    passed: 'text-green-400',
-    failed: 'text-red-400',
+    running: 'text-[var(--status-warn)]',
+    passed: 'text-[var(--status-ok)]',
+    failed: 'text-[var(--status-err)]',
   };
 
   const statusIcons = {
@@ -345,9 +345,9 @@ export function PipelineStage({
 
   const progressColors = {
     pending: 'bg-[var(--muted)]/50',
-    running: 'bg-yellow-500',
-    passed: 'bg-green-500',
-    failed: 'bg-red-500',
+    running: 'bg-[var(--status-warn)]',
+    passed: 'bg-[var(--status-ok)]',
+    failed: 'bg-[var(--status-err)]',
   };
 
   return (
@@ -390,9 +390,9 @@ export function ActivityEntry({
     error: '✗',
   };
   const colors = {
-    success: 'text-green-400',
-    pending: 'text-yellow-400 animate-spin',
-    error: 'text-red-400',
+    success: 'text-[var(--status-ok)]',
+    pending: 'text-[var(--status-warn)] animate-spin',
+    error: 'text-[var(--status-err)]',
   };
 
   return (

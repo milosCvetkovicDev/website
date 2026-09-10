@@ -28,6 +28,7 @@ operation.
 | 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)                   | Accepted | 2026-09-08 |
 | 0008 | [Accent colour roles](0008-accent-colour-roles.md)                                   | Accepted | 2026-09-09 |
 | 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md) | Accepted | 2026-09-09 |
+| 0010 | [Status colour tokens](0010-status-colour-tokens.md)                                 | Accepted | 2026-09-09 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; the site is not deployed and `miloscvetkovic.dev` still resolves to the Namecheap parking

@@ -75,8 +75,8 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
         </div>
         {meta && (
           <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-            <span className="font-mono text-[10px] text-green-500/80">{meta.status}</span>
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--status-ok)]" />
+            <span className="font-mono text-[10px] text-[var(--status-ok)]">{meta.status}</span>
           </div>
         )}
       </div>
@@ -130,7 +130,7 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
               <ul className="space-y-1">
                 {project.impact.slice(0, 3).map((item, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-[var(--muted)]">
-                    <span className="mt-0.5 text-green-400">✓</span>
+                    <span className="mt-0.5 text-[var(--status-ok)]">✓</span>
                     <span>{item}</span>
                   </li>
                 ))}

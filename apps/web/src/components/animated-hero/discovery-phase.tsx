@@ -114,7 +114,7 @@ export function DiscoveryPhase() {
                   </p>
                 </div>
                 <div className="flex gap-3 text-[var(--muted)]">
-                  <span className="text-green-400">←</span>
+                  <span className="text-[var(--status-ok)]">←</span>
                   <p>Interesting. What does &quot;fix itself&quot; mean to you?</p>
                 </div>
                 <div className="flex gap-3">
@@ -124,11 +124,11 @@ export function DiscoveryPhase() {
                   </p>
                 </div>
                 <div className="flex gap-3 text-[var(--muted)]">
-                  <span className="text-green-400">←</span>
+                  <span className="text-[var(--status-ok)]">←</span>
                   <p>Autonomous code changes need guardrails. What&apos;s the blast radius?</p>
                 </div>
                 <div className="flex gap-3 text-[var(--muted)]">
-                  <span className="text-green-400">←</span>
+                  <span className="text-[var(--status-ok)]">←</span>
                   <p>
                     I&apos;m thinking: budget caps, confidence thresholds, human approval...
                     <TypingCursor />
