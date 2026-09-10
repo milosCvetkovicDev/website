@@ -81,9 +81,12 @@ describe.each(phases)('$name', ({ Phase }) => {
   // step each. Building the timeline is by far the most expensive thing these tests do -- GSAP
   // reads every tween's start value through getComputedStyle, and jsdom answers each read by
   // matching its user-agent stylesheet against the element, because the write GSAP makes right
-  // after invalidates the document's style cache. Four mounts per phase cost five builds; this
-  // costs two, asserts the same four facts, and additionally covers unmounting a rebuilt context,
-  // which nothing did before.
+  // after invalidates the document's style cache. Four mounts per phase cost five builds
+  // between them; this costs two.
+  //
+  // It swaps which unmount is covered rather than adding one: the old tests unmounted a
+  // first-generation context, this unmounts a rebuilt one. The first-generation teardown is still
+  // exercised, by the switch to reduced motion -- React calls the same effect cleanup either way.
   //
   // The explicit timeout is the one place in the suite the 5s default is too tight. The test
   // itself takes ~0.5s, and 0.8s on a two-core CI runner, but it is the first GSAP mount in the
@@ -92,14 +95,20 @@ describe.each(phases)('$name', ({ Phase }) => {
   // importing jsdom at once, that has been measured at 5.5s. Raising the global default would hide
   // a genuinely slow test appearing anywhere else in the suite.
   it('builds, tears down and rebuilds its scroll animations, and removes them on unmount', () => {
+    // ScrollTrigger's registry is global, so a count only means anything from a clean start.
+    expect(ScrollTrigger.getAll()).toHaveLength(0);
+
     const { unmount } = render(<Phase />);
-    expect(ScrollTrigger.getAll().length).toBeGreaterThan(0);
+    const built = ScrollTrigger.getAll().length;
+    expect(built).toBeGreaterThan(0);
 
     act(() => media.set(true));
     expect(ScrollTrigger.getAll()).toHaveLength(0);
 
     act(() => media.set(false));
-    expect(ScrollTrigger.getAll().length).toBeGreaterThan(0);
+    // Exactly what it built the first time. A rebuild that stacked a second context on the first
+    // would leak on every preference flip and still be "greater than zero".
+    expect(ScrollTrigger.getAll()).toHaveLength(built);
 
     unmount();
     expect(ScrollTrigger.getAll()).toHaveLength(0);
