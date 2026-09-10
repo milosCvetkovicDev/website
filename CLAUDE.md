@@ -99,13 +99,15 @@ is there so that a future buildable package is compiled before the apps typechec
   actually needed.
 - Tailwind v4 is CSS-first: the theme is declared in `apps/web/src/app/globals.css` and compiled by
   `@tailwindcss/postcss`. There is no `tailwind.config.js` and there should not be one.
-- The accent colour has two tokens with different roles (ADR 0008). `--accent` paints surfaces:
+- The accent colour has two tokens with different roles (ADR 0011, superseding 0008). `--accent` paints surfaces:
   solid fills that carry white text, borders, indicators and the `bg-[var(--accent)]/10` tints.
   `--accent-text` is the accent as text and the only accent allowed in a `text-` utility or a
   `color` style, because `--accent` misses WCAG AA as text in the dark theme (3.5:1 on the
   background, 3.2:1 on the card).
   Decorative SVG frames, brackets and lines drawn with `currentColor` keep `--accent`; icons that
-  sit with text take `--accent-text`. Never dim text with an opacity modifier such as `/60` to make
+  sit with text take `--accent-text`. A component with a hard-coded dark background scopes the dark
+  tokens with the `dark` class **and** sets `color` on that same element: `color` inherits as an
+  already-resolved value, so scoping alone leaves an unclassed child with the page theme's colour. Never dim text with an opacity modifier such as `/60` to make
   it look secondary, not even `aria-hidden` text (axe measures it anyway); use `--muted` instead.
   Never let a GSAP `from()`, `fromTo()` or `set()` leave text at a partial opacity: the "from"
   state renders immediately, before any scroll trigger fires.
@@ -123,9 +125,11 @@ is there so that a future buildable package is compiled before the apps typechec
   (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `Highlights`, `FeaturedWork`, `TechStack`,
   `CTA`, `PersonJsonLd`, `WebsiteJsonLd`). The hero and its phases live in
   `components/animated-hero` and are imported from there directly, not through the barrel.
-  `app/layout.tsx` also imports from the component modules directly: every client module reachable
-  from a server component's imports lands in that layout's client chunk, so a barrel import there
-  would ship `FeaturedWork` to every route (see ADR 0009).
+  Layouts import from the component modules directly, never through the barrel: every client module
+  reachable from a server component's imports lands in that layout's client chunk, so a barrel
+  import in `app/layout.tsx` would ship `FeaturedWork` to every route (see ADR 0009). A
+  `no-restricted-imports` rule in `apps/web/eslint.config.mjs`, scoped to `src/app/**/layout.tsx`,
+  fails lint on it.
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
   keep relative imports for siblings inside one folder.

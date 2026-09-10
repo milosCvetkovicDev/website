@@ -53,13 +53,16 @@ function GlowBorder() {
 // tokens to its subtree: in the light theme the page's --foreground and --muted are dark greys
 // that would be invisible on it. Inside it, `dark:` variants and the `.dark` scrollbar rules apply
 // in both page themes, so children style themselves with the tokens rather than `dark:` overrides.
+// It also sets `color` explicitly. Scoping the tokens is not enough on its own: `color` inherits as
+// an already-resolved value, so a descendant with no colour class of its own keeps the dark grey
+// the light theme resolved on <body> and renders invisible here.
 export const Terminal = forwardRef<
   HTMLDivElement,
   { children: React.ReactNode; className?: string; title?: string }
 >(({ children, className = '', title }, ref) => (
   <div
     ref={ref}
-    className={`dark group relative overflow-hidden rounded-lg border border-[#30363d] bg-[#0d1117] font-mono text-sm transition-all duration-300 hover:border-[var(--accent)]/50 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)] ${className}`}
+    className={`dark group relative overflow-hidden rounded-lg border border-[#30363d] bg-[#0d1117] font-mono text-sm text-[var(--foreground)] transition-all duration-300 hover:border-[var(--accent)]/50 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)] ${className}`}
   >
     <CornerBrackets className="opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
     <GlowBorder />

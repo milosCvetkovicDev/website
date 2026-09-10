@@ -1,52 +1,25 @@
 'use client';
 
-import { useEffect, useState, lazy, memo, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, memo, type ReactNode } from 'react';
 import { HeroSection } from './hero-section';
 import { SectionProgress } from './section-progress';
-import { DeferredSection, SectionPlaceholder } from './deferred-section';
-import { usePrefetchPhases } from './use-prefetch-phases';
+import { DiscoveryPhase } from './discovery-phase';
+import { StrategyPhase } from './strategy-phase';
+import { ExecutionPhase } from './execution-phase';
+import { GauntletPhase } from './gauntlet-phase';
+import { LoopPhase } from './loop-phase';
+import { GameComplete } from './game-complete';
 import { useIsHydrated } from '@/hooks/use-is-hydrated';
 
 // Memoize hero section to prevent re-renders
 const MemoizedHeroSection = memo(HeroSection);
 
-// The story sections are server-rendered like everything else, but their chunks, hydration and
-// GSAP work wait until DeferredSection sees them approach the viewport. The loaders are shared with
-// usePrefetchPhases so the chunks can be warmed without mounting anything.
-const loadDiscoveryPhase = () => import('./discovery-phase');
-const loadStrategyPhase = () => import('./strategy-phase');
-const loadExecutionPhase = () => import('./execution-phase');
-const loadGauntletPhase = () => import('./gauntlet-phase');
-const loadLoopPhase = () => import('./loop-phase');
-const loadGameComplete = () => import('./game-complete');
-const phaseLoaders = [
-  loadDiscoveryPhase,
-  loadStrategyPhase,
-  loadExecutionPhase,
-  loadGauntletPhase,
-  loadLoopPhase,
-  loadGameComplete,
-];
-
-// A chunk that fails to load (stale hashes after a deploy, an offline tab) must not send the whole
-// page to error.tsx: the section falls back to its placeholder and the failure is logged once.
-function lazySection<T>(load: () => Promise<T>, pick: (module: T) => ComponentType) {
-  return lazy(() =>
-    load()
-      .then((module) => ({ default: pick(module) }))
-      .catch((error: unknown) => {
-        console.error('[animated-hero] a story section failed to load', error);
-        return { default: SectionPlaceholder };
-      }),
-  );
-}
-
-const DiscoveryPhase = lazySection(loadDiscoveryPhase, (m) => m.DiscoveryPhase);
-const StrategyPhase = lazySection(loadStrategyPhase, (m) => m.StrategyPhase);
-const ExecutionPhase = lazySection(loadExecutionPhase, (m) => m.ExecutionPhase);
-const GauntletPhase = lazySection(loadGauntletPhase, (m) => m.GauntletPhase);
-const LoopPhase = lazySection(loadLoopPhase, (m) => m.LoopPhase);
-const GameComplete = lazySection(loadGameComplete, (m) => m.GameComplete);
+// The story sections are imported directly, not through React.lazy. Two attempts at deferring them
+// both cost more than they saved. Holding their Suspense boundary suspended during hydration made
+// React discard the server markup, so the sections left the DOM until the visitor scrolled. Leaving
+// them lazy without that gate puts a placeholder on screen until each chunk arrives, and the swap
+// from a 100vh placeholder to the real section is a layout shift: it took CLS from 0.034 to 0.092.
+// Rendering them outright costs blocking time at load and pays it back in stability. See ADR 0009.
 
 const MemoizedSectionProgress = memo(SectionProgress);
 
@@ -211,7 +184,6 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
 export function AnimatedHero({ children }: { children?: ReactNode }) {
   const mounted = useIsHydrated();
-  usePrefetchPhases(phaseLoaders);
 
   return (
     <div className="relative">
@@ -226,30 +198,18 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
         {/* Section 1: Hero - server-rendered children passed through */}
         <MemoizedHeroSection>{children}</MemoizedHeroSection>
 
-        {/* Story sections: server-rendered, each hydrated when it approaches the viewport */}
-        <DeferredSection>
-          <DiscoveryPhase />
-        </DeferredSection>
+        {/* Story sections: server-rendered, code-split, each behind its own Suspense boundary */}
+        <DiscoveryPhase />
 
-        <DeferredSection>
-          <StrategyPhase />
-        </DeferredSection>
+        <StrategyPhase />
 
-        <DeferredSection>
-          <ExecutionPhase />
-        </DeferredSection>
+        <ExecutionPhase />
 
-        <DeferredSection>
-          <GauntletPhase />
-        </DeferredSection>
+        <GauntletPhase />
 
-        <DeferredSection>
-          <LoopPhase />
-        </DeferredSection>
+        <LoopPhase />
 
-        <DeferredSection>
-          <GameComplete />
-        </DeferredSection>
+        <GameComplete />
       </div>
     </div>
   );
