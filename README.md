@@ -55,6 +55,8 @@ pnpm dev:web
 
 The site runs on `http://localhost:3000`. `pnpm dev:playground` starts the sandbox.
 
+`pnpm install` runs no dependency build scripts: the packages pnpm 10 would ask about ship prebuilt binaries and are denied in `pnpm-workspace.yaml` ([ADR 0007](docs/adr/0007-dependency-build-scripts.md)). A checkout from before that setting keeps printing the warning until `pnpm clean && pnpm install`.
+
 ## Quality gates
 
 Every gate runs on every push and pull request in CI. The first three also run on each commit through Husky.

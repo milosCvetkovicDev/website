@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
 
@@ -192,8 +193,12 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
       {/* Scan line effect */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg opacity-0 transition-opacity group-hover:opacity-100">
         <div
-          className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/20 to-transparent"
-          style={{ animation: 'scan-down 2s linear infinite' }}
+          className="scan-line [animation-play-state:paused] group-hover:[animation-play-state:running]"
+          style={
+            {
+              '--scan-line-color': 'color-mix(in oklab, var(--accent) 20%, transparent)',
+            } as CSSProperties
+          }
         />
       </div>
     </Link>

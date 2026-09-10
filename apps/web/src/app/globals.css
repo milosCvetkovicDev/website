@@ -314,10 +314,12 @@ main {
   animation: glitch 0.5s ease-in-out infinite;
 }
 
-/* Scan down animation for loading */
+/* Scan line that sweeps a panel top to bottom. The element covers its parent and draws the 1px line
+   as a background image, so the sweep is a transform of the element's own height and stays on the
+   compositor; animating `top` instead would lay out and paint every frame. */
 @keyframes scan-down {
   0% {
-    top: -2px;
+    transform: translateY(-2px);
     opacity: 0;
   }
   10% {
@@ -327,13 +329,25 @@ main {
     opacity: 1;
   }
   100% {
-    top: 100%;
+    transform: translateY(100%);
     opacity: 0;
   }
 }
 
-.animate-scan-down {
+.scan-line {
+  --scan-line-color: color-mix(in oklab, var(--accent) 30%, transparent);
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(to right, transparent, var(--scan-line-color), transparent);
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
   animation: scan-down 2s linear infinite;
+}
+
+/* A sweep nobody can see should not run: the featured work cards expose data-active. */
+[data-active='false'] .scan-line {
+  animation-play-state: paused;
 }
 
 /* Scanline overlay for retro effect */
@@ -406,20 +420,6 @@ main {
   animation: highlight-scan 0.6s ease-out forwards;
 }
 
-@keyframes log-appear {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-log-appear {
-  animation: log-appear 0.25s ease forwards;
-}
-
 /* Hero breathing and scroll animations */
 @keyframes hero-breathe {
   0%,
@@ -433,11 +433,11 @@ main {
 @keyframes hero-scroll-bounce {
   0%,
   100% {
-    top: 7px;
+    transform: translateY(0);
     opacity: 1;
   }
   50% {
-    top: 20px;
+    transform: translateY(13px);
     opacity: 0.4;
   }
 }
