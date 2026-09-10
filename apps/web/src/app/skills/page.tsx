@@ -116,8 +116,10 @@ function SkillBar({
   return (
     <div className="group rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 transition-all hover:border-[var(--accent)]/50">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="font-semibold transition-colors group-hover:text-[var(--accent)]">{name}</h3>
-        <span className="rounded bg-[var(--accent)]/10 px-2 py-1 font-mono text-xs text-[var(--accent)]">
+        <h3 className="font-semibold transition-colors group-hover:text-[var(--accent-text)]">
+          {name}
+        </h3>
+        <span className="rounded bg-[var(--accent)]/10 px-2 py-1 font-mono text-xs text-[var(--accent-text)]">
           {years} years
         </span>
       </div>
@@ -155,7 +157,7 @@ function SkillCategory({ category }: { category: (typeof skillCategories)[0] }) 
         {category.skills.map((skill) => (
           <span
             key={skill}
-            className="rounded bg-[var(--accent)]/10 px-2 py-1 font-mono text-xs text-[var(--accent)]/80"
+            className="rounded bg-[var(--accent)]/10 px-2 py-1 font-mono text-xs text-[var(--accent-text)]"
           >
             {skill}
           </span>
@@ -171,7 +173,7 @@ export default function SkillsPage() {
       <div className="mx-auto max-w-4xl px-6">
         {/* Header */}
         <div className="mb-16">
-          <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent)] uppercase">
+          <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             Technical toolkit
           </p>
           <h1 className="mb-6 text-3xl font-bold md:text-4xl lg:text-5xl">Tools are just tools.</h1>
@@ -183,7 +185,7 @@ export default function SkillsPage() {
 
         {/* Core skills with depth */}
         <section className="mb-20">
-          <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent)] uppercase">
+          <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             Primary weapons
           </h2>
           <div className="grid gap-4 md:grid-cols-2">
@@ -195,7 +197,7 @@ export default function SkillsPage() {
 
         {/* What makes it different */}
         <section className="mb-20">
-          <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent)] uppercase">
+          <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             What makes the difference
           </h2>
           <div className="grid gap-4 md:grid-cols-3">
@@ -213,7 +215,7 @@ export default function SkillsPage() {
 
         {/* Full skill grid */}
         <section className="mb-20">
-          <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent)] uppercase">
+          <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             The full toolkit
           </h2>
           <div className="grid gap-4 md:grid-cols-2">
@@ -268,7 +270,7 @@ export default function SkillsPage() {
               href="https://www.linkedin.com/in/milos-cvetkovic-dev"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-[var(--accent)] px-6 py-3 font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10"
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--accent)] px-6 py-3 font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent)]/10"
             >
               <span>Follow on LinkedIn</span>
             </a>

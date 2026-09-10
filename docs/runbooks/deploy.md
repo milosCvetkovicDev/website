@@ -318,6 +318,27 @@ run. A CLS of 0.03 to 0.06 attributed to the boot loader is Lighthouse re-center
 changes the emulated viewport at about 0.9 s, which it counts by design within 500 ms of that event;
 visitors never see it.
 
+Accessibility on that same 2026-09-09 baseline was 96 on both pages. The points went to colour
+contrast (the accent used as text, labels dimmed with opacity modifiers, and a scroll reveal that
+parked the quest log at 30% opacity) and, on `/`, to Featured Work cards whose `aria-labelledby`
+name did not contain their visible text. Both were fixed the same day by splitting the accent into
+`--accent` and `--accent-text` and restructuring the cards
+([ADR 0008](../adr/0008-accent-colour-roles.md)); re-run with the same CLI against the local
+production build, both pages score accessibility 100 with `color-contrast` passing and
+`label-content-name-mismatch` not applicable. The command that reproduces the accessibility run is
+
+```bash
+CHROME_PATH="$(node -e "console.log(require('@playwright/test').chromium.executablePath())")" \
+  pnpm dlx lighthouse http://localhost:3000/ --only-categories=accessibility --output=json \
+  --output-path=/tmp/lh-a11y-home.json --chrome-flags="--headless=new"
+```
+
+from `apps/web` with `pnpm start` serving the build. `--headless=new` follows the machine's
+appearance setting for `prefers-color-scheme`, so on a Mac in dark mode this is a dark-theme audit;
+the light theme is checked with Playwright and axe-core instead. The same rule set now runs in CI on
+every pull request: `apps/web/e2e/accessibility.spec.ts` audits both pages in both colour schemes at
+the desktop viewport, at rest, and fails the `e2e` job on any violation.
+
 ## Routine deployments
 
 - **Production**: merging a pull request into `main` triggers a production deployment. There is no

@@ -182,7 +182,7 @@ export function GauntletPhase() {
       <div className="w-full max-w-3xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">
-          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="rainbow">PHASE 4</AnimatedText>
           </span>
           <AnimatedText animation="gravity" className="font-mono text-sm text-[var(--muted)]">
@@ -212,13 +212,16 @@ export function GauntletPhase() {
             <div
               className={`rounded-lg border p-6 text-center transition-all duration-500 ${
                 shownDeploymentStatus === 'success'
-                  ? 'border-green-500/50 bg-green-500/10'
-                  : 'border-yellow-500/50 bg-yellow-500/10'
+                  ? 'border-[var(--status-ok)]/50 bg-[var(--status-ok)]/10'
+                  : 'border-[var(--status-warn)]/50 bg-[var(--status-warn)]/10'
               }`}
             >
               {shownDeploymentStatus === 'deploying' ? (
                 <div className="flex items-center justify-center gap-3">
-                  <svg className="h-5 w-5 animate-spin text-yellow-400" viewBox="0 0 24 24">
+                  <svg
+                    className="h-5 w-5 animate-spin text-[var(--status-warn)]"
+                    viewBox="0 0 24 24"
+                  >
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -234,13 +237,15 @@ export function GauntletPhase() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  <span className="font-mono text-yellow-400">DEPLOYING TO PRODUCTION...</span>
+                  <span className="font-mono text-[var(--status-warn)]">
+                    DEPLOYING TO PRODUCTION...
+                  </span>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center justify-center gap-2">
                     <svg
-                      className="h-6 w-6 text-green-400"
+                      className="h-6 w-6 text-[var(--status-ok)]"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -252,9 +257,11 @@ export function GauntletPhase() {
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    <span className="font-mono text-lg text-green-400">DEPLOYMENT SUCCESSFUL</span>
+                    <span className="font-mono text-lg text-[var(--status-ok)]">
+                      DEPLOYMENT SUCCESSFUL
+                    </span>
                   </div>
-                  <p className="font-mono text-sm text-green-400/70">
+                  <p className="font-mono text-sm text-[var(--status-ok)]">
                     Production environment updated
                   </p>
                 </div>
@@ -270,9 +277,7 @@ export function GauntletPhase() {
               <span className="text-xl">🏆</span>
               <div>
                 <div className="font-semibold">Achievement Unlocked</div>
-                <div className="text-sm opacity-80">
-                  &quot;Zero Trust, Full Send&quot; — +500 XP
-                </div>
+                <div className="text-sm">&quot;Zero Trust, Full Send&quot; — +500 XP</div>
               </div>
             </div>
           </NotificationToast>

@@ -27,7 +27,7 @@ export function TechStack() {
           <h2 className="text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
             Tech Stack
           </h2>
-          <Link href="/skills" className="text-sm text-[var(--accent)] hover:underline">
+          <Link href="/skills" className="text-sm text-[var(--accent-text)] hover:underline">
             View all skills →
           </Link>
         </div>
