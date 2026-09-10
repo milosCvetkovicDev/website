@@ -5,6 +5,8 @@ node_modules
 # Build outputs
 dist
 .next
+# Build directory for the dev server Playwright starts locally (NEXT_DIST_DIR).
+.next-e2e
 .turbo
 out
 

@@ -34,6 +34,12 @@ const nextConfig: NextConfig = {
   // Outside a pnpm workspace there is no nested-lockfile problem to solve, so leave the root to
   // Next's own inference rather than failing the build or refusing to boot the server.
   ...(workspaceRoot ? { turbopack: { root: workspaceRoot } } : {}),
+  // Playwright's local web server sets NEXT_DIST_DIR (apps/web/playwright.config.ts) so that the
+  // `next dev` it starts never shares apps/web/.next with a `pnpm dev` running from this same
+  // checkout: two dev servers writing one build directory race over the manifests and chunks.
+  // Unset everywhere else, CI included, where `next build` and `next start` have to agree on it.
+  // `||`, not `??`: an empty value (an unset variable expanded by a shell) must fall back too.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
 };
 
 export default nextConfig;

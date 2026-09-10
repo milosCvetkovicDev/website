@@ -39,6 +39,7 @@ perform an operation.
 | 0011 | [Colour roles, corrected for scoped surfaces and stacked tints](0011-colour-roles-on-scoped-surfaces.md)                    | Accepted                                  | 2026-09-10 |
 | 0012 | [Correcting factual errors in accepted records](0012-correcting-accepted-records.md)                                        | Accepted                                  | 2026-09-10 |
 | 0013 | [Dependency build scripts stay disabled, and the reviewed versions are enforced](0013-dependency-build-scripts-reviewed.md) | Accepted                                  | 2026-09-10 |
+| 0014 | [Playwright starts the server it tests, on a port of its own](0014-playwright-owns-its-server.md)                           | Accepted                                  | 2026-09-10 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
