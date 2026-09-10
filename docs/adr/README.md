@@ -52,7 +52,8 @@ edited afterwards, and its other sections only to correct a claim that is untrue
 
 1. Take the next unused number from the table above, checking open branches too, since two records
    must not claim the same number. Copy the record closest in shape to yours as the starting point,
-   for example `cp docs/adr/0005-hosting-on-vercel.md docs/adr/0007-my-decision.md`.
+   for example `cp docs/adr/0005-hosting-on-vercel.md docs/adr/NNNN-my-decision.md`, with
+   `NNNN` replaced by that next number.
 2. Replace the body, keeping the heading set used by every record in this directory: an H1 of the
    form `# NNNN. Title`, then `## Status`, `## Date`, `## Context`, `## Decision`,
    `## Consequences` with `### Positive` and `### Trade-offs` (or `### Negative`) beneath it, and
