@@ -57,8 +57,10 @@ pnpm --filter web test:e2e
 
 These are every gate in `.github/workflows/ci.yml`. The first six commands are the `quality` job;
 the last two are the `e2e` job, which on CI runs Playwright against the production build
-(`next start`) while the same command locally reuses or starts the dev server. Both jobs must be
-green before a pull request can merge, and merging to `main` is what deploys. Vercel runs none of
+(`next start`) on port 3000, while the same command locally starts a dev server on port 3210.
+Playwright always starts the server it tests and never attaches to one that is already running, so
+a local run is unaffected by whatever holds 3000 ([ADR 0014](../adr/0014-playwright-owns-its-server.md)).
+Both jobs must be green before a pull request can merge, and merging to `main` is what deploys. Vercel runs none of
 them: it runs the install command and `turbo run build`, which is `next build` for `web`, and
 nothing else.
 
@@ -383,7 +385,9 @@ static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
       Confirm the `e2e` job was green on the deployed commit. The spec targets `next start` on
       localhost, so anything the hosting layer injects or blocks is outside it: after a
       Vercel-side change (analytics, headers), open the live `/` once with the console open.
-      Locally: `pnpm --filter web build && CI=true pnpm --filter web test:e2e`.
+      Locally: `pnpm --filter web build && CI=true pnpm --filter web test:e2e`. `CI=true` selects
+      the production build and the runner hardening, not the port; the run serves 3210, so it works
+      while a dev server or another checkout holds 3000.
 - [ ] Lighthouse spot check on `/` and one case study page in an incognito window; note the scores
       somewhere rather than acting on them immediately
 
@@ -419,7 +423,8 @@ CHROME_PATH="$(node -e "console.log(require('@playwright/test').chromium.executa
   --output-path=/tmp/lh-a11y-home.json --chrome-flags="--headless=new"
 ```
 
-from `apps/web` with `pnpm start` serving the build. `--headless=new` follows the machine's
+from `apps/web` with `pnpm start` serving the build, which listens on 3000 and is started by hand:
+it is a different server from the one the e2e suite runs on 3210. `--headless=new` follows the machine's
 appearance setting for `prefers-color-scheme`, so on a Mac in dark mode this is a dark-theme audit;
 the light theme is checked with Playwright and axe-core instead. The same rule set now runs in CI on
 every pull request: `apps/web/e2e/accessibility.spec.ts` audits both pages in both colour schemes at

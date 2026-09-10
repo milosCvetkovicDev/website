@@ -25,7 +25,7 @@
     "test:e2e": {
       "dependsOn": ["build"],
       "cache": false,
-      "env": ["CI"]
+      "env": ["CI", "PLAYWRIGHT_PORT"]
     },
     "clean": {
       "cache": false

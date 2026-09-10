@@ -35,10 +35,11 @@ perform an operation.
 | 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)                                                  | Superseded by 0013 (corrected 2026-09-10) | 2026-09-09 |
 | 0008 | [Accent colour roles](0008-accent-colour-roles.md)                                                                          | Superseded by 0011                        | 2026-09-09 |
 | 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md)                                        | Accepted                                  | 2026-09-09 |
-| 0010 | [Status colour tokens](0010-status-colour-tokens.md)                                                                        | Accepted                                  | 2026-09-09 |
+| 0010 | [Status colour tokens](0010-status-colour-tokens.md)                                                                        | Accepted (corrected 2026-09-10)           | 2026-09-09 |
 | 0011 | [Colour roles, corrected for scoped surfaces and stacked tints](0011-colour-roles-on-scoped-surfaces.md)                    | Accepted                                  | 2026-09-10 |
 | 0012 | [Correcting factual errors in accepted records](0012-correcting-accepted-records.md)                                        | Accepted                                  | 2026-09-10 |
 | 0013 | [Dependency build scripts stay disabled, and the reviewed versions are enforced](0013-dependency-build-scripts-reviewed.md) | Accepted                                  | 2026-09-10 |
+| 0014 | [Playwright starts the server it tests, on a port of its own](0014-playwright-owns-its-server.md)                           | Accepted                                  | 2026-09-10 |
 | 0015 | [Case-study slugs are fixed at build time](0015-static-case-study-params.md)                                                | Accepted                                  | 2026-09-10 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
@@ -52,7 +53,8 @@ edited afterwards, and its other sections only to correct a claim that is untrue
 
 1. Take the next unused number from the table above, checking open branches too, since two records
    must not claim the same number. Copy the record closest in shape to yours as the starting point,
-   for example `cp docs/adr/0005-hosting-on-vercel.md docs/adr/0007-my-decision.md`.
+   for example `cp docs/adr/0005-hosting-on-vercel.md docs/adr/NNNN-my-decision.md`, with
+   `NNNN` replaced by that next number.
 2. Replace the body, keeping the heading set used by every record in this directory: an H1 of the
    form `# NNNN. Title`, then `## Status`, `## Date`, `## Context`, `## Decision`,
    `## Consequences` with `### Positive` and `### Trade-offs` (or `### Negative`) beneath it, and

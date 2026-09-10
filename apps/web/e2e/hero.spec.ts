@@ -6,7 +6,10 @@ test.describe('Hero Section', () => {
     await page.goto('/');
     // Wait for hero content to be visible instead of arbitrary timeout
     await page.waitForSelector('h1', { state: 'visible' });
-    // Guard against reuseExistingServer attaching to some other project's dev server on :3000.
+    // A smoke check that this application rendered. It no longer guards against a foreign server:
+    // Playwright starts the one it tests, and an occupied port aborts the run before the first test
+    // (ADR 0014). It never caught a second checkout of this site either, and the not-found and error
+    // pages carry this title too; status and path are what catch a wrong page, in the specs below.
     await expect(page).toHaveTitle(/Milos Cvetkovic/);
     // The boot loader is removed once React has hydrated; interactions before that are lost.
     await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });

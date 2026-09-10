@@ -27,13 +27,18 @@ import { expect, test, type Page } from '@playwright/test';
  * Each page is audited twice. At rest, which is what Lighthouse scores and what the original
  * findings were about. Then, for `/`, again after scrolling the whole story.
  *
- * The second pass exists because at rest the six story sections are not in the document at all.
- * `DeferredSection` suspends each one until it approaches the viewport, so an unscrolled `/`
- * renders six empty placeholders: axe measures 30 text nodes there against 424 once the story has
- * been walked. That, not a GSAP reveal, is how the light-theme contrast failures fixed by ADR 0010
- * stayed invisible to this gate until they were found by hand. `text-green-400` on a near-white
- * page is 1.7:1, and with the class put back the at-rest pass is still green while the scrolled
- * pass fails.
+ * The second pass exists because most of the story is invisible to axe until it is revealed. The
+ * six sections are in the document from the first byte, but each phase starts its GSAP reveal at
+ * `opacity: 0`, and axe skips a fully transparent element: at rest 93 elements are transparent, 58
+ * of them carrying text, so `/` measures 103 colour-contrast nodes against 425 once the story has
+ * been walked. That is how the light-theme contrast failures fixed by ADR 0010 stayed invisible to
+ * this gate until they were found by hand. `text-green-400` on a near-white page is 1.7:1, and
+ * with the class put back the at-rest pass is still green while the scrolled pass fails.
+ *
+ * An earlier version of this comment blamed `DeferredSection`, the hydration gate that kept the
+ * sections out of the document entirely and left the at-rest pass measuring 30 nodes. PR #22
+ * removed it and restored the markup; the floors below are what stop the audited surface shrinking
+ * that way again without a test failing.
  *
  * The scrolled pass emulates `prefers-reduced-motion: reduce`, which is what makes it a gate rather
  * than a coin flip. Every phase then renders its finished state on mount instead of on a timeline
@@ -51,6 +56,22 @@ import { expect, test, type Page } from '@playwright/test';
  * Some status colours cannot be reached by any audit, because nothing constructs them: a `failed`
  * `PipelineStage`, the `warning` and `error` `NotificationToast` variants, and the `pending` and
  * `error` `ActivityEntry` variants. They are unreachable, not merely uncovered.
+ *
+ * The boot loader on `/` is outside all of this, and cannot be brought inside it. `openPage` waits
+ * for it to be hidden, so no pass measures it, and holding it on screen instead does not help.
+ * Measured on 2026-09-10 by aborting the page's `.js` chunks, which stops hydration and leaves the
+ * prerendered loader up for good: axe puts every one of its text nodes in `incomplete`, with
+ * "background color could not be determined because it is overlapped by another element". axe is
+ * right and the overlap is total. The loader is `z-[1]` and the story is `relative z-10` in the
+ * same stacking context, so the hero paints over it: `elementFromPoint` at the centre of the
+ * loader's own heading, boot line and version tag returns hero content in all three cases, never
+ * the loader. Only `violations` fail here, so an assertion on the loader would be green whatever
+ * colours it used, and there is nothing on screen for it to be green about. Abort the `.css` chunk
+ * with the `.js` and it is worse than useless: the stylesheet goes too and every node passes at
+ * 21:1 against an unstyled page. Its progress and boot-message states are not reachable either.
+ * `useIsHydrated` flips on the first client commit, so the effect driving them never sees `visible`
+ * true and the loader only ever renders its first message. What the loader looks like is held by
+ * the token rules in CLAUDE.md and by review, not by this gate.
  *
  * Both passes run at the project's desktop viewport. A mobile viewport, which is what Lighthouse
  * emulates by default, is still not covered.
@@ -117,20 +138,35 @@ const LIGHTHOUSE_AXE_OPTIONS: AxeRunOptions = {
 };
 
 const pages = ['/', '/work/self-healing-agent'];
+
+/**
+ * Fewest colour-contrast nodes each page must still measure at rest. A floor, not a target: the
+ * point is that a change which unmounts content or hides it behind `opacity: 0` fails here instead
+ * of silently shrinking the audit, which is what happened while `DeferredSection` existed. Measured
+ * against the production build on 2026-09-10: 103 on `/` and 48 on the case study, identical in
+ * both colour schemes. Set with room for ordinary copy edits; raise them if a page genuinely grows.
+ */
+const AT_REST_CONTRAST_FLOOR: Record<(typeof pages)[number], number> = {
+  '/': 80,
+  '/work/self-healing-agent': 40,
+};
 const colorSchemes = ['light', 'dark'] as const;
 
 /**
- * Walks the page to the bottom so every `DeferredSection` hydrates. Two animation frames per step
- * let React commit each section before the next one moves.
+ * Walks the page to the bottom so every phase has been through the viewport. Two animation frames
+ * per step let React commit before the next one moves.
  *
- * Stepping is not what makes this work today. `DeferredSection` observes with a root margin of
- * `10000px 0px 0px 0px`, and its own comment says so: anything already scrolled past counts as
- * approached, so a single jump to the bottom hydrates the lot. Measured, not assumed: with the
- * loop replaced by that one jump this spec still audits over 400 text nodes and still fails on a
- * reintroduced palette class. The walk is kept for two reasons that outlive that margin: it bounds
- * how far the margin would have to reach if the story grew, and it is the only form that would
- * also drive the `ScrollTrigger`s if a `no-preference` pass is ever added. Under `reduce` no
- * ScrollTrigger is created at all, so today the walk's shape does not affect what is measured.
+ * Stepping is not what makes this work today. The sections are server-rendered and stay in the
+ * document, so nothing has to be brought into being by scrolling: what the walk changes is
+ * `opacity`, since axe skips a fully transparent element and every phase starts its reveal at 0.
+ * Under `reduce` each phase renders its finished state on mount (ADR 0009) and no `ScrollTrigger`
+ * is created, so a single jump to the bottom would measure the same nodes. The walk is kept
+ * because it is the only form that would also drive the `ScrollTrigger`s if a `no-preference`
+ * pass is ever added, and because it fails loudly on a page that cannot scroll.
+ *
+ * This used to describe `DeferredSection`, a hydration gate that kept each section out of the
+ * document until it approached the viewport. PR #22 removed it; the sections have been in the DOM
+ * from the first byte since.
  *
  * `behavior: 'instant'` matters: the two-argument `scrollTo(x, y)` inherits any CSS
  * `scroll-behavior`, and under `smooth` each step would animate for hundreds of milliseconds while
@@ -212,8 +248,8 @@ async function openPage(
   // error naming the URL rather than as the test budget.
   const response = await page.goto(path, { waitUntil: 'networkidle', timeout: 30_000 });
   // A renamed slug or a rendering error would serve the not-found or the error page, whose
-  // title also matches below; the status and the path catch that. The title guards against
-  // reuseExistingServer attaching to another project's server on :3000.
+  // title also matches below; the status and the path catch that. The title is left as a
+  // smoke check that this application rendered at all (ADR 0014).
   expect(response?.status(), `${path} should answer 200`).toBe(200);
   expect(new URL(page.url()).pathname, `${path} should not redirect`).toBe(path);
   await expect(page).toHaveTitle(/Milos Cvetkovic/);
@@ -260,11 +296,15 @@ test.describe('Accessibility', () => {
         // off appears in none of the four result lists, axe only logs an unknown tag instead of
         // throwing, and a page with no text would leave `color-contrast` inapplicable. Each sentinel
         // covers one part of the options. `document-title` is selected by the `wcag2a` tag alone,
-        // `color-contrast` (with at least one measured node) by `wcag2aa` alone, and
-        // `label-content-name-mismatch` only by the rules map; that one has been inapplicable on
-        // both pages since the cards' accessible names became their visible text, so presence in
-        // the results is its only proof.
-        expect(passingNodes(results, 'color-contrast')).toBeGreaterThan(0);
+        // `color-contrast` by `wcag2aa` alone, and `label-content-name-mismatch` only by the rules
+        // map; that one has been inapplicable on both pages since the cards' accessible names became
+        // their visible text, so presence in the results is its only proof.
+        expect(
+          passingNodes(results, 'color-contrast'),
+          `${path} at rest measured far fewer colour-contrast nodes than it should. Content that ` +
+            'stopped being rendered, or became transparent, is no longer being audited: find what ' +
+            'left the page before adjusting this floor.',
+        ).toBeGreaterThan(AT_REST_CONTRAST_FLOOR[path]);
         expect(ruleIdsThatRan(results)).toEqual(
           expect.arrayContaining(['document-title', 'label-content-name-mismatch']),
         );
@@ -319,10 +359,17 @@ test.describe('Accessibility', () => {
         // The real proof that this pass measured the story and not just the shell. Visibility
         // assertions cannot give it: every phase is server-rendered, so its markup is in the DOM
         // and "visible" to Playwright even unhydrated and fully transparent, while axe skips
-        // anything at `opacity: 0`. Node counts do give it. Measured on this page: 30 at rest,
-        // 409 scrolled. A floor of 200 fails loudly if the walk ever stops working, and leaves
-        // room for the copy to change.
-        expect(passingNodes(results, 'color-contrast')).toBeGreaterThan(200);
+        // anything at `opacity: 0`. Node counts do give it. Measured against the production build
+        // on 2026-09-10: 103 at rest, 425 scrolled, identical in both colour schemes. The floor was
+        // 200, which is under half of what the page measures: five of its nine sections could stop
+        // being revealed and the pass would still be green. 350 keeps the same headroom for copy
+        // changes that the at-rest floors have, and still fails loudly if the walk stops working.
+        expect(
+          passingNodes(results, 'color-contrast'),
+          'the scrolled pass measured far fewer colour-contrast nodes than it should: either the ' +
+            'walk stopped reaching the bottom, or content stopped being revealed. Find what left ' +
+            'the page before adjusting this floor.',
+        ).toBeGreaterThan(350);
       });
     }
   });

@@ -1,3 +1,10 @@
+/**
+ * These are pure data assertions with no DOM in them, and building a jsdom window is the most
+ * expensive thing in a test file that does not need one -- importing the module alone costs about
+ * two seconds in every worker.
+ *
+ * @vitest-environment node
+ */
 import { describe, expect, it } from 'vitest';
 import { CONNECTIONS, NODES, getActiveConnections } from '../architecture-graph';
 

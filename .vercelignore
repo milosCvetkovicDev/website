@@ -5,6 +5,7 @@
 # that .gitignore excludes has to be repeated here. .turbo matters most: its cache tarballs
 # exceed Vercel's 100 MB per-file upload limit.
 .turbo
+.next-e2e
 .pnpm-store
 dist
 build
