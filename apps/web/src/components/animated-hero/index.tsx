@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, memo, type ReactNode } from 'react';
+import { useEffect, useRef, useState, memo, type ReactNode } from 'react';
 import { HeroSection } from './hero-section';
 import { SectionProgress } from './section-progress';
 import { DiscoveryPhase } from './discovery-phase';
@@ -184,14 +184,18 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
 export function AnimatedHero({ children }: { children?: ReactNode }) {
   const mounted = useIsHydrated();
+  // The seven progress dots describe this wrapper, not the document: `/` carries on with Featured
+  // Work and Tech Stack below it. The loader and the indicator itself are fixed, so the only thing
+  // in flow here is the story, and the wrapper's box is the story's box.
+  const storyRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="relative">
+    <div className="relative" ref={storyRef}>
       {/* Bootstrap loader overlay - fades out when mounted */}
       <BootstrapLoader visible={!mounted} />
 
       {/* Section Progress Indicator */}
-      <MemoizedSectionProgress />
+      <MemoizedSectionProgress storyRef={storyRef} />
 
       {/* Content Layer */}
       <div className="relative z-10">
