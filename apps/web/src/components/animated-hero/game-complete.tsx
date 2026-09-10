@@ -20,12 +20,52 @@ export function GameComplete() {
     gsap.registerPlugin(ScrollTrigger);
 
     const ctx = gsap.context(() => {
+      // The breathing glow is deliberately NOT a child of the timeline below. GSAP gives a child
+      // with `repeat: -1` a total duration of 1e10 seconds, and a timeline takes its duration from
+      // its longest child, so this timeline used to be ~317 years long. The `reverse` toggleAction
+      // only flips the time scale and never seeks, so scrolling back up rewound every second the
+      // glow had been breathing before the entrance itself began to un-play: linger half a minute
+      // and the terminal dissolved half a minute later, while still on screen. Kept out of the
+      // timeline, the entrance is 1.4s and reverses at once, like every other phase.
+      const glow = gsap.to(ctaRef.current, {
+        boxShadow: '0 0 30px rgba(139, 92, 246, 0.4)',
+        duration: 1,
+        delay: 0.2,
+        repeat: -1,
+        yoyo: true,
+        ease: 'power1.inOut',
+        paused: true,
+      });
+
+      // `resume` on an entrance that has already finished is rendered with events suppressed, so
+      // onComplete does not fire again and the glow has to be picked up by hand. Guarded, because
+      // a visitor who deep-links below the section gets `resume` on an entrance that never played.
+      const resumeGlowIfEntranceDone = () => {
+        if (tl.progress() === 1) glow.play();
+      };
+
       const tl = gsap.timeline({
+        onComplete: () => {
+          // restart rather than play, so the 0.2s beat after the CTA lands is the same every time.
+          glow.restart(true);
+        },
+        onReverseComplete: () => {
+          glow.pause(0);
+        },
         scrollTrigger: {
           trigger: sectionRef.current,
           start: 'top center',
-          // The CTA glow below repeats forever; pause it while the section is scrolled past.
+          // `pause`/`resume` keep the entrance from finishing, and so from starting the glow,
+          // while the section is scrolled past.
           toggleActions: 'play pause resume reverse',
+          onEnter: resumeGlowIfEntranceDone,
+          onEnterBack: resumeGlowIfEntranceDone,
+          onLeave: () => {
+            glow.pause();
+          },
+          onLeaveBack: () => {
+            glow.pause();
+          },
         },
       });
 
@@ -36,25 +76,12 @@ export function GameComplete() {
         { opacity: 1, scale: 1, duration: 0.6, ease: 'power2.out' },
       );
 
-      // CTA pulses
+      // CTA fades and slides up
       tl.fromTo(
         ctaRef.current,
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.5 },
         '+=0.3',
-      );
-
-      // Add subtle pulse to CTA
-      tl.to(
-        ctaRef.current,
-        {
-          boxShadow: '0 0 30px rgba(139, 92, 246, 0.4)',
-          duration: 1,
-          repeat: -1,
-          yoyo: true,
-          ease: 'power1.inOut',
-        },
-        '+=0.2',
       );
     }, sectionRef);
 
