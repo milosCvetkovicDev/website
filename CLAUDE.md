@@ -146,6 +146,19 @@ is there so that a future buildable package is compiled before the apps typechec
 - Browser APIs are stubbed per test file, not globally. `matchMedia` and `IntersectionObserver` are
   defined in a `beforeEach` inside the file that needs them, as in
   `src/components/animated-hero/__tests__/tmux-background.test.tsx`. Keep new stubs local too.
+- Building a jsdom window costs about two seconds in every worker, and it is by far the largest
+  single cost in the suite. A test file with no DOM in it declares `@vitest-environment node` in a
+  docblock at the top, as the three `src/data/__tests__` files do.
+- Two query patterns dominate a slow test file, and a CPU profile says which. `getByRole` with a
+  `name` option recomputes the accessible name of every candidate on every call, so resolve an
+  element once and reuse it unless the accessible name is what the test is asserting. And every
+  GSAP tween reads its start value through `getComputedStyle`, which jsdom answers by matching its
+  user-agent stylesheet against the element, so a mount that builds a timeline is expensive:
+  prefer walking one mount through a lifecycle over re-mounting per assertion.
+- `testTimeout` stays at the 5s default. A test that genuinely needs longer takes an explicit
+  timeout as `it`'s third argument, with a comment saying why, as the phase lifecycle test in
+  `src/components/animated-hero/__tests__/story-phases.test.tsx` does. Raising the global default
+  hides the next slow test instead.
 - e2e specs must wait for hydration before interacting, because events fired before it are lost.
   `e2e/hero.spec.ts` waits for the `System Boot` loader to be hidden, and also asserts the page
   title. That assertion is only a smoke check that the app rendered: it never could catch a second
