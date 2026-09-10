@@ -9,24 +9,31 @@ environment variable is documented in [`.env.example`](../../.env.example).
 
 ## Status
 
-As of 2026-09-08 the site is **not deployed**. There is no Vercel project, no `vercel.json` in the
-repository, and no deployment history. `miloscvetkovic.dev` currently serves a Namecheap parking
-page: the apex `A` record points at `162.255.119.232`, `www` is a `CNAME` to
-`parkingpage.namecheap.com`, and the domain uses Namecheap BasicDNS
-(`dns1.registrar-servers.com`, `dns2.registrar-servers.com`). This runbook takes it from that state
-to a live production deployment on the apex domain, and then covers routine deploys, rollback and
-the failures worth knowing about in advance.
+As of 2026-09-09 the site is **live at `https://miloscvetkovic.dev`**. The Vercel project is
+`portfolio` in the team `cvetkovicmilosgmailcoms-projects`, linked to
+`github.com/milosCvetkovicDev/website` with production branch `main`, Root Directory `apps/web`,
+Node 22.x and `pnpm install --frozen-lockfile` as the install command. Its first production
+deployment was built from commit `a8b4a91` and passed every check under **Verify**. The Namecheap
+records were switched the same day: the apex resolves to `216.198.79.1` and `64.29.17.1`, `www` is
+a `CNAME` to `30c6e6551c22e39e.vercel-dns-017.com.` and redirects to the apex with a 308, Namecheap
+BasicDNS (`dns1.registrar-servers.com`, `dns2.registrar-servers.com`) stays authoritative, the mail
+records were untouched, and the certificate was created with `vercel certs issue` after automatic
+issuance had not happened within ten minutes. What the domain looked like
+before, and how to put it back, is under **Reverting the DNS change**. There is still no
+`vercel.json`; the only Vercel-specific file in the repository is `.vercelignore`, explained under
+Path B. The rest of this runbook covers routine deploys, rollback and the failures worth knowing
+about in advance.
 
 ## Prerequisites
 
-| Requirement       | Detail                                                                                                                                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Vercel account    | Hobby is sufficient. The account must be able to add a custom domain.                                                                                                                                               |
-| Domain control    | Namecheap account that owns `miloscvetkovic.dev`, with access to **Domain List → Manage**.                                                                                                                          |
-| GitHub repository | `github.com/milosCvetkovicDev/website`, with the Vercel GitHub app authorised for it.                                                                                                                               |
-| Node 22           | Matches `.nvmrc` (`22`) and `engines.node` (`>=22`) in the root `package.json`. `nvm use`.                                                                                                                          |
-| pnpm 10.33.0      | Pinned by `packageManager` in the root `package.json`. Use corepack rather than a global pnpm.                                                                                                                      |
-| Vercel CLI        | `npm i -g vercel`. Needed for the CLI setup path, for `vercel rollback`, and for inspecting deployments (`vercel ls`, `vercel inspect`, `vercel logs`). Only the last has no dashboard equivalent that is as quick. |
+| Requirement       | Detail                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Vercel account    | Hobby is sufficient. The account must be able to add a custom domain.                                                                                                                                                                                                                                                                                                                   |
+| Domain control    | Namecheap account that owns `miloscvetkovic.dev`, with access to **Domain List → Manage**.                                                                                                                                                                                                                                                                                              |
+| GitHub repository | `github.com/milosCvetkovicDev/website`, with the Vercel GitHub app authorised for it.                                                                                                                                                                                                                                                                                                   |
+| Node 22           | Matches `.nvmrc` (`22`) and `engines.node` (`>=22`) in the root `package.json`. `nvm use`.                                                                                                                                                                                                                                                                                              |
+| pnpm 10.33.0      | Pinned by `packageManager` in the root `package.json`. Use corepack rather than a global pnpm.                                                                                                                                                                                                                                                                                          |
+| Vercel CLI        | `npm i -g vercel`. Path B was run with 59.13.1 and uses `vercel project update` (54.21 or newer; its `--root-directory` and `--node-version` flags are in `--help` but not yet on the docs page), `vercel api`, `vercel deploy-hooks` and `vercel curl` (48.8 or newer). Also used for `vercel rollback` and for inspecting deployments (`vercel ls`, `vercel inspect`, `vercel logs`). |
 
 `vercel login` opens a browser and completes an interactive email or OAuth confirmation. It cannot
 be run by an agent or in a non-interactive shell. Milos must run it himself, once, before any other
@@ -52,44 +59,52 @@ These are every gate in `.github/workflows/ci.yml`. The first six commands are t
 the last two are the `e2e` job, which on CI runs Playwright against the production build
 (`next start`) while the same command locally reuses or starts the dev server. Both jobs must be
 green before a pull request can merge, and merging to `main` is what deploys. Vercel runs none of
-them: it runs the install command and `next build`, nothing else.
+them: it runs the install command and `turbo run build`, which is `next build` for `web`, and
+nothing else.
 
 ## One-time project setup
 
-The two paths below reach the same project, but the CLI path does not necessarily connect the Git
-repository. If you take it, run `vercel git connect` (or connect the repository under **Project
-Settings → Git**) and confirm the connection before relying on push-to-deploy or pull request
-previews. Do one path, not both. The dashboard path is recommended for the first setup because the
-Node.js version, the production branch and the monorepo build setting are dashboard-only.
+The two paths below reach the same project. Do one path, not both. Path B is the one that was
+actually used on 2026-09-09: with CLI version 59 or newer every setting in the table can be set or
+read from the terminal, and the dashboard path remains as the alternative for someone without the
+CLI. Whichever path you take, confirm the Git connection (the `link` field in the `vercel api` output
+under Path B, or **Project Settings → Git**) before relying on push-to-deploy or pull request
+previews.
 
 ### Settings that matter
 
-| Setting                              | Value                                                   |
-| ------------------------------------ | ------------------------------------------------------- |
-| Git repository                       | `github.com/milosCvetkovicDev/website`                  |
-| Root Directory                       | `apps/web`                                              |
-| Include files outside Root Directory | Enabled (required, see below)                           |
-| Framework Preset                     | Next.js                                                 |
-| Node.js Version                      | 22.x                                                    |
-| Install Command                      | `pnpm install --frozen-lockfile` (override)             |
-| Build Command                        | leave as the framework default (`next build`)           |
-| Output Directory                     | leave as the framework default                          |
-| Production Branch                    | `main`                                                  |
-| `NEXT_PUBLIC_SITE_URL`               | `https://miloscvetkovic.dev` for Production and Preview |
+| Setting                              | Value                                                                  |
+| ------------------------------------ | ---------------------------------------------------------------------- |
+| Git repository                       | `github.com/milosCvetkovicDev/website`                                 |
+| Root Directory                       | `apps/web`                                                             |
+| Include files outside Root Directory | Enabled (required, see below)                                          |
+| Framework Preset                     | Next.js                                                                |
+| Node.js Version                      | 22.x                                                                   |
+| Install Command                      | `pnpm install --frozen-lockfile` (override)                            |
+| Build Command                        | leave unset; Vercel runs `turbo run build` scoped to `web` (see below) |
+| Output Directory                     | leave as the framework default                                         |
+| Production Branch                    | `main`                                                                 |
+| `NEXT_PUBLIC_SITE_URL`               | `https://miloscvetkovic.dev` for Production and Preview                |
 
-Do not set a custom build command such as `turbo build`. With Root Directory `apps/web`, Vercel runs
-the build inside that directory, where `pnpm build` is already `next build` (see
-`apps/web/package.json`). Turborepo is the local and CI task runner, not part of the Vercel build.
+Leave the build command unset. Because `turbo.json` sits at the repository root, Vercel detects
+Turborepo ("Detected Turbo. Adjusting default settings" in the build log) and runs `turbo run build`
+with only `web` in scope, which executes the `build` task from `turbo.json` and therefore
+`next build` inside `apps/web`. The task's `env` list (`NEXT_PUBLIC_SITE_URL`) and `outputs` apply on
+Vercel exactly as they do locally and in CI, and that run uses Vercel's own remote cache ("Remote
+caching enabled"), which needs nothing from the repository. Setting the command to `turbo build` by
+hand adds nothing and removes the framework detection.
 
 **Include source files outside of the Root Directory in the Build Step** must be on. `pnpm-lock.yaml`
 and `pnpm-workspace.yaml` live at the repository root, and `apps/web` declares
 `"@repo/prettier-config": "workspace:*"`, so the install cannot succeed with only `apps/web`
-available. Vercel often enables this automatically when it detects a workspace; confirm it under
-**Project Settings → General** rather than assuming it.
+available. Vercel enabled it automatically on 2026-09-09; confirm it under **Project Settings →
+General**, or with `vercel api /v9/projects/<project-id> --raw | jq .sourceFilesOutsideRootDirectory`,
+which must print `true`, rather than assuming it.
 
 `apps/web/package.json` has no `engines` field, and Vercel reads the Node version from the Root
 Directory's `package.json` or from the project setting. The root `engines.node` and `.nvmrc` do not
-reach it, so the Node.js Version must be set explicitly in the dashboard.
+reach it, so the Node.js Version must be set explicitly, in the dashboard or with
+`vercel project update portfolio --node-version 22.x`.
 
 ### Path A: dashboard
 
@@ -113,26 +128,63 @@ reach it, so the Node.js Version must be set explicitly in the dashboard.
 
 ### Path B: Vercel CLI
 
-Run every command from the repository root. Do not `cd` into `apps/web`: `vercel deploy` uploads the
-working directory, and from `apps/web` that upload leaves out `pnpm-lock.yaml` and
-`pnpm-workspace.yaml`, so the install fails with `ERR_PNPM_NO_LOCKFILE` and the `workspace:*`
-dependency on `@repo/prettier-config` cannot resolve.
+This is the path that created the project on 2026-09-09. Run every command from the repository
+root. Do not `cd` into `apps/web`: `vercel deploy` uploads the working directory, and from `apps/web`
+that upload leaves out `pnpm-lock.yaml` and `pnpm-workspace.yaml`, so the install fails with
+`ERR_PNPM_NO_LOCKFILE` and the `workspace:*` dependency on `@repo/prettier-config` cannot resolve.
 
 ```bash
 vercel login                       # interactive, human-run, opens a browser
-vercel link                        # answer apps/web when asked where the code is located
-vercel git connect                 # attach github.com/milosCvetkovicDev/website if it is not attached
-vercel env add NEXT_PUBLIC_SITE_URL production   # paste https://miloscvetkovic.dev
-vercel env add NEXT_PUBLIC_SITE_URL preview      # paste https://miloscvetkovic.dev
-vercel env ls                      # confirm both entries exist
-vercel deploy                      # preview deployment, prints a URL
-vercel deploy --prod               # production deployment
+vercel link --yes                  # creates project "portfolio" (the directory name), writes .vercel/project.json
+vercel project update portfolio --root-directory apps/web --framework nextjs \
+  --node-version 22.x --install-command "pnpm install --frozen-lockfile" --yes
+vercel git connect https://github.com/milosCvetkovicDev/website --yes
+vercel api /v9/projects/<project-id> --raw \
+  | jq '{rootDirectory, nodeVersion, installCommand, sourceFilesOutsideRootDirectory, link}'
+vercel env add NEXT_PUBLIC_SITE_URL production \
+  --value https://miloscvetkovic.dev --no-sensitive --yes
+vercel env add NEXT_PUBLIC_SITE_URL preview \
+  --value https://miloscvetkovic.dev --no-sensitive --yes
+vercel env ls                      # both entries, type Config
 ```
 
-After linking, still open **Project Settings → General** in the dashboard to set **Node.js Version**
-to 22.x, the **Install Command** override and the include-files-outside-the-root-directory option,
-and **Project Settings → Git** to confirm the production branch is `main`. The CLI does not set
-those.
+`<project-id>` is `projectId` in `.vercel/project.json`, which `vercel link` writes (the directory
+is gitignored). The `jq` line is the check that matters: `rootDirectory`, `nodeVersion` and
+`installCommand` must show the values just set, `sourceFilesOutsideRootDirectory` must be `true`,
+and `link` must name the repository with `productionBranch: "main"`.
+
+Three things about these commands are not obvious:
+
+- `vercel link --yes` also writes a `.env.local` at the repository root holding a short-lived
+  `VERCEL_OIDC_TOKEN`, and appends `.env*` to `.gitignore` even though `.env.local` is already
+  listed there. The file is ignored and harmless; revert the `.gitignore` change, because `.env*`
+  would also match the tracked `.env.example`.
+- `vercel git connect` printed `Failed to connect milosCvetkovicDev/website to project` on
+  2026-09-09 even though the link had been recorded. Trust the `link` field in the `vercel api`
+  output, not the message. A missing `link` means the Vercel GitHub App is not installed for the
+  `milosCvetkovicDev` account; install it from **Project Settings → Git** and run the command again.
+- `vercel deploy` uploads the working tree filtered by `.vercelignore` and the CLI's built-in list of
+  about two dozen names (`node_modules`, `.next`, `.git` and `.env.local` among them, not `.turbo`),
+  never by `.gitignore`. Without `.vercelignore` the first attempt
+  uploaded 1.9 GB of `.turbo` cache and failed with `File size limit exceeded (100 MB)`. The file is
+  committed for that reason; keep it aligned with `.gitignore`.
+
+For the first production deployment, prefer a Git-triggered build over `vercel deploy --prod`: it
+builds the commit on `main` inside Vercel, so the deployment carries the commit and branch, and it
+proves that the Git connection can clone the repository. A deploy hook does that without a push:
+
+```bash
+vercel deploy-hooks create bootstrap-main --ref main   # prints a URL; treat it as a secret
+curl -X POST "<hook url>"                              # returns {"job":{"state":"PENDING",...}}
+vercel ls                                              # the new deployment, Environment: Production
+vercel inspect <deployment-url> --wait --timeout 5m    # blocks until READY or ERROR
+vercel inspect <deployment-url> --logs 2>&1 | grep -E 'Cloning|install|turbo run'   # log is on stderr
+vercel deploy-hooks remove <hook-id> --yes             # anyone holding the URL can start builds
+```
+
+On 2026-09-09 this built `a8b4a91` in 38 seconds. Fetch pages from the deployment with
+`vercel curl <path> --deployment <deployment-url>`, which gets through deployment protection by
+creating a project-wide bypass secret on first use (see **Not covered**).
 
 ### Notes
 
@@ -141,22 +193,31 @@ those.
   inlined into the client bundle at build time.
 - Because `NEXT_PUBLIC_*` values are inlined at build time, editing the variable in Vercel has no
   effect until the next deployment. Changing it always requires a redeploy.
-- Turborepo **remote caching** is optional and is off. There is no `.turbo/config.json` or
-  `TURBO_TOKEN` in the repository, and nothing in this runbook depends on it. Leave it off unless
-  build times become a problem.
+- Turborepo **remote caching** is off locally and in CI: there is no `.turbo/config.json` or
+  `TURBO_TOKEN` in the repository, and nothing in this runbook depends on it. Vercel builds are the
+  exception; they run `turbo run build` against Vercel's own remote cache automatically, without any
+  configuration in the repository.
 
 ## Domain and DNS
 
 ### 1. In Vercel
 
-1. **Project Settings → Domains → Add**. Add `miloscvetkovic.dev`.
-2. Add `www.miloscvetkovic.dev` as a second domain.
-3. Set `miloscvetkovic.dev` as the **primary** domain, and edit `www.miloscvetkovic.dev` so it
-   **redirects to `miloscvetkovic.dev`** with status **308 Permanent Redirect**. Vercel offers 307
-   and 308 here and defaults to 307, which is the wrong choice for a canonical host. Vercel will then
-   show the DNS records it expects for each domain.
-4. Both domains will sit in **Invalid Configuration** until the Namecheap records change. That is
-   expected at this point.
+Done on 2026-09-09 from the CLI; the dashboard equivalent is **Project Settings → Domains**.
+
+```bash
+vercel domains add miloscvetkovic.dev portfolio
+vercel domains add www.miloscvetkovic.dev portfolio
+vercel api /v9/projects/<project-id>/domains/www.miloscvetkovic.dev -X PATCH \
+  -f redirect=miloscvetkovic.dev -F redirectStatusCode=308
+vercel api /v9/projects/<project-id>/domains --raw \
+  | jq '.domains[] | {name, redirect, redirectStatusCode}'
+vercel domains verify miloscvetkovic.dev        # prints the records Vercel expects for the apex
+vercel domains verify www.miloscvetkovic.dev    # and for www
+```
+
+The apex is primary and `www` redirects to it with **308 Permanent Redirect**; in the dashboard
+Vercel offers 307 and 308 and defaults to 307, which is the wrong choice for a canonical host. Both
+domains sit in **Invalid Configuration** until the Namecheap records change. That is expected.
 
 ### 2. At Namecheap
 
@@ -177,36 +238,45 @@ dig +short TXT miloscvetkovic.dev
 dig +short NS miloscvetkovic.dev
 ```
 
-Remove:
+Remove. This is what the Advanced DNS tab actually showed on 2026-09-09: the parking
+`A 162.255.119.232` that `dig` reports is not listed as an `A` record, Namecheap serves it from the
+URL Redirect Record.
 
-| Type                | Host  | Current value                | Action            |
-| ------------------- | ----- | ---------------------------- | ----------------- |
-| A Record            | `@`   | `162.255.119.232`            | Delete            |
-| CNAME Record        | `www` | `parkingpage.namecheap.com.` | Delete            |
-| URL Redirect Record | any   | any                          | Delete if present |
+| Type                | Host  | Value                                      | Action |
+| ------------------- | ----- | ------------------------------------------ | ------ |
+| URL Redirect Record | `@`   | `http://www.miloscvetkovic.dev` (Unmasked) | Delete |
+| CNAME Record        | `www` | `parkingpage.namecheap.com.`               | Delete |
 
-Add exactly the two records Vercel lists for these domains under **Project Settings → Domains**, an
-`A` record on `@` and a `CNAME` on `www`, with TTL `Automatic`:
+Add the records Vercel lists for these domains (`vercel domains verify <domain>`, or **Project
+Settings → Domains**), with TTL `Automatic`. On 2026-09-09 Vercel's first-ranked recommendation was
+two `A` records on the apex and one project-specific `CNAME` on `www`:
 
-| Type         | Host  | Value                                      | TTL       |
-| ------------ | ----- | ------------------------------------------ | --------- |
-| A Record     | `@`   | the apex address Vercel shows for the apex | Automatic |
-| CNAME Record | `www` | the CNAME target Vercel shows for `www`    | Automatic |
+| Type         | Host  | Value                                  | TTL       |
+| ------------ | ----- | -------------------------------------- | --------- |
+| A Record     | `@`   | `216.198.79.1`                         | Automatic |
+| A Record     | `@`   | `64.29.17.1`                           | Automatic |
+| CNAME Record | `www` | `30c6e6551c22e39e.vercel-dns-017.com.` | Automatic |
 
-Do not copy DNS values out of this runbook or any other document. Vercel has changed its apex address
-(from `76.76.21.21` to `216.198.79.1`) and now issues project-specific `*.vercel-dns-NNN.com` CNAME
-targets, so the dashboard is the only authority and typing a stale value leaves both domains
-permanently in **Invalid Configuration**. Record the values you actually entered in the pull request
-that follows the cutover, and update the `dig` expectations under **Verify** to match.
+Confirm those values against `vercel domains verify` or the dashboard before typing them, and do not
+take them from `vercel domains inspect`, which recommends the second-ranked `76.76.21.21`. Vercel
+has changed its apex address before (`76.76.21.21` is now its second-ranked option, as is
+`cname.vercel-dns.com` for `www`) and the CNAME target is issued per project, so a value copied from
+an older document can leave both domains permanently in **Invalid Configuration**. If the values have
+moved on, record the ones actually entered in the pull request that follows the cutover, and update
+the `dig` expectations under **Verify** to match.
 
-Then, back in Vercel, open **Project Settings → Domains** and use **Refresh** on each domain until
-both report **Valid Configuration**. Vercel issues the TLS certificate automatically once the
+Then run `vercel domains verify miloscvetkovic.dev` and `vercel domains verify www.miloscvetkovic.dev`
+(or use **Refresh** on each domain under **Project Settings → Domains**) until both report a valid
+configuration. Vercel issues the TLS certificate automatically once the
 records resolve; that usually takes under a minute after propagation. If a domain reaches **Valid
 Configuration** but the certificate does not issue within a few minutes, check for a `CAA` record
 blocking Vercel's certificate authority with `dig +short CAA miloscvetkovic.dev` (empty today, and
 anything else must permit `letsencrypt.org`). `.dev` is on the HSTS preload list, so browsers refuse
 plain HTTP: until the certificate issues the site is unreachable everywhere, with no HTTP fallback.
-Work the certificate problem rather than changing the DNS records again.
+Work the certificate problem rather than changing the DNS records again. On 2026-09-09 nothing had
+been issued ten minutes after both domains verified, with `CAA` empty;
+`vercel certs issue miloscvetkovic.dev www.miloscvetkovic.dev` created the certificate in 12 seconds
+and the apex answered over HTTPS immediately.
 
 ### Cautions
 
@@ -229,25 +299,27 @@ Work the certificate problem rather than changing the DNS records again.
 
 ### Reverting the DNS change
 
-Delete the `A` record on `@` and the `CNAME` on `www` that point at Vercel, restore
-`A @ 162.255.119.232` and `CNAME www parkingpage.namecheap.com.`, then re-enable the parking page on
-the Domain tab. Expect the same propagation delay as the cutover, and re-check the `MX` and `TXT`
-records afterwards. Leave the Vercel project in place: a domain sitting in **Invalid Configuration**
-costs nothing.
+Delete the two `A` records on `@` and the `CNAME` on `www` that point at Vercel, then add back what
+was there before 2026-09-09: a **URL Redirect Record** on `@` to `http://www.miloscvetkovic.dev`
+(Unmasked; Namecheap serves it as `A 162.255.119.232`) and `CNAME www parkingpage.namecheap.com.`,
+or re-enable the parking page on the Domain tab, which creates the same records. Expect the same
+propagation delay as the cutover, and re-check the `MX` and `TXT` records afterwards. Leave the
+Vercel project in place: a domain sitting in **Invalid Configuration** costs nothing.
 
 ## Verify
 
 Run these once Vercel reports Valid Configuration for both domains. The two `dig` expectations below
-are whatever values Vercel gave you in **Project Settings → Domains**, not fixed constants.
+are the values Vercel issued on 2026-09-09; if `vercel domains verify` shows different ones, those
+win.
 
 ```bash
-# Apex resolves to the Vercel address shown in the dashboard.
-dig +short miloscvetkovic.dev
-# expect: the apex A record value Vercel listed, and nothing else
+# Apex resolves to the Vercel addresses shown by `vercel domains verify`.
+dig +short miloscvetkovic.dev @1.1.1.1
+# expect: 216.198.79.1 and 64.29.17.1 in either order, and nothing else
 
 # www is a CNAME to Vercel (dig prints the CNAME target, then the address it resolves to).
-dig +short www.miloscvetkovic.dev
-# expect: the CNAME target Vercel listed, followed by an IP address
+dig +short www.miloscvetkovic.dev @1.1.1.1
+# expect: 30c6e6551c22e39e.vercel-dns-017.com. followed by an IP address
 
 # www redirects to the apex.
 curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://www.miloscvetkovic.dev
@@ -268,6 +340,20 @@ curl -sS https://miloscvetkovic.dev/robots.txt
 # expect: every <loc> begins https://miloscvetkovic.dev, and robots ends with
 #         Sitemap: https://miloscvetkovic.dev/sitemap.xml
 ```
+
+Before DNS exists, the same checks run against the production deployment itself. The production
+alias `https://portfolio-theta-gold-77.vercel.app` answers plain `curl`, while the per-deployment
+and branch URLs redirect to a Vercel login (see **Not covered**);
+`vercel curl <path> --deployment <deployment-url>` fetches those, with the side effect noted under
+**Not covered**. On 2026-09-09 the first production build passed all of it: the `<title>`, the nine
+sitemap entries, `robots.txt` and both JSON-LD `url` fields carried the apex origin and both
+not-found pages rendered; a headless
+Chromium (Playwright, which `apps/web` already has) loaded all nine routes without a console error or
+page error, in light and dark schemes, with reduced motion, at 800×453 and 375×812, and with a
+stored theme; the toggle switched to light, persisted across a reload, and the `<html>` class was
+already `light` when navigation committed, so there was no flash. Claude Code's in-app Browser
+pane logs React error #418 on these pages while an unmodified Chromium does not, so use a real
+browser or Playwright for the console check.
 
 Then walk the site by hand. The App Router serves nine pages; `sitemap.ts` lists all nine, six
 static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
@@ -318,6 +404,27 @@ run. A CLS of 0.03 to 0.06 attributed to the boot loader is Lighthouse re-center
 changes the emulated viewport at about 0.9 s, which it counts by design within 500 ms of that event;
 visitors never see it.
 
+Accessibility on that same 2026-09-09 baseline was 96 on both pages. The points went to colour
+contrast (the accent used as text, labels dimmed with opacity modifiers, and a scroll reveal that
+parked the quest log at 30% opacity) and, on `/`, to Featured Work cards whose `aria-labelledby`
+name did not contain their visible text. Both were fixed the same day by splitting the accent into
+`--accent` and `--accent-text` and restructuring the cards
+([ADR 0008](../adr/0008-accent-colour-roles.md)); re-run with the same CLI against the local
+production build, both pages score accessibility 100 with `color-contrast` passing and
+`label-content-name-mismatch` not applicable. The command that reproduces the accessibility run is
+
+```bash
+CHROME_PATH="$(node -e "console.log(require('@playwright/test').chromium.executablePath())")" \
+  pnpm dlx lighthouse http://localhost:3000/ --only-categories=accessibility --output=json \
+  --output-path=/tmp/lh-a11y-home.json --chrome-flags="--headless=new"
+```
+
+from `apps/web` with `pnpm start` serving the build. `--headless=new` follows the machine's
+appearance setting for `prefers-color-scheme`, so on a Mac in dark mode this is a dark-theme audit;
+the light theme is checked with Playwright and axe-core instead. The same rule set now runs in CI on
+every pull request: `apps/web/e2e/accessibility.spec.ts` audits both pages in both colour schemes at
+the desktop viewport, at rest, and fails the `e2e` job on any violation.
+
 ## Routine deployments
 
 - **Production**: merging a pull request into `main` triggers a production deployment. There is no
@@ -333,12 +440,17 @@ visitors never see it.
 
   ```bash
   vercel ls                      # recent deployments, newest first
-  vercel inspect <deployment-url># shows the commit, branch, environment and build state
+  vercel inspect <deployment-url>                  # environment, build state and aliases; no commit
+  vercel inspect <deployment-url> --logs 2>&1 | grep Cloning   # the branch and commit that were built
   vercel logs <deployment-url>   # runtime logs for that deployment
   ```
 
 - Deploying by hand (`vercel deploy --prod`) bypasses the Git flow and produces a production
-  deployment with no associated commit. Avoid it except to recover from a broken Git integration.
+  deployment with no associated commit. Avoid it except to recover from a broken Git integration,
+  and remember that it uploads the working tree as filtered by `.vercelignore`.
+- To rebuild `main` without a commit, for example after changing `NEXT_PUBLIC_SITE_URL`, run
+  `vercel redeploy <deployment-url>` against the current production deployment, or use the
+  deploy-hook sequence from Path B. Both build from Git.
 
 ## Rollback
 
@@ -371,17 +483,20 @@ the branch and the live site agree.
 
 ## Troubleshooting
 
-| Symptom                                                                                  | Cause                                               | Fix                                                                                                               |
-| ---------------------------------------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Install fails, `ERR_PNPM_NO_LOCKFILE` or `@repo/prettier-config` is not in the workspace | Workspace root not available to the build           | Settings → General → enable **Include source files outside of the Root Directory in the Build Step**, redeploy    |
-| Install fails, `ERR_PNPM_OUTDATED_LOCKFILE`                                              | Lockfile does not match a `package.json`            | `pnpm install` locally, commit `pnpm-lock.yaml`, push                                                             |
-| Build fails, `next: command not found`                                                   | Root Directory is not `apps/web`                    | Settings → General → Root Directory: `apps/web`, redeploy                                                         |
-| Build or runtime behaves as if on an older Node                                          | Node version not set; `.nvmrc` is not read          | Settings → General → Node.js Version: 22.x, redeploy                                                              |
-| Domain stuck on **Invalid Configuration**                                                | Records not propagated, or parking records remain   | Delete leftover records, disable parking page, wait, Refresh                                                      |
-| Domain is **Valid Configuration** but HTTPS fails and the site is unreachable            | Certificate has not issued                          | `dig +short CAA miloscvetkovic.dev`; remove or widen a `CAA` record that excludes `letsencrypt.org`, then Refresh |
-| `www` returns 200 instead of a redirect                                                  | `www` added as a serving domain, not a redirect     | Settings → Domains: apex primary, `www` redirects to it with 308                                                  |
-| Previews emit apex URLs in sitemap, robots and JSON-LD                                   | Expected: Preview uses the same value as Production | No fix needed. To make previews self-identify, give Preview a different `NEXT_PUBLIC_SITE_URL` and redeploy       |
-| A page 404s in production but works locally                                              | Live deployment predates the new case study slug    | `vercel inspect <url>` to check the commit, then redeploy `main`                                                  |
+| Symptom                                                                                  | Cause                                                    | Fix                                                                                                                                                                                                  |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install fails, `ERR_PNPM_NO_LOCKFILE` or `@repo/prettier-config` is not in the workspace | Workspace root not available to the build                | Settings → General → enable **Include source files outside of the Root Directory in the Build Step**, redeploy                                                                                       |
+| Install fails, `ERR_PNPM_OUTDATED_LOCKFILE`                                              | Lockfile does not match a `package.json`                 | `pnpm install` locally, commit `pnpm-lock.yaml`, push                                                                                                                                                |
+| Build fails, `next: command not found`                                                   | Root Directory is not `apps/web`                         | Settings → General → Root Directory: `apps/web`, redeploy                                                                                                                                            |
+| Build or runtime behaves as if on an older Node                                          | Node version not set; `.nvmrc` is not read               | Settings → General → Node.js Version: 22.x, redeploy                                                                                                                                                 |
+| Domain stuck on **Invalid Configuration**                                                | Records not propagated, or parking records remain        | Delete leftover records, disable parking page, wait, Refresh                                                                                                                                         |
+| Domain is **Valid Configuration** but HTTPS fails and the site is unreachable            | Certificate has not issued                               | `dig +short CAA miloscvetkovic.dev`; remove or widen a `CAA` record that excludes `letsencrypt.org`, then Refresh; if `CAA` is empty, `vercel certs issue miloscvetkovic.dev www.miloscvetkovic.dev` |
+| `www` returns 200 instead of a redirect                                                  | `www` added as a serving domain, not a redirect          | Settings → Domains: apex primary, `www` redirects to it with 308                                                                                                                                     |
+| Previews emit apex URLs in sitemap, robots and JSON-LD                                   | Expected: Preview uses the same value as Production      | No fix needed. To make previews self-identify, give Preview a different `NEXT_PUBLIC_SITE_URL` and redeploy                                                                                          |
+| A page 404s in production but works locally                                              | Live deployment predates the new case study slug         | `vercel inspect <url> --logs 2>&1 \| grep Cloning` to check the commit, then redeploy `main`                                                                                                         |
+| `vercel deploy` uploads gigabytes, then fails with `File size limit exceeded (100 MB)`   | `.vercelignore` missing or out of step with `.gitignore` | Restore `.vercelignore` (it must list `.turbo`), or deploy from Git instead                                                                                                                          |
+| `vercel git connect` prints `Failed to connect`                                          | Often spurious                                           | `vercel api /v9/projects/<id> --raw \| jq .link`; if `link` is set the connection exists, otherwise install the Vercel GitHub App and retry                                                          |
+| Install log warns `Ignored build scripts: esbuild, sharp, unrs-resolver`                 | pnpm 10 blocks dependency scripts by default             | Harmless, the packages ship prebuilt binaries. Silence it deliberately with `pnpm approve-builds` in its own pull request                                                                            |
 
 Detail on the less obvious rows:
 
@@ -420,11 +535,33 @@ This runbook deliberately stops short of the following. None of it exists yet; d
   which goes nowhere you can see. The site is fully prerendered, so there is little server runtime
   and `vercel logs` shows little beyond request-level information. In practice a client-side
   production failure is invisible until someone reports it.
-- **Preview protection is left at whatever Vercel defaults to.** Vercel applies deployment protection
-  to new projects (**Vercel Authentication**, under **Settings → Deployment Protection**), which
-  requires a Vercel login to open a preview or a `*.vercel.app` URL. That is transparent while you
-  are signed in as the project owner and a wall for anyone else. Check the setting after the first
-  deploy and decide deliberately; this runbook does not change it.
+- **Deployment protection is Vercel's default, plus one bypass secret.**
+  `vercel project protection portfolio` reports `ssoProtection.deploymentType:
+all_except_custom_domains`. Observed on 2026-09-09: the per-deployment URL
+  (`portfolio-<hash>-<team>.vercel.app`), the branch URL (`portfolio-git-main-<team>.vercel.app`) and
+  the team URL answer `302` to a Vercel login, while the production alias
+  `portfolio-theta-gold-77.vercel.app` answers `200` to anyone, as the custom domains will once they
+  resolve (that is what `all_except_custom_domains` means). Pull request previews are therefore
+  private to the project owner, which is a wall for any reviewer without a Vercel login. The same
+  command also lists `protectionBypass`. Beware that `vercel curl` **creates** an
+  `automation-bypass` secret on first use, without prompting: Vercel injects it into deployments as
+  `VERCEL_AUTOMATION_BYPASS_SECRET`, and anyone holding it gets past the login on every deployment
+  until it is revoked. One was created that way on 2026-09-09 and revoked the same day, because
+  nothing in this repository uses it and the end-to-end job runs against a local `next start`
+  rather than a preview. To revoke one:
+
+  ```bash
+  vercel project protection disable portfolio --protection-bypass \
+    --protection-bypass-secret "$(vercel project protection portfolio \
+      | sed -n '/^{/,$p' | jq -r '.protectionBypass | keys[0]')"
+  ```
+
+  Confirm with `vercel project protection portfolio`, whose `protectionBypass` must come back empty.
+  There is no `--yes` on this subcommand, and passing one is worse than useless: the CLI prints
+  `unknown or unexpected option` **and still exits 0**, so a wrapper that trusts the exit code
+  reports success while nothing changed. Check the state, not the exit code, after any
+  `vercel project protection` call.
+
 - **No staging environment, no custom domains for previews, no `vercel.json`.** Redirects, headers
   and rewrites are whatever Next.js does by default.
 - **No uptime monitoring or alerting.** Nothing will tell you the site is down.

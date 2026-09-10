@@ -247,7 +247,7 @@ export function ExecutionPhase() {
       <div className="w-full max-w-5xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">
-          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="glitch">PHASE 3</AnimatedText>
           </span>
           <AnimatedText animation="stagger-up" className="font-mono text-sm text-[var(--muted)]">
@@ -306,7 +306,7 @@ export function ExecutionPhase() {
                 />
                 <div className="flex items-center justify-between border-t border-[var(--accent)]/20 pt-2">
                   <span className="font-mono text-xs text-[var(--muted)]">TIME ELAPSED</span>
-                  <span ref={timeRef} className="font-mono text-[var(--accent)]">
+                  <span ref={timeRef} className="font-mono text-[var(--accent-text)]">
                     {complete ? '00:14:32' : '00:00:00'}
                   </span>
                 </div>
@@ -316,12 +316,12 @@ export function ExecutionPhase() {
             {/* Combo Counter */}
             <div
               ref={comboRef}
-              className="flex items-center justify-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4"
+              className="flex items-center justify-center gap-2 rounded-lg border border-[var(--status-warn)]/30 bg-[var(--status-warn)]/10 p-4"
             >
-              <span ref={comboCountRef} className="text-3xl font-bold text-yellow-400">
+              <span ref={comboCountRef} className="text-3xl font-bold text-[var(--status-warn)]">
                 {complete ? 'x12' : 'x0'}
               </span>
-              <span className="font-mono text-sm text-yellow-400/80">COMMIT STREAK</span>
+              <span className="font-mono text-sm text-[var(--status-warn)]">COMMIT STREAK</span>
             </div>
           </div>
         </div>
@@ -332,7 +332,7 @@ export function ExecutionPhase() {
             <div className="grid gap-2 md:grid-cols-2">
               {activities.map((activity, i) => (
                 <ActivityEntry key={i} status="success">
-                  <span className="text-[var(--accent)]">{activity.file}</span>
+                  <span className="text-[var(--accent-text)]">{activity.file}</span>
                   <span className="text-[var(--muted)]"> — {activity.desc}</span>
                 </ActivityEntry>
               ))}

@@ -106,7 +106,7 @@ export function SectionProgress() {
               <span
                 className={`font-mono text-[10px] tracking-wider transition-all duration-300 ${
                   index === activeSection
-                    ? 'text-[var(--accent)] opacity-100'
+                    ? 'text-[var(--accent-text)] opacity-100'
                     : 'text-[var(--muted)] opacity-0 group-hover:opacity-100'
                 }`}
               >
@@ -141,8 +141,9 @@ export function SectionProgress() {
         </div>
       </div>
 
-      {/* Corner frame elements */}
-      <div className="pointer-events-none fixed inset-0 z-40">
+      {/* Corner frame elements and the section readout: visual chrome only. The dots above carry
+          the accessible navigation, so this layer is hidden from assistive technology. */}
+      <div className="pointer-events-none fixed inset-0 z-40" aria-hidden="true">
         {/* Top-left corner */}
         <div className="absolute top-4 left-4">
           <svg width="40" height="40" viewBox="0 0 40 40" className="text-[var(--accent)]/30">
@@ -172,7 +173,7 @@ export function SectionProgress() {
         </div>
 
         {/* Current section indicator - positioned bottom-left to avoid overlap with scroll indicator */}
-        <div className="absolute bottom-4 left-16 font-mono text-[10px] tracking-widest text-[var(--accent)]/50">
+        <div className="absolute bottom-4 left-16 font-mono text-[10px] tracking-widest text-[var(--accent-text)]">
           [{String(activeSection + 1).padStart(2, '0')}/{String(sections.length).padStart(2, '0')}]{' '}
           {sections[activeSection]?.label}
         </div>

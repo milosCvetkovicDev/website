@@ -72,7 +72,7 @@ export default function ContactPage() {
                 rel="noopener noreferrer"
                 className="group flex items-center gap-6 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 transition-colors hover:border-[var(--accent)]/50"
               >
-                <div className="text-[var(--muted)] transition-colors group-hover:text-[var(--accent)]">
+                <div className="text-[var(--muted)] transition-colors group-hover:text-[var(--accent-text)]">
                   {link.icon}
                 </div>
                 <div className="flex-1">
@@ -109,7 +109,7 @@ export default function ContactPage() {
           </p>
           <Link
             href="/work"
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--accent)] px-6 py-3 font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--accent)] px-6 py-3 font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent)]/10"
           >
             <span>View My Work</span>
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

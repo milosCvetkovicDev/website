@@ -79,7 +79,7 @@ export default function AboutPage() {
       <div className="mx-auto max-w-3xl px-6">
         {/* Hook */}
         <div className="mb-16">
-          <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent)] uppercase">
+          <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             The short version
           </p>
           <h1 className="mb-6 text-3xl leading-tight font-bold md:text-4xl lg:text-5xl">
@@ -127,7 +127,9 @@ export default function AboutPage() {
                 key={fact.label}
                 className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 text-center"
               >
-                <div className="mb-1 text-2xl font-bold text-[var(--accent)]">{fact.value}</div>
+                <div className="mb-1 text-2xl font-bold text-[var(--accent-text)]">
+                  {fact.value}
+                </div>
                 <div className="text-xs tracking-wider text-[var(--muted)] uppercase">
                   {fact.label}
                 </div>
@@ -138,7 +140,7 @@ export default function AboutPage() {
 
         {/* Timeline with story */}
         <section className="mb-20">
-          <h2 className="mb-8 font-mono text-sm tracking-wider text-[var(--accent)] uppercase">
+          <h2 className="mb-8 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             The longer version
           </h2>
           <div className="space-y-12">
@@ -146,7 +148,7 @@ export default function AboutPage() {
               <div key={item.year} className="relative">
                 {/* Year badge */}
                 <div className="mb-3 flex items-center gap-4">
-                  <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 font-mono text-sm font-bold text-[var(--accent)]">
+                  <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 font-mono text-sm font-bold text-[var(--accent-text)]">
                     {item.year}
                   </span>
                   <span className="text-sm text-[var(--muted)]">{item.company}</span>
@@ -155,7 +157,7 @@ export default function AboutPage() {
                 {/* Content */}
                 <div className="border-l-0 border-[var(--border)] pl-0 md:border-l-2 md:pl-4">
                   <h3 className="mb-2 text-xl font-semibold">{item.role}</h3>
-                  <p className="mb-3 text-sm font-medium text-[var(--accent)] italic">
+                  <p className="mb-3 text-sm font-medium text-[var(--accent-text)] italic">
                     &quot;{item.highlight}&quot;
                   </p>
                   <p className="leading-relaxed text-[var(--muted)]">{item.description}</p>
@@ -167,7 +169,7 @@ export default function AboutPage() {
 
         {/* Beliefs */}
         <section className="mb-20">
-          <h2 className="mb-8 font-mono text-sm tracking-wider text-[var(--accent)] uppercase">
+          <h2 className="mb-8 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             What I believe
           </h2>
           <div className="space-y-6">
@@ -190,7 +192,7 @@ export default function AboutPage() {
 
         {/* Credentials (compact) */}
         <section className="mb-20">
-          <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent)] uppercase">
+          <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             Credentials
           </h2>
           <div className="flex flex-wrap gap-4">
@@ -234,7 +236,7 @@ export default function AboutPage() {
               href="https://github.com/milosCvetkovicDev"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-[var(--accent)] px-6 py-3 font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10"
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--accent)] px-6 py-3 font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent)]/10"
             >
               <span>GitHub</span>
             </a>
@@ -242,7 +244,7 @@ export default function AboutPage() {
               href="https://x.com/milos_dev"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-[var(--accent)] px-6 py-3 font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/10"
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--accent)] px-6 py-3 font-semibold text-[var(--accent-text)] transition-colors hover:bg-[var(--accent)]/10"
             >
               <span>X / Twitter</span>
             </a>

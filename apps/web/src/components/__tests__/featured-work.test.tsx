@@ -49,6 +49,21 @@ describe('FeaturedWork', () => {
     }
   });
 
+  it('names each card link by its visible text alone, with the description attached', () => {
+    // WCAG 2.5.3 (Label in Name): the accessible name must contain the visible label. The card is
+    // one click target through the link's ::after overlay, so the link itself holds only the title.
+    stubMatchMedia(true);
+    renderFeaturedWork();
+    for (const project of featuredProjects) {
+      const link = linkFor(project.title);
+      expect(link).toHaveAccessibleName(project.title);
+      expect(link.textContent).toBe(project.title);
+      expect(link).not.toHaveAttribute('aria-labelledby');
+      expect(link).not.toHaveAttribute('aria-label');
+      expect(link).toHaveAccessibleDescription(project.description);
+    }
+  });
+
   it('renders nothing when there are no projects', () => {
     stubMatchMedia(true);
     const { container } = render(<FeaturedWork projects={[]} />);
