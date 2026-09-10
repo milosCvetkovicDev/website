@@ -10,6 +10,15 @@ import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
  */
 export const MEASURE_THROTTLE_MS = 33;
 
+// The house focus indicator, matching `FOCUS_RING` in `components/featured-work.tsx`: an outline
+// rather than a ring, so it survives Windows High Contrast / forced-colors mode, where box-shadow
+// is not painted. `--accent` is the token ADR 0011 assigns to focus, and it clears the 3:1 that
+// WCAG 1.4.11 asks of an indicator in both themes; the browser default was merely probably
+// adequate and varies by browser. (`globals.css` also defines a `.focus-ring` utility that nothing
+// references; consolidating the two idioms is a separate change.)
+const FOCUS_RING =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]';
+
 const sections = [
   { id: 'loading', label: 'INIT' },
   { id: 'discovery', label: 'DISCOVER' },
@@ -139,44 +148,65 @@ export function SectionProgress({
     <>
       {/* Vertical progress bar on the right */}
       <div className="fixed top-1/2 right-6 z-50 hidden -translate-y-1/2 flex-col items-center gap-2 lg:flex">
-        {/* Section dots */}
-        <div className="flex flex-col gap-3">
-          {sections.map((section, index) => (
-            <button
-              key={section.id}
-              onClick={() => {
-                const { top, range } = measureStory(storyRef.current);
-                const targetScroll = top + (index / (sections.length - 1)) * range;
-                // Smooth scrolling is motion; jump straight there when the user has opted out
-                // ('auto' would defer to a CSS scroll-behavior, 'instant' does not).
-                window.scrollTo({
-                  top: targetScroll,
-                  behavior: prefersReducedMotion ? 'instant' : 'smooth',
-                });
-              }}
-              className="group flex items-center gap-2"
-              aria-label={`Go to ${section.label} section`}
-            >
-              {/* Dot */}
-              <div
-                className={`relative h-3 w-3 rounded-full transition-all duration-300 ${
-                  index <= activeSection ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'
-                } ${index === activeSection ? 'shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_60%,transparent)]' : ''}`}
-              />
+        {/* Section dots. Seven in-page destinations, so a landmark rather than a bare div: it
+            puts the story in the landmark list a screen reader user navigates by. The name has to
+            be distinct from the site navigation in the header, which is unnamed, or the two
+            <nav>s would share a (role, accessible name) pair and be indistinguishable there.
 
-              {/* Label (shows on hover) */}
-              <span
-                className={`font-mono text-[10px] tracking-wider transition-all duration-300 ${
-                  index === activeSection
-                    ? 'text-[var(--accent-text)] opacity-100'
-                    : 'text-[var(--muted)] opacity-0 group-hover:opacity-100'
-                }`}
-              >
-                {section.label}
-              </span>
-            </button>
-          ))}
-        </div>
+            The list inside it is what carries the ordinal. `aria-current` says which dot is the
+            current one but not that it is the fourth of seven, and the `[04/07]` readout that
+            says so visually is aria-hidden chrome. As list items the buttons are announced as
+            "4 of 7" within a list of 7, which is the same fact. `gap-3` moves to the list because
+            the list is now the flex column; Tailwind's preflight strips the marker and padding. */}
+        <nav aria-label="Story sections">
+          <ul className="flex flex-col gap-3">
+            {sections.map((section, index) => (
+              <li key={section.id}>
+                <button
+                  onClick={() => {
+                    const { top, range } = measureStory(storyRef.current);
+                    const targetScroll = top + (index / (sections.length - 1)) * range;
+                    // Smooth scrolling is motion; jump straight there when the user has opted out
+                    // ('auto' would defer to a CSS scroll-behavior, 'instant' does not).
+                    window.scrollTo({
+                      top: targetScroll,
+                      behavior: prefersReducedMotion ? 'instant' : 'smooth',
+                    });
+                  }}
+                  className={`group flex items-center gap-2 rounded ${FOCUS_RING}`}
+                  aria-label={`Go to ${section.label} section`}
+                  // Which dot is active was carried by a fill colour and a glow alone, neither of
+                  // which reaches assistive technology. `location` rather than `step`: the dots
+                  // are seven places in the page a visitor can jump between in any order, not
+                  // stages of a process that has to be advanced through.
+                  aria-current={index === activeSection ? 'location' : undefined}
+                >
+                  {/* Dot */}
+                  <div
+                    className={`relative h-3 w-3 rounded-full transition-all duration-300 ${
+                      index <= activeSection ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'
+                    } ${index === activeSection ? 'shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_60%,transparent)]' : ''}`}
+                  />
+
+                  {/* Label, revealed to the pointer and to the keyboard alike: without the
+                      focus-visible variant a keyboard user tabbing the group got seven unlabelled
+                      dots. The reveal stays legal under the "never dim text" rule because it is
+                      binary — axe skips text at `opacity: 0` and measures it at 1, and it never
+                      rests at a partial value in between (ADR 0008, ADR 0011). */}
+                  <span
+                    className={`font-mono text-[10px] tracking-wider transition-all duration-300 ${
+                      index === activeSection
+                        ? 'text-[var(--accent-text)] opacity-100'
+                        : 'text-[var(--muted)] opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+                    }`}
+                  >
+                    {section.label}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
         {/* Connecting line */}
         <div className="absolute top-0 left-1.5 -z-10 h-full w-px">
