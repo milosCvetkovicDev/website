@@ -4,29 +4,21 @@ import { useEffect, useState, lazy, memo, type ComponentType, type ReactNode } f
 import { HeroSection } from './hero-section';
 import { SectionProgress } from './section-progress';
 import { DeferredSection, SectionPlaceholder } from './deferred-section';
-import { usePrefetchPhases } from './use-prefetch-phases';
 import { useIsHydrated } from '@/hooks/use-is-hydrated';
 
 // Memoize hero section to prevent re-renders
 const MemoizedHeroSection = memo(HeroSection);
 
-// The story sections are server-rendered like everything else, but their chunks, hydration and
-// GSAP work wait until DeferredSection sees them approach the viewport. The loaders are shared with
-// usePrefetchPhases so the chunks can be warmed without mounting anything.
+// The story sections live in their own chunk, fetched when React renders them at hydration. They
+// are NOT hydration-deferred: holding their Suspense boundary suspended during hydration made React
+// discard the server markup and replace it with the placeholder until the visitor scrolled, which
+// took the sections out of find-in-page and out of screen-reader browse mode. See ADR 0009.
 const loadDiscoveryPhase = () => import('./discovery-phase');
 const loadStrategyPhase = () => import('./strategy-phase');
 const loadExecutionPhase = () => import('./execution-phase');
 const loadGauntletPhase = () => import('./gauntlet-phase');
 const loadLoopPhase = () => import('./loop-phase');
 const loadGameComplete = () => import('./game-complete');
-const phaseLoaders = [
-  loadDiscoveryPhase,
-  loadStrategyPhase,
-  loadExecutionPhase,
-  loadGauntletPhase,
-  loadLoopPhase,
-  loadGameComplete,
-];
 
 // A chunk that fails to load (stale hashes after a deploy, an offline tab) must not send the whole
 // page to error.tsx: the section falls back to its placeholder and the failure is logged once.
@@ -211,7 +203,6 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
 export function AnimatedHero({ children }: { children?: ReactNode }) {
   const mounted = useIsHydrated();
-  usePrefetchPhases(phaseLoaders);
 
   return (
     <div className="relative">
@@ -226,7 +217,7 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
         {/* Section 1: Hero - server-rendered children passed through */}
         <MemoizedHeroSection>{children}</MemoizedHeroSection>
 
-        {/* Story sections: server-rendered, each hydrated when it approaches the viewport */}
+        {/* Story sections: server-rendered, code-split, each behind its own Suspense boundary */}
         <DeferredSection>
           <DiscoveryPhase />
         </DeferredSection>
