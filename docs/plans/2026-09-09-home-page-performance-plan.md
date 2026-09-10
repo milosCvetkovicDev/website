@@ -38,7 +38,7 @@ every per-frame cost. The causes are the same in every trace, and they are what 
 | The page renders a frame every 16 ms forever: two keyframe animations animate `top`, which is a layout property, so the main thread lays out and paints at 60 fps.       | 30 `Layout`, 30 `UpdateLayoutTree` and 30 `Commit` events per 500 ms bucket after load.                                                              |
 | About 290 character spans in the story sections carry `will-change: transform, opacity`, so each is a compositing layer and every frame pays to re-layerize them.        | `Layerize` rises from 0.25 ms per frame before the sections mount to 1.3 ms per frame after, 37 to 42 ms per 500 ms.                                 |
 | `layout.tsx` imports its client components through the `@/components` barrel, which pulls `FeaturedWork` and its data into the layout chunk that every route loads.      | `/work/self-healing-agent` loads the 27.7 KB chunk containing `VIEW ARCHIVE` and the architecture graph although it renders neither.                 |
-| The first layout of the page costs 43 ms for 535 layout objects.                                                                                                         | First `Layout` event at 111 ms. Consistent with instantiating the two web fonts on first use. Not actionable without changing the fonts; left as is. |
+| The first layout of the page costs 39 to 43 ms across runs, for 535 layout objects.                                                                                      | First `Layout` event at 111 ms. Consistent with instantiating the two web fonts on first use. Not actionable without changing the fonts; left as is. |
 
 ## Decisions
 
@@ -62,16 +62,16 @@ every per-frame cost. The causes are the same in every trace, and they are what 
 
 ### Task 2: Compositor-only keyframes and no static will-change (D2, D3)
 
-**Files:** `apps/web/src/app/globals.css`, `apps/web/src/components/animated-hero/index.tsx`, `apps/web/src/components/animated-hero/hero-section.tsx`, `apps/web/src/components/animated-hero/animated-text.tsx`, `apps/web/src/components/featured-work.tsx`
+**Files:** `apps/web/src/app/globals.css`, `apps/web/src/components/animated-hero/index.tsx`, `apps/web/src/components/animated-hero/animated-text.tsx`, `apps/web/src/components/featured-work.tsx`, `apps/web/src/app/work/page.tsx` (`hero-section.tsx` is unchanged: its inline `top: 7px` is simply what the keyframes stop animating)
 
 - [x] `hero-scroll-bounce` animates `translateY(0 -> 13px)` with the dot's `top: 7px` static.
-- [x] `scan-down` animates `translateY(-2px -> 100%)` on a full-height `.scan-line` element whose 1px gradient is a background image; both call sites (boot loader, featured work cards) use it.
+- [x] `scan-down` animates `translateY(-2px -> 100%)` on a full-height `.scan-line` element whose 1px gradient is a background image; all three call sites (boot loader, featured work cards, `/work` project cards) use it.
 - [x] Remove `gpuAcceleratedStyle` from `animated-text.tsx`.
 - [x] Re-measure: `Layout` per 500 ms dropped from 30 to 2 to 8 (tmux ticks), `Layerize` from 37 to 42 ms to 1 to 3 ms. Style recalcs stay at 60 per second while the scroll dot animates; see the ADR trade-offs.
 
 ### Task 3: Mount story sections on approach (D4)
 
-**Files:** `apps/web/src/components/animated-hero/index.tsx`
+**Files:** `apps/web/src/components/animated-hero/index.tsx`, `apps/web/src/components/animated-hero/deferred-section.tsx`, `apps/web/src/components/animated-hero/use-prefetch-phases.ts`, `apps/web/src/components/animated-hero/__tests__/deferred-section.test.tsx`, `apps/web/src/components/animated-hero/__tests__/use-prefetch-phases.test.tsx`
 
 - [x] `DeferredSection` (`deferred-section.tsx`) server-renders each phase and suspends its Suspense boundary during hydration until an `IntersectionObserver` (top-only root margin, so anything already scrolled past counts) reports it near the viewport; then the lazy phase hydrates. No `IntersectionObserver` means hydrate after the page has hydrated. A failed chunk falls back to the placeholder instead of `error.tsx`.
 - [x] Prefetch the six phase modules once (`use-prefetch-phases.ts`): on the first pointer, touch, key or scroll event, armed one second after hydration, or after 3 s idle (`requestIdleCallback` with a timeout fallback), never under Data Saver. Idle-only prefetch was measured first and rejected: it evaluated the shared GSAP chunk (33 ms observed, 132 ms at 4×) at 0.7 s, inside the window Lighthouse scores.
@@ -79,9 +79,11 @@ every per-frame cost. The causes are the same in every trace, and they are what 
 
 ### Task 4: Keep FeaturedWork out of the layout chunk (D5)
 
-**Files:** `apps/web/src/app/layout.tsx`, `CLAUDE.md`
+**Files:** `apps/web/src/app/layout.tsx`, `apps/web/eslint.config.mjs`, `CLAUDE.md`
 
-- [x] Direct imports in `layout.tsx`; note the rule next to the barrel convention in `CLAUDE.md`.
+- [x] Direct imports in `layout.tsx`; a `no-restricted-imports` rule scoped to
+      `src/app/**/layout.tsx` in `apps/web/eslint.config.mjs` bans `@/components` there; note the
+      rule next to the barrel convention in `CLAUDE.md`.
 - [x] Re-measure `/work/self-healing-agent`: the chunk containing `VIEW ARCHIVE` is no longer in its script list.
 
 ### Task 5: Guards
@@ -89,7 +91,7 @@ every per-frame cost. The causes are the same in every trace, and they are what 
 **Files:** `apps/web/e2e/hero.spec.ts`
 
 - [x] e2e: observe `layout-shift` entries for four seconds of log activity and assert the summed value stays under 0.005 (and that lines did land); assert the section copy is in the HTML response; scroll through the whole story programmatically and assert the summed shift stays under 0.02.
-- [x] Existing e2e and unit suites green: 56 unit tests, 13 e2e against the branch build; the new shift guard fails against `main` (0.015), so it is a real guard.
+- [x] Existing e2e and unit suites green: 65 unit tests, 15 e2e against the branch build; the new shift guard fails against `main` (0.030), so it is a real guard.
 
 ### Task 6: Verification and review
 
@@ -104,7 +106,7 @@ every per-frame cost. The causes are the same in every trace, and they are what 
 
 ### Task 8: Pull request
 
-- [x] Conventional commits on `perf/home-page-cls-and-tbt`, PR #15 against `main` using the template with the real command output; squash merge is the remaining step.
+- [x] Conventional commits on `perf/home-page-cls-and-tbt`, PR #15 against `main` using the template with the real command output; squash-merged as `2a4def1`.
 
 ## Ledger
 
@@ -119,5 +121,5 @@ Every attempt, kept or not, so the next person does not re-run a dead one.
 | D4 with placeholders instead of server HTML       | sections in the HTML response on main                                                    | six empty 100vh blocks in the HTML; LinkedIn CTA unreachable by keyboard until scrolled                                                                                                                                | rejected in review; replaced by the gate |
 | D4 hydration gate (server HTML kept)              | as above                                                                                 | interleaved with main on a quiet machine (bench 2,061 to 2,160): perf 96 vs 92 to 93, TBT 86 to 87 vs 194 to 256 ms, SI 1.06 vs 1.53 s, LCP 2.61 s both; section copy back in the HTML                                 | kept                                     |
 | D5 layout imports                                 | `/work/[slug]` loads the 27.7 KB chunk containing FeaturedWork                           | chunk gone from the route; perf 98 vs 97 to 98, TBT 57 to 58 vs 58 to 65 ms (within noise)                                                                                                                             | kept for the bytes, not for the score    |
-| Font instantiation in the first layout            | first `Layout` 39 ms for 535 objects; 21 ms with woff2 blocked                           | not changed: the fonts are the design                                                                                                                                                                                  | not attempted                            |
+| Font instantiation in the first layout            | first `Layout` 39 to 43 ms for 535 objects; 21 ms with woff2 blocked                     | not changed: the fonts are the design                                                                                                                                                                                  | not attempted                            |
 | Scroll dot compositing                            | 60 style recalcs per second attributed to the dot's transform animation                  | every variant tried (margin centering, `translate` keyframes, radius, `will-change`, probes at any size) still re-styled per frame although Chrome reports `compositeFailed=0`; opacity-only probes eventually did too | left as is, recorded in ADR 0009         |

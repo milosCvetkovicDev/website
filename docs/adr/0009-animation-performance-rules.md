@@ -42,10 +42,13 @@ Animated and lazy-loaded UI in `apps/web` follows five rules.
    the flow of anything the visitor can see. `AnimatedPane` in
    `apps/web/src/components/animated-hero/tmux-background.tsx` is the reference implementation:
    `ResizeObserver` sizes the slot grid to the pane, text is written into existing slots, and the
-   only animation is a transform on the newest slot.
-2. **Keyframes animate `transform` and `opacity` only.** No `top`, `left`, `width`, `height`,
-   `margin`, `box-shadow` or `background-position` in `@keyframes`, in GSAP tweens that repeat, or
-   in transitions that fire continuously. A sweep that must travel a parent's height is a
+   only animation is an `element.animate` on the newest slot touching opacity and transform alone.
+2. **Repeating animations move only `transform` and `opacity`.** No `top`, `left`, `width`,
+   `height`, `margin` or `background-position` in `@keyframes`, in GSAP tweens that repeat, or in
+   transitions that fire continuously: each of those forces style, layout and paint on every frame
+   the animation runs. Paint-only properties such as `box-shadow` and `filter` cost a repaint
+   rather than a relayout, so they are allowed sparingly and only where the animation stops when
+   nothing can see it. The `GameComplete` call to action is the single instance today. A sweep that must travel a parent's height is a
    full-height element translated by its own height (`.scan-line` in `globals.css`), not a thin
    element with an animated offset.
 3. **No static `will-change`.** GSAP promotes elements for the duration of a tween on its own, and a
@@ -61,8 +64,10 @@ Animated and lazy-loaded UI in `apps/web` follows five rules.
    after the first sign of intent (pointer, touch, key or scroll, armed one second after hydration)
    or a few idle seconds, never under Data Saver and never during the first paint's window. A chunk
    that fails to load falls back to the section placeholder instead of the route's error page. An
-   animation that repeats forever pauses while its section is scrolled past
-   (`toggleActions: 'play pause resume reverse'`; `[data-active='false'] .scan-line`).
+   animation that repeats forever stops while nothing can see it: a GSAP timeline uses
+   `toggleActions: 'play pause resume reverse'` so it pauses once its section is scrolled past, and
+   `.scan-line` is paused by `[data-active='false']` on an unhovered, unfocused featured-work card
+   and by `[animation-play-state:paused]` until hover on a `/work` project card.
 5. **Server components import client components from their own modules.** `app/layout.tsx` does
    not import from the `@/components` barrel; pages may, because a page's chunk is only paid for by
    that page. The barrel stays for the page-level components it lists.
@@ -100,8 +105,10 @@ main thread go quiet between tmux ticks.
   the entrance takes over; the 96 px of top padding and the unanimated phase header absorb most of
   that. This is the accepted cost of not paying for six sections at load, and it is bounded: nothing
   is ever missing from the page, only late to animate.
-- Visitors who never scroll never load GSAP. Visitors who move the pointer load it within a second,
-  as before.
+- Nobody pays for GSAP during the first second: the intent listeners are armed one second after
+  hydration, so a pointer already resting over the page does not count. After that the first
+  pointer, touch, key, wheel or scroll event loads the chunks, and with no interaction at all they
+  are still warmed after three idle seconds. Only Data Saver suppresses the prefetch entirely.
 - The slot grid rotates text through up to 40 slots per pane on every tick, about 240 text node
   replacements per second across the five panes. That is cheaper than the layout shifts it replaces
   and invisible in the trace, but it is not free, and `MAX_LINES` should not grow without measuring.
