@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (corrected 2026-09-10)
 
 ## Date
 
@@ -39,7 +39,7 @@ alone. Status text in the phases sits on four light surfaces: the page (`#fafafa
 (the accent at 5% over the page), its own 10% tint over the page (the toasts and the deployment
 and combo panels) and that tint inside a HUD panel (the alert box). Each layer of tint costs a
 third to a half of a ratio point. green-700 and amber-700 pass on the page (4.7:1 and 4.8:1) and
-fail on a HUD panel (4.4:1 and 4.5:1) and on their tints (3.9:1 to 4.2:1); red-600 fails on every
+fail on a HUD panel (4.40:1 and 4.47:1) and on their tints (3.9:1 to 4.2:1); red-600 fails on every
 surface but the page; red-700 passes everywhere. Dimming makes it worse: status text with an
 opacity modifier fails on every candidate shade (green-800 at `/70` is 3.2:1 on its tint), the
 same trap ADR 0008 closed for the accent.
@@ -110,19 +110,25 @@ Rules that follow:
 
 ### Trade-offs
 
-- Dark theme: text, icons and the readouts keep their bytes (`#05df72`, `#fdc700`, `#ff6467`,
-  measured in the page before and after), except the hero island's readout, which moves from
-  Tailwind v3's green-400 `#4ade80` to v4's `#05df72`. Solid status fills (the pipeline bars, the
+- Dark theme: status text and icons stay on the green-400, yellow-400 and red-400 shades, and
+  every colour inside the hero phases keeps its exact bytes (`#05df72`, `#fdc700`, `#ff6467`,
+  measured in the page before and after). Three sites outside the phases do change, each of them
+  previously on a different shade: the hero island's readout moves from Tailwind v3's green-400
+  `#4ade80` to v4's `#05df72`, and on the work pages the live-status label (green-500 at 80%
+  alpha) and the case-study impact tick icon (green-500) both move to `#05df72` at full opacity.
+  Solid status fills (the pipeline bars, the
   alert dot, the unused `ProgressBar` variants) move from the 500 shade to the 400 shade the text
   used, one Tailwind step lighter; the 10% tints, the 50% borders and the 20% glows shift by the
   same step, which is not visible at those alphas.
 - Light theme: this is where the look changes. Bars, dots, borders, tints and glows are now the 800
   and 700 shades, darker than the 500 shades that shipped; a 10% tint of green-800 over the page is
-  a grey-green rather than a mint. The warn colour is a dark amber, not yellow: no yellow clears
-  4.5:1 on a light surface.
-- Five pieces of status text were dimmed and are now at full colour in both themes: "COMMIT STREAK"
-  (`/80`), "Production environment updated" (`/70`), the hover-only "LOCKED" label (`/60`, now also
-  `aria-hidden`), and the subtitles of the two toasts (`opacity-80`).
+  a grey-green rather than a mint. The warn colour is a dark amber rather than a yellow: no yellow
+  lighter than yellow-800 clears 4.5:1 on these surfaces (yellow-700 reaches 3.88:1 on its own tint
+  in a panel), and amber-800 was chosen over yellow-800, which also clears it.
+- Six pieces of status text were dimmed and are now at full colour in both themes: "COMMIT STREAK"
+  (`/80`), "Production environment updated" (`/70`), the work cards' live-status label (`/80`), the
+  hover-only "LOCKED" label (`/60`, now also `aria-hidden`), and the subtitles of the two toasts
+  (`opacity-80`).
 - The alpha forms compile to `color-mix()` under `@supports`, with the solid colour as the
   fallback, so a browser without `color-mix()` would paint the tints solid. Every accent tint on
   the site already has that shape, and Tailwind v4's floor (Safari 16.4, Chrome 111, Firefox 128)
@@ -147,3 +153,45 @@ so the dark theme would change. Rejected.
 
 **Move only the text and leave fills on palette classes.** Fixes the audit but leaves two colour
 systems in the same files and a rule with a footnote. Rejected.
+
+## Corrections
+
+### 2026-09-10
+
+Five factual claims in this record were false when it was accepted. The decision is untouched: the
+three tokens, their values and the rules that follow from them all stand. They were found by an
+independent audit of the merged branch, and every ratio below was recomputed from the rendered
+token values by converting Tailwind v4's oklch definitions to sRGB and blending the tints over the
+page in gamma space, the method the Decision section describes. The conversion reproduces axe's own
+reported backgrounds, for example `#e1f5e9` for green-500 at 10% over `#fafafa`, which is what
+makes it checkable.
+
+1. Context said green-700 and amber-700 "fail on a HUD panel (4.4:1 and 4.5:1)". Amber-700 on a HUD
+   panel is 4.47:1, and rounding it to "4.5:1" while calling it a failure prints the AA threshold
+   itself as a failing value. Replaced with "(4.40:1 and 4.47:1)".
+
+2. Decision says, of the light-theme ratios: "A hovered HUD panel doubles its accent tint, which
+   takes the error alert to 4.5:1 for the seconds it is red; red-800 would add margin and was
+   judged too dark for the healing-log line." The sentence stands as accepted, and this entry
+   records what is true. The value is **4.46:1**, not 4.5:1, so it is below the threshold rather
+   than at it: hovering a `HudPanel` replaces its `bg-[var(--accent)]/5` with
+   `hover:bg-[var(--accent)]/10`, and `--status-err` `#c10007` over its own 10% tint over that
+   surface measures 4.456:1. At rest the same node is 4.764:1. This is the one state in the change
+   that does not meet the bar the record is about, and the record presented it as meeting it.
+
+3. Consequences said dark-theme "text, icons and the readouts keep their bytes ... except the hero
+   island's readout". Two further sites change in the dark theme, both brought into the change
+   during its review: the work cards' live-status label, `text-green-500/80` and now the token at
+   full opacity, and the case-study impact tick icon, `text-green-500` and now the token. Both move
+   from green-500 `#00c950` to green-400 `#05df72`. Now enumerated.
+
+4. Consequences said "no yellow clears 4.5:1 on a light surface". Yellow-800 `#894b00` clears it on
+   all four surfaces this record lists, its worst being 5.28:1 on its own 10% tint inside a HUD
+   panel. Yellow-700 is the lightest that fails, at 3.88:1 there. Now says that no yellow lighter
+   than yellow-800 clears it and that amber-800 was chosen over yellow-800, which also clears it.
+
+5. Consequences said "Five pieces of status text were dimmed"; there are six. `git grep -nE
+'text-(green|yellow|amber|red)-[0-9]{3}/[0-9]+' <the commit before this change> -- apps/web/src`
+   returns four alpha-dimmed status texts, and two more carried `opacity-80`. The one missing from
+   the list is the work cards' live-status label, `text-green-500/80`. Now "Six", with that label
+   listed.
