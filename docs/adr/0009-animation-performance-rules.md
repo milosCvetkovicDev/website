@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (corrected 2026-09-10)
 
 ## Date
 
@@ -104,10 +104,11 @@ main thread go quiet between tmux ticks.
   better on every metric, so what was given up is the deferral, not the work that made the page
   faster. Deferring the animation rather than the content — each phase importing GSAP from inside an
   approach-gated effect — is what would buy the blocking time back, and it is the open follow-up.
-- Nobody pays for GSAP during the first second: the intent listeners are armed one second after
-  hydration, so a pointer already resting over the page does not count. After that the first
-  pointer, touch, key, wheel or scroll event loads the chunks, and with no interaction at all they
-  are still warmed after three idle seconds. Only Data Saver suppresses the prefetch entirely.
+- Everyone pays for GSAP at load on `/`. `index.tsx` imports the six phases at module scope and each
+  of them imports `gsap` and `ScrollTrigger` through `use-gsap-scroll.ts`, so GSAP is part of the
+  route's initial client payload and evaluates during load rather than on intent or at idle. There
+  are no intent listeners, no idle warm-up and no Data Saver check. The 234 ms of blocking time
+  above is where this shows up.
 - The slot grid rotates text through up to 40 slots per pane on every tick, about 240 text node
   replacements per second across the five panes. That is cheaper than the layout shifts it replaces
   and invisible in the trace, but it is not free, and `MAX_LINES` should not grow without measuring.
@@ -158,10 +159,57 @@ main thread go quiet between tmux ticks.
   visitor is still looking at the hero. The work moved but was not removed.
 - **Prefetch the section chunks at idle.** Measured and rejected: evaluating the shared GSAP chunk is
   a 33 ms task (132 ms at 4×) that landed at 0.7 s and started GSAP's frame loop for the rest of the
-  session. Waiting for intent or a few idle seconds keeps the same experience for anyone who scrolls.
+  session. The intent-and-idle prefetch kept in its place was removed along with the deferral it
+  served, so nothing prefetches these chunks today.
 - **`will-change` only on the sections' hover targets.** Rejected: GSAP already promotes during
   tweens, and the hover effects are short; there was nothing left for `will-change` to buy.
 - **A Lighthouse CI budget.** Deferred, not rejected. The numbers vary by ±100 ms TBT between runs
   on an idle machine and far more on a loaded one, so a gate needs a median of several runs and a
   runner that is quieter than GitHub's shared ones. The e2e layout-shift guard in
   `apps/web/e2e/hero.spec.ts` covers the regression that would hurt most.
+
+## Corrections
+
+### 2026-09-10
+
+An independent review of the code merged as `743a860` found two false claims about prefetching, one
+of them contradicting a bullet a few lines below it in the same section. Both sit outside
+`## Decision`, neither changes which option the decision selects or the conditions under which it
+would be revisited, and neither fix introduces guidance the record did not already carry. Corrected
+under [ADR 0012](0012-correcting-accepted-records.md).
+
+**A prefetch mechanism that does not exist**, in `### Trade-offs`. The record read: "Nobody pays for
+GSAP during the first second: the intent listeners are armed one second after hydration, so a pointer
+already resting over the page does not count. After that the first pointer, touch, key, wheel or
+scroll event loads the chunks, and with no interaction at all they are still warmed after three idle
+seconds. Only Data Saver suppresses the prefetch entirely." It now reads: "Everyone pays for GSAP at
+load on `/`. `index.tsx` imports the six phases at module scope and each of them imports `gsap` and
+`ScrollTrigger` through `use-gsap-scroll.ts`, so GSAP is part of the route's initial client payload
+and evaluates during load rather than on intent or at idle. There are no intent listeners, no idle
+warm-up and no Data Saver check. The 234 ms of blocking time above is where this shows up." What was
+wrong: the bullet describes `use-prefetch-phases.ts` as live behaviour, and the commit that wrote the
+bullet deleted that file in the same change, leaving it contradicting "There is no `DeferredSection`
+and no prefetch hook any more" four bullets later. It was false when it entered the record rather
+than overtaken afterwards. Evidence: `git show --stat 743a860` lists
+`apps/web/src/components/animated-hero/use-prefetch-phases.ts`, `deferred-section.tsx` and both of
+their test files among the deleted files, and `git grep -n -i prefetch -- apps/web/src` returns no
+hits.
+
+**A rejected alternative pointing at a design that is gone**, in `## Alternatives considered`, under
+**Prefetch the section chunks at idle**. The record read: "Waiting for intent or a few idle seconds
+keeps the same experience for anyone who scrolls." It now reads: "The intent-and-idle prefetch kept
+in its place was removed along with the deferral it served, so nothing prefetches these chunks
+today." What was wrong: that sentence is the justification for rejecting idle prefetch, and it names
+intent-or-idle prefetch as what the repository does instead, so a reader re-evaluating this
+alternative would weigh it against a mechanism that no longer exists. The measurement and the
+rejection itself are untouched, as ADR 0012 requires of a rejected alternative. Evidence: the same
+`git grep` above.
+
+That second sentence was true when this record was accepted on 2026-09-09 and was falsified by
+`743a860` the next day, which is normally the "overtaken since" case that ADR 0012 reserves for
+supersession. It is corrected in place because `743a860` had already rewritten rule 4, both
+prefetch-related trade-offs and two other entries under `## Alternatives considered` in this file,
+re-pointing the record at the world that commit created; the sentence is a straggler from that
+incomplete sweep rather than reasoning preserved from the original decision. Supersession would also
+be the wrong instrument, because `## Decision` is accurate as written and already states that the
+phases are imported directly.

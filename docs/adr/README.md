@@ -34,7 +34,7 @@ perform an operation.
 | 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)                                                          | Accepted                                  | 2026-09-08 |
 | 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)                                                  | Superseded by 0013 (corrected 2026-09-10) | 2026-09-09 |
 | 0008 | [Accent colour roles](0008-accent-colour-roles.md)                                                                          | Superseded by 0011                        | 2026-09-09 |
-| 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md)                                        | Accepted                                  | 2026-09-09 |
+| 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md)                                        | Accepted (corrected 2026-09-10)           | 2026-09-09 |
 | 0010 | [Status colour tokens](0010-status-colour-tokens.md)                                                                        | Accepted                                  | 2026-09-09 |
 | 0011 | [Colour roles, corrected for scoped surfaces and stacked tints](0011-colour-roles-on-scoped-surfaces.md)                    | Accepted                                  | 2026-09-10 |
 | 0012 | [Correcting factual errors in accepted records](0012-correcting-accepted-records.md)                                        | Accepted                                  | 2026-09-10 |

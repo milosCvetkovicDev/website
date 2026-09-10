@@ -202,7 +202,7 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
         {/* Section 1: Hero - server-rendered children passed through */}
         <MemoizedHeroSection>{children}</MemoizedHeroSection>
 
-        {/* Story sections: server-rendered, code-split, each behind its own Suspense boundary */}
+        {/* Story sections: server-rendered, imported directly — no code splitting, no Suspense */}
         <DiscoveryPhase />
 
         <StrategyPhase />
@@ -219,6 +219,6 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
   );
 }
 
-// Re-export only the hero section (used above the fold)
-// Other phases are lazy-loaded internally
+// Re-export only the hero section (used above the fold). The other phases are internal to this
+// module: AnimatedHero renders them itself, so nothing outside needs to import them.
 export { HeroSection } from './hero-section';
