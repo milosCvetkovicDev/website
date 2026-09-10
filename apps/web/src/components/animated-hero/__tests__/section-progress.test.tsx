@@ -1,7 +1,7 @@
 import { StrictMode, useRef } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SectionProgress } from '../section-progress';
+import { MEASURE_THROTTLE_MS, SectionProgress } from '../section-progress';
 
 // The seven dots name the seven sections of the hero story, so the geometry that matters is the
 // story's, not the document's. `/` renders the story under a sticky nav and then keeps going with
@@ -79,11 +79,11 @@ function runFrame() {
 /**
  * Runs frames until everything the component has scheduled has been applied. A measurement that
  * lands inside the throttle window waits the window out a frame at a time rather than dropping, so
- * the indicator settles within a window plus a frame at worst. 200ms is well past that.
+ * the indicator settles within a window plus a frame at worst; four windows leaves room to spare.
  */
 function settle() {
   act(() => {
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(MEASURE_THROTTLE_MS * 4);
   });
 }
 
@@ -164,6 +164,8 @@ describe('SectionProgress', () => {
 
     expect(screen.getByText('[04/07] BUILD')).toBeInTheDocument();
     expect(dot('BUILD')).toHaveClass('bg-[var(--accent)]');
+    // The dot after it stays unlit: reaching a section is not the same as lighting them all.
+    expect(dot('TEST')).toHaveClass('bg-[var(--border)]');
     expect(mobileBar()?.style.width).toBe('50%');
     expect(progressLine()?.style.height).toBe('50%');
   });
@@ -183,10 +185,37 @@ describe('SectionProgress', () => {
     // so an update deferred here is the last chance to be right.
     dispatchScrollTo(STORY_TOP + STORY_RANGE);
     runFrame();
+
+    // Still on the previous value, because this frame is inside the window. Without the throttle
+    // the indicator would already be at the end of the story here, so this is what pins the
+    // throttle itself; the assertions below are what pin its trailing edge.
+    expect(readout).toHaveTextContent('[02/07] DISCOVER');
+    expect(mobileBar()?.style.width).toBe('25%');
+
     settle();
 
     expect(readout).toHaveTextContent('[07/07] CTA');
     expect(mobileBar()?.style.width).toBe('100%');
+  });
+
+  it('stops measuring once it is unmounted', () => {
+    const { unmount } = render(<Story />);
+
+    scrollWindowTo(STORY_TOP + STORY_RANGE / 4);
+    expect(mobileBar()?.style.width).toBe('25%');
+
+    unmount();
+    const scheduled = vi.spyOn(window, 'requestAnimationFrame');
+    setScrollY(STORY_TOP + STORY_RANGE);
+    window.innerHeight = VIEWPORT_HEIGHT * 2;
+    act(() => {
+      window.dispatchEvent(new Event('scroll'));
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    // Both listeners went with the component, so neither event schedules any work. The `resize`
+    // one is new here and would otherwise leak on every unmount with nothing to notice.
+    expect(scheduled).not.toHaveBeenCalled();
   });
 
   it('keeps measuring after a re-run of the effect, as StrictMode does in development', () => {

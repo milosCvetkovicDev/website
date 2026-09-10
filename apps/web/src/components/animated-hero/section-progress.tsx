@@ -3,8 +3,12 @@
 import { useEffect, useState, useRef, useCallback, type RefObject } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
-/** Smallest gap between two measurements, ~30fps. The dots move a whole step at a time. */
-const MEASURE_THROTTLE_MS = 33;
+/**
+ * Smallest gap between two measurements, ~30fps. The dots and the readout move a whole step at a
+ * time, so they lose nothing to it; the mobile bar is continuous and does move at half rate on a
+ * 60Hz screen. Exported so the unit tests can wait out a window rather than hard-code one.
+ */
+export const MEASURE_THROTTLE_MS = 33;
 
 const sections = [
   { id: 'loading', label: 'INIT' },
@@ -46,7 +50,9 @@ export function SectionProgress({
   const prefersReducedMotion = usePrefersReducedMotion();
   const rafRef = useRef<number | null>(null);
   // No measurement has been taken yet, so the first one is never throttled: the pass scheduled when
-  // the listeners are attached has to land on the frame it asked for.
+  // the listeners are attached lands on the frame it asked for. The ref outlives a re-attach, so a
+  // second attach's pass can fall inside the window instead and reach the DOM through the deferral
+  // below — which is why the two have to work together.
   const lastMeasureRef = useRef(Number.NEGATIVE_INFINITY);
 
   // Refs for direct DOM manipulation (avoid React re-renders during scroll)
