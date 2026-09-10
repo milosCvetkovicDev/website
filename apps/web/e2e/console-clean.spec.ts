@@ -78,8 +78,9 @@ async function expectCleanConsole(page: Page, route: Route) {
   const response = await page.goto(route.path, { waitUntil: 'networkidle' });
   const documentUrl = response?.url() ?? page.url();
   // Soft, so that a wrong status, a redirect or a wrong title still reports the console problems
-  // collected below, which usually explain it. The title guards against reuseExistingServer
-  // attaching to some other project's dev server on :3000.
+  // collected below, which usually explain it. The title is only a smoke check that this
+  // application rendered; the status and the path above are what catch a wrong page, and the
+  // not-found routes below carry this title too.
   expect.soft(response?.status(), `${route.path} should answer ${route.status}`).toBe(route.status);
   expect.soft(new URL(documentUrl).pathname, `${route.path} should not redirect`).toBe(route.path);
   await expect.soft(page).toHaveTitle(/Milos Cvetkovic/);

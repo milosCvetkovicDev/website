@@ -212,8 +212,8 @@ async function openPage(
   // error naming the URL rather than as the test budget.
   const response = await page.goto(path, { waitUntil: 'networkidle', timeout: 30_000 });
   // A renamed slug or a rendering error would serve the not-found or the error page, whose
-  // title also matches below; the status and the path catch that. The title guards against
-  // reuseExistingServer attaching to another project's server on :3000.
+  // title also matches below; the status and the path catch that. The title is left as a
+  // smoke check that this application rendered at all (ADR 0014).
   expect(response?.status(), `${path} should answer 200`).toBe(200);
   expect(new URL(page.url()).pathname, `${path} should not redirect`).toBe(path);
   await expect(page).toHaveTitle(/Milos Cvetkovic/);
