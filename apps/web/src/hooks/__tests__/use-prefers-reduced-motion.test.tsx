@@ -52,4 +52,10 @@ describe('usePrefersReducedMotion', () => {
     unmount();
     expect(media.listenerCount()).toBe(0);
   });
+
+  it('reports false in a browser without window.matchMedia', () => {
+    Reflect.deleteProperty(window, 'matchMedia');
+    const { result } = renderHook(() => usePrefersReducedMotion());
+    expect(result.current).toBe(false);
+  });
 });

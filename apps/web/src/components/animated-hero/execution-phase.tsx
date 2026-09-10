@@ -100,8 +100,13 @@ export function ExecutionPhase() {
   const [animationComplete, setAnimationComplete] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  // The stats tween starts from a ScrollTrigger callback, outside the GSAP context, so it is
-  // tracked here and reverted alongside the context instead of outliving the component.
+  // The count is a tween on a plain object whose onUpdate writes straight into the DOM. GSAP
+  // re-enters the context for a ScrollTrigger callback, so `ctx.revert()` reverts this tween too,
+  // and reverting renders it at its start frame, firing onUpdate one last time. That last call
+  // would put 0% back over the finished values React has just rendered, so the teardown clears
+  // this flag before reverting anything and onUpdate stops writing.
+  const countingRef = useRef(false);
+  // Tracked so entering the section again stops the previous count rather than run two at once.
   const tweensRef = useRef<gsap.core.Tween[]>([]);
 
   useEffect(() => {
@@ -109,6 +114,11 @@ export function ExecutionPhase() {
     if (prefersReducedMotion) return;
 
     gsap.registerPlugin(ScrollTrigger);
+
+    const stopCount = () => {
+      tweensRef.current.forEach((tween) => tween.kill());
+      tweensRef.current = [];
+    };
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -118,12 +128,20 @@ export function ExecutionPhase() {
           end: 'bottom center',
           toggleActions: 'play none none reverse',
           onEnter: () => {
+            // Entering again (scrolling back up and down) restarts the count instead of running two.
+            stopCount();
+            countingRef.current = true;
+            // The count is starting over, so the finished state React renders has to go back with
+            // it. Leaving it latched would keep `complete` true, and React only rewrites a span
+            // whose rendered value changed, so nothing would ever correct what this count writes.
+            setAnimationComplete(false);
             // Animate stats using direct DOM manipulation (no React re-renders)
             const statsTween = gsap.to(
               {},
               {
                 duration: 3,
                 onUpdate: function () {
+                  if (!countingRef.current) return;
                   const progress = this.progress();
                   const files = Math.round(progress * 34);
                   const tests = Math.round(progress * 89);
@@ -196,13 +214,16 @@ export function ExecutionPhase() {
     }, sectionRef);
 
     return () => {
+      countingRef.current = false;
       ctx.revert();
-      tweensRef.current.forEach((tween) => tween.revert());
-      tweensRef.current = [];
+      stopCount();
     };
   }, [prefersReducedMotion]);
 
-  // With reduced motion the finished build is shown instead of counting up to it.
+  // With reduced motion the finished build is shown instead of counting up to it. Each value is
+  // the only child of its span, so React writes it with textContent, overwriting whatever the
+  // count last put there - but only when the value it renders actually changes, which is why a
+  // restarting count resets `animationComplete` above.
   const complete = prefersReducedMotion || animationComplete;
 
   const getTokenColor = (type: string) => {

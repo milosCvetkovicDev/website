@@ -40,8 +40,8 @@ export function SectionProgress() {
       }
       lastUpdateRef.current = now;
 
-      // Overscroll (rubber-banding) reports a negative scrollY, and a page that fits the
-      // viewport has no range to divide by; both read as the top of the page.
+      // Rubber-band overscroll puts scrollY below zero or past the range, and a page that fits the
+      // viewport has no range to divide by: clamp to the first and last section, and to the top.
       const scrollRange = getScrollRange();
       const progress = scrollRange > 0 ? Math.min(1, Math.max(0, window.scrollY) / scrollRange) : 0;
 
@@ -85,10 +85,11 @@ export function SectionProgress() {
               key={section.id}
               onClick={() => {
                 const targetScroll = (index / (sections.length - 1)) * getScrollRange();
-                // Smooth scrolling is motion; jump straight there when the user has opted out.
+                // Smooth scrolling is motion; jump straight there when the user has opted out
+                // ('auto' would defer to a CSS scroll-behavior, 'instant' does not).
                 window.scrollTo({
                   top: targetScroll,
-                  behavior: prefersReducedMotion ? 'auto' : 'smooth',
+                  behavior: prefersReducedMotion ? 'instant' : 'smooth',
                 });
               }}
               className="group flex items-center gap-2"
