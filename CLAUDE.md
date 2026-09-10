@@ -197,10 +197,14 @@ is there so that a future buildable package is compiled before the apps typechec
   `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"` before any node, pnpm or npx command.
 - A fresh clone or git worktree has no git hooks until `pnpm install` has run `prepare`.
 - `apps/web/next.config.ts` pins `turbopack.root` (which is also the file tracing root) to the
-  repository root, resolved from the config file's own path, and throws if `pnpm-workspace.yaml` is
-  not there. Without it Next.js takes the outermost lockfile above the app as the root, so a git
-  worktree nested under `.claude/worktrees/` was built against the parent checkout with a "multiple
-  lockfiles" warning.
+  workspace root, found by walking up from the directory Next evaluates the config in until a
+  `pnpm-workspace.yaml` appears, and left to Next's own inference when there is none. Without it
+  Next.js takes the outermost lockfile above the app as the root, so a git worktree nested under
+  `.claude/worktrees/` was built against the parent checkout with a "multiple lockfiles" warning.
+  Do not replace the search with a fixed `'..', '..'` hop: under the default loader the config is
+  evaluated as `<projectDir>/next.config.compiled.js`, so the starting directory is whatever Next
+  was invoked on, not this file, and `next info` from a subdirectory then resolves outside the
+  repository. `apps/web/src/test/next-config.test.ts` pins all of this.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm.
 - `pnpm install` runs no dependency lifecycle scripts. `allowBuilds` in `pnpm-workspace.yaml` denies the
