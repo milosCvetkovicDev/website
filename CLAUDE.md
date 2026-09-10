@@ -99,13 +99,15 @@ is there so that a future buildable package is compiled before the apps typechec
   actually needed.
 - Tailwind v4 is CSS-first: the theme is declared in `apps/web/src/app/globals.css` and compiled by
   `@tailwindcss/postcss`. There is no `tailwind.config.js` and there should not be one.
-- The accent colour has two tokens with different roles (ADR 0008). `--accent` paints surfaces:
+- The accent colour has two tokens with different roles (ADR 0011, superseding 0008). `--accent` paints surfaces:
   solid fills that carry white text, borders, indicators and the `bg-[var(--accent)]/10` tints.
   `--accent-text` is the accent as text and the only accent allowed in a `text-` utility or a
   `color` style, because `--accent` misses WCAG AA as text in the dark theme (3.5:1 on the
   background, 3.2:1 on the card).
   Decorative SVG frames, brackets and lines drawn with `currentColor` keep `--accent`; icons that
-  sit with text take `--accent-text`. Never dim text with an opacity modifier such as `/60` to make
+  sit with text take `--accent-text`. A component with a hard-coded dark background scopes the dark
+  tokens with the `dark` class **and** sets `color` on that same element: `color` inherits as an
+  already-resolved value, so scoping alone leaves an unclassed child with the page theme's colour. Never dim text with an opacity modifier such as `/60` to make
   it look secondary, not even `aria-hidden` text (axe measures it anyway); use `--muted` instead.
   Never let a GSAP `from()`, `fromTo()` or `set()` leave text at a partial opacity: the "from"
   state renders immediately, before any scroll trigger fires.
