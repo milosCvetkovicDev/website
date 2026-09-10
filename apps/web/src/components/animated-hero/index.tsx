@@ -148,8 +148,8 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
             {bootMessages.slice(0, currentMessage + 1).map((msg, i) => (
               <div
                 key={i}
-                className={`flex items-center gap-2 font-mono text-xs transition-opacity duration-200 ${
-                  i === currentMessage ? 'text-[var(--foreground)]' : 'text-[var(--muted)]/50'
+                className={`flex items-center gap-2 font-mono text-xs transition-colors duration-200 ${
+                  i === currentMessage ? 'text-[var(--foreground)]' : 'text-[var(--muted)]'
                 }`}
               >
                 <span
@@ -176,7 +176,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
       {/* Version tag */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-        <span className="font-mono text-[10px] text-[var(--muted)]/30">v2.0.26</span>
+        <span className="font-mono text-[10px] text-[var(--muted)]">v2.0.26</span>
       </div>
     </div>
   );
