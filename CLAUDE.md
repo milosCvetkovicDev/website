@@ -43,6 +43,8 @@ pnpm (`pnpm@10.33.0`), not Node. CI reads Node from `.nvmrc` and pnpm from `pack
 | `pnpm test:e2e`                                                  | Playwright specs in `apps/web/e2e`                                      |
 | `pnpm format`                                                    | Prettier over the whole repo, writing changes                           |
 | `pnpm format:check`                                              | Prettier in check mode, no writes                                       |
+| `pnpm check:allowbuilds`                                         | Checks `allowBuilds` entries against the versions the lockfile resolves |
+| `pnpm test:scripts`                                              | `node:test` tests for the root `scripts/` gates                         |
 | `pnpm clean`                                                     | `turbo clean` in both apps, then `rm -rf node_modules` at the root      |
 | `pnpm prepare`                                                   | `husky`; runs on install and is what creates the git hooks              |
 | `pnpm --filter web test:e2e`                                     | Playwright without going through Turborepo                              |
@@ -67,10 +69,11 @@ is there so that a future buildable package is compiled before the apps typechec
   message if it is still not on PATH.
 - lint-staged has a config per package. The root one only runs `prettier --write`; `apps/web` and
   `apps/playground` run `eslint --fix --max-warnings 0` then `prettier --write` on TS/JS files.
-- CI is `.github/workflows/ci.yml`, two jobs. `quality`: install, `format:check`, `lint`,
-  `typecheck`, `test`, `build`. `e2e`: install chromium, build web, run the Playwright specs; the
-  report is uploaded as an artifact on failure or cancellation. Actions are SHA-pinned,
-  `permissions: contents: read`, and concurrency cancels superseded runs on pull requests only.
+- CI is `.github/workflows/ci.yml`, two jobs. `quality`: install, `check:allowbuilds`,
+  `test:scripts`, `format:check`, `lint`, `typecheck`, `test`, `build`. `e2e`: install chromium, build web, run the
+  Playwright specs; the report is uploaded as an artifact on failure or cancellation. Actions are
+  SHA-pinned, `permissions: contents: read`, and concurrency cancels superseded runs on pull
+  requests only.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
 - Every route must load with a clean browser console. `apps/web/e2e/console-clean.spec.ts` fails
   on any console error, console warning or page error, React hydration mismatches included, so a
@@ -211,17 +214,24 @@ is there so that a future buildable package is compiled before the apps typechec
   repository. `apps/web/src/test/next-config.test.ts` pins all of this.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm.
-- `pnpm install` runs no dependency lifecycle scripts. `allowBuilds` in `pnpm-workspace.yaml` denies the
-  three packages pnpm 10 would otherwise warn about (esbuild, sharp, unrs-resolver): their scripts
-  only check the prebuilt platform binaries the lockfile already installs, and download or compile
-  one only when none is present. An `Ignored build scripts` warning naming a package without an
-  entry is a new decision: run `pnpm ignored-builds` and `pnpm why -r <name>`, read its `scripts`
-  under `node_modules/.pnpm/<name>@<version>/node_modules/<name>/`, then add it to `allowBuilds` as
-  `true` or `false` with a comment; do not run `pnpm approve-builds --all`. A warning naming a
-  package that already has an entry means the `node_modules` predates the entry: pnpm re-reports
-  the builds recorded in `node_modules/.modules.yaml` until `pnpm clean && pnpm install`. Do not add
-  `strictDepBuilds`, which turns that stale warning into a failed install (ADR 0007,
-  `docs/adr/0007-dependency-build-scripts.md`).
+- `pnpm install` runs no dependency lifecycle scripts. `allowBuilds` in `pnpm-workspace.yaml` denies
+  the two packages pnpm 10 would otherwise warn about (esbuild, unrs-resolver): their scripts only
+  check the prebuilt platform binaries the lockfile already installs, and download one only when
+  none is present. sharp has no entry because it has had no install script since 0.35.0, and an
+  entry belongs there only while the package still declares one — an entry for a scriptless package
+  would silently deny whatever a later release adds instead of letting pnpm report it. Each entry
+  carries a `Reviewed at <version>` comment, and `pnpm check:allowbuilds` fails CI when one drifts
+  from the lockfile or outlives its script, so a Dependabot bump of a denied package means reading
+  the new script and updating the comment. That check fails closed: anything it cannot parse is an
+  error, not a skip, so a legal but unrecognised edit to the block fails CI rather than passing
+  unchecked. Its own tests are `pnpm test:scripts`. An `Ignored build scripts` warning naming a package
+  without an entry is a new decision: run `pnpm ignored-builds` and `pnpm why -r <name>`, read its
+  `scripts` under `node_modules/.pnpm/<name>@<version>/node_modules/<name>/`, then add it to
+  `allowBuilds` as `true` or `false` with a comment; do not run `pnpm approve-builds --all`. A
+  warning naming a package that already has an entry means the `node_modules` predates the entry:
+  pnpm re-reports the builds recorded in `node_modules/.modules.yaml` until
+  `pnpm clean && pnpm install`. Do not add `strictDepBuilds`, which turns that stale warning into a
+  failed install (ADR 0013, `docs/adr/0013-dependency-build-scripts-reviewed.md`, superseding 0007).
 - `apps/web/README.md` is untouched `create-next-app` boilerplate: it says `npm run dev` and
   `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
   authoritative documents.
