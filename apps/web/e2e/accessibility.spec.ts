@@ -52,6 +52,22 @@ import { expect, test, type Page } from '@playwright/test';
  * `PipelineStage`, the `warning` and `error` `NotificationToast` variants, and the `pending` and
  * `error` `ActivityEntry` variants. They are unreachable, not merely uncovered.
  *
+ * The boot loader on `/` is outside all of this, and cannot be brought inside it. `openPage` waits
+ * for it to be hidden, so no pass measures it, and holding it on screen instead does not help.
+ * Measured on 2026-09-10 by aborting the page's `.js` chunks, which stops hydration and leaves the
+ * prerendered loader up for good: axe puts every one of its text nodes in `incomplete`, with
+ * "background color could not be determined because it is overlapped by another element". axe is
+ * right and the overlap is total. The loader is `z-[1]` and the story is `relative z-10` in the
+ * same stacking context, so the hero paints over it: `elementFromPoint` at the centre of the
+ * loader's own heading, boot line and version tag returns hero content in all three cases, never
+ * the loader. Only `violations` fail here, so an assertion on the loader would be green whatever
+ * colours it used, and there is nothing on screen for it to be green about. Abort the `.css` chunk
+ * with the `.js` and it is worse than useless: the stylesheet goes too and every node passes at
+ * 21:1 against an unstyled page. Its progress and boot-message states are not reachable either.
+ * `useIsHydrated` flips on the first client commit, so the effect driving them never sees `visible`
+ * true and the loader only ever renders its first message. What the loader looks like is held by
+ * the token rules in CLAUDE.md and by review, not by this gate.
+ *
  * Both passes run at the project's desktop viewport. A mobile viewport, which is what Lighthouse
  * emulates by default, is still not covered.
  */
