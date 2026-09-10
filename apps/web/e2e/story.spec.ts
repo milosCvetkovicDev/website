@@ -4,12 +4,14 @@ test.describe('Story sections', () => {
   test('scrolling back up reverses the closing section at once', async ({ page }) => {
     await page.goto('/');
 
-    const cta = page.getByRole('link', { name: /connect on linkedin/i });
+    // The footer links to the same profile, so match the closing section's own call to action by
+    // the text it carries rather than by the destination.
+    const cta = page.locator('a[href*="linkedin.com/in/"]', { hasText: 'Connect on LinkedIn' });
+    await expect(cta).toHaveCount(1);
     await cta.scrollIntoViewIfNeeded();
 
-    // The section hydrates on approach, then its entrance timeline runs; the breathing glow is
-    // started by that timeline's onComplete, so a box-shadow on the call to action is the signal
-    // that the entrance has finished.
+    // The entrance timeline starts the breathing glow from its onComplete, so a box-shadow on the
+    // call to action is the signal that the entrance has finished.
     await expect
       .poll(() => cta.evaluate((el) => getComputedStyle(el).boxShadow), { timeout: 30_000 })
       .not.toBe('none');
@@ -21,9 +23,8 @@ test.describe('Story sections', () => {
 
     await page.evaluate(() => window.scrollTo(0, 0));
 
-    // The entrance is 1.4s long, so two seconds is enough for it to have fully reversed. With the
-    // glow inside the timeline this assertion fails: four seconds of breathing rewind first.
-    await page.waitForTimeout(2_000);
-    await expect(cta).toHaveCSS('opacity', '0');
+    // The entrance is 1.4s long, so three seconds is ample for it to have fully reversed. With the
+    // glow inside the timeline this fails: four seconds of breathing rewind first.
+    await expect(cta).toHaveCSS('opacity', '0', { timeout: 3_000 });
   });
 });

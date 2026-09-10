@@ -54,18 +54,16 @@ Animated and lazy-loaded UI in `apps/web` follows five rules.
 3. **No static `will-change`.** GSAP promotes elements for the duration of a tween on its own, and a
    compositing layer per element is paid on every frame the main thread produces. `will-change` is
    acceptable only on a handful of elements and only while they are about to animate.
-4. **Sections below the fold are code-split, and their markup stays in the document.** The six
-   story phases are `React.lazy` components behind their own `Suspense` boundary
-   (`apps/web/src/components/animated-hero/deferred-section.tsx`), so their JavaScript is a separate
-   chunk fetched when React renders them, and a chunk that fails to load falls back to the section
-   placeholder instead of the route's error page. Deferring their _hydration_ was tried and reverted;
-   the Consequences below say why. An animation that repeats forever stops while nothing can see it:
-   a GSAP timeline uses `toggleActions: 'play pause resume reverse'` so it pauses once its section is
-   scrolled past, and `.scan-line` is paused by `[data-active='false']` on an unhovered, unfocused
-   featured-work card and by `[animation-play-state:paused]` until hover on a `/work` project card.
-   An endless tween is never a child of a timeline that a ScrollTrigger reverses: GSAP gives such a
-   child a total duration of 1e10 seconds, the parent inherits it, and `reverse` then rewinds every
-   second the tween has been running before the entrance itself moves.
+4. **Below-the-fold sections render like everything else.** The six story phases are imported
+   directly by `apps/web/src/components/animated-hero/index.tsx`. Two attempts at deferring them
+   both cost more than they saved and are recorded under Alternatives; the rule that survives is
+   that a section's markup is in the document from the first paint and stays there. What is deferred
+   is animation, not content: an animation that repeats forever stops while nothing can see it, with
+   `toggleActions: 'play pause resume reverse'` on a GSAP timeline, `[data-active='false']` on an
+   unhovered featured-work card, and `[animation-play-state:paused]` until hover on a `/work` card.
+   An endless tween is never a child of a timeline a ScrollTrigger reverses: GSAP gives such a child
+   a total duration of 1e10 seconds, the parent inherits it, and `reverse` then rewinds every second
+   the tween has been running before the entrance itself moves.
 5. **Server components import client components from their own modules.** `app/layout.tsx` does
    not import from the `@/components` barrel; pages may, because a page's chunk is only paid for by
    that page. The barrel stays for the page-level components it lists.
@@ -96,12 +94,16 @@ main thread go quiet between tmux ticks.
 
 ### Trade-offs
 
-- The sections hydrate at load, and their chunk is fetched then too, so the page pays for six
-  phases' render and GSAP setup during startup. That is the cost of the reverted experiment below,
-  and it is not yet re-measured: every attempt on 2026-09-10 landed on a machine Lighthouse flagged
-  as CPU-starved (`benchmarkIndex` 611 to 904). Deferring the animation work rather than the
-  hydration — each phase importing GSAP from inside an approach-gated effect — would recover it
-  without touching the markup, and is the next thing to try.
+- The story sections render and hydrate at load, and that is the price of the two reverted
+  experiments. Measured on 2026-09-10, five interleaved runs per build on an idle machine
+  (`benchmarkIndex` 1,554 to 2,001, no warnings), this build against `main` carrying the hydration
+  gate: performance 92 against 96, LCP 2.77 s against 2.63 s, blocking time 234 ms against 94 ms,
+  Speed Index 1.34 s against 1.13 s. Cumulative layout shift goes the other way, 0.016 against
+  0.034, because nothing swaps a placeholder for a section any more. Against the build this whole
+  effort started from (`a8b4a91`: performance 92, CLS 0.037, blocking time 252 ms) it is level or
+  better on every metric, so what was given up is the deferral, not the work that made the page
+  faster. Deferring the animation rather than the content — each phase importing GSAP from inside an
+  approach-gated effect — is what would buy the blocking time back, and it is the open follow-up.
 - Nobody pays for GSAP during the first second: the intent listeners are armed one second after
   hydration, so a pointer already resting over the page does not count. After that the first
   pointer, touch, key, wheel or scroll event loads the chunks, and with no interaction at all they
@@ -125,8 +127,8 @@ main thread go quiet between tmux ticks.
   paint from each of those frames, which is the part rule 2 is about. The harness is
   `dot-bisect.mjs` and `dot-frames.mjs` in the scratch notes of that session; anyone resuming
   should start from the frame cadence, not from the animation.
-- `DeferredSection` is now a plain `Suspense` boundary. It holds no observer and no state, and the
-  sections are in the live DOM from the first paint onward.
+- There is no `DeferredSection` and no prefetch hook any more; `index.tsx` renders the phases
+  directly, which is also the last of the indirection those two experiments added.
 - The hover text effects and any other interactivity inside a section are inert until it hydrates.
   The six sections hold one interactive element, the LinkedIn link, and it is a plain anchor that
   works without hydration.
@@ -147,6 +149,10 @@ main thread go quiet between tmux ticks.
   the copy came back only when the visitor scrolled to it. The HTML response was correct throughout,
   which is why the assertion written at the time passed. `apps/web/e2e/hero.spec.ts` now reads the
   live DOM after hydration instead.
+- **Keep the sections lazy behind `Suspense` without the gate.** Measured and rejected the same day.
+  It restores the markup, but every section shows a 100vh placeholder until its chunk arrives and
+  the swap to real content is a layout shift: CLS 0.092 against 0.034, with blocking time 281 ms.
+  Importing the phases directly gives CLS 0.016 at 234 ms.
 - **Mount the story sections after `requestIdleCallback` instead of on approach.** Rejected: idle
   arrives about a second after load, inside the window Lighthouse measures and inside the time a real
   visitor is still looking at the hero. The work moved but was not removed.
