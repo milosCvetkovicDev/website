@@ -181,8 +181,12 @@ is there so that a future buildable package is compiled before the apps typechec
   they describe.
 - `docs/adr` — numbered architecture decision records, indexed in `docs/adr/README.md`. Naming is
   `NNNN-kebab-title.md`, numbers are never reused, and the section order is Status, Date, Context,
-  Decision, Consequences, Alternatives considered. An accepted record is not edited: supersede it
-  with a new number and set the old status to `Superseded by NNNN`.
+  Decision, Consequences, Alternatives considered, optionally followed by Corrections. An accepted
+  record's `## Decision` is never edited: supersede it with a new number and set the old status to
+  `Superseded by ADR-NNNN`. Its other sections may be corrected when they state something that was
+  false when the record was accepted, under the rules in
+  `docs/adr/0011-correcting-accepted-records.md`, which sets the status to
+  `Accepted (corrected YYYY-MM-DD)` and adds a dated, append-only `## Corrections` entry.
 - `docs/runbooks` — operational procedures. `docs/runbooks/deploy.md` is the deployment procedure.
 - `README.md` addresses a reader landing on GitHub; this file addresses an agent about to change
   code. Keep them consistent without duplicating each other.
