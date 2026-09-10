@@ -30,8 +30,27 @@ function stubIntersectionObserver() {
     );
 }
 
-const renderFeaturedWork = () => render(<FeaturedWork projects={featuredProjects} />);
-const linkFor = (title: string) => screen.getByRole('link', { name: title });
+/** Resolves a card link the way a user finds it: by role and accessible name. */
+const linkByAccessibleName = (title: string) => screen.getByRole('link', { name: title });
+
+// A `name` option makes getByRole compute the accessible name of every candidate, and
+// dom-accessibility-api walking those subtrees was over a third of this file's runtime. The cards
+// are keyed list items whose attributes change in place and never remount, so the tests below that
+// only need a handle on a card resolve all three links once, with one role query and no name
+// computation at all. The two tests that are *about* the accessible name still query by it.
+function renderFeaturedWork() {
+  const utils = render(<FeaturedWork projects={featuredProjects} />);
+  const links = new Map(screen.getAllByRole('link').map((link) => [link.textContent, link]));
+  return {
+    ...utils,
+    linkFor(title: string) {
+      const link = links.get(title);
+      if (!link) throw new Error(`No featured-work card link titled "${title}"`);
+      return link;
+    },
+  };
+}
+
 const litConnections = (project: (typeof featuredProjects)[number]) =>
   getActiveConnections(project.activeNodes).filter((connection) => connection.active).length;
 
@@ -45,7 +64,7 @@ describe('FeaturedWork', () => {
     stubMatchMedia(true);
     renderFeaturedWork();
     for (const project of featuredProjects) {
-      expect(linkFor(project.title)).toHaveAttribute('href', `/work/${project.slug}`);
+      expect(linkByAccessibleName(project.title)).toHaveAttribute('href', `/work/${project.slug}`);
     }
   });
 
@@ -55,7 +74,7 @@ describe('FeaturedWork', () => {
     stubMatchMedia(true);
     renderFeaturedWork();
     for (const project of featuredProjects) {
-      const link = linkFor(project.title);
+      const link = linkByAccessibleName(project.title);
       expect(link).toHaveAccessibleName(project.title);
       expect(link.textContent).toBe(project.title);
       expect(link).not.toHaveAttribute('aria-labelledby');
@@ -72,7 +91,7 @@ describe('FeaturedWork', () => {
 
   it('activates a project and its architecture nodes on keyboard focus', () => {
     stubMatchMedia(true);
-    const { container } = renderFeaturedWork();
+    const { container, linkFor } = renderFeaturedWork();
     const [first, second] = featuredProjects;
     const secondCard = linkFor(second.title);
 
@@ -94,7 +113,7 @@ describe('FeaturedWork', () => {
 
   it('keeps the focused card active when the mouse leaves another card', () => {
     stubMatchMedia(true);
-    renderFeaturedWork();
+    const { linkFor } = renderFeaturedWork();
     const [first, second] = featuredProjects;
 
     fireEvent.mouseEnter(linkFor(first.title));
@@ -106,7 +125,7 @@ describe('FeaturedWork', () => {
 
   it('keeps the focused card active when the mouse only passes over another card', () => {
     stubMatchMedia(true);
-    renderFeaturedWork();
+    const { linkFor } = renderFeaturedWork();
     const [first, second] = featuredProjects;
 
     // Focus first, then hover elsewhere and leave: the keyboard focus must survive.
@@ -121,7 +140,7 @@ describe('FeaturedWork', () => {
 
   it('keeps the hovered card active when focus moves away', () => {
     stubMatchMedia(true);
-    renderFeaturedWork();
+    const { linkFor } = renderFeaturedWork();
     const [first, second] = featuredProjects;
 
     fireEvent.mouseEnter(linkFor(first.title));
@@ -147,7 +166,7 @@ describe('FeaturedWork', () => {
   it('renders no SMIL animations under reduced motion', () => {
     stubMatchMedia(true);
     const intersect = stubIntersectionObserver();
-    const { container } = renderFeaturedWork();
+    const { container, linkFor } = renderFeaturedWork();
     intersect(true);
     fireEvent.focus(linkFor(featuredProjects[1].title));
     expect(container.querySelectorAll('animateMotion, animate')).toHaveLength(0);
