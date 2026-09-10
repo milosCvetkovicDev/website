@@ -38,6 +38,45 @@ const activities = [
   { file: 'tests/agent.test.ts', desc: 'Unit test suite' },
 ];
 
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `00:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Module scope, not created during render: the GSAP timeline writes into the refs it is handed, so
+// a new component identity on every render would remount the bars and drop those writes.
+const AnimatedProgressBar = ({
+  label,
+  progressRef,
+  textRef,
+  complete,
+}: {
+  label: string;
+  progressRef: React.RefObject<HTMLDivElement | null>;
+  textRef: React.RefObject<HTMLSpanElement | null>;
+  complete: boolean;
+}) => (
+  <div className="group flex items-center gap-3">
+    <span className="w-24 shrink-0 font-mono text-xs text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
+      {label}
+    </span>
+    <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
+      <div
+        ref={progressRef}
+        className="h-full rounded-full bg-[var(--accent)] transition-none"
+        style={{ width: complete ? '100%' : '0%' }}
+      />
+    </div>
+    <span
+      ref={textRef}
+      className="w-12 text-right font-mono text-xs text-[var(--muted)] tabular-nums"
+    >
+      {complete ? '100%' : '0%'}
+    </span>
+  </div>
+);
+
 export function ExecutionPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const codeRef = useRef<HTMLDivElement>(null);
@@ -166,12 +205,6 @@ export function ExecutionPhase() {
   // With reduced motion the finished build is shown instead of counting up to it.
   const complete = prefersReducedMotion || animationComplete;
 
-  function formatTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `00:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-
   const getTokenColor = (type: string) => {
     switch (type) {
       case 'keyword':
@@ -190,36 +223,6 @@ export function ExecutionPhase() {
         return 'text-[var(--foreground)]';
     }
   };
-
-  // Custom progress bar component using refs for direct DOM manipulation
-  const AnimatedProgressBar = ({
-    label,
-    progressRef,
-    textRef,
-  }: {
-    label: string;
-    progressRef: React.RefObject<HTMLDivElement | null>;
-    textRef: React.RefObject<HTMLSpanElement | null>;
-  }) => (
-    <div className="group flex items-center gap-3">
-      <span className="w-24 shrink-0 font-mono text-xs text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
-        {label}
-      </span>
-      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
-        <div
-          ref={progressRef}
-          className="h-full rounded-full bg-[var(--accent)] transition-none"
-          style={{ width: complete ? '100%' : '0%' }}
-        />
-      </div>
-      <span
-        ref={textRef}
-        className="w-12 text-right font-mono text-xs text-[var(--muted)] tabular-nums"
-      >
-        {complete ? '100%' : '0%'}
-      </span>
-    </div>
-  );
 
   return (
     <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
@@ -272,16 +275,19 @@ export function ExecutionPhase() {
                   label="FILES"
                   progressRef={filesProgressRef}
                   textRef={filesTextRef}
+                  complete={complete}
                 />
                 <AnimatedProgressBar
                   label="TESTS"
                   progressRef={testsProgressRef}
                   textRef={testsTextRef}
+                  complete={complete}
                 />
                 <AnimatedProgressBar
                   label="COVERAGE"
                   progressRef={coverageProgressRef}
                   textRef={coverageTextRef}
+                  complete={complete}
                 />
                 <div className="flex items-center justify-between border-t border-[var(--accent)]/20 pt-2">
                   <span className="font-mono text-xs text-[var(--muted)]">TIME ELAPSED</span>
