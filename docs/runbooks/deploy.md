@@ -290,7 +290,14 @@ static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
       WebSite, from `apps/web/src/components/json-ld.tsx`) and their `url` fields are the apex
 - [ ] The theme toggle in the navigation switches light and dark, the choice survives a reload, and
       there is no light-to-dark flash on first paint
-- [ ] Browser console is clean on every page: no errors, no hydration warnings, no 404s for assets
+- [ ] Browser console is clean on every page. `apps/web/e2e/console-clean.spec.ts` covers this in
+      CI on every pull request: it loads every route above, both not-found pages and `/` under
+      reduced motion against the production build and fails on any console error, console warning
+      or page error, React hydration mismatches and 404s for assets requested on load included.
+      Confirm the `e2e` job was green on the deployed commit. The spec targets `next start` on
+      localhost, so anything the hosting layer injects or blocks is outside it: after a
+      Vercel-side change (analytics, headers), open the live `/` once with the console open.
+      Locally: `pnpm --filter web build && CI=true pnpm --filter web test:e2e`.
 - [ ] Lighthouse spot check on `/` and one case study page in an incognito window; note the scores
       somewhere rather than acting on them immediately
 

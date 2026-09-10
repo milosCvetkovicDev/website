@@ -72,6 +72,9 @@ is there so that a future buildable package is compiled before the apps typechec
   report is uploaded as an artifact on failure or cancellation. Actions are SHA-pinned,
   `permissions: contents: read`, and concurrency cancels superseded runs on pull requests only.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
+- Every route must load with a clean browser console. `apps/web/e2e/console-clean.spec.ts` fails
+  on any console error, console warning or page error, React hydration mismatches included, so a
+  stray `console.warn` fails the `e2e` job. Case-study routes come from `src/data/case-studies.ts`.
 - `eslint-disable` is not an acceptable fix for the React Hooks rules. `react-hooks/set-state-in-effect`
   in particular is pointing at a real hydration problem: restructure the component instead. See
   `docs/adr/0006-hydration-safe-client-state.md` and `apps/web/src/hooks/use-is-hydrated.ts`.
