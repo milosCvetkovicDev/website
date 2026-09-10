@@ -167,6 +167,11 @@ is there so that a future buildable package is compiled before the apps typechec
 - Non-interactive shells have neither node nor pnpm on PATH. Run
   `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"` before any node, pnpm or npx command.
 - A fresh clone or git worktree has no git hooks until `pnpm install` has run `prepare`.
+- `apps/web/next.config.ts` pins `turbopack.root` (which is also the file tracing root) to the
+  repository root, resolved from the config file's own path, and throws if `pnpm-workspace.yaml` is
+  not there. Without it Next.js takes the outermost lockfile above the app as the root, so a git
+  worktree nested under `.claude/worktrees/` was built against the parent checkout with a "multiple
+  lockfiles" warning.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm.
 - `pnpm install` runs no dependency lifecycle scripts. `allowBuilds` in `pnpm-workspace.yaml` denies the
