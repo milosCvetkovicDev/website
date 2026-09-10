@@ -1,5 +1,5 @@
 import { StrictMode, useRef } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MEASURE_THROTTLE_MS, SectionProgress } from '../section-progress';
 
@@ -112,8 +112,10 @@ function resizeViewportTo(height: number) {
 
 const mobileBar = () => document.querySelector<HTMLElement>('.will-change-\\[width\\]');
 const progressLine = () => document.querySelector<HTMLElement>('.will-change-\\[height\\]');
-const dot = (label: string) =>
-  screen.getByRole('button', { name: `Go to ${label} section` }).firstElementChild;
+const dotButton = (label: string) => screen.getByRole('button', { name: `Go to ${label} section` });
+const dot = (label: string) => dotButton(label).firstElementChild;
+const currentDots = () =>
+  screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-current'));
 
 describe('SectionProgress', () => {
   beforeEach(() => {
@@ -251,6 +253,44 @@ describe('SectionProgress', () => {
 
     expect(readout).toHaveTextContent('[05/07] TEST');
     expect(mobileBar()?.style.width).toBe('60%');
+  });
+
+  it('moves aria-current with the active section and leaves it on exactly one dot', () => {
+    // The fill colour and the glow that mark the active dot reach nobody using assistive
+    // technology, and every dot up to the active one shares the fill, so `aria-current` is the
+    // only thing that says which of them the visitor is on.
+    render(<Story />);
+
+    expect(currentDots()).toEqual([dotButton('INIT')]);
+    expect(dotButton('INIT')).toHaveAttribute('aria-current', 'location');
+
+    scrollWindowTo(STORY_TOP + STORY_RANGE / 2);
+
+    expect(currentDots()).toEqual([dotButton('BUILD')]);
+    expect(dotButton('INIT')).not.toHaveAttribute('aria-current');
+  });
+
+  it('keeps aria-current on the last dot once the story is behind the viewport', () => {
+    // The readout clamps to the last section past the end of the story, and `aria-current` is
+    // derived from the same index, so it has to clamp with it rather than disappearing.
+    render(<Story />);
+
+    scrollWindowTo(DOCUMENT_RANGE);
+
+    expect(currentDots()).toEqual([dotButton('CTA')]);
+  });
+
+  it('names the dot group and gives it the set semantics of a list', () => {
+    render(<Story />);
+
+    const group = screen.getByRole('navigation', { name: 'Story sections' });
+
+    expect(group).toContainElement(dotButton('INIT'));
+    expect(group).toContainElement(dotButton('CTA'));
+    // The list is what makes a screen reader announce "4 of 7"; the `[04/07]` readout that says
+    // so on screen is aria-hidden, so without it the ordinal reaches nobody.
+    expect(within(group).getByRole('list')).toBeInTheDocument();
+    expect(within(group).getAllByRole('listitem')).toHaveLength(7);
   });
 
   it('tracks the scroll position in a browser without window.matchMedia', () => {
