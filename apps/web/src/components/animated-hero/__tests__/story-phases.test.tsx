@@ -194,3 +194,65 @@ describe('ExecutionPhase', () => {
     expect(screen.getByText('x12')).toBeInTheDocument();
   });
 });
+
+describe('GameComplete', () => {
+  beforeEach(() => {
+    media.reduce = false;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function renderWithTimeline() {
+    const timelineSpy = vi.spyOn(gsap, 'timeline');
+    const view = render(<GameComplete />);
+    const cta = screen.getByRole('link', { name: /connect on linkedin/i });
+    const entrance = timelineSpy.mock.results[0].value as gsap.core.Timeline;
+    const glow = gsap.getTweensOf(cta).find((tween) => tween.vars.repeat === -1);
+    if (!glow) throw new Error('the CTA glow tween was not created');
+    return { ...view, cta, entrance, glow };
+  }
+
+  it('keeps the endless glow out of the entrance timeline', () => {
+    const { entrance, glow } = renderWithTimeline();
+
+    // A `repeat: -1` child would give the timeline a duration of 1e10 seconds, and the `reverse`
+    // toggleAction would then rewind every second the glow had been breathing before the entrance
+    // began to un-play. The entrance is the two fromTo steps and nothing else.
+    expect(entrance.duration()).toBeCloseTo(1.4, 5);
+    expect(glow.parent).not.toBe(entrance);
+  });
+
+  it('holds the glow until the entrance has finished', () => {
+    const { entrance, glow } = renderWithTimeline();
+    expect(glow.paused()).toBe(true);
+
+    act(() => {
+      entrance.totalTime(entrance.duration());
+    });
+
+    expect(glow.paused()).toBe(false);
+  });
+
+  it('stops the glow when the section is scrolled past', () => {
+    const { entrance, glow } = renderWithTimeline();
+    act(() => {
+      entrance.totalTime(entrance.duration());
+    });
+    expect(glow.paused()).toBe(false);
+
+    act(() => ScrollTrigger.getAll()[0].vars.onLeave?.(ScrollTrigger.getAll()[0]));
+
+    expect(glow.paused()).toBe(true);
+  });
+
+  it('kills the glow on unmount', () => {
+    const { cta, glow, unmount } = renderWithTimeline();
+    expect(gsap.getTweensOf(cta)).toContain(glow);
+
+    unmount();
+
+    expect(gsap.getTweensOf(cta)).toHaveLength(0);
+  });
+});

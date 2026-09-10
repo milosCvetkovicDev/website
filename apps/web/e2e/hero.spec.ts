@@ -92,6 +92,20 @@ test.describe('Hero Section', () => {
     expect(shiftScore).toBeLessThan(0.005);
   });
 
+  test('story sections stay in the DOM after hydration', async ({ page }) => {
+    // Holding each section's Suspense boundary suspended during hydration put the markup in the
+    // HTML but let React replace it with the placeholder the moment the page hydrated, so the copy
+    // and the closing call to action left the document until the visitor scrolled to them. This is
+    // the guard for that: read the live DOM well after hydration, without scrolling.
+    await page.goto('/');
+    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
+    await page.waitForTimeout(3_000);
+    for (const copy of ['TECH TREE', 'CI/CD PIPELINE', 'SELF-HEALING LOG']) {
+      await expect(page.getByText(copy, { exact: false }).first()).toBeAttached();
+    }
+    await expect(page.getByRole('link', { name: /connect on linkedin/i })).toBeAttached();
+  });
+
   test('story sections are server-rendered', async ({ page }) => {
     const response = await page.goto('/');
     const html = (await response?.text()) ?? '';
@@ -102,8 +116,14 @@ test.describe('Hero Section', () => {
   });
 
   test('scrolling through the story does not shift visible layout', async ({ page }) => {
-    // Programmatic scrolling is not user input, so anything that moves while the sections hydrate
-    // on approach counts here.
+    // Reduced motion, deliberately: the phases stage their own content in as they animate (the CI
+    // pipeline rows, the healing log), and those are intended movements, not layout instability.
+    // With motion off every section renders its end state, so anything that moves while scrolling
+    // is the page being unstable — which is what this guard is for. It also makes the measurement
+    // independent of machine load, which a run on a busy laptop is not.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    // Programmatic scrolling is not user input, so nothing here is discounted as recent input.
     const shiftScore = await page.evaluate(async () => {
       let total = 0;
       const observer = new PerformanceObserver((list) => {

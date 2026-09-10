@@ -10,8 +10,8 @@
  * - --accent-text is the same hue used as text. It is tuned per theme so that it reaches WCAG AA
  *   (4.5:1) on --background, --card and every accent tint up to /20. Never use --accent as a
  *   text colour: in the dark theme it is 3.5:1 on the background and 3.2:1 on the card.
- * - --muted is secondary text; the light value is set so it still passes on the /5 and /10
- *   accent tints it sits on (the HUD panels and tag pills).
+ * - --muted is secondary text; the light value is set so it still passes on the accent tints it
+ *   sits on, including a /10 tag pill stacked on a /5 panel, where #666666 was 4.4:1.
  * - --status-ok, --status-warn and --status-err are the status colours of the hero, the HUD elements
  *   and the work pages (ADR 0010): one token per role for text, icons, borders, tints, bars, dots
  *   and glows. The dark values are the shades the status text always used (green-400, yellow-400,
@@ -25,7 +25,7 @@
   --accent: #7c3aed;
   --accent-hover: #6d28d9;
   --accent-text: #6d28d9;
-  --muted: #666666;
+  --muted: #636363;
   --border: #e5e5e5;
   --card: #ffffff;
   --card-hover: #f5f5f5;
