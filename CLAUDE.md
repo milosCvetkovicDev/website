@@ -48,6 +48,7 @@ pnpm (`pnpm@10.33.0`), not Node. CI reads Node from `.nvmrc` and pnpm from `pack
 | `pnpm clean`                                                     | `turbo clean` in both apps, then `rm -rf node_modules` at the root      |
 | `pnpm prepare`                                                   | `husky`; runs on install and is what creates the git hooks              |
 | `pnpm --filter web test:e2e`                                     | Playwright without going through Turborepo                              |
+| `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`                | Playwright on a port other than the default 3210                        |
 | `pnpm --filter web test:watch`                                   | Vitest in watch mode                                                    |
 | `pnpm --filter web exec vitest run <path>`                       | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx` |
 | `pnpm --filter web exec playwright install --with-deps chromium` | Needed once before the first e2e run                                    |
@@ -159,11 +160,21 @@ is there so that a future buildable package is compiled before the apps typechec
   `src/components/animated-hero/__tests__/story-phases.test.tsx` does. Raising the global default
   hides the next slow test instead.
 - e2e specs must wait for hydration before interacting, because events fired before it are lost.
-  `e2e/hero.spec.ts` waits for the `System Boot` loader to be hidden, and also asserts the page title
-  to catch a stray dev server on port 3000.
+  `e2e/hero.spec.ts` waits for the `System Boot` loader to be hidden, and also asserts the page
+  title. That assertion is only a smoke check that the app rendered: it never could catch a second
+  checkout of this site, which serves the same title character for character, and the not-found and
+  error pages carry it too. Status and path are what catch a wrong page.
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build
   with `pnpm start` inside `apps/web`, sets `forbidOnly`, retries twice, uses one worker and a 10s
-  expect timeout. Locally it reuses a running dev server on port 3000.
+  expect timeout. Locally it serves the dev server instead.
+- Playwright always starts the server it tests. `reuseExistingServer` is `false` in both modes, so a
+  port that is already taken aborts the run instead of testing whatever is answering on it. The port
+  is 3210 by default, which leaves 3000 to `pnpm dev`; `.github/workflows/ci.yml` sets
+  `PLAYWRIGHT_PORT: '3000'` on the `e2e` job, and `PLAYWRIGHT_PORT` overrides the default anywhere
+  else. A value that is not an integer between 1 and 65535 throws at config load rather than falling
+  back. The local dev server also builds into `.next-e2e` (`NEXT_DIST_DIR`, read by
+  `apps/web/next.config.ts`), so it never fights a `pnpm dev` from the same checkout over
+  `apps/web/.next`. See `docs/adr/0014-playwright-owns-its-server.md`.
 
 ## Working with this repo in Claude Code
 
@@ -249,8 +260,29 @@ is there so that a future buildable package is compiled before the apps typechec
   `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
   authoritative documents.
 - To reproduce the CI e2e run locally:
-  `pnpm --filter web build && CI=true pnpm --filter web test:e2e`. `pnpm --filter web start` serves
-  the production build on port 3000 on its own.
+  `pnpm --filter web build && CI=true pnpm --filter web test:e2e`. `CI=true` chooses the production
+  build and the runner hardening, not the port: the run serves 3210 like every other local run, so
+  it works while another checkout holds 3000. `pnpm --filter web start` serves the production build
+  on port 3000 on its own, which is what the hand-run Lighthouse commands in
+  `docs/runbooks/deploy.md` expect.
+- Two checkouts running the local e2e suite at the same moment both want 3210, and the second aborts
+  with Playwright's `is already used` error. Give it another port:
+  `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`.
+- Nothing reuses a server any more, so a run killed part-way can leave an orphaned `next dev` holding
+  3210 and every later run in that checkout aborts. Clear it with
+  `lsof -ti tcp:3210 | xargs kill` rather than moving to another port, which only leaks the orphan.
+- `.next-e2e` is known to seven places, not one: both `.gitignore` files, `.prettierignore`,
+  `globalIgnores` in `apps/web/eslint.config.mjs`, the `include` list in `apps/web/tsconfig.json`,
+  `.vercelignore` (the Vercel CLI never reads `.gitignore`, and the directory runs to ~150 MB) and
+  the `clean` script in `apps/web/package.json`. The tsconfig entries are load-bearing: `next dev`
+  appends its `distDir` type paths to that file itself, so without them every local e2e run rewrites
+  a tracked file and `pnpm format:check` fails on the result. A different `NEXT_DIST_DIR` value would
+  need all seven.
+- Only an e2e run refreshes `.next-e2e`, and `apps/web/tsconfig.json` compiles the route types in it.
+  If `pnpm typecheck` disagrees with CI about a route that was added, renamed or removed on another
+  branch, the copy in `.next-e2e` is stale: `pnpm --filter web exec rm -rf .next-e2e`, or
+  `pnpm --filter web clean`. Two local suites in the _same_ checkout on different ports also share
+  it, so do not overlap them; two different checkouts are fine, they have their own.
 - To point the site at a non-default origin locally, copy the root `.env.example` to
   `apps/web/.env.local` yourself; the PreToolUse guard blocks agent writes to `.env*`.
 - The site is live at `https://miloscvetkovic.dev` since 2026-09-09: Vercel project `portfolio`,

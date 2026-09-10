@@ -87,6 +87,10 @@ jobs:
         run: pnpm --filter web build
 
       - name: Run e2e tests
+        # The suite defaults to 3210, which keeps a developer machine's :3000 out of it; on a runner
+        # nothing else is listening, so CI stays on the conventional port (ADR 0014).
+        env:
+          PLAYWRIGHT_PORT: '3000'
         run: pnpm --filter web test:e2e
 
       - name: Upload Playwright report
