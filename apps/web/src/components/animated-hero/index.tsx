@@ -1,37 +1,54 @@
 'use client';
 
-import { useEffect, useState, lazy, Suspense, memo, type ReactNode } from 'react';
+import { useEffect, useState, lazy, memo, type ComponentType, type ReactNode } from 'react';
 import { HeroSection } from './hero-section';
 import { SectionProgress } from './section-progress';
+import { DeferredSection, SectionPlaceholder } from './deferred-section';
+import { usePrefetchPhases } from './use-prefetch-phases';
 import { useIsHydrated } from '@/hooks/use-is-hydrated';
 
 // Memoize hero section to prevent re-renders
 const MemoizedHeroSection = memo(HeroSection);
 
-// Lazy load heavy components that are below the fold
-const DiscoveryPhase = lazy(() =>
-  import('./discovery-phase').then((m) => ({ default: m.DiscoveryPhase })),
-);
-const StrategyPhase = lazy(() =>
-  import('./strategy-phase').then((m) => ({ default: m.StrategyPhase })),
-);
-const ExecutionPhase = lazy(() =>
-  import('./execution-phase').then((m) => ({ default: m.ExecutionPhase })),
-);
-const GauntletPhase = lazy(() =>
-  import('./gauntlet-phase').then((m) => ({ default: m.GauntletPhase })),
-);
-const LoopPhase = lazy(() => import('./loop-phase').then((m) => ({ default: m.LoopPhase })));
-const GameComplete = lazy(() =>
-  import('./game-complete').then((m) => ({ default: m.GameComplete })),
-);
+// The story sections are server-rendered like everything else, but their chunks, hydration and
+// GSAP work wait until DeferredSection sees them approach the viewport. The loaders are shared with
+// usePrefetchPhases so the chunks can be warmed without mounting anything.
+const loadDiscoveryPhase = () => import('./discovery-phase');
+const loadStrategyPhase = () => import('./strategy-phase');
+const loadExecutionPhase = () => import('./execution-phase');
+const loadGauntletPhase = () => import('./gauntlet-phase');
+const loadLoopPhase = () => import('./loop-phase');
+const loadGameComplete = () => import('./game-complete');
+const phaseLoaders = [
+  loadDiscoveryPhase,
+  loadStrategyPhase,
+  loadExecutionPhase,
+  loadGauntletPhase,
+  loadLoopPhase,
+  loadGameComplete,
+];
+
+// A chunk that fails to load (stale hashes after a deploy, an offline tab) must not send the whole
+// page to error.tsx: the section falls back to its placeholder and the failure is logged once.
+function lazySection<T>(load: () => Promise<T>, pick: (module: T) => ComponentType) {
+  return lazy(() =>
+    load()
+      .then((module) => ({ default: pick(module) }))
+      .catch((error: unknown) => {
+        console.error('[animated-hero] a story section failed to load', error);
+        return { default: SectionPlaceholder };
+      }),
+  );
+}
+
+const DiscoveryPhase = lazySection(loadDiscoveryPhase, (m) => m.DiscoveryPhase);
+const StrategyPhase = lazySection(loadStrategyPhase, (m) => m.StrategyPhase);
+const ExecutionPhase = lazySection(loadExecutionPhase, (m) => m.ExecutionPhase);
+const GauntletPhase = lazySection(loadGauntletPhase, (m) => m.GauntletPhase);
+const LoopPhase = lazySection(loadLoopPhase, (m) => m.LoopPhase);
+const GameComplete = lazySection(loadGameComplete, (m) => m.GameComplete);
 
 const MemoizedSectionProgress = memo(SectionProgress);
-
-// Minimal loading placeholder for lazy sections
-function SectionPlaceholder() {
-  return <div className="min-h-screen" />;
-}
 
 // Boot sequence messages for immersive loading
 const bootMessages = [
@@ -126,12 +143,12 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
         <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-6 backdrop-blur-sm">
           {/* Header */}
           <div className="mb-4 flex items-center justify-between">
-            <span className="font-mono text-xs tracking-wider text-[var(--accent)] uppercase">
+            <span className="font-mono text-xs tracking-wider text-[var(--accent-text)] uppercase">
               System Boot
             </span>
             <div className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
-              <span className="font-mono text-[10px] text-[var(--accent)]/60">ACTIVE</span>
+              <span className="font-mono text-[10px] text-[var(--accent-text)]">ACTIVE</span>
             </div>
           </div>
 
@@ -162,7 +179,11 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
                   i === currentMessage ? 'text-[var(--foreground)]' : 'text-[var(--muted)]/50'
                 }`}
               >
-                <span className={i <= currentMessage ? 'text-green-400' : 'text-[var(--muted)]'}>
+                <span
+                  className={
+                    i <= currentMessage ? 'text-[var(--status-ok)]' : 'text-[var(--muted)]'
+                  }
+                >
                   {i < currentMessage ? '✓' : i === currentMessage ? '›' : '○'}
                 </span>
                 <span>{msg.text}</span>
@@ -176,10 +197,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
         {/* Decorative scan line */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg">
-          <div
-            className="animate-scan-down absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)]/30 to-transparent"
-            style={{ animation: 'scan-down 2s linear infinite' }}
-          />
+          <div className="scan-line" />
         </div>
       </div>
 
@@ -193,6 +211,7 @@ function BootstrapLoader({ visible }: { visible: boolean }) {
 
 export function AnimatedHero({ children }: { children?: ReactNode }) {
   const mounted = useIsHydrated();
+  usePrefetchPhases(phaseLoaders);
 
   return (
     <div className="relative">
@@ -207,30 +226,30 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
         {/* Section 1: Hero - server-rendered children passed through */}
         <MemoizedHeroSection>{children}</MemoizedHeroSection>
 
-        {/* Lazy loaded sections below the fold */}
-        <Suspense fallback={<SectionPlaceholder />}>
+        {/* Story sections: server-rendered, each hydrated when it approaches the viewport */}
+        <DeferredSection>
           <DiscoveryPhase />
-        </Suspense>
+        </DeferredSection>
 
-        <Suspense fallback={<SectionPlaceholder />}>
+        <DeferredSection>
           <StrategyPhase />
-        </Suspense>
+        </DeferredSection>
 
-        <Suspense fallback={<SectionPlaceholder />}>
+        <DeferredSection>
           <ExecutionPhase />
-        </Suspense>
+        </DeferredSection>
 
-        <Suspense fallback={<SectionPlaceholder />}>
+        <DeferredSection>
           <GauntletPhase />
-        </Suspense>
+        </DeferredSection>
 
-        <Suspense fallback={<SectionPlaceholder />}>
+        <DeferredSection>
           <LoopPhase />
-        </Suspense>
+        </DeferredSection>
 
-        <Suspense fallback={<SectionPlaceholder />}>
+        <DeferredSection>
           <GameComplete />
-        </Suspense>
+        </DeferredSection>
       </div>
     </div>
   );

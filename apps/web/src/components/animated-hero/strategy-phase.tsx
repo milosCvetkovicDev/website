@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const techChoices = [
   {
@@ -48,14 +49,13 @@ export function StrategyPhase() {
   const architectureRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLDivElement>(null);
 
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
+    if (prefersReducedMotion) return;
 
     gsap.registerPlugin(ScrollTrigger);
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (prefersReducedMotion) return;
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -130,14 +130,14 @@ export function StrategyPhase() {
     }, sectionRef);
 
     return () => ctx.revert();
-  }, []);
+  }, [prefersReducedMotion]);
 
   return (
     <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
       <div className="w-full max-w-5xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">
-          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="perspective">PHASE 2</AnimatedText>
           </span>
           <AnimatedText animation="scramble" className="font-mono text-sm text-[var(--muted)]">
@@ -167,7 +167,7 @@ export function StrategyPhase() {
                     <span className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
                       {tech.category}
                     </span>
-                    <span className="text-[var(--accent)] transition-transform duration-300 group-hover:translate-x-1">
+                    <span className="text-[var(--accent-text)] transition-transform duration-300 group-hover:translate-x-1">
                       →
                     </span>
                     <span className="font-semibold">{tech.choice}</span>
@@ -177,10 +177,13 @@ export function StrategyPhase() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-green-400 transition-transform duration-300 group-hover:scale-110">
+                  <span className="text-[var(--status-ok)] transition-transform duration-300 group-hover:scale-110">
                     ✓
                   </span>
-                  <span className="font-mono text-[10px] text-green-400/60 opacity-0 transition-opacity group-hover:opacity-100">
+                  <span
+                    className="font-mono text-[10px] text-[var(--status-ok)] opacity-0 transition-opacity group-hover:opacity-100"
+                    aria-hidden="true"
+                  >
                     LOCKED
                   </span>
                 </div>

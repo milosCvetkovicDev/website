@@ -376,22 +376,54 @@ static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
       WebSite, from `apps/web/src/components/json-ld.tsx`) and their `url` fields are the apex
 - [ ] The theme toggle in the navigation switches light and dark, the choice survives a reload, and
       there is no light-to-dark flash on first paint
-- [ ] Browser console is clean on every page: no errors, no hydration warnings, no 404s for assets
+- [ ] Browser console is clean on every page. `apps/web/e2e/console-clean.spec.ts` covers this in
+      CI on every pull request: it loads every route above, both not-found pages and `/` under
+      reduced motion against the production build and fails on any console error, console warning
+      or page error, React hydration mismatches and 404s for assets requested on load included.
+      Confirm the `e2e` job was green on the deployed commit. The spec targets `next start` on
+      localhost, so anything the hosting layer injects or blocks is outside it: after a
+      Vercel-side change (analytics, headers), open the live `/` once with the console open.
+      Locally: `pnpm --filter web build && CI=true pnpm --filter web test:e2e`.
 - [ ] Lighthouse spot check on `/` and one case study page in an incognito window; note the scores
       somewhere rather than acting on them immediately
 
-Lighthouse baseline, recorded on 2026-09-09 against the first production build (Lighthouse 13.4.1
-CLI, default mobile emulation with simulated throttling and a 4× CPU slowdown). Performance scores
-depend on the machine running the audit: in the JSON, `environment.benchmarkIndex` should be above
-about 1,500 and `runWarnings` empty, otherwise the numbers describe a loaded laptop, not the site.
-A first run at benchmarkIndex 711, carrying Lighthouse's "slower CPU than expected" warning, scored
-`/` at 24 and was discarded. Clean runs: `/` performance 93, accessibility 96, best practices 100,
-SEO 100, with LCP 2.2 s, CLS 0.001 and TBT 280 ms (benchmarkIndex 1,632; a run at 1,102 gave 81
-with TBT 650 ms); `/work/self-healing-agent` 100, 96, 100, 100 with LCP 1.7 s, CLS 0 and TBT 40 ms.
-The home page transfers 318 KiB. Accessibility loses points to a colour-contrast failure on both
-pages and, on `/`, to the three Featured Work cards whose `aria-labelledby` name does not contain
-their visible text. Recorded, not acted on: the accessibility items are a follow-up, not a launch
-blocker.
+Lighthouse baseline, recorded on 2026-09-09 with the Lighthouse 13.4.1 CLI (default mobile emulation,
+simulated throttling, 4× CPU slowdown). The first run against the first production build scored `/`
+at performance 24 with LCP 4.6 s, CLS 0.345 and TBT 2,160 ms, but its JSON carries a
+`benchmarkIndex` near 700 and the "slower CPU than Lighthouse expects" warning: the machine was busy.
+Clean runs of the same command against the same build (`environment.benchmarkIndex` above 1,500,
+`runWarnings` empty) gave `/` 84 to 93 with CLS 0.034 to 0.038 and TBT 217 to 468 ms, and
+`/work/self-healing-agent` 97 to 98 with TBT 58 to 65 ms. After the home page performance work
+([plan](../plans/2026-09-09-home-page-performance-plan.md), [ADR 0009](../adr/0009-animation-performance-rules.md)),
+five runs interleaved with that baseline on the same machine give `/` 96 in every run with LCP
+2.6 s, CLS 0.034 (all of it the boot-loader artifact described below) and TBT 86 to 87 ms, and
+`/work/self-healing-agent` 98 with TBT 53 to 54 ms; the case-study route also stopped loading the
+27.7 KB FeaturedWork chunk. Before comparing a future run
+with these, check `.environment.benchmarkIndex` and `.runWarnings` in its JSON and discard a flagged
+run. A CLS of 0.03 to 0.06 attributed to the boot loader is Lighthouse re-centering it when it
+changes the emulated viewport at about 0.9 s, which it counts by design within 500 ms of that event;
+visitors never see it.
+
+Accessibility on that same 2026-09-09 baseline was 96 on both pages. The points went to colour
+contrast (the accent used as text, labels dimmed with opacity modifiers, and a scroll reveal that
+parked the quest log at 30% opacity) and, on `/`, to Featured Work cards whose `aria-labelledby`
+name did not contain their visible text. Both were fixed the same day by splitting the accent into
+`--accent` and `--accent-text` and restructuring the cards
+([ADR 0008](../adr/0008-accent-colour-roles.md)); re-run with the same CLI against the local
+production build, both pages score accessibility 100 with `color-contrast` passing and
+`label-content-name-mismatch` not applicable. The command that reproduces the accessibility run is
+
+```bash
+CHROME_PATH="$(node -e "console.log(require('@playwright/test').chromium.executablePath())")" \
+  pnpm dlx lighthouse http://localhost:3000/ --only-categories=accessibility --output=json \
+  --output-path=/tmp/lh-a11y-home.json --chrome-flags="--headless=new"
+```
+
+from `apps/web` with `pnpm start` serving the build. `--headless=new` follows the machine's
+appearance setting for `prefers-color-scheme`, so on a Mac in dark mode this is a dark-theme audit;
+the light theme is checked with Playwright and axe-core instead. The same rule set now runs in CI on
+every pull request: `apps/web/e2e/accessibility.spec.ts` audits both pages in both colour schemes at
+the desktop viewport, at rest, and fails the `e2e` job on any violation.
 
 ## Routine deployments
 

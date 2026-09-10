@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { Terminal, HudPanel, QuestItem, TypingCursor } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const requirements = [
   { id: 'monitoring', label: 'monitoring', delay: 0 },
@@ -19,14 +20,13 @@ export function DiscoveryPhase() {
   const questRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLDivElement>(null);
 
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
+    if (prefersReducedMotion) return;
 
     gsap.registerPlugin(ScrollTrigger);
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (prefersReducedMotion) return;
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
@@ -59,14 +59,17 @@ export function DiscoveryPhase() {
         );
       }
 
-      // Quest log updates
+      // Quest log updates. fromTo() renders its "from" state immediately, before the trigger
+      // fires, so the entries must start fully hidden rather than dimmed: dimmed text sits on the
+      // page at 2.7:1 until the user scrolls here, which fails WCAG AA (and the Lighthouse audit).
       const questItems = questRef.current?.querySelectorAll('.quest-item');
-      if (questItems) {
+      if (questItems?.length) {
         tl.fromTo(
           questItems,
-          { opacity: 0.3 },
+          { opacity: 0, x: -8 },
           {
             opacity: 1,
+            x: 0,
             duration: 0.3,
             stagger: 0.2,
           },
@@ -84,14 +87,14 @@ export function DiscoveryPhase() {
     }, sectionRef);
 
     return () => ctx.revert();
-  }, []);
+  }, [prefersReducedMotion]);
 
   return (
     <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
       <div className="w-full max-w-5xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">
-          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="morse">PHASE 1</AnimatedText>
           </span>
           <AnimatedText animation="highlight" className="font-mono text-sm text-[var(--muted)]">
@@ -105,27 +108,27 @@ export function DiscoveryPhase() {
             <Terminal>
               <div className="space-y-4">
                 <div className="flex gap-3">
-                  <span className="text-[var(--accent)]">&gt;</span>
+                  <span className="text-[var(--accent-text)]">&gt;</span>
                   <p className="text-[var(--foreground)]">
                     &quot;I&apos;m tired of 3am pages. Build something that fixes itself.&quot;
                   </p>
                 </div>
                 <div className="flex gap-3 text-[var(--muted)]">
-                  <span className="text-green-400">←</span>
+                  <span className="text-[var(--status-ok)]">←</span>
                   <p>Interesting. What does &quot;fix itself&quot; mean to you?</p>
                 </div>
                 <div className="flex gap-3">
-                  <span className="text-[var(--accent)]">&gt;</span>
+                  <span className="text-[var(--accent-text)]">&gt;</span>
                   <p className="text-[var(--foreground)]">
                     Detect the error. Understand it. Open a PR with a fix.
                   </p>
                 </div>
                 <div className="flex gap-3 text-[var(--muted)]">
-                  <span className="text-green-400">←</span>
+                  <span className="text-[var(--status-ok)]">←</span>
                   <p>Autonomous code changes need guardrails. What&apos;s the blast radius?</p>
                 </div>
                 <div className="flex gap-3 text-[var(--muted)]">
-                  <span className="text-green-400">←</span>
+                  <span className="text-[var(--status-ok)]">←</span>
                   <p>
                     I&apos;m thinking: budget caps, confidence thresholds, human approval...
                     <TypingCursor />
@@ -145,10 +148,10 @@ export function DiscoveryPhase() {
                 {requirements.map((req, index) => (
                   <span
                     key={req.id}
-                    className="requirement-tag cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+                    className="requirement-tag cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent-text)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]"
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
-                    <span className="mr-1 opacity-50">#{index + 1}</span>
+                    <span className="mr-1 text-[var(--muted)]">#{index + 1}</span>
                     {req.label}
                   </span>
                 ))}

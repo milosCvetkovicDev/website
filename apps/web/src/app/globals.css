@@ -2,15 +2,36 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Colour roles. The violet accent is split by role (ADR 0008):
+ * - --accent paints surfaces: solid fills that carry white text, borders, indicators and the
+ *   translucent tints (bg-[var(--accent)]/10 and friends). White on it is 5.7:1, and still
+ *   4.9:1 on the dark --accent-hover.
+ * - --accent-text is the same hue used as text. It is tuned per theme so that it reaches WCAG AA
+ *   (4.5:1) on --background, --card and every accent tint up to /20. Never use --accent as a
+ *   text colour: in the dark theme it is 3.5:1 on the background and 3.2:1 on the card.
+ * - --muted is secondary text; the light value is set so it still passes on the /5 and /10
+ *   accent tints it sits on (the HUD panels and tag pills).
+ * - --status-ok, --status-warn and --status-err are the status colours of the hero, the HUD elements
+ *   and the work pages (ADR 0010): one token per role for text, icons, borders, tints, bars, dots
+ *   and glows. The dark values are the shades the status text always used (green-400, yellow-400,
+ *   red-400), so dark text is unchanged; the light values (green-800, amber-800, red-700) are the
+ *   first shades that reach 4.5:1 on the HUD panels and on their own /10 tints. Never dim status
+ *   text with an opacity modifier: even green-800 at /70 is 3.2:1 on its tint.
+ */
 :root {
   --background: #fafafa;
   --foreground: #171717;
-  --accent: #8b5cf6;
-  --accent-hover: #7c3aed;
-  --muted: #737373;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-text: #6d28d9;
+  --muted: #666666;
   --border: #e5e5e5;
   --card: #ffffff;
   --card-hover: #f5f5f5;
+  --status-ok: theme(--color-green-800);
+  --status-warn: theme(--color-amber-800);
+  --status-err: theme(--color-red-700);
   --tmux-border: #d0d0d8;
   --tmux-bar: #e4e4e8;
   --tmux-bg: #fafafa;
@@ -36,12 +57,16 @@
 .dark {
   --background: #0a0a0a;
   --foreground: #fafafa;
-  --accent: #8b5cf6;
-  --accent-hover: #a78bfa;
+  --accent: #7c3aed;
+  --accent-hover: #834bf1;
+  --accent-text: #a78bfa;
   --muted: #a3a3a3;
   --border: #262626;
   --card: #171717;
   --card-hover: #262626;
+  --status-ok: theme(--color-green-400);
+  --status-warn: theme(--color-yellow-400);
+  --status-err: theme(--color-red-400);
   --tmux-border: #5a6190;
   --tmux-bar: #282d45;
   --tmux-bg: #0d1017;
@@ -69,7 +94,11 @@
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
+  --color-accent-text: var(--accent-text);
   --color-muted: var(--muted);
+  --color-status-ok: var(--status-ok);
+  --color-status-warn: var(--status-warn);
+  --color-status-err: var(--status-err);
   --color-border: var(--border);
   --color-card: var(--card);
   --color-card-hover: var(--card-hover);
@@ -314,10 +343,12 @@ main {
   animation: glitch 0.5s ease-in-out infinite;
 }
 
-/* Scan down animation for loading */
+/* Scan line that sweeps a panel top to bottom. The element covers its parent and draws the 1px line
+   as a background image, so the sweep is a transform of the element's own height and stays on the
+   compositor; animating `top` instead would lay out and paint every frame. */
 @keyframes scan-down {
   0% {
-    top: -2px;
+    transform: translateY(-2px);
     opacity: 0;
   }
   10% {
@@ -327,13 +358,25 @@ main {
     opacity: 1;
   }
   100% {
-    top: 100%;
+    transform: translateY(100%);
     opacity: 0;
   }
 }
 
-.animate-scan-down {
+.scan-line {
+  --scan-line-color: color-mix(in oklab, var(--accent) 30%, transparent);
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(to right, transparent, var(--scan-line-color), transparent);
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
   animation: scan-down 2s linear infinite;
+}
+
+/* A sweep nobody can see should not run: the featured work cards expose data-active. */
+[data-active='false'] .scan-line {
+  animation-play-state: paused;
 }
 
 /* Scanline overlay for retro effect */
@@ -406,20 +449,6 @@ main {
   animation: highlight-scan 0.6s ease-out forwards;
 }
 
-@keyframes log-appear {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-log-appear {
-  animation: log-appear 0.25s ease forwards;
-}
-
 /* Hero breathing and scroll animations */
 @keyframes hero-breathe {
   0%,
@@ -433,11 +462,11 @@ main {
 @keyframes hero-scroll-bounce {
   0%,
   100% {
-    top: 7px;
+    transform: translateY(0);
     opacity: 1;
   }
   50% {
-    top: 20px;
+    transform: translateY(13px);
     opacity: 0.4;
   }
 }

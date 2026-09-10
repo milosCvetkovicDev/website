@@ -4,27 +4,28 @@ import { useEffect, useRef } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { Terminal } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 export function GameComplete() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLAnchorElement>(null);
 
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
+    if (prefersReducedMotion) return;
 
     gsap.registerPlugin(ScrollTrigger);
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (prefersReducedMotion) return;
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
           start: 'top center',
-          toggleActions: 'play none none reverse',
+          // The CTA glow below repeats forever; pause it while the section is scrolled past.
+          toggleActions: 'play pause resume reverse',
         },
       });
 
@@ -58,7 +59,7 @@ export function GameComplete() {
     }, sectionRef);
 
     return () => ctx.revert();
-  }, []);
+  }, [prefersReducedMotion]);
 
   return (
     <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
@@ -67,7 +68,7 @@ export function GameComplete() {
           <Terminal className="text-left">
             <div className="space-y-4">
               <div className="border-b border-[#30363d] py-4 text-center">
-                <span className="text-lg font-bold text-green-400">
+                <span className="text-lg font-bold text-[var(--status-ok)]">
                   <AnimatedText animation="scramble">SESSION COMPLETE</AnimatedText>
                 </span>
               </div>
@@ -75,15 +76,15 @@ export function GameComplete() {
               <div className="space-y-2 py-4">
                 <div className="flex items-center justify-center gap-2 text-[var(--muted)]">
                   <span>Ideas</span>
-                  <span className="text-[var(--accent)]">→</span>
+                  <span className="text-[var(--accent-text)]">→</span>
                   <span>Architecture</span>
-                  <span className="text-[var(--accent)]">→</span>
+                  <span className="text-[var(--accent-text)]">→</span>
                   <span>Code</span>
-                  <span className="text-[var(--accent)]">→</span>
+                  <span className="text-[var(--accent-text)]">→</span>
                   <span>Production</span>
                 </div>
                 <div className="text-center text-sm text-[var(--muted)]">
-                  Time: <span className="text-[var(--accent)]">1 conversation</span>
+                  Time: <span className="text-[var(--accent-text)]">1 conversation</span>
                 </div>
               </div>
 

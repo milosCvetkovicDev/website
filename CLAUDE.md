@@ -72,9 +72,17 @@ is there so that a future buildable package is compiled before the apps typechec
   report is uploaded as an artifact on failure or cancellation. Actions are SHA-pinned,
   `permissions: contents: read`, and concurrency cancels superseded runs on pull requests only.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
+- Every route must load with a clean browser console. `apps/web/e2e/console-clean.spec.ts` fails
+  on any console error, console warning or page error, React hydration mismatches included, so a
+  stray `console.warn` fails the `e2e` job. Case-study routes come from `src/data/case-studies.ts`.
 - `eslint-disable` is not an acceptable fix for the React Hooks rules. `react-hooks/set-state-in-effect`
   in particular is pointing at a real hydration problem: restructure the component instead. See
   `docs/adr/0006-hydration-safe-client-state.md` and `apps/web/src/hooks/use-is-hydrated.ts`.
+- Accessibility is gated. `apps/web/e2e/accessibility.spec.ts` runs axe-core with the rule set
+  behind Lighthouse's accessibility category on `/` and `/work/self-healing-agent`, in both colour
+  schemes, at the desktop viewport and unscrolled, and fails the `e2e` job on any violation. A new
+  `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
+  Conventions and ADR 0008.
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
   grouped into one pull request and open npm pull requests are capped at five; github-actions bumps
   are not grouped.
@@ -91,10 +99,33 @@ is there so that a future buildable package is compiled before the apps typechec
   actually needed.
 - Tailwind v4 is CSS-first: the theme is declared in `apps/web/src/app/globals.css` and compiled by
   `@tailwindcss/postcss`. There is no `tailwind.config.js` and there should not be one.
+- The accent colour has two tokens with different roles (ADR 0008). `--accent` paints surfaces:
+  solid fills that carry white text, borders, indicators and the `bg-[var(--accent)]/10` tints.
+  `--accent-text` is the accent as text and the only accent allowed in a `text-` utility or a
+  `color` style, because `--accent` misses WCAG AA as text in the dark theme (3.5:1 on the
+  background, 3.2:1 on the card).
+  Decorative SVG frames, brackets and lines drawn with `currentColor` keep `--accent`; icons that
+  sit with text take `--accent-text`. Never dim text with an opacity modifier such as `/60` to make
+  it look secondary, not even `aria-hidden` text (axe measures it anyway); use `--muted` instead.
+  Never let a GSAP `from()`, `fromTo()` or `set()` leave text at a partial opacity: the "from"
+  state renders immediately, before any scroll trigger fires.
+- Status colours come from three theme tokens (ADR 0010): `--status-ok`, `--status-warn` and
+  `--status-err`, used as `text-[var(--status-ok)]`, `bg-[var(--status-ok)]/10`,
+  `border-[var(--status-ok)]/50` and so on for text, icons, borders, tints, bars, dots and glows
+  alike, in the hero and on the work pages. Never use a palette status class such as
+  `text-green-400` or `bg-red-500` in a component, nor a hard-coded status hex with a `dark:`
+  override, and never dim status text: no alpha modifier on a status token used as a text colour
+  and no resting `opacity-*` below 100 on an element whose text carries one (a reveal from
+  `opacity-0` to full is fine). The light values are the first shades that pass AA on the HUD
+  panels and on their own tints; anything dimmer fails. Inside `Terminal` the tokens resolve to
+  their dark values in both themes.
 - Components live in `apps/web/src/components`. `index.ts` is a barrel for the page-level ones
   (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `Highlights`, `FeaturedWork`, `TechStack`,
   `CTA`, `PersonJsonLd`, `WebsiteJsonLd`). The hero and its phases live in
   `components/animated-hero` and are imported from there directly, not through the barrel.
+  `app/layout.tsx` also imports from the component modules directly: every client module reachable
+  from a server component's imports lands in that layout's client chunk, so a barrel import there
+  would ship `FeaturedWork` to every route (see ADR 0009).
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
   keep relative imports for siblings inside one folder.
@@ -161,8 +192,24 @@ is there so that a future buildable package is compiled before the apps typechec
 - Non-interactive shells have neither node nor pnpm on PATH. Run
   `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"` before any node, pnpm or npx command.
 - A fresh clone or git worktree has no git hooks until `pnpm install` has run `prepare`.
+- `apps/web/next.config.ts` pins `turbopack.root` (which is also the file tracing root) to the
+  repository root, resolved from the config file's own path, and throws if `pnpm-workspace.yaml` is
+  not there. Without it Next.js takes the outermost lockfile above the app as the root, so a git
+  worktree nested under `.claude/worktrees/` was built against the parent checkout with a "multiple
+  lockfiles" warning.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm.
+- `pnpm install` runs no dependency lifecycle scripts. `allowBuilds` in `pnpm-workspace.yaml` denies the
+  three packages pnpm 10 would otherwise warn about (esbuild, sharp, unrs-resolver): their scripts
+  only check the prebuilt platform binaries the lockfile already installs, and download or compile
+  one only when none is present. An `Ignored build scripts` warning naming a package without an
+  entry is a new decision: run `pnpm ignored-builds` and `pnpm why -r <name>`, read its `scripts`
+  under `node_modules/.pnpm/<name>@<version>/node_modules/<name>/`, then add it to `allowBuilds` as
+  `true` or `false` with a comment; do not run `pnpm approve-builds --all`. A warning naming a
+  package that already has an entry means the `node_modules` predates the entry: pnpm re-reports
+  the builds recorded in `node_modules/.modules.yaml` until `pnpm clean && pnpm install`. Do not add
+  `strictDepBuilds`, which turns that stale warning into a failed install (ADR 0007,
+  `docs/adr/0007-dependency-build-scripts.md`).
 - `apps/web/README.md` is untouched `create-next-app` boilerplate: it says `npm run dev` and
   `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
   authoritative documents.

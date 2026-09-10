@@ -22,8 +22,17 @@ test.describe('Featured Work', () => {
     await section.getByRole('link', { name: first.title, exact: true }).hover();
     await expect(section.locator('path[data-active="true"]')).toHaveCount(litCount(first));
 
-    await page.mouse.move(0, 0);
+    // The whole card is the hover target, not only the title text: hover the description, which
+    // sits under the title link's ::after overlay (force skips the "receives events" check that the
+    // overlay is designed to fail).
+    const firstCard = section.getByRole('link', { name: first.title, exact: true });
     const secondCard = section.getByRole('link', { name: second.title, exact: true });
+    await section.getByText(second.description, { exact: true }).hover({ force: true });
+    await expect(secondCard).toHaveAttribute('data-active', 'true');
+    await expect(firstCard).toHaveAttribute('data-active', 'false');
+    await expect(section.locator('path[data-active="true"]')).toHaveCount(litCount(second));
+
+    await page.mouse.move(0, 0);
     await secondCard.focus();
     await expect(secondCard).toHaveAttribute('data-active', 'true');
     await expect(section.locator('path[data-active="true"]')).toHaveCount(litCount(second));

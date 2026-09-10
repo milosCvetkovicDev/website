@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { gsap, ScrollTrigger } from './use-gsap-scroll';
 import { HudPanel, PipelineStage, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const pipelineStages = [
   { name: 'LINT', duration: 0.5 },
@@ -15,6 +16,10 @@ const pipelineStages = [
 ];
 
 type StageStatus = 'pending' | 'running' | 'passed' | 'failed';
+type StageState = { status: StageStatus; progress: number };
+
+const pendingStages: StageState[] = pipelineStages.map(() => ({ status: 'pending', progress: 0 }));
+const passedStages: StageState[] = pipelineStages.map(() => ({ status: 'passed', progress: 100 }));
 
 export function GauntletPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -23,27 +28,117 @@ export function GauntletPhase() {
   const achievementRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLDivElement>(null);
 
-  const [stageStates, setStageStates] = useState<{ status: StageStatus; progress: number }[]>(
-    pipelineStages.map(() => ({ status: 'pending', progress: 0 })),
-  );
+  const [stageStates, setStageStates] = useState<StageState[]>(pendingStages);
   const [deploymentStatus, setDeploymentStatus] = useState<'idle' | 'deploying' | 'success'>(
     'idle',
   );
   const [showAchievement, setShowAchievement] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  // The sequence runs from a ScrollTrigger callback, outside the GSAP context, so every timer and
+  // tween is tracked here and cancelled on unmount (or a reduced-motion switch) instead of being
+  // left to set state on a component that is gone.
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const tweensRef = useRef<gsap.core.Tween[]>([]);
+  const later = useCallback((callback: () => void, delayMs: number) => {
+    timersRef.current.push(setTimeout(callback, delayMs));
+  }, []);
+  const track = useCallback((tween: gsap.core.Tween) => {
+    tweensRef.current.push(tween);
+  }, []);
+
+  const animatePipeline = useCallback(() => {
+    let delay = 0;
+
+    pipelineStages.forEach((stage, index) => {
+      // Start running
+      later(() => {
+        setStageStates((prev) => {
+          const newStates = [...prev];
+          newStates[index] = { status: 'running', progress: 0 };
+          return newStates;
+        });
+
+        // Animate progress
+        track(
+          gsap.to(
+            {},
+            {
+              duration: stage.duration,
+              onUpdate: function () {
+                setStageStates((prev) => {
+                  const newStates = [...prev];
+                  newStates[index] = {
+                    status: 'running',
+                    progress: Math.round(this.progress() * 100),
+                  };
+                  return newStates;
+                });
+              },
+              onComplete: () => {
+                setStageStates((prev) => {
+                  const newStates = [...prev];
+                  newStates[index] = { status: 'passed', progress: 100 };
+                  return newStates;
+                });
+              },
+            },
+          ),
+        );
+      }, delay * 1000);
+
+      delay += stage.duration + 0.2;
+    });
+
+    // Deployment animation
+    later(() => {
+      setDeploymentStatus('deploying');
+      track(
+        gsap.fromTo(
+          deployRef.current,
+          { opacity: 0, scale: 0.9 },
+          { opacity: 1, scale: 1, duration: 0.4 },
+        ),
+      );
+
+      later(() => {
+        setDeploymentStatus('success');
+
+        // Achievement pops in
+        later(() => {
+          setShowAchievement(true);
+          track(
+            gsap.fromTo(
+              achievementRef.current,
+              { opacity: 0, y: 20, scale: 0.8 },
+              {
+                opacity: 1,
+                y: 0,
+                scale: 1,
+                duration: 0.5,
+                ease: 'back.out(1.7)',
+              },
+            ),
+          );
+
+          // Headline
+          track(
+            gsap.fromTo(
+              headlineRef.current,
+              { opacity: 0, y: 20 },
+              { opacity: 1, y: 0, duration: 0.5 },
+            ),
+          );
+        }, 300);
+      }, 1000);
+    }, delay * 1000);
+  }, [later, track]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    // Reduced motion: the finished pipeline is rendered directly via the derived values below.
+    if (prefersReducedMotion) return;
 
     gsap.registerPlugin(ScrollTrigger);
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (prefersReducedMotion) {
-      setStageStates(pipelineStages.map(() => ({ status: 'passed', progress: 100 })));
-      setDeploymentStatus('success');
-      setShowAchievement(true);
-      return;
-    }
 
     const ctx = gsap.context(() => {
       ScrollTrigger.create({
@@ -68,94 +163,26 @@ export function GauntletPhase() {
       );
     }, sectionRef);
 
-    return () => ctx.revert();
-  }, []);
+    return () => {
+      ctx.revert();
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+      tweensRef.current.forEach((tween) => tween.revert());
+      tweensRef.current = [];
+    };
+  }, [animatePipeline, prefersReducedMotion]);
 
-  const animatePipeline = () => {
-    let delay = 0;
-
-    pipelineStages.forEach((stage, index) => {
-      // Start running
-      setTimeout(() => {
-        setStageStates((prev) => {
-          const newStates = [...prev];
-          newStates[index] = { status: 'running', progress: 0 };
-          return newStates;
-        });
-
-        // Animate progress
-        gsap.to(
-          {},
-          {
-            duration: stage.duration,
-            onUpdate: function () {
-              setStageStates((prev) => {
-                const newStates = [...prev];
-                newStates[index] = {
-                  status: 'running',
-                  progress: Math.round(this.progress() * 100),
-                };
-                return newStates;
-              });
-            },
-            onComplete: () => {
-              setStageStates((prev) => {
-                const newStates = [...prev];
-                newStates[index] = { status: 'passed', progress: 100 };
-                return newStates;
-              });
-            },
-          },
-        );
-      }, delay * 1000);
-
-      delay += stage.duration + 0.2;
-    });
-
-    // Deployment animation
-    setTimeout(() => {
-      setDeploymentStatus('deploying');
-      gsap.fromTo(
-        deployRef.current,
-        { opacity: 0, scale: 0.9 },
-        { opacity: 1, scale: 1, duration: 0.4 },
-      );
-
-      setTimeout(() => {
-        setDeploymentStatus('success');
-
-        // Achievement pops in
-        setTimeout(() => {
-          setShowAchievement(true);
-          gsap.fromTo(
-            achievementRef.current,
-            { opacity: 0, y: 20, scale: 0.8 },
-            {
-              opacity: 1,
-              y: 0,
-              scale: 1,
-              duration: 0.5,
-              ease: 'back.out(1.7)',
-            },
-          );
-
-          // Headline
-          gsap.fromTo(
-            headlineRef.current,
-            { opacity: 0, y: 20 },
-            { opacity: 1, y: 0, duration: 0.5 },
-          );
-        }, 300);
-      }, 1000);
-    }, delay * 1000);
-  };
+  // With reduced motion the pipeline is shown finished instead of running stage by stage.
+  const shownStageStates = prefersReducedMotion ? passedStages : stageStates;
+  const shownDeploymentStatus = prefersReducedMotion ? 'success' : deploymentStatus;
+  const achievementVisible = prefersReducedMotion || showAchievement;
 
   return (
     <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
       <div className="w-full max-w-3xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">
-          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent)]">
+          <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="rainbow">PHASE 4</AnimatedText>
           </span>
           <AnimatedText animation="gravity" className="font-mono text-sm text-[var(--muted)]">
@@ -171,8 +198,8 @@ export function GauntletPhase() {
                 <PipelineStage
                   key={stage.name}
                   name={stage.name}
-                  status={stageStates[index].status}
-                  progress={stageStates[index].progress}
+                  status={shownStageStates[index].status}
+                  progress={shownStageStates[index].progress}
                 />
               ))}
             </div>
@@ -181,17 +208,20 @@ export function GauntletPhase() {
 
         {/* Deployment Status */}
         <div ref={deployRef} className="mt-6">
-          {deploymentStatus !== 'idle' && (
+          {shownDeploymentStatus !== 'idle' && (
             <div
               className={`rounded-lg border p-6 text-center transition-all duration-500 ${
-                deploymentStatus === 'success'
-                  ? 'border-green-500/50 bg-green-500/10'
-                  : 'border-yellow-500/50 bg-yellow-500/10'
+                shownDeploymentStatus === 'success'
+                  ? 'border-[var(--status-ok)]/50 bg-[var(--status-ok)]/10'
+                  : 'border-[var(--status-warn)]/50 bg-[var(--status-warn)]/10'
               }`}
             >
-              {deploymentStatus === 'deploying' ? (
+              {shownDeploymentStatus === 'deploying' ? (
                 <div className="flex items-center justify-center gap-3">
-                  <svg className="h-5 w-5 animate-spin text-yellow-400" viewBox="0 0 24 24">
+                  <svg
+                    className="h-5 w-5 animate-spin text-[var(--status-warn)]"
+                    viewBox="0 0 24 24"
+                  >
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -207,13 +237,15 @@ export function GauntletPhase() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  <span className="font-mono text-yellow-400">DEPLOYING TO PRODUCTION...</span>
+                  <span className="font-mono text-[var(--status-warn)]">
+                    DEPLOYING TO PRODUCTION...
+                  </span>
                 </div>
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center justify-center gap-2">
                     <svg
-                      className="h-6 w-6 text-green-400"
+                      className="h-6 w-6 text-[var(--status-ok)]"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -225,9 +257,11 @@ export function GauntletPhase() {
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    <span className="font-mono text-lg text-green-400">DEPLOYMENT SUCCESSFUL</span>
+                    <span className="font-mono text-lg text-[var(--status-ok)]">
+                      DEPLOYMENT SUCCESSFUL
+                    </span>
                   </div>
-                  <p className="font-mono text-sm text-green-400/70">
+                  <p className="font-mono text-sm text-[var(--status-ok)]">
                     Production environment updated
                   </p>
                 </div>
@@ -237,15 +271,13 @@ export function GauntletPhase() {
         </div>
 
         {/* Achievement */}
-        <div ref={achievementRef} className={`mt-6 ${showAchievement ? '' : 'opacity-0'}`}>
+        <div ref={achievementRef} className={`mt-6 ${achievementVisible ? '' : 'opacity-0'}`}>
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
               <span className="text-xl">🏆</span>
               <div>
                 <div className="font-semibold">Achievement Unlocked</div>
-                <div className="text-sm opacity-80">
-                  &quot;Zero Trust, Full Send&quot; — +500 XP
-                </div>
+                <div className="text-sm">&quot;Zero Trust, Full Send&quot; — +500 XP</div>
               </div>
             </div>
           </NotificationToast>
@@ -254,7 +286,7 @@ export function GauntletPhase() {
         {/* Headline */}
         <div
           ref={headlineRef}
-          className={`mt-16 text-center ${showAchievement ? '' : 'opacity-0'}`}
+          className={`mt-16 text-center ${achievementVisible ? '' : 'opacity-0'}`}
         >
           <h2 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="glitch">
