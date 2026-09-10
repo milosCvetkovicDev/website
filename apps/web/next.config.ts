@@ -3,23 +3,37 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { NextConfig } from 'next';
 
-// The monorepo root, two directories above apps/web, resolved from this file's own location so it
-// is right in every checkout. Without it Next.js infers the root from the outermost lockfile above
-// the app, which is the wrong directory whenever a checkout sits below another one that has a
-// lockfile, such as a git worktree under .claude/worktrees/ (the parent checkout wins).
-const monorepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+/**
+ * The nearest ancestor of `startDir` that holds a `pnpm-workspace.yaml`, or null if there is none.
+ * Exported so `src/test/next-config.test.ts` can pin the behaviour this file depends on.
+ */
+export function findWorkspaceRoot(startDir: string): string | null {
+  let dir = startDir;
 
-if (!existsSync(path.join(monorepoRoot, 'pnpm-workspace.yaml'))) {
-  throw new Error(
-    `apps/web/next.config.ts resolved the monorepo root to ${monorepoRoot}, but there is no ` +
-      'pnpm-workspace.yaml there. Update turbopack.root if the app moved.',
-  );
+  while (!existsSync(path.join(dir, 'pnpm-workspace.yaml'))) {
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+
+  return dir;
 }
 
+// Next.js infers the workspace root from the OUTERMOST lockfile above the app, which is the wrong
+// directory whenever one checkout sits below another that has a lockfile: a git worktree under
+// .claude/worktrees/ gets built against the parent checkout. Searching upward for the workspace
+// file takes the innermost match instead, which is always the checkout being built.
+//
+// Search rather than counting directories. Under Next's default loader this file is compiled to
+// CommonJS and evaluated as <projectDir>/next.config.compiled.js, so import.meta.url reports the
+// directory Next was invoked on, not this file. A fixed '..', '..' hop is therefore wrong whenever
+// those differ, as they do for `next info` run from a subdirectory of the app.
+const workspaceRoot = findWorkspaceRoot(path.dirname(fileURLToPath(import.meta.url)));
+
 const nextConfig: NextConfig = {
-  turbopack: {
-    root: monorepoRoot,
-  },
+  // Outside a pnpm workspace there is no nested-lockfile problem to solve, so leave the root to
+  // Next's own inference rather than failing the build or refusing to boot the server.
+  ...(workspaceRoot ? { turbopack: { root: workspaceRoot } } : {}),
 };
 
 export default nextConfig;
