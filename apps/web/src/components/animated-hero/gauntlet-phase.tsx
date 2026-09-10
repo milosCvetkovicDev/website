@@ -35,19 +35,35 @@ export function GauntletPhase() {
   const [showAchievement, setShowAchievement] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  // The sequence runs from a ScrollTrigger callback, outside the GSAP context, so every timer and
-  // tween is tracked here and cancelled on unmount (or a reduced-motion switch) instead of being
-  // left to set state on a component that is gone.
+  // The sequence is driven by timers the ScrollTrigger callback schedules, and anything created
+  // inside those timers runs after GSAP has left the context, so `ctx.revert()` never sees it.
+  // Everything is tracked here instead, and cancelled when the section is entered again, on
+  // unmount, or on a reduced-motion switch, rather than left to set state on a component that is
+  // gone. Progress tweens only drive React state, so killing them is enough; the reveal tweens are
+  // reverted, because revert restores the inline styles they set, where kill would freeze them
+  // mid-flight and that inline opacity would beat the class-driven state.
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const tweensRef = useRef<gsap.core.Tween[]>([]);
+  const progressTweensRef = useRef<gsap.core.Tween[]>([]);
+  const revealTweensRef = useRef<gsap.core.Tween[]>([]);
   const later = useCallback((callback: () => void, delayMs: number) => {
     timersRef.current.push(setTimeout(callback, delayMs));
   }, []);
-  const track = useCallback((tween: gsap.core.Tween) => {
-    tweensRef.current.push(tween);
+  const cancelSequence = useCallback(() => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    progressTweensRef.current.forEach((tween) => tween.kill());
+    progressTweensRef.current = [];
+    revealTweensRef.current.forEach((tween) => tween.revert());
+    revealTweensRef.current = [];
   }, []);
 
   const animatePipeline = useCallback(() => {
+    // Entering again (scrolling back up and down, or motion being allowed again) restarts the
+    // run from pending instead of stacking on it or resuming a half-finished one.
+    cancelSequence();
+    setStageStates(pendingStages);
+    setDeploymentStatus('idle');
+    setShowAchievement(false);
     let delay = 0;
 
     pipelineStages.forEach((stage, index) => {
@@ -60,7 +76,7 @@ export function GauntletPhase() {
         });
 
         // Animate progress
-        track(
+        progressTweensRef.current.push(
           gsap.to(
             {},
             {
@@ -93,7 +109,7 @@ export function GauntletPhase() {
     // Deployment animation
     later(() => {
       setDeploymentStatus('deploying');
-      track(
+      revealTweensRef.current.push(
         gsap.fromTo(
           deployRef.current,
           { opacity: 0, scale: 0.9 },
@@ -107,7 +123,7 @@ export function GauntletPhase() {
         // Achievement pops in
         later(() => {
           setShowAchievement(true);
-          track(
+          revealTweensRef.current.push(
             gsap.fromTo(
               achievementRef.current,
               { opacity: 0, y: 20, scale: 0.8 },
@@ -122,7 +138,7 @@ export function GauntletPhase() {
           );
 
           // Headline
-          track(
+          revealTweensRef.current.push(
             gsap.fromTo(
               headlineRef.current,
               { opacity: 0, y: 20 },
@@ -132,7 +148,7 @@ export function GauntletPhase() {
         }, 300);
       }, 1000);
     }, delay * 1000);
-  }, [later, track]);
+  }, [cancelSequence, later]);
 
   useEffect(() => {
     // Reduced motion: the finished pipeline is rendered directly via the derived values below.
@@ -165,12 +181,9 @@ export function GauntletPhase() {
 
     return () => {
       ctx.revert();
-      timersRef.current.forEach(clearTimeout);
-      timersRef.current = [];
-      tweensRef.current.forEach((tween) => tween.revert());
-      tweensRef.current = [];
+      cancelSequence();
     };
-  }, [animatePipeline, prefersReducedMotion]);
+  }, [animatePipeline, cancelSequence, prefersReducedMotion]);
 
   // With reduced motion the pipeline is shown finished instead of running stage by stage.
   const shownStageStates = prefersReducedMotion ? passedStages : stageStates;
