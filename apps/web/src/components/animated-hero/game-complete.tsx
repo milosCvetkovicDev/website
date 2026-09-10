@@ -24,7 +24,8 @@ export function GameComplete() {
         scrollTrigger: {
           trigger: sectionRef.current,
           start: 'top center',
-          toggleActions: 'play none none reverse',
+          // The CTA glow below repeats forever; pause it while the section is scrolled past.
+          toggleActions: 'play pause resume reverse',
         },
       });
 
