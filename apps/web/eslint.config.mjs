@@ -30,6 +30,11 @@ const eslintConfig = defineConfig([
     '.next/**',
     // The build directory of the dev server Playwright starts locally (NEXT_DIST_DIR).
     '.next-e2e/**',
+    // Playwright's own output. `CI=true pnpm --filter web test:e2e`, which CLAUDE.md and the deploy
+    // runbook both tell you to run locally, writes a bundled HTML report here; linting it reports
+    // thousands of problems in minified vendor code and fails `pnpm lint` under --max-warnings 0.
+    'playwright-report/**',
+    'test-results/**',
     'out/**',
     'build/**',
     'next-env.d.ts',
