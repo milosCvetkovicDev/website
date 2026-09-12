@@ -552,12 +552,20 @@ reads. Both live in `apps/web/vercel.json`, which Vercel reads from the project'
 reasoning, and the 2026-09-10 outage that prompted them, are in
 [ADR 0016](../adr/0016-vercel-deployment-budget.md).
 
-| Push                                      | What happens                        | Quota cost |
-| ----------------------------------------- | ----------------------------------- | ---------- |
-| A Dependabot branch                       | no deployment is created at all     | none       |
-| Any other branch, no build inputs changed | deployment created, build cancelled | one        |
-| Merge to `main`, no build inputs changed  | builds (production always builds)   | one        |
-| Anything that changed a build input       | builds                              | one        |
+| Push                                                                                      | What happens                                           | Quota cost |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------ | ---------- |
+| A Dependabot branch                                                                       | no deployment is created at all                        | none       |
+| The first push of any other branch, whatever it changed                                   | builds: there is no earlier deployment to diff against | one        |
+| A later push to that branch, no build inputs changed since its last successful deployment | deployment created, build cancelled                    | one        |
+| Merge to `main`, no build inputs changed                                                  | builds (production always builds)                      | one        |
+| Anything that changed a build input                                                       | builds                                                 | one        |
+
+The rows are read top to bottom, and **every row applies only to a commit whose own tree contains
+`apps/web/vercel.json`**: Vercel reads the file from the pushed commit, not from `main`. A branch
+cut before the file existed keeps deploying and building on every push until it is rebased, so an
+open Dependabot pull request stops creating deployments only once Dependabot has rebased it. Check
+with `git cat-file -e <pushed-sha>:apps/web/vercel.json` before reading a deployment as a failure of
+either rule.
 
 - **`git.deploymentEnabled`** stops the deployment being created, which is the half that actually
   saves quota. It matches branch names with minimatch, and `dependabot/*` and `dependabot/**` are the
@@ -567,9 +575,14 @@ reasoning, and the 2026-09-10 outage that prompted them, are in
 - **`ignoreCommand`** runs `scripts/vercel-ignore-build.mjs` once the deployment exists, and cancels
   the build when the commit changes nothing the site is built from. It does **not** save quota:
   Vercel counts a cancelled build as a full deployment. What it saves is the build minutes and the
-  single Hobby concurrent build slot, so a real build no longer queues behind a runbook edit.
+  single Hobby concurrent build slot, so a real build no longer queues behind a runbook edit. It
+  needs a base, `VERCEL_GIT_PREVIOUS_SHA`, which Vercel sets to the commit of the branch's last
+  successful deployment, and a branch's first push has none: a fresh documentation-only pull request
+  still builds once, and only its later pushes are cancelled. A docs pull request whose preview built
+  is not a sign the gate is broken; the `BUILD:` or `SKIP:` line in its build log says why.
 - **The exit code is inverted**: `0` skips the build, `1` builds it. That is Vercel's contract. The
-  script's header comment says so, and a test asserts it.
+  script's header comment says so, and `pnpm test:scripts` runs the script as a process and asserts
+  the exit status of both verdicts.
 - **Production always builds**, so the newest production deployment's commit stays equal to `main`'s
   HEAD. To let documentation-only merges skip as well, set `VERCEL_SKIP_DOCS_ONLY_PRODUCTION=1` in the
   project's **Production** environment; then production can legitimately lag `main` and the

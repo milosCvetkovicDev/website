@@ -47,11 +47,10 @@ perform an operation.
 choice; it was carried out on 2026-09-09 and the site is live, see
 [docs/runbooks/deploy.md](../runbooks/deploy.md). It is marked superseded for one sentence only, the
 one that said no `vercel.json` is added, which [ADR 0016](0016-vercel-deployment-budget.md) replaces;
-the hosting decision itself stands, and 0005's own status line says which part went. The bodies of
-0002 and 0005
-still describe the state on 2026-09-08, when they were accepted. A record's decision is never
-edited afterwards, and its other sections only to correct a claim that is untrue, which
-[ADR 0007](0007-dependency-build-scripts.md) carries an example of.
+the hosting decision itself stands, and the one-line pointer under 0005's status says which part
+went. The bodies of 0002 and 0005 still describe the state on 2026-09-08, when they were accepted.
+A record's decision is never edited afterwards, and its other sections only to correct a claim that
+is untrue, which [ADR 0007](0007-dependency-build-scripts.md) carries an example of.
 
 ## Writing a new ADR
 

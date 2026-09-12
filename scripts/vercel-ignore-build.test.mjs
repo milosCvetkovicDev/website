@@ -8,9 +8,15 @@
 // See docs/adr/0016-vercel-deployment-budget.md for the policy these cases encode.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { devNull, tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { after, before, describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
+  BUILD_EXIT_CODE,
   buildInputsIn,
   decide,
   isBuildInput,
@@ -298,9 +304,148 @@ describe('readDiff', () => {
 });
 
 describe('the exit-code contract', () => {
-  it('skips with 0, because Vercel reads 0 as "ignore this build"', () => {
+  it('skips with 0 and builds with 1, because Vercel reads 0 as "ignore this build"', () => {
     // Inverted on purpose, and the one fact in this file that is not ours to choose:
     // https://vercel.com/docs/project-configuration/vercel-json#ignorecommand
     assert.equal(SKIP_EXIT_CODE, 0);
+    assert.equal(BUILD_EXIT_CODE, 1);
+  });
+});
+
+describe('the command, run as a process the way Vercel runs it', () => {
+  // The constants above say what each code means; only a real process says which one main() picks.
+  // Swap the ternary in main(), swap the two constants, or let main() not run at all, and every case
+  // above stays green while these go red. So these assert the literal statuses 0 and 1, never the
+  // exported constants.
+  //
+  // The fixture is a throwaway repository: a base commit, a commit under apps/web/, then a docs-only
+  // commit on top. The script runs with apps/web as its working directory, where Vercel's Root
+  // Directory puts it.
+  const script = fileURLToPath(new URL('./vercel-ignore-build.mjs', import.meta.url));
+  const sha = {};
+  let scratch;
+  let repo;
+
+  // Hermetic: no inherited VERCEL_* variable, no user or system git config (signing, hooks,
+  // templates), and git may not walk up out of the scratch directory into a real repository.
+  const baseEnv = () => ({
+    PATH: process.env.PATH,
+    GIT_CONFIG_GLOBAL: devNull,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CEILING_DIRECTORIES: scratch,
+  });
+
+  const git = (...args) =>
+    execFileSync(
+      'git',
+      [
+        '-c',
+        'user.name=test',
+        '-c',
+        'user.email=test@example.invalid',
+        '-c',
+        'commit.gpgsign=false',
+      ].concat(['-c', 'init.defaultBranch=main'], args),
+      { cwd: repo, env: baseEnv(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    ).trim();
+
+  const commit = (files, message) => {
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(dirname(join(repo, path)), { recursive: true });
+      writeFileSync(join(repo, path), text);
+    }
+    git('add', '-A');
+    git('commit', '-q', '-m', message);
+    return git('rev-parse', 'HEAD');
+  };
+
+  before(() => {
+    scratch = realpathSync(mkdtempSync(join(tmpdir(), 'vercel-ignore-build-')));
+    repo = join(scratch, 'repo');
+    mkdirSync(repo);
+    git('init', '-q');
+    sha.base = commit({ 'apps/web/page.tsx': 'export default 1;\n', 'docs/a.md': '# a\n' }, 'base');
+    sha.code = commit({ 'apps/web/page.tsx': 'export default 2;\n' }, 'code');
+    sha.docs = commit({ 'docs/b.md': '# b\n' }, 'docs only');
+  });
+
+  after(() => {
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
+  });
+
+  const run = (env, { cwd = join(repo, 'apps', 'web'), entry = script } = {}) =>
+    spawnSync(process.execPath, [entry], { cwd, env: { ...baseEnv(), ...env }, encoding: 'utf8' });
+
+  const push = (from, to) => ({
+    VERCEL_GIT_PREVIOUS_SHA: sha[from],
+    VERCEL_GIT_COMMIT_SHA: sha[to],
+  });
+
+  it('exits 0, which cancels the build, for a documentation-only preview push', () => {
+    const result = run({
+      VERCEL_ENV: 'preview',
+      VERCEL_GIT_COMMIT_REF: 'docs/x',
+      ...push('code', 'docs'),
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /^SKIP: /);
+  });
+
+  it('exits 1 for a preview push whose tip is docs-only but whose range touched apps/web', () => {
+    // Vercel's own example diffs HEAD^ against HEAD, which would skip this push.
+    const result = run({
+      VERCEL_ENV: 'preview',
+      VERCEL_GIT_COMMIT_REF: 'fix/x',
+      ...push('base', 'docs'),
+    });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /^BUILD: build inputs changed: apps\/web\/page\.tsx/);
+  });
+
+  it('exits 1 for a documentation-only production push without the opt-in', () => {
+    const result = run({
+      VERCEL_ENV: 'production',
+      VERCEL_GIT_COMMIT_REF: 'main',
+      ...push('code', 'docs'),
+    });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /^BUILD: a production deployment always builds/);
+  });
+
+  it("exits 1 on a branch's first push, which has no previous deployment to diff against", () => {
+    // VERCEL_GIT_PREVIOUS_SHA is the SHA of the branch's last successful deployment, so a branch
+    // that has never deployed has none. A docs-only pull request therefore builds once.
+    const result = run({
+      VERCEL_ENV: 'preview',
+      VERCEL_GIT_COMMIT_REF: 'docs/x',
+      VERCEL_GIT_COMMIT_SHA: sha.docs,
+    });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /VERCEL_GIT_PREVIOUS_SHA is not set/);
+  });
+
+  it('exits 0 for a dependabot preview before it ever needs a repository', () => {
+    const outside = join(scratch, 'not-a-repository');
+    mkdirSync(outside, { recursive: true });
+    const result = run(
+      { VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_REF: 'dependabot/npm_and_yarn/eslint-10.10.0' },
+      { cwd: outside },
+    );
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /^SKIP: dependabot\//);
+  });
+
+  it('still runs, and still builds, when invoked through a symlinked path', () => {
+    // Node resolves symlinks in import.meta.url but not in process.argv[1]. A plain comparison of the
+    // two decides the script is merely being imported, main() never runs, and the process exits 0:
+    // Vercel would cancel every build, production included, with nothing in the log.
+    const linked = join(scratch, 'linked-scripts');
+    symlinkSync(dirname(script), linked, 'dir');
+    const result = run(
+      { VERCEL_ENV: 'production', VERCEL_GIT_COMMIT_REF: 'main', ...push('code', 'docs') },
+      { entry: join(linked, 'vercel-ignore-build.mjs') },
+    );
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /^BUILD: /);
   });
 });

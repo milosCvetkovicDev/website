@@ -35,6 +35,7 @@
 // `git rev-parse --show-toplevel` instead, so the diff can never silently read the wrong tree.
 
 import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /** Vercel ignores the build when the command exits 0. */
@@ -220,8 +221,28 @@ function main() {
   });
 
   console.log(`${verdict.build ? 'BUILD' : 'SKIP'}: ${verdict.reason}`);
-  process.exit(verdict.build ? BUILD_EXIT_CODE : SKIP_EXIT_CODE);
+  // `exitCode` rather than `process.exit()`, so the verdict line is flushed before the process ends:
+  // stdout to a pipe is asynchronous on macOS, and the line is the only record of why.
+  process.exitCode = verdict.build ? BUILD_EXIT_CODE : SKIP_EXIT_CODE;
+}
+
+/**
+ * Whether this file is the process's entry point, compared through realpath on both sides.
+ *
+ * Node's ESM loader resolves symlinks in `import.meta.url` but leaves `process.argv[1]` as typed, so
+ * the plain comparison `scripts/check-allowbuilds-drift.mjs` uses is false whenever the invocation
+ * path crosses a symlink. There that is a gate that silently does not run; here it is worse, because
+ * a script that never calls `main()` exits 0 and Vercel reads 0 as "skip" — production included.
+ */
+function isEntryPoint(argv1) {
+  if (!argv1) return false;
+  const self = fileURLToPath(import.meta.url);
+  try {
+    return realpathSync(argv1) === realpathSync(self);
+  } catch {
+    return argv1 === self;
+  }
 }
 
 // Importable for its tests; runs only when invoked as the command.
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
+if (isEntryPoint(process.argv[1])) main();

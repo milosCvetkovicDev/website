@@ -110,7 +110,15 @@ segments (`dependabot/npm_and_yarn/vitejs/plugin-react-6.1.1`), and listing both
 rule holds whether or not the matcher lets `*` cross a slash. Vercel resolves a branch that matches
 several rules by building if any of them is `true`, so two `false` entries cannot conflict.
 
-**A build is skipped when the commit changes nothing the site is built from.** The decision lives in
+**Both rules are read from the commit being pushed, not from `main`.** This record's own branch
+showed it: its first preview ran `node ../../scripts/vercel-ignore-build.mjs` from its own
+`apps/web/vercel.json` while `main` had no such file. The converse follows, and it is easy to misread
+as a failure: a branch cut before this record merged carries no `vercel.json`, so every push to it
+keeps deploying and building exactly as before until it is rebased onto a `main` that has the file.
+An already-open Dependabot pull request stops creating deployments only after Dependabot rebases it.
+
+**A build is skipped when the push changes nothing the site is built from since the branch's last
+successful deployment.** The decision lives in
 `scripts/vercel-ignore-build.mjs`, not in dashboard state: the build-input set is the
 `BUILD_INPUT_DIRECTORIES` and `BUILD_INPUT_FILES` constants at the top of that file, and this record
 deliberately does not restate them, so there is one place to change when they change. Its tests are
@@ -118,8 +126,9 @@ deliberately does not restate them, so there is one place to change when they ch
 
 **The exit code is inverted relative to every other gate in this repository: `0` skips the build,
 `1` builds it.** That is Vercel's contract, quoted above. It is stated in the script's header
-comment, asserted by a test, and repeated here because a reader who assumes the usual convention
-inverts the whole policy.
+comment, asserted by tests that run the script as a process and read its exit status for both
+verdicts, and repeated here because a reader who assumes the usual convention inverts the whole
+policy.
 
 **The script never skips because it could not see.** It exits 1 — build — when the base SHA is
 unset, is not an object name, is absent from Vercel's shallow clone, when the diff command fails,
@@ -148,8 +157,9 @@ demonstrably do.
 - The skip policy is tracked, reviewed and tested like any other code. A dashboard-only Ignored Build
   Step is invisible in a diff, has no tests, and is lost if the project is recreated; `pnpm
 test:scripts` fails on a regression in this one.
-- Documentation-only pull requests stop occupying the single Hobby concurrent build slot, so a real
-  build no longer queues behind a runbook edit.
+- A later push to a branch that has already deployed, when it changes no build input, stops
+  occupying the single Hobby concurrent build slot, so a real build no longer queues behind it. A
+  documentation-only branch's first push is not caught; see Trade-offs.
 - The `Vercel` commit status on `main`'s HEAD remains a true statement about the live site, because
   production still builds every merge unless the opt-in is set.
 
@@ -161,6 +171,17 @@ test:scripts` fails on a regression in this one.
 - A build cancelled by the Ignored Build Step still counts as a deployment, so the docs-only half of
   this policy does not reduce the daily count at all. It is easy to misread the policy as fixing more
   than it does; the runbook's rate-limit row says so in the place an operator will be reading.
+- **The docs-only skip cannot fire on a branch's first push.** `VERCEL_GIT_PREVIOUS_SHA` is "The git
+  SHA of the last successful deployment for the project and branch"
+  ([docs](https://vercel.com/docs/environment-variables/system-environment-variables)), so a branch
+  that has never deployed supplies no base, and the script builds rather than guess. This record's
+  own branch logged `BUILD: cannot tell what changed (VERCEL_GIT_PREVIOUS_SHA is not set); building.`
+  on its first push. Work here is one short-lived branch per task, so a fresh documentation-only pull
+  request, the commonest shape of one, still builds once; what the skip catches is the second and
+  later pushes to a branch that has already built. A docs pull request whose preview built is
+  therefore not evidence that the gate is broken. Diffing against `main` would catch the first push
+  too, but Vercel's clone is shallow and need not contain `main`, and a base the script has to guess
+  at is exactly what it refuses to use.
 - A skipped build reports on the commit as cancelled. If the `Vercel` context were ever made a
   required status check on `main` or on pull requests, every docs-only change would block on a check
   that never arrives.

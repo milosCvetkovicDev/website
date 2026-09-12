@@ -4,14 +4,12 @@
 
 Superseded by ADR-0016
 
-One rule below no longer applies: "No `vercel.json` is added". `apps/web/vercel.json` now carries the
-Git and build-step configuration that has no dashboard equivalent, see
-[ADR 0016](0016-vercel-deployment-budget.md); response headers still belong in `headers()` in
-`next.config.ts` and not there. Everything else stands — one project, Root Directory `apps/web`, the
-Next.js preset, the install-command and Node overrides, production from `main`, the apex primary and
-DNS at Namecheap — and the rest of this record is the reasoning as it was on 2026-09-08, when there
-was no Vercel project and `miloscvetkovic.dev` was still parked, so it describes what becomes true
-once the procedure in [docs/runbooks/deploy.md](../runbooks/deploy.md) has been followed.
+No longer applies: "No `vercel.json` is added". See [ADR 0016](0016-vercel-deployment-budget.md).
+
+The decision stands but has not been carried out. As of 2026-09-08 there is no Vercel
+project and `miloscvetkovic.dev` is still parked, so everything recorded below describes what
+becomes true once the procedure in [docs/runbooks/deploy.md](../runbooks/deploy.md) has been
+followed.
 
 ## Date
 
