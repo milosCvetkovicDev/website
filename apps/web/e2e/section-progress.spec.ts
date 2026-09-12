@@ -1,5 +1,6 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectHydrated, gotoHydrated } from './support/hydration';
 
 // The dots name the seven sections of the AnimatedHero story, but `/` keeps going with Featured
 // Work, Tech Stack and the footer below it — the story is a little over three quarters of the
@@ -17,13 +18,6 @@ const dot = (page: Page, label: string) =>
 /** The dot's text label. A direct child, so a future icon span inside the button cannot match. */
 const dotLabel = (page: Page, label: string) => dot(page, label).locator('> span');
 
-/**
- * Tabs until `target` holds focus, and fails naming the count if it never does. Real Tab presses
- * rather than `locator.focus()`: `:focus-visible`, which is what reveals a dot's label, only
- * matches a programmatic focus when Chromium judges the last interaction to have been a keypress,
- * so scripted focus would make the reveal assertions a coin flip. Getting there at all is half of
- * what these tests are about, so the walk is the assertion as much as the setup.
- */
 /**
  * What `value` computes to as a colour, read from a throwaway element beside `near`.
  *
@@ -44,14 +38,22 @@ function resolveColor(near: Locator, value: string) {
   }, value);
 }
 
+/**
+ * Tabs until `target` holds focus, and fails naming the count if it never does. Real Tab presses
+ * rather than `locator.focus()`: `:focus-visible`, which is what reveals a dot's label, only
+ * matches a programmatic focus when Chromium judges the last interaction to have been a keypress,
+ * so scripted focus would make the reveal assertions a coin flip. Getting there at all is half of
+ * what these tests are about, so the walk is the assertion as much as the setup.
+ */
 async function tabTo(page: Page, target: Locator, limit = 30) {
   for (let presses = 0; presses < limit; presses++) {
     await page.keyboard.press('Tab');
     if (await target.evaluate((el) => el === document.activeElement)) return;
   }
   // Where focus stopped is the one fact worth having in a CI log for this failure, and the
-  // default message does not carry it. The limit is generous: the header has six focusable
-  // elements ahead of the seven dots, so the furthest dot is reached in thirteen presses.
+  // default message does not carry it. The limit is generous: it covers the skip link, every
+  // focusable element in the header and the seven dots with room to spare, so running out means
+  // focus went somewhere else, not that the walk was too short.
   const stopped = await page.evaluate(() => {
     const el = document.activeElement;
     if (!el) return 'nothing';
@@ -66,11 +68,11 @@ test.describe('Section progress', () => {
   test.beforeEach(async ({ page }) => {
     // Reduced motion makes a dot jump instant, so no assertion here can race a smooth scroll.
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/');
-    // Guard against reuseExistingServer attaching to some other project's dev server on :3000.
+    await gotoHydrated(page, '/');
+    // A smoke check that this application rendered, nothing more. Playwright starts the server it
+    // tests and an occupied port aborts the run (ADR 0014), so there is no foreign server left to
+    // guard against; status and path are what catch a wrong page.
     await expect(page).toHaveTitle(/Milos Cvetkovic/);
-    // The boot loader is removed once React has hydrated; interactions before that are lost.
-    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
   });
 
   test('sends the last dot to the closing section rather than the footer', async ({ page }) => {
@@ -101,7 +103,7 @@ test.describe('Section progress', () => {
     expect(scrolled).toBeGreaterThan(0);
 
     await page.reload();
-    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
+    await expectHydrated(page);
 
     // The browser puts the page back where it was and tells nobody: scroll restoration dispatches
     // no scroll event the indicator could listen for. It is also not ordered against hydration, so

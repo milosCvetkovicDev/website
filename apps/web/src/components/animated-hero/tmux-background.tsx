@@ -458,12 +458,16 @@ function StaticPane({ config }: { config: PaneConfig }) {
   const lines = config.seq.slice(0, 15);
   return (
     <div
+      // The whole tree is aria-hidden, so a role query cannot reach a pane: `data-pane` is how the
+      // unit tests and e2e specs identify one, instead of the layout classes they used before.
+      data-pane={config.title}
       className="flex min-w-0 flex-1 flex-col overflow-hidden border-r last:border-r-0"
       style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
     >
       <PaneTitle title={config.title} host={config.host} />
       <div className="relative flex-1 overflow-hidden">
         <div
+          data-pane-lines=""
           className="absolute right-0 bottom-0 left-0 font-mono whitespace-nowrap"
           style={{ padding: '6px 10px', fontSize: '14px', lineHeight: '1.65' }}
         >
@@ -621,13 +625,15 @@ function AnimatedPane({
 
   return (
     <div
+      data-pane={config.title}
       className="flex min-w-0 flex-1 flex-col overflow-hidden border-r last:border-r-0"
       style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
     >
       <PaneTitle title={config.title} host={config.host} />
-      <div ref={viewportRef} className="relative flex-1 overflow-hidden">
+      <div ref={viewportRef} data-pane-viewport="" className="relative flex-1 overflow-hidden">
         <div
           ref={slotsRef}
+          data-pane-slots=""
           className="absolute right-0 bottom-0 left-0 font-mono whitespace-nowrap"
           style={{
             padding: `${PANE_PADDING_Y_PX}px ${PANE_PADDING_X_PX}px`,
@@ -688,6 +694,9 @@ export function TmuxBackground() {
   return (
     <div
       ref={containerRef}
+      // What the IntersectionObserver watches, so the test can assert that it watches this element
+      // rather than only that `observe` was called with something.
+      data-tmux-background=""
       className="pointer-events-none absolute inset-0 z-0 flex flex-col overflow-hidden"
       aria-hidden="true"
       style={{ background: 'var(--tmux-bg)' }}

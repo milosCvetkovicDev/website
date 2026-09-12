@@ -39,11 +39,14 @@ describe('HeroContent', () => {
 
   it('renders sr-only SEO text for crawlers as a separate paragraph', () => {
     render(<HeroContent />);
-    const srOnly = document.querySelector('p.sr-only');
-    expect(srOnly).toBeInTheDocument();
-    expect(srOnly?.textContent).toContain('AI-native development');
-    expect(srOnly?.textContent).toContain('TypeScript');
-    expect(srOnly?.textContent).toContain('React');
+    // Found by its text, then checked for what makes it sr-only text: a paragraph of its own,
+    // visually hidden. The class is the assertion here, not the locator.
+    const srOnly = screen.getByText(/Senior Full Stack Engineer/);
+    expect(srOnly.tagName).toBe('P');
+    expect(srOnly).toHaveClass('sr-only');
+    expect(srOnly.textContent).toContain('AI-native development');
+    expect(srOnly.textContent).toContain('TypeScript');
+    expect(srOnly.textContent).toContain('React');
   });
 
   it('uses semantic HTML for player card (dl/dt/dd)', () => {
@@ -67,11 +70,14 @@ describe('HeroContent', () => {
 
   it('renders the player card header dots (decorative)', () => {
     const { container } = render(<HeroContent />);
-    // Three colored dots in the card header, inside an aria-hidden div
-    const decorativeHeader = container.querySelector('[aria-hidden="true"]');
-    expect(decorativeHeader).toBeInTheDocument();
-    // Should have 3 dot divs inside
-    const dots = decorativeHeader?.querySelectorAll('.rounded-full');
-    expect(dots).toHaveLength(3);
+    // The window chrome is decoration with no role or name, so it is named rather than found by
+    // being the first aria-hidden element in the tree.
+    const chrome = container.querySelector('[data-decoration="window-controls"]');
+    expect(chrome).toBeInTheDocument();
+    expect(chrome).toHaveAttribute('aria-hidden', 'true');
+    expect(chrome?.querySelectorAll('[data-window-control]')).toHaveLength(3);
+    // The three controls are all that is in there: a fourth child would be content hidden from
+    // assistive technology, which is what aria-hidden decoration must never carry.
+    expect(chrome?.children).toHaveLength(3);
   });
 });

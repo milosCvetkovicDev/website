@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { gotoHydrated } from './support/hydration';
 
 test.describe('Story sections', () => {
   test('scrolling back up reverses the closing section at once', async ({ page }) => {
-    await page.goto('/');
+    await gotoHydrated(page, '/');
 
     // The footer links to the same profile, so match the closing section's own call to action by
     // the text it carries rather than by the destination.
