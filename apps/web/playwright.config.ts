@@ -35,6 +35,21 @@ export function resolvePort(raw: string | undefined, fallback: number): number {
 
 const port = resolvePort(process.env.PLAYWRIGHT_PORT, DEFAULT_PORT);
 
+/**
+ * Selects the phone-only specs under `e2e/mobile/`.
+ *
+ * Anchored on a path separator so it cannot be satisfied by a file merely *named* for a phone:
+ * `e2e/mobile-menu.spec.ts` at the top level would match a bare `/mobile/` on some platforms once
+ * Playwright normalises separators, and would then run three times at three viewports. A trailing
+ * separator requires the directory.
+ *
+ * Exported for `src/test/playwright-config.test.ts`, which pins both halves of the split: a spec in
+ * `e2e/mobile/` runs on the two phone projects and on neither desktop one, and a spec outside it the
+ * other way round. The two projects' `testMatch` and the desktop project's `testIgnore` are the same
+ * pattern, so they cannot drift apart into a spec that runs everywhere or nowhere.
+ */
+export const MOBILE_SPECS = /[\\/]mobile[\\/]/;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -48,7 +63,32 @@ export default defineConfig({
     baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Three projects. The desktop one is the original and still runs everything that is not phone
+  // specific; the two phone ones run only `e2e/mobile/`, which is where a spec goes when the defect
+  // it measures needs a real phone viewport and a real `isMobile` (a tap rather than a click, and a
+  // `<header>` whose `backdrop-blur-sm` becomes the containing block for the `fixed` menu panel it
+  // renders — the whole of pages-1).
+  //
+  // WebKit rather than Firefox for the second engine, for two reasons that both matter here:
+  // Playwright's `isMobile` is unsupported on Firefox, and whether a `backdrop-filter` ancestor
+  // becomes the containing block for a `fixed` descendant is exactly the class of behaviour that
+  // differs between Blink and WebKit. A mobile-menu geometry assertion that only ever ran on
+  // Chromium would say nothing about what an iPhone visitor sees.
+  //
+  // `resolvePort` and the `webServer` block below are untouched: one server, started by this run,
+  // never reused, whichever projects are selected (ADR 0014).
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      // Without this the desktop project would run the phone specs at 1280x720, where the mobile
+      // header is `md:hidden` and every menu locator resolves to nothing: nine tests failing for a
+      // reason that has nothing to do with the defect they exist to record.
+      testIgnore: MOBILE_SPECS,
+    },
+    { name: 'mobile-chrome', use: { ...devices['Pixel 7'] }, testMatch: MOBILE_SPECS },
+    { name: 'mobile-safari', use: { ...devices['iPhone 13'] }, testMatch: MOBILE_SPECS },
+  ],
   webServer: {
     // CI runs the production build (`pnpm build` runs first); locally the dev server.
     command: isCI ? 'pnpm start' : 'pnpm dev',

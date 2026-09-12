@@ -81,7 +81,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm --filter web exec playwright install --with-deps chromium
+        # webkit as well as chromium: the two phone projects in apps/web/playwright.config.ts are
+        # Pixel 7 (chromium) and iPhone 13 (webkit). A missing browser makes the whole suite fail in
+        # milliseconds, so a run that dies immediately after a Playwright bump is this step, not a
+        # broken spec.
+        run: pnpm --filter web exec playwright install --with-deps chromium webkit
 
       - name: Build web
         run: pnpm --filter web build
