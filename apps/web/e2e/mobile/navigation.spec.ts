@@ -70,12 +70,12 @@ async function boxOf(locator: Locator, what: string) {
 }
 
 test.describe('the mobile header', () => {
-  // No retries, for a reason specific to expected failures. CI sets `retries: 2`, and a `test.fail()`
-  // that passes on its first attempt is an *unexpected pass* — the signal that says a defect has been
-  // fixed and the annotation must go. With retries on, Playwright would run it again, see it fail as
-  // annotated, and report the whole thing as flaky rather than as a failure. The one outcome these rows
-  // exist to produce would be swallowed. The green tests here want it for the ordinary reason: they are
-  // the regression floor for #46 and a retry could hide an intermittent break in it.
+  // No retries, for a reason specific to expected failures. CI sets `retries: 2`, and an expected
+  // failure that passes on its first attempt is an *unexpected pass* — the signal that says a defect
+  // has been fixed and the annotation must go. With retries on, Playwright would run it again, see it
+  // fail as annotated, and report the whole thing as flaky rather than as a failure. The one outcome
+  // these rows exist to produce would be swallowed. The green tests here want it for the ordinary
+  // reason: they are the regression floor for #46 and a retry could hide an intermittent break in it.
   test.describe.configure({ retries: 0 });
 
   test('opens and closes the menu by its own buttons', async ({ page }) => {
