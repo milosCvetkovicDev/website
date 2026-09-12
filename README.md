@@ -61,17 +61,17 @@ The site runs on `http://localhost:3000`. `pnpm dev:playground` starts the sandb
 
 Every gate runs on every push and pull request in CI. The first three also run on each commit through Husky.
 
-| Command                      | What it checks                                                     | Pre-commit         | CI  |
-| ---------------------------- | ------------------------------------------------------------------ | ------------------ | --- |
-| `pnpm format:check`          | Prettier, shared config, Tailwind class order                      | yes (staged files) | yes |
-| `pnpm lint`                  | ESLint with `--max-warnings 0` in every app                        | yes (staged files) | yes |
-| commitlint                   | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...) | yes                | -   |
-| `pnpm check:allowbuilds`     | `allowBuilds` entries against the versions the lockfile resolves   | -                  | yes |
-| `pnpm test:scripts`          | The root `scripts/` gates: allowBuilds drift and the AI refusals   | -                  | yes |
-| `pnpm typecheck`             | `next typegen && tsc --noEmit` (web), `tsc -b` (playground)        | -                  | yes |
-| `pnpm test`                  | Vitest unit tests                                                  | -                  | yes |
-| `pnpm build`                 | Production builds of both apps                                     | -                  | yes |
-| `pnpm --filter web test:e2e` | Playwright against the production build                            | -                  | yes |
+| Command                      | What it checks                                                                                           | Pre-commit         | CI  |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------ | --- |
+| `pnpm format:check`          | Prettier, shared config, Tailwind class order                                                            | yes (staged files) | yes |
+| `pnpm lint`                  | ESLint with `--max-warnings 0` in every app                                                              | yes (staged files) | yes |
+| commitlint                   | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...); in CI, the PR title and every commit | yes                | yes |
+| `pnpm check:allowbuilds`     | `allowBuilds` entries against the versions the lockfile resolves                                         | -                  | yes |
+| `pnpm test:scripts`          | The root `scripts/` gates: allowBuilds drift and the AI refusals                                         | -                  | yes |
+| `pnpm typecheck`             | `next typegen && tsc --noEmit` (web), `tsc -b` (playground)                                              | -                  | yes |
+| `pnpm test`                  | Vitest unit tests                                                                                        | -                  | yes |
+| `pnpm build`                 | Production builds of both apps                                                                           | -                  | yes |
+| `pnpm --filter web test:e2e` | Playwright against the production build                                                                  | -                  | yes |
 
 Useful extras: `pnpm lint:fix`, `pnpm format`, `pnpm clean`.
 

@@ -75,6 +75,15 @@ is there so that a future buildable package is compiled before the apps typechec
   Playwright specs; the report is uploaded as an artifact on failure or cancellation. Actions are
   SHA-pinned, `permissions: contents: read`, and concurrency cancels superseded runs on pull
   requests only.
+- Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
+  `main` never passes through the local hook. `.github/workflows/commitlint.yml`, job
+  `Commit messages`, lints the pull request title (the squash commit's subject), every commit between
+  the pull request's base and head, and on a push to `main` the new HEAD, all with
+  `commitlint.config.mjs`. It re-runs on every `edited` event, a body edit included, and has no
+  job-level `if`: GitHub reports a job skipped by a condition as Success, which would satisfy a
+  required check on a title nobody linted. Four commits on `main` from before the check (54b8b80,
+  d7d058d, a8b4a91, 3e98c14) fail `body-max-line-length` and stay as accepted history: `main` is
+  never rewritten.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
 - Every route must load with a clean browser console. `apps/web/e2e/console-clean.spec.ts` fails
   on any console error, console warning or page error, React hydration mismatches included, so a

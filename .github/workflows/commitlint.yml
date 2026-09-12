@@ -1,0 +1,85 @@
+name: Commit messages
+
+# commitlint ran only in .husky/commit-msg, which the squash commits GitHub writes to `main` never
+# pass through. Four commits on `main` already fail the repository's own convention because of it.
+# This lints the messages that actually land: the pull request title, which becomes the subject of
+# the squash commit, every commit on the branch, and the new HEAD on `main` after the merge.
+#
+# A workflow of its own rather than a step in ci.yml: a title edit then re-runs this alone instead of
+# the build and the e2e suite, and ci.yml keeps exactly the seven gates the docs list.
+#
+# No `workflow_dispatch`: a manual run has no title and no commit range, so every lint step below
+# would be skipped and the job would still report green on whatever SHA it ran against.
+
+on:
+  pull_request:
+    # `edited` covers a retitle. It also fires for a body or base edit, and those re-run the whole job
+    # on purpose: see the note on the job below.
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
+
+# PRs: cancel superseded runs. main: never cancel, every commit gets full results. A run cancelled by
+# a newer event on the same PR is always followed by that newer run, which lints the same title and
+# commits in full, so cancelling never leaves a PR without a real result.
+concurrency:
+  group: commitlint-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Branch protection binds required checks to this display name, so it does not change.
+  #
+  # Deliberately no job-level `if` to skip body-only edits. GitHub reports a job skipped by a
+  # condition as Success on the head SHA, and a skipped job satisfies a required check. A skip would
+  # therefore turn a failing title green without linting it: open a PR titled `update stuff`, watch
+  # this fail, edit only the body, and the newest `Commit messages` result on that SHA is a pass. The
+  # concurrency group made it worse, because the skipped run joined the group before its `if` was
+  # evaluated and cancelled a real lint still in progress. Re-linting on every edit costs well under
+  # a minute and is always correct.
+  commitlint:
+    name: Commit messages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # commitlint walks a commit range, so the whole history has to be there.
+          fetch-depth: 0
+
+      - name: Set up pnpm (version from package.json#packageManager)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint the pull request title
+        if: github.event_name == 'pull_request'
+        # The title is attacker-controlled input, so it arrives through the environment and is never
+        # interpolated into the script. `printf` rather than `echo`, which would eat a leading `-`.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint
+
+      - name: Lint every commit on the branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
+      - name: Lint the new commit on main
+        if: github.event_name == 'push'
+        # One commit: whatever the merge just wrote. The four commits on `main` that predate this
+        # check stay as they are — `main` is never rewritten — so the range is deliberately not the
+        # whole history.
+        run: pnpm exec commitlint --from HEAD~1 --to HEAD --verbose
