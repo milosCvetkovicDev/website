@@ -181,11 +181,16 @@ export function SectionProgress({
                   // stages of a process that has to be advanced through.
                   aria-current={index === activeSection ? 'location' : undefined}
                 >
-                  {/* Dot */}
+                  {/* Dot. `data-state` is not a test hook bolted onto a colour: the fill is drawn
+                      from it through Tailwind's data variants, so the attribute and what the dot
+                      looks like cannot drift apart. */}
                   <div
-                    className={`relative h-3 w-3 rounded-full transition-all duration-300 ${
-                      index <= activeSection ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'
-                    } ${index === activeSection ? 'shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_60%,transparent)]' : ''}`}
+                    data-state={index <= activeSection ? 'reached' : 'pending'}
+                    className={`relative h-3 w-3 rounded-full transition-all duration-300 data-[state=pending]:bg-[var(--border)] data-[state=reached]:bg-[var(--accent)] ${
+                      index === activeSection
+                        ? 'shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_60%,transparent)]'
+                        : ''
+                    }`}
                   />
 
                   {/* Label, revealed to the pointer and to the keyboard alike: without the
@@ -213,6 +218,9 @@ export function SectionProgress({
           <div className="h-full w-full bg-[var(--border)]" />
           <div
             ref={progressLineRef}
+            // The tests used to find this by its will-change utility, which is a performance hint,
+            // not an identity.
+            data-progress="section"
             className="absolute top-0 w-full bg-[var(--accent)] will-change-[height]"
             style={{
               height: `${(activeSection / (sections.length - 1)) * 100}%`,
@@ -227,6 +235,7 @@ export function SectionProgress({
         <div className="h-1 bg-[var(--border)]">
           <div
             ref={mobileProgressRef}
+            data-progress="scroll"
             className="h-full bg-[var(--accent)] will-change-[width]"
             style={{ width: '0%', transition: 'none' }}
           />

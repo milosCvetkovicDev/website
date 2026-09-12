@@ -2,6 +2,7 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap, ScrollTrigger } from '../use-gsap-scroll';
 import { GauntletPhase } from '../gauntlet-phase';
+import { onlyCounterTween } from './support/tweens';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
 // it at import time, so the stub must exist before the imports above are evaluated.
@@ -39,11 +40,26 @@ const media = vi.hoisted(() => {
   return state;
 });
 
+// mount() calls ScrollTrigger.refresh(), which restores the scroll position through window.scrollTo,
+// and jsdom does not implement it: every call builds an Error, captures a stack and prints it through
+// the virtual console, twelve of them per run of this file. The no-op is defined for the file's whole
+// lifetime, before the imports register ScrollTrigger, rather than spied per test: afterEach hands
+// GSAP its ticker back and then restores every mock, and a refresh the ticker ran after that restore
+// reached jsdom's own method again, between tests, where no spy could catch it. vi.restoreAllMocks()
+// does not undo a property definition.
+vi.hoisted(() => {
+  Object.defineProperty(window, 'scrollTo', {
+    configurable: true,
+    writable: true,
+    value: () => {},
+  });
+});
+
 const STAGE_COUNT = 6;
 // The six stages run back to back with a 0.2s gap; deployment starts once the last one ends.
 const PIPELINE_MS = 5300;
 
-const achievement = () => screen.getByText('Achievement Unlocked').closest('.mt-6');
+const achievement = () => document.querySelector('[data-gauntlet="achievement"]');
 const pendingStages = () => screen.getAllByText('○');
 const passedStages = () => screen.getAllByText('●');
 
@@ -115,7 +131,7 @@ describe('GauntletPhase', () => {
     // Spy after mount: the first timer creates the LINT stage's progress tween on a plain object.
     const toSpy = vi.spyOn(gsap, 'to');
     act(() => vi.advanceTimersByTime(1));
-    const [progressTarget] = toSpy.mock.calls[0];
+    const { target: progressTarget } = onlyCounterTween(toSpy);
     expect(gsap.getTweensOf(progressTarget)).toHaveLength(1);
     expect(vi.getTimerCount()).toBeGreaterThan(0);
 
@@ -143,7 +159,7 @@ describe('GauntletPhase', () => {
     mount();
     const toSpy = vi.spyOn(gsap, 'to');
     act(() => vi.advanceTimersByTime(1));
-    const [progressTarget] = toSpy.mock.calls[0];
+    const { target: progressTarget } = onlyCounterTween(toSpy);
     expect(vi.getTimerCount()).toBeGreaterThan(0);
 
     act(() => media.set(true));

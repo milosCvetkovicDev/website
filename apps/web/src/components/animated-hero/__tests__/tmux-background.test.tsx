@@ -124,9 +124,14 @@ describe('TmuxBackground', () => {
     expect(screen.getByText('us-east-1')).toBeInTheDocument();
   });
 
-  it('sets up IntersectionObserver for visibility tracking', () => {
-    render(<TmuxBackground />);
-    expect(mockObserve).toHaveBeenCalled();
+  it('observes its own root for visibility, not some other element', () => {
+    const { container } = render(<TmuxBackground />);
+    const root = container.querySelector('[data-tmux-background]');
+    expect(root).toBeInTheDocument();
+    // Which element is observed is the whole point: the panes stop ticking when the hero scrolls
+    // out of view, so an observer pointed at the wrong node leaves them running off-screen.
+    expect(mockObserve).toHaveBeenCalledTimes(1);
+    expect(mockObserve).toHaveBeenCalledWith(root);
   });
 });
 
@@ -181,8 +186,11 @@ describe('AnimatedPane log slots', () => {
   });
 
   function kubectlSlots() {
-    const pane = screen.getByText(/kubectl \u2014 pods/).closest('.flex-col');
-    const slots = pane?.querySelector('.whitespace-nowrap');
+    // The tree is aria-hidden, so there is no role to query. `data-pane` names the pane and
+    // `data-pane-slots` its rotating slot container, instead of the layout classes this used to
+    // reach through -- `.flex-col` and `.whitespace-nowrap` both match several elements.
+    const pane = document.querySelector('[data-pane="kubectl \u2014 pods"]');
+    const slots = pane?.querySelector('[data-pane-slots]');
     if (!(slots instanceof HTMLElement)) throw new Error('slot container not rendered');
     return slots;
   }

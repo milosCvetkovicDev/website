@@ -1,18 +1,15 @@
 import { test, expect } from '@playwright/test';
+import { gotoHydrated } from './support/hydration';
 
 test.describe('Hero Section', () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.goto('/');
-    // Wait for hero content to be visible instead of arbitrary timeout
-    await page.waitForSelector('h1', { state: 'visible' });
+    await gotoHydrated(page, '/');
     // A smoke check that this application rendered. It no longer guards against a foreign server:
     // Playwright starts the one it tests, and an occupied port aborts the run before the first test
     // (ADR 0014). It never caught a second checkout of this site either, and the not-found and error
     // pages carry this title too; status and path are what catch a wrong page, in the specs below.
     await expect(page).toHaveTitle(/Milos Cvetkovic/);
-    // The boot loader is removed once React has hydrated; interactions before that are lost.
-    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
   });
 
   test('renders the headline', async ({ page }) => {
@@ -45,11 +42,19 @@ test.describe('Hero Section', () => {
   });
 
   test('tmux background renders with 5 panes', async ({ page }) => {
-    await expect(page.getByText('kubectl', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('psql', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('gh actions', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('nginx', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('prometheus', { exact: false }).first()).toBeVisible();
+    // Counted, and named, through `data-pane` on each pane root. The tree is aria-hidden, so no role
+    // reaches it, and the substring checks this replaced passed on a sixth pane or a duplicated one.
+    const panes = page.locator('[data-tmux-background] [data-pane]');
+    await expect(panes).toHaveCount(5);
+    expect(await panes.evaluateAll((els) => els.map((el) => el.getAttribute('data-pane')))).toEqual(
+      [
+        'kubectl \u2014 pods',
+        'psql \u2014 slow query log',
+        'gh actions \u2014 CI pipeline',
+        'nginx \u2014 access + error',
+        'prometheus \u2014 alerts',
+      ],
+    );
   });
 
   test('tmux log lines animate into panes', async ({ page }) => {
@@ -100,8 +105,7 @@ test.describe('Hero Section', () => {
     // HTML but let React replace it with the placeholder the moment the page hydrated, so the copy
     // and the closing call to action left the document until the visitor scrolled to them. This is
     // the guard for that: read the live DOM well after hydration, without scrolling.
-    await page.goto('/');
-    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
+    await gotoHydrated(page, '/');
     await page.waitForTimeout(3_000);
     for (const copy of ['TECH TREE', 'CI/CD PIPELINE', 'SELF-HEALING LOG']) {
       await expect(page.getByText(copy, { exact: false }).first()).toBeAttached();
@@ -109,9 +113,12 @@ test.describe('Hero Section', () => {
     await expect(page.getByRole('link', { name: /connect on linkedin/i })).toBeAttached();
   });
 
-  test('story sections are server-rendered', async ({ page }) => {
-    const response = await page.goto('/');
-    const html = (await response?.text()) ?? '';
+  // The server HTML is read through the `request` fixture, not a second navigation: the page has
+  // nothing to hydrate here, and reading a response the browser also renders invites a wait on it.
+  test('story sections are server-rendered', async ({ request }) => {
+    const response = await request.get('/');
+    expect(response.status()).toBe(200);
+    const html = await response.text();
     // Plain text from four of the six sections (the headlines are split into per-character spans).
     for (const copy of ['TECH TREE', 'CI/CD PIPELINE', 'SELF-HEALING LOG', 'Connect on LinkedIn']) {
       expect(html).toContain(copy);
@@ -125,7 +132,9 @@ test.describe('Hero Section', () => {
     // is the page being unstable — which is what this guard is for. It also makes the measurement
     // independent of machine load, which a run on a busy laptop is not.
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/');
+    // Hydrated first: measured from the moment of navigation, the loader leaving and the phases
+    // mounting counted against the story as shift the visitor never scrolled into.
+    await gotoHydrated(page, '/');
     // Programmatic scrolling is not user input, so nothing here is discounted as recent input.
     const shiftScore = await page.evaluate(async () => {
       let total = 0;
@@ -177,10 +186,11 @@ test.describe('Hero Section', () => {
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
   });
 
-  test('hero content is SSR-rendered (SEO)', async ({ page }) => {
-    // Check the raw HTML response for SSR content
-    const response = await page.goto('/');
-    const html = await response?.text();
+  test('hero content is SSR-rendered (SEO)', async ({ request }) => {
+    // The raw HTML response, through the `request` fixture rather than a second navigation.
+    const response = await request.get('/');
+    expect(response.status()).toBe(200);
+    const html = await response.text();
 
     expect(html).toContain('This happened at 3am');
     expect(html).toContain('Milos Cvetkovic');

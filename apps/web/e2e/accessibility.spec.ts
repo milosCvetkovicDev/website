@@ -1,5 +1,6 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { expectHydrated } from './support/hydration';
 
 /**
  * Accessibility regression gate: `/` and `/work/self-healing-agent` must produce zero axe-core
@@ -253,10 +254,9 @@ async function openPage(
   expect(response?.status(), `${path} should answer 200`).toBe(200);
   expect(new URL(page.url()).pathname, `${path} should not redirect`).toBe(path);
   await expect(page).toHaveTitle(/Milos Cvetkovic/);
-  // `/` shows a boot loader until React has hydrated and removes it 600 ms later; the audit
-  // is of the page behind it. Other routes have no loader, so the locator matches nothing
-  // and this passes at once.
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  // The audit is of the hydrated page, not of the boot loader `/` shows in front of it; on other
+  // routes the wait passes at once.
+  await expectHydrated(page);
   // Playwright ignores unknown emulation options silently: prove the scheme reached the page.
   await expect(page.locator('html')).toContainClass(colorScheme);
   // axe skips what is not on screen, so a page that rendered nothing would be green: require
@@ -295,7 +295,7 @@ test.describe('Accessibility', () => {
         expect(
           describeViolations(results.violations),
           `${path} in the ${colorScheme} theme must have no axe violations. For a colour contrast ` +
-            'failure, read the token roles in docs/adr/0008-accent-colour-roles.md first.',
+            'failure, read the token roles in docs/adr/0011-colour-roles-on-scoped-surfaces.md first.',
         ).toEqual([]);
         // Prove the options took effect and that real content was measured: a rule that is switched
         // off appears in none of the four result lists, axe only logs an unknown tag instead of
@@ -318,7 +318,7 @@ test.describe('Accessibility', () => {
   }
 
   test.describe('the whole story', () => {
-    // A scrolled `/` gives axe over 400 text nodes to measure against the at-rest pass's 30. It
+    // A scrolled `/` gives axe over 400 text nodes to measure against the at-rest pass's 103. It
     // takes 2.7 s on a CI runner and 4.5 to 6.4 s locally, so 120 s is roughly twenty times the
     // measured cost. It is deliberately not larger: the e2e job has 20 minutes, of which the build
     // and the browser install take about a third, and two of these tests hanging to a five-minute
