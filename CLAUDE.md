@@ -30,28 +30,28 @@ pnpm (`pnpm@10.33.0`), not Node. CI reads Node from `.nvmrc` and pnpm from `pack
 
 ## Commands
 
-| Command                                                          | What it does                                                            |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `pnpm dev`                                                       | `turbo dev` across every app                                            |
-| `pnpm dev:web`                                                   | Next.js dev server on port 3000                                         |
-| `pnpm dev:playground`                                            | Vite dev server for the sandbox                                         |
-| `pnpm build`                                                     | `next build` (web) and `tsc -b && vite build` (playground)              |
-| `pnpm lint`                                                      | ESLint in each app with `--max-warnings 0`                              |
-| `pnpm lint:fix`                                                  | `eslint --fix` in each app, without `--max-warnings 0`                  |
-| `pnpm typecheck`                                                 | `next typegen && tsc --noEmit` (web), `tsc -b` (playground)             |
-| `pnpm test`                                                      | Vitest unit tests (web only)                                            |
-| `pnpm test:e2e`                                                  | Playwright specs in `apps/web/e2e`                                      |
-| `pnpm format`                                                    | Prettier over the whole repo, writing changes                           |
-| `pnpm format:check`                                              | Prettier in check mode, no writes                                       |
-| `pnpm check:allowbuilds`                                         | Checks `allowBuilds` entries against the versions the lockfile resolves |
-| `pnpm test:scripts`                                              | `node:test` tests for the root `scripts/` gates                         |
-| `pnpm clean`                                                     | `turbo clean` in both apps, then `rm -rf node_modules` at the root      |
-| `pnpm prepare`                                                   | `husky`; runs on install and is what creates the git hooks              |
-| `pnpm --filter web test:e2e`                                     | Playwright without going through Turborepo                              |
-| `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`                | Playwright on a port other than the default 3210                        |
-| `pnpm --filter web test:watch`                                   | Vitest in watch mode                                                    |
-| `pnpm --filter web exec vitest run <path>`                       | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx` |
-| `pnpm --filter web exec playwright install --with-deps chromium` | Needed once before the first e2e run                                    |
+| Command                                                          | What it does                                                                       |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `pnpm dev`                                                       | `turbo dev` across every app                                                       |
+| `pnpm dev:web`                                                   | Next.js dev server on port 3000                                                    |
+| `pnpm dev:playground`                                            | Vite dev server for the sandbox                                                    |
+| `pnpm build`                                                     | `next build` (web) and `tsc -b && vite build` (playground)                         |
+| `pnpm lint`                                                      | ESLint in each app with `--max-warnings 0`                                         |
+| `pnpm lint:fix`                                                  | `eslint --fix` in each app, without `--max-warnings 0`                             |
+| `pnpm typecheck`                                                 | `next typegen && tsc --noEmit` (web), `tsc -b` (playground), then `tsc -p scripts` |
+| `pnpm test`                                                      | Vitest unit tests (web only)                                                       |
+| `pnpm test:e2e`                                                  | Playwright specs in `apps/web/e2e`                                                 |
+| `pnpm format`                                                    | Prettier over the whole repo, writing changes                                      |
+| `pnpm format:check`                                              | Prettier in check mode, no writes                                                  |
+| `pnpm check:allowbuilds`                                         | Checks `allowBuilds` entries against the versions the lockfile resolves            |
+| `pnpm test:scripts`                                              | `node:test` tests for the root `scripts/` gates                                    |
+| `pnpm clean`                                                     | `turbo clean` in both apps, then `rm -rf node_modules` at the root                 |
+| `pnpm prepare`                                                   | `husky`; runs on install and is what creates the git hooks                         |
+| `pnpm --filter web test:e2e`                                     | Playwright without going through Turborepo                                         |
+| `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`                | Playwright on a port other than the default 3210                                   |
+| `pnpm --filter web test:watch`                                   | Vitest in watch mode                                                               |
+| `pnpm --filter web exec vitest run <path>`                       | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx`            |
+| `pnpm --filter web exec playwright install --with-deps chromium` | Needed once before the first e2e run                                               |
 
 `pnpm lint:fix` drops `--max-warnings 0`, so it exits 0 on warnings that `pnpm lint` and CI fail on.
 Always finish with `pnpm lint`.
@@ -62,6 +62,12 @@ Always finish with `pnpm lint`.
 `typecheck` and `test` declare `dependsOn: ["^build"]` in `turbo.json`. Nothing an app depends on
 has a `build` task today (`@repo/prettier-config` is config only), so this is currently a no-op. It
 is there so that a future buildable package is compiled before the apps typecheck against it.
+
+`pnpm typecheck` runs `turbo typecheck` and then `tsc -p scripts`, which type-checks every
+`scripts/**/*.mjs` with `checkJs` and `strict` against `scripts/tsconfig.json` (JSDoc types, root
+`typescript` and `@types/node`). The script is wrapped as `sh -c '... "$@" ...' --` because pnpm
+appends extra arguments to the end of a script: `pnpm typecheck --force` would otherwise hand
+`--force` to `tsc`, which rejects it outside build mode, instead of to `turbo`.
 
 ## Quality gates
 
@@ -84,6 +90,15 @@ is there so that a future buildable package is compiled before the apps typechec
   required check on a title nobody linted. Four commits on `main` from before the check (54b8b80,
   d7d058d, a8b4a91, 3e98c14) fail `body-max-line-length` and stay as accepted history: `main` is
   never rewritten.
+- The web server's output is gated. The `e2e` job tees the Playwright run into a log under
+  `shell: bash`, whose `pipefail` keeps a failing run failing through the pipe, and
+  `scripts/check-webserver-log.mjs` then fails the job on any `[WebServer]` error except ADR 0015's
+  `Error: Internal: NoFallbackError`, the accepted signal that sends an unknown `/work/*` slug to
+  the 404. A missing or empty log fails too. Its tests run in `pnpm test:scripts`.
+- The root `scripts/` gates are type-checked, not linted. `pnpm typecheck` ends in `tsc -p scripts`
+  (strict, `checkJs`), so CI's existing Typecheck step covers them and the gate count stays seven.
+  There is no root `eslint.config.*` on purpose: ADR 0003's per-package lint-staged split relies on
+  its absence.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
 - Every route must load with a clean browser console. `apps/web/e2e/console-clean.spec.ts` fails
   on any console error, console warning or page error, React hydration mismatches included, so a
@@ -157,7 +172,8 @@ is there so that a future buildable package is compiled before the apps typechec
   reachable from a server component's imports lands in that layout's client chunk, so a barrel
   import in `app/layout.tsx` would ship `FeaturedWork` to every route (see ADR 0009). A
   `no-restricted-imports` rule in `apps/web/eslint.config.mjs`, scoped to `src/app/**/layout.tsx`,
-  fails lint on it.
+  fails lint on it in every spelling that reaches the barrel (`@/components`, `@/components/index`,
+  `../components`, `../components/index`), pinned by `apps/web/src/test/eslint-config.test.ts`.
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
   keep relative imports for siblings inside one folder.
@@ -190,7 +206,9 @@ is there so that a future buildable package is compiled before the apps typechec
   error pages carry it too. Status and path are what catch a wrong page.
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build
   with `pnpm start` inside `apps/web`, sets `forbidOnly`, retries twice, uses one worker and a 10s
-  expect timeout. Locally it serves the dev server instead.
+  expect timeout, and sets `failOnFlakyTests`: a test that passes only on a retry fails the run, so
+  the report and its `on-first-retry` trace are uploaded instead of discarded with a green job.
+  Locally it serves the dev server instead.
 - The two gate specs opt out of those retries: `e2e/console-clean.spec.ts` and
   `e2e/accessibility.spec.ts` both set `test.describe.configure({ retries: 0 })`. A retry would turn
   an intermittent console message or axe violation into a green "flaky" run, which is the one outcome

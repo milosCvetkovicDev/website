@@ -265,6 +265,11 @@ async function openPage(
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 }
 
+// The shared config records a trace only on the first retry, and this file never retries, so a
+// failing audit kept no trace at all. Playwright only accepts this option at file level, as in
+// console-clean.spec.ts.
+test.use({ trace: 'retain-on-failure' });
+
 test.describe('Accessibility', () => {
   // No retries: a retry would turn an intermittent violation, say text sampled mid-animation, into
   // a "flaky" pass, which is the one outcome a gate must not produce. The budget covers the

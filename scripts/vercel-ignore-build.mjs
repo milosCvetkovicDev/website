@@ -73,17 +73,37 @@ export const BUILD_INPUT_FILES = [
  */
 export const SKIPPED_REF_NAMESPACES = ['dependabot/'];
 
-/** Git diff paths are repository-relative with forward slashes on every platform. */
+/**
+ * What changed between the previous deployment and this commit: the paths, or the reason they could
+ * not be read.
+ *
+ * @typedef {{ paths: string[], unavailable?: undefined } | { unavailable: string, paths?: undefined }} Diff
+ */
+
+/**
+ * Git diff paths are repository-relative with forward slashes on every platform.
+ *
+ * @param {string} path
+ * @returns {boolean}
+ */
 export function isBuildInput(path) {
   if (BUILD_INPUT_FILES.includes(path)) return true;
   // Prefixes carry their trailing slash, so `apps/web/` cannot claim a future `apps/website`.
   return BUILD_INPUT_DIRECTORIES.some((directory) => path.startsWith(directory));
 }
 
+/**
+ * @param {string[]} paths
+ * @returns {string[]}
+ */
 export function buildInputsIn(paths) {
   return paths.filter(isBuildInput);
 }
 
+/**
+ * @param {unknown} commitRef
+ * @returns {boolean}
+ */
 function isSkippedRef(commitRef) {
   if (typeof commitRef !== 'string') return false;
   return SKIPPED_REF_NAMESPACES.some((namespace) => commitRef.startsWith(namespace));
@@ -97,6 +117,9 @@ function isSkippedRef(commitRef) {
  *
  * Returns `{ build, reason }`. The reason is printed into the build log, because the only person who
  * ever reads it is looking at a deployment that did or did not happen and wants to know why.
+ *
+ * @param {{ vercelEnv?: string, commitRef?: string, diff: Diff, allowProductionSkip?: boolean }} options
+ * @returns {{ build: boolean, reason: string }}
  */
 export function decide({ vercelEnv, commitRef, diff, allowProductionSkip = false }) {
   // The environment gate comes first, so nothing below it can skip a production build that the
@@ -123,7 +146,8 @@ export function decide({ vercelEnv, commitRef, diff, allowProductionSkip = false
     return { build: false, reason: `${commitRef} is a dependabot branch; CI verifies these.` };
   }
 
-  if (diff.unavailable) {
+  // `!== undefined` rather than truthiness, so an empty reason is still a reason: it builds.
+  if (diff.unavailable !== undefined) {
     return { build: true, reason: `cannot tell what changed (${diff.unavailable}); building.` };
   }
 
@@ -154,6 +178,10 @@ export function decide({ vercelEnv, commitRef, diff, allowProductionSkip = false
  * `maxBuffer` is raised from the 1 MB default: a wide enough diff would otherwise overflow it and be
  * reported as "cannot tell what changed". That still builds, so nothing breaks, but the reason in the
  * log would name the wrong cause.
+ *
+ * @param {string[]} args
+ * @param {string} cwd
+ * @returns {string | null}
  */
 function git(args, cwd) {
   try {
@@ -168,11 +196,21 @@ function git(args, cwd) {
   }
 }
 
-/** Rejects anything that is not a hexadecimal object name before it reaches a git argument. */
+/**
+ * Rejects anything that is not a hexadecimal object name before it reaches a git argument.
+ *
+ * @param {unknown} value
+ * @returns {value is string}
+ */
 function isObjectName(value) {
   return typeof value === 'string' && /^[0-9a-f]{7,64}$/i.test(value);
 }
 
+/**
+ * @param {Record<string, string | undefined>} env Vercel's system environment variables
+ * @param {(args: string[], cwd: string) => string | null} [run] injected by the tests
+ * @returns {Diff}
+ */
 export function readDiff(env, run = git) {
   const repoRoot = run(['rev-parse', '--show-toplevel'], process.cwd())?.trim();
   if (!repoRoot) {
@@ -233,6 +271,9 @@ function main() {
  * the plain comparison `scripts/check-allowbuilds-drift.mjs` uses is false whenever the invocation
  * path crosses a symlink. There that is a gate that silently does not run; here it is worse, because
  * a script that never calls `main()` exits 0 and Vercel reads 0 as "skip" — production included.
+ *
+ * @param {string | undefined} argv1
+ * @returns {boolean}
  */
 function isEntryPoint(argv1) {
   if (!argv1) return false;
