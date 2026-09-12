@@ -13,9 +13,13 @@ const eslintConfig = defineConfig([
       'no-restricted-imports': [
         'error',
         {
-          paths: [
+          // A pattern, not a `paths` entry: `paths` matches the specifier character for character,
+          // so it caught `@/components` and missed `@/components/index`, `../components` and
+          // `../components/index`, all of which resolve to the same src/components/index.ts. The
+          // trailing `/?` covers the directory spelling, and `(\.\./)+` reaches a nested layout.
+          patterns: [
             {
-              name: '@/components',
+              regex: '^(@/|(\\.\\./)+)components(/index(\\.tsx?)?)?/?$',
               message:
                 'Import layout components from their own modules; the barrel pulls every client component into the layout chunk (ADR 0009).',
             },

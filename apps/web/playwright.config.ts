@@ -40,6 +40,11 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
+  // A test that passes only on a retry fails the run in CI. The retries stay (ADR 0004), so a flake
+  // is still retried and reported as flaky, but the job goes red, which is what uploads the report
+  // and the `on-first-retry` trace (`failure() || cancelled()` in ci.yml) instead of discarding
+  // both with a green run. Locally there are no retries, so a flake has nothing to pass on.
+  failOnFlakyTests: isCI,
   // CI runners are slow and the pages are animation-heavy: one worker, longer expect timeout.
   workers: isCI ? 1 : undefined,
   expect: { timeout: isCI ? 10_000 : 5_000 },

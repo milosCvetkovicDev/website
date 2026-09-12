@@ -89,9 +89,21 @@ jobs:
       - name: Run e2e tests
         # The suite defaults to 3210, which keeps a developer machine's :3000 out of it; on a runner
         # nothing else is listening, so CI stays on the conventional port (ADR 0014).
+        #
+        # `shell: bash` for `pipefail`, which the default `bash -e {0}` does not set: without it the
+        # pipe into `tee` would report tee's status and turn a failing Playwright run green. The log
+        # is captured because nothing in the suite reads what the web server printed, and the step
+        # below is what reads it.
+        shell: bash
         env:
           PLAYWRIGHT_PORT: '3000'
-        run: pnpm --filter web test:e2e
+        run: pnpm --filter web test:e2e 2>&1 | tee "$RUNNER_TEMP/e2e.log"
+
+      - name: Check the web server's log
+        # Runs even when the suite failed, so a server error is reported beside the test failure
+        # rather than hidden behind it.
+        if: success() || failure()
+        run: node scripts/check-webserver-log.mjs "$RUNNER_TEMP/e2e.log"
 
       - name: Upload Playwright report
         if: failure() || cancelled()

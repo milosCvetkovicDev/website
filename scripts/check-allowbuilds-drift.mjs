@@ -14,7 +14,7 @@
 // a line it cannot read, a block it cannot find, a package it cannot inspect — is a failure with a
 // message, not a skip. The only deliberate skip is an uninstalled `node_modules`, which is reported.
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -27,16 +27,50 @@ const ADR = 'docs/adr/0013-dependency-build-scripts-reviewed.md';
 /** A failure that stops the check outright, as opposed to a finding about an entry. */
 class CheckError extends Error {}
 
+/**
+ * One `name: bool` line of the `allowBuilds` block, with the version its comment says was read.
+ *
+ * @typedef {{ name: string, scalar: string, reviewed: string | null, lineNumber: number }} AllowBuildsEntry
+ */
+
+/**
+ * What inspecting an installed package found. Exactly one field is set: the lifecycle hooks it
+ * declares, a reason the test was skipped, or a reason it could not be carried out.
+ *
+ * @typedef {{ hooks?: string[], skipped?: string, unverifiable?: string }} LifecycleHooks
+ */
+
+/**
+ * The message of whatever was thrown. A `catch` binding is `unknown`: anything can be thrown.
+ *
+ * @param {unknown} error
+ * @returns {string}
+ */
+function messageOf(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * @param {string} path
+ * @param {string} what how the file is named in the error
+ * @returns {string}
+ */
 function read(path, what) {
   try {
     return readFileSync(path, 'utf8');
   } catch (error) {
-    throw new CheckError(`cannot read ${what} (${path}): ${error.message}`);
+    throw new CheckError(`cannot read ${what} (${path}): ${messageOf(error)}`);
   }
 }
 
-/** Splits `false # a note` into its scalar and drops the comment. Quotes are honoured. */
+/**
+ * Splits `false # a note` into its scalar and drops the comment. Quotes are honoured.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
 function scalarBeforeComment(text) {
+  /** @type {string | null} */
   let quote = null;
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
@@ -56,6 +90,9 @@ function scalarBeforeComment(text) {
  * comment lines directly above it. Hand-parsed rather than pulled from a YAML library: this gate
  * exists to shrink the install-time dependency surface, so it should not widen it. The cost of
  * hand-parsing is that anything it cannot read has to be an error rather than a shrug.
+ *
+ * @param {string} source the text of pnpm-workspace.yaml
+ * @returns {AllowBuildsEntry[]}
  */
 export function readAllowBuilds(source) {
   const lines = source.split('\n').map((line) => line.replace(/\r$/, ''));
@@ -80,8 +117,11 @@ export function readAllowBuilds(source) {
     );
   }
 
+  /** @type {AllowBuildsEntry[]} */
   const entries = [];
+  /** @type {string[]} */
   const unreadable = [];
+  /** @type {string[]} */
   let comment = [];
 
   for (const [offset, line] of lines.slice(headers[0].index + 1).entries()) {
@@ -139,6 +179,9 @@ export function readAllowBuilds(source) {
  * Collects the versions pnpm-lock.yaml resolves per package, from the `packages:` section, whose
  * keys are bare `name@version`. The `snapshots:` section repeats them with peer suffixes such as
  * `sharp@0.35.4(@types/node@20.19.30)`, which is why only `packages:` is read.
+ *
+ * @param {string} source the text of pnpm-lock.yaml
+ * @returns {Map<string, Set<string>>} each package name with every version the lockfile resolves
  */
 export function readResolvedVersions(source) {
   const lines = source.split('\n').map((line) => line.replace(/\r$/, ''));
@@ -147,6 +190,7 @@ export function readResolvedVersions(source) {
     throw new CheckError('pnpm-lock.yaml has no `packages:` section; cannot check allowBuilds.');
   }
 
+  /** @type {Map<string, Set<string>>} */
   const resolved = new Map();
 
   for (const line of lines.slice(start + 1)) {
@@ -162,8 +206,9 @@ export function readResolvedVersions(source) {
     if (!key) continue;
 
     const [, name, version] = key;
-    if (!resolved.has(name)) resolved.set(name, new Set());
-    resolved.get(name).add(version);
+    const versions = resolved.get(name) ?? new Set();
+    versions.add(version);
+    resolved.set(name, versions);
   }
 
   if (resolved.size === 0) {
@@ -183,6 +228,12 @@ export function readResolvedVersions(source) {
  *
  * `dirs` is the store listing, read once per run so that two entries cannot be judged against two
  * different states of a store another process is rewriting.
+ *
+ * @param {string} name
+ * @param {string} version
+ * @param {string[] | null} dirs the entries of node_modules/.pnpm, or null when it is not installed
+ * @param {(dir: string, name: string) => unknown} readManifest parses one package's package.json
+ * @returns {LifecycleHooks}
  */
 export function readLifecycleHooks(name, version, dirs, readManifest) {
   if (dirs === null) return { skipped: 'node_modules is not installed' };
@@ -203,28 +254,40 @@ export function readLifecycleHooks(name, version, dirs, readManifest) {
   try {
     parsed = readManifest(match, name);
   } catch (error) {
-    return { unverifiable: `cannot read its package.json: ${error.message}` };
+    return { unverifiable: `cannot read its package.json: ${messageOf(error)}` };
   }
 
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { unverifiable: 'its package.json is not an object' };
   }
 
-  const { scripts } = parsed;
+  const { scripts } = /** @type {{ scripts?: unknown }} */ (parsed);
   if (scripts != null && (typeof scripts !== 'object' || Array.isArray(scripts))) {
     return { unverifiable: 'its package.json has a non-object `scripts`' };
   }
+  const declared = /** @type {Record<string, unknown> | null | undefined} */ (scripts);
 
   // An empty or whitespace-only command is not a script. A package that blanked its hook rather
   // than deleting it has dropped it just as surely.
-  const hooks = LIFECYCLE_SCRIPTS.filter(
-    (hook) => typeof scripts?.[hook] === 'string' && scripts[hook].trim() !== '',
-  );
+  const hooks = LIFECYCLE_SCRIPTS.filter((hook) => {
+    const command = declared?.[hook];
+    return typeof command === 'string' && command.trim() !== '';
+  });
   return { hooks };
 }
 
+/**
+ * Every problem with the entries, and every entry whose lifecycle-script test was skipped.
+ *
+ * @param {AllowBuildsEntry[]} entries
+ * @param {Map<string, Set<string>>} resolved
+ * @param {(name: string, version: string) => LifecycleHooks} inspect
+ * @returns {{ problems: string[], skips: string[] }}
+ */
 export function collectProblems(entries, resolved, inspect) {
+  /** @type {string[]} */
   const problems = [];
+  /** @type {string[]} */
   const skips = [];
 
   for (const { name, scalar, reviewed, lineNumber } of entries) {
@@ -278,7 +341,7 @@ export function collectProblems(entries, resolved, inspect) {
         `${name}@${version}: cannot confirm the package still declares a lifecycle script ` +
           `(${result.unverifiable}). Reinstall, or update this check if the store layout changed.`,
       );
-    } else if (result.hooks.length === 0) {
+    } else if (!result.hooks || result.hooks.length === 0) {
       problems.push(
         `${name}@${version}: declares no ${LIFECYCLE_SCRIPTS.join('/')} script, so the entry ` +
           `decides nothing. Drop it — an entry for a scriptless package would silently deny any ` +
@@ -308,17 +371,19 @@ function main() {
     return;
   }
 
+  /** @type {string[] | null} */
   let dirs = null;
   if (existsSync(pnpmDir)) {
     try {
       dirs = readdirSync(pnpmDir);
     } catch (error) {
-      console.error(`allowBuilds check could not run: cannot list ${pnpmDir}: ${error.message}`);
+      console.error(`allowBuilds check could not run: cannot list ${pnpmDir}: ${messageOf(error)}`);
       process.exitCode = 1;
       return;
     }
   }
 
+  /** @type {(dir: string, name: string) => unknown} */
   const readManifest = (dir, name) =>
     JSON.parse(readFileSync(join(pnpmDir, dir, 'node_modules', name, 'package.json'), 'utf8'));
 
@@ -339,5 +404,25 @@ function main() {
   process.exitCode = 1;
 }
 
-// Importable for its tests; runs only when invoked as the command.
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
+/**
+ * Whether this module was started as the command, as opposed to imported by its tests.
+ *
+ * Both sides are resolved through `realpathSync`. Node normally hands `import.meta.url` back already
+ * resolved while leaving `process.argv[1]` exactly as it was typed, so any path that reaches the
+ * script through a symlinked directory used to compare unequal and skip `main()` -- exiting 0 with
+ * no output, which is the one thing the rule at the top of this file forbids. Resolving argv[1] fixes
+ * that direction; resolving `import.meta.url` as well covers `--preserve-symlinks-main`, under which
+ * it is the unresolved side.
+ *
+ * A path that cannot be resolved (it does not exist) is not this module, so it is not the command.
+ */
+function startedAsCommand() {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
+  } catch {
+    return false;
+  }
+}
+
+if (startedAsCommand()) main();

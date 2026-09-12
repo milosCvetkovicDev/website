@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import type { PlaywrightTestConfig } from '@playwright/test';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolvePort } from '../../playwright.config';
 
 const FALLBACK = 3210;
@@ -38,5 +39,36 @@ describe('resolvePort', () => {
     expect(() => resolve('abc')).toThrow(
       'PLAYWRIGHT_PORT must be an integer between 1 and 65535, got "abc".',
     );
+  });
+});
+
+/**
+ * Loads playwright.config.ts fresh under the current environment. The module reads `process.env`
+ * while it is evaluated, so each mode needs its own module instance.
+ */
+async function loadConfig(ci: string | undefined): Promise<PlaywrightTestConfig> {
+  vi.stubEnv('CI', ci);
+  // The suite's own port must not leak into the assertions: a developer or CI runner that exported
+  // PLAYWRIGHT_PORT would otherwise change what the config comes out as.
+  vi.stubEnv('PLAYWRIGHT_PORT', '');
+  vi.resetModules();
+  return (await import('../../playwright.config')).default;
+}
+
+describe('playwright.config.ts flaky tests', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  // CI retries twice (ADR 0004). Without this a test that passed only on a retry left the job green,
+  // and the report and its retry trace are uploaded only when the job fails, so both were discarded.
+  it('fails the run on a flaky test under CI', async () => {
+    expect((await loadConfig('true')).failOnFlakyTests).toBe(true);
+  });
+
+  // Locally there are no retries, so nothing can pass on one.
+  it('leaves it off locally', async () => {
+    expect((await loadConfig(undefined)).failOnFlakyTests).toBeFalsy();
   });
 });

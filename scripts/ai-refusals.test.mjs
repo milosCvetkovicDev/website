@@ -57,6 +57,10 @@ const SCANNED_EXTENSIONS = new Set([
   '.svg',
 ]);
 
+/**
+ * @param {string} relative
+ * @returns {string} the absolute path
+ */
 function requireTree(relative) {
   const absolute = join(repoRoot, relative);
   if (!existsSync(absolute)) {
@@ -65,18 +69,33 @@ function requireTree(relative) {
   return absolute;
 }
 
+/**
+ * @param {string} relative
+ * @returns {string} the file's text
+ */
 function requireFile(relative) {
   const absolute = join(repoRoot, relative);
   try {
     return readFileSync(absolute, 'utf8');
   } catch (error) {
-    throw new Error(`cannot read ${relative}, so this guard cannot check it: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`cannot read ${relative}, so this guard cannot check it: ${message}`);
   }
 }
 
-/** Every path under `relative`, files and directories alike, as repository-relative paths. */
+/**
+ * Every path under `relative`, files and directories alike, as repository-relative paths.
+ *
+ * @param {string} relative
+ * @returns {{ path: string, directory: boolean }[]}
+ */
 function walk(relative) {
+  /** @type {{ path: string, directory: boolean }[]} */
   const entries = [];
+  /**
+   * @param {string} absolute
+   * @param {string} prefix
+   */
   const descend = (absolute, prefix) => {
     for (const entry of readdirSync(absolute, { withFileTypes: true })) {
       if (entry.isDirectory() && SKIPPED_DIRS.has(entry.name)) continue;
@@ -103,7 +122,11 @@ function findRecord() {
   return { path, text: requireFile(path) };
 }
 
-/** The refusal table, found by its header rather than by a line number or a section title. */
+/**
+ * The refusal table, found by its header rather than by a line number or a section title.
+ *
+ * @param {{ path: string, text: string }} record
+ */
 function readRefusalTable({ path, text }) {
   const lines = text.split('\n');
   const header = lines.findIndex(
@@ -117,6 +140,7 @@ function readRefusalTable({ path, text }) {
   if (header === -1) {
     throw new Error(`${path} has no "Mechanism | Why not | Source | Date" table to check against`);
   }
+  /** @param {string} line */
   const cellsOf = (line) =>
     line
       .split('|')
@@ -172,8 +196,14 @@ const MECHANISMS = [
   'middleware.ts',
 ];
 
+/** @param {string} key */
 const rowFor = (key) => rows.filter((row) => row.mechanism.includes(key));
 
+/**
+ * @param {string} key
+ * @param {string[]} found
+ * @returns {string}
+ */
 function refusal(key, found) {
   const row = rowFor(key)[0];
   const where = row
@@ -189,7 +219,11 @@ const sources = walk(`${WEB}/src`).filter(
   (entry) => !entry.directory && SCANNED_EXTENSIONS.has(extname(entry.path)),
 );
 
-/** A file or a route-handler directory carrying one of these names, anywhere under apps/web. */
+/**
+ * A file or a route-handler directory carrying one of these names, anywhere under apps/web.
+ *
+ * @param {...string} names
+ */
 const anySegment =
   (...names) =>
   () =>
@@ -197,6 +231,7 @@ const anySegment =
       .filter((entry) => entry.path.split('/').some((part) => names.includes(part)))
       .map((entry) => entry.path);
 
+/** @param {...string} names */
 const inPublic =
   (...names) =>
   () =>
@@ -211,6 +246,8 @@ const inPublic =
  * `/AGENTS.md` just as a file in `public/` does. Only directories count, so a Markdown note that is
  * not a route segment stays silent, and so does an un-served `apps/web/AGENTS.md`, which is the
  * repository hygiene the record's row permits.
+ *
+ * @param {...string} names
  */
 const routeDirectory =
   (...names) =>
@@ -224,12 +261,17 @@ const routeDirectory =
       )
       .map((entry) => entry.path);
 
+/** @param {...string} paths */
 const exactly =
   (...paths) =>
   () =>
     paths.filter((path) => existsSync(join(repoRoot, path)));
 
-/** A literal string anywhere under apps/web/src. Case-sensitive, which is what keeps it precise. */
+/**
+ * A literal string anywhere under apps/web/src. Case-sensitive, which is what keeps it precise.
+ *
+ * @param {string} needle
+ */
 const stringUnderSrc = (needle) => () =>
   sources
     .filter((entry) => requireFile(entry.path).includes(needle))
@@ -238,6 +280,8 @@ const stringUnderSrc = (needle) => () =>
 /**
  * A case-insensitive name anywhere under apps/web. IndexNow's own artefact is a key file whose name
  * is unpredictable, so what this catches is the code that would submit to it, not the key.
+ *
+ * @param {string} needle
  */
 const nameUnderWeb = (needle) => () => {
   const lowered = needle.toLowerCase();
@@ -250,6 +294,10 @@ const nameUnderWeb = (needle) => () => {
 const robotsPath = `${WEB}/src/app/robots.ts`;
 const configPath = `${WEB}/next.config.ts`;
 
+/**
+ * @param {string} text
+ * @param {string} needle
+ */
 const occurrences = (text, needle) => text.split(needle).length - 1;
 
 const CHECKS = [
