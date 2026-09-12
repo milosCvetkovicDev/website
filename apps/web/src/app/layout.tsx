@@ -1,5 +1,10 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+// Self-hosted through next/font/local (the `geist` package) rather than fetched from Google Fonts at
+// build time: outside dev, Next turns a failed Google Fonts fetch into a build error, so an outage or
+// a network block on a runner blocked every production deploy. The package sets the same
+// --font-geist-sans and --font-geist-mono variables globals.css already reads.
+import { GeistMono } from 'geist/font/mono';
+import { GeistSans } from 'geist/font/sans';
 import './globals.css';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 // Imported from their own modules, not the `@/components` barrel: every client module reachable
@@ -11,16 +16,6 @@ import { Footer } from '@/components/footer';
 import { PersonJsonLd, WebsiteJsonLd } from '@/components/json-ld';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -92,7 +87,7 @@ export default function RootLayout({
         <WebsiteJsonLd />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} flex min-h-screen flex-col antialiased`}
+        className={`${GeistSans.variable} ${GeistMono.variable} flex min-h-screen flex-col antialiased`}
         suppressHydrationWarning
       >
         <ThemeProvider>
