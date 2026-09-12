@@ -92,6 +92,15 @@ is there so that a future buildable package is compiled before the apps typechec
   measured, so content that stops being rendered or goes transparent fails too. A new
   `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
   Conventions and ADR 0008.
+- The AI-facing refusals are gated. `scripts/ai-refusals.test.mjs` runs under `pnpm test:scripts` and
+  fails when a mechanism `docs/adr/0017-ai-discoverability-policy.md` refuses reappears: an
+  `llms-full.txt`, `ai.txt`, `tdmrep.json`, `ai-plugin.json`, `agents.json`, `cv.json`, `resume.json`
+  or `agent-skills` path anywhere under `apps/web`, an `AGENTS.md` under `apps/web/public`, a
+  `middleware.ts` or `proxy.ts`, a `FAQPage`, `HowTo`, `speakable`, `SearchAction`, `potentialAction`
+  or `modelContext` string under `apps/web/src`, an IndexNow reference, a `Content-Signal` line or a
+  second `userAgent` group in `robots.ts`, or a `nonce` in `next.config.ts`. It also fails when that
+  record's refusal table loses a row, a source URL or a date. Adding one of these is a deliberate
+  act: supersede the record and delete the matching assertion in the same pull request.
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
   grouped into one pull request and open npm pull requests are capped at five; github-actions bumps
   are not grouped.
@@ -227,6 +236,13 @@ is there so that a future buildable package is compiled before the apps typechec
   false when the record was accepted, under the rules in
   `docs/adr/0012-correcting-accepted-records.md`, which sets the status to
   `Accepted (corrected YYYY-MM-DD)` and adds a dated, append-only `## Corrections` entry.
+- Before adding any AI-facing or machine-readable file — an `llms.txt` variant, a `.well-known`
+  descriptor, a crawler directive, a new JSON-LD type — read
+  `docs/adr/0017-ai-discoverability-policy.md`. It carries the crawler policy with its trade-off, what
+  each measure of the AI-discoverability work is for and who consumes it, and eighteen mechanisms that
+  were considered and refused, each with the source and date that settle it. Adding one of them means
+  superseding that record rather than editing it, and deleting the matching assertion in
+  `scripts/ai-refusals.test.mjs`.
 - `docs/runbooks` — operational procedures. `docs/runbooks/deploy.md` is the deployment procedure.
 - `README.md` addresses a reader landing on GitHub; this file addresses an agent about to change
   code. Keep them consistent without duplicating each other.

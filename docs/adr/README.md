@@ -42,6 +42,7 @@ perform an operation.
 | 0014 | [Playwright starts the server it tests, on a port of its own](0014-playwright-owns-its-server.md)                           | Accepted                                  | 2026-09-10 |
 | 0015 | [Case-study slugs are fixed at build time](0015-static-case-study-params.md)                                                | Accepted                                  | 2026-09-10 |
 | 0016 | [Dependabot branches never deploy, and unaffected commits never build](0016-vercel-deployment-budget.md)                    | Accepted                                  | 2026-09-12 |
+| 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)                          | Accepted                                  | 2026-09-12 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see

@@ -66,6 +66,8 @@ Every gate runs on every push and pull request in CI. The first three also run o
 | `pnpm format:check`          | Prettier, shared config, Tailwind class order                      | yes (staged files) | yes |
 | `pnpm lint`                  | ESLint with `--max-warnings 0` in every app                        | yes (staged files) | yes |
 | commitlint                   | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...) | yes                | -   |
+| `pnpm check:allowbuilds`     | `allowBuilds` entries against the versions the lockfile resolves   | -                  | yes |
+| `pnpm test:scripts`          | The root `scripts/` gates: allowBuilds drift and the AI refusals   | -                  | yes |
 | `pnpm typecheck`             | `next typegen && tsc --noEmit` (web), `tsc -b` (playground)        | -                  | yes |
 | `pnpm test`                  | Vitest unit tests                                                  | -                  | yes |
 | `pnpm build`                 | Production builds of both apps                                     | -                  | yes |
