@@ -106,4 +106,4 @@ This repository is developed with Claude Code and keeps its configuration in the
 
 ## Deployment
 
-The `web` app deploys to Vercel from `main` (project `portfolio`) with preview deployments for pull requests. Root directory `apps/web`, Node 22, one environment variable (`NEXT_PUBLIC_SITE_URL`), and `.vercelignore` keeps caches and local files out of CLI uploads. Full procedure: [docs/runbooks/deploy.md](docs/runbooks/deploy.md).
+The `web` app deploys to Vercel from `main` (project `portfolio`) with preview deployments for pull requests, except that Dependabot branches create no deployment and a later push that changes no build input has its preview build cancelled ([ADR 0016](docs/adr/0016-vercel-deployment-budget.md)). Root directory `apps/web`, Node 22, one environment variable (`NEXT_PUBLIC_SITE_URL`), and `.vercelignore` keeps caches and local files out of what Vercel receives, from Git-triggered builds and CLI uploads alike. Full procedure: [docs/runbooks/deploy.md](docs/runbooks/deploy.md).

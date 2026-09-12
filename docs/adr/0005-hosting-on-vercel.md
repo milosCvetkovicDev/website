@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted. The decision stands but has not been carried out. As of 2026-09-08 there is no Vercel
+Superseded by ADR-0016
+
+No longer applies: "No `vercel.json` is added". See [ADR 0016](0016-vercel-deployment-budget.md).
+
+The decision stands but has not been carried out. As of 2026-09-08 there is no Vercel
 project and `miloscvetkovic.dev` is still parked, so everything recorded below describes what
 becomes true once the procedure in [docs/runbooks/deploy.md](../runbooks/deploy.md) has been
 followed.

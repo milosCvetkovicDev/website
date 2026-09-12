@@ -1,30 +1,63 @@
-# Read only by Vercel CLI uploads (`vercel deploy`, Path B in docs/runbooks/deploy.md).
-# Git-triggered deployments clone the repository and never consult this file.
-# The CLI applies a built-in list (node_modules, .next, .git, .env.local, .env.*.local,
-# .DS_Store, npm-debug.log and a few more) and never reads .gitignore, so everything else
-# that .gitignore excludes has to be repeated here. .turbo matters most: its cache tarballs
-# exceed Vercel's 100 MB per-file upload limit.
-.turbo
-.next-e2e
-.pnpm-store
-dist
-build
-out
-coverage
-test-results
-playwright-report
+# Read by BOTH kinds of deployment, which is easy to get wrong:
+#   - Vercel CLI uploads (`vercel deploy`, Path B in docs/runbooks/deploy.md) filter the working
+#     tree through this file plus the CLI's own built-in list, and never through .gitignore.
+#   - Git-triggered deployments clone the repository and then apply this file too. The build log for
+#     6e0a87a reports "Found .vercelignore (repository root)" and "Removed 2 ignored files defined
+#     in .vercelignore /.vscode/extensions.json /.vscode/settings.json".
+# The CLI's built-in list covers node_modules, .next, .git, .env.local, .env.*.local, .DS_Store,
+# npm-debug.log and a few more, so everything else that the root .gitignore and the two
+# apps/*/.gitignore files exclude is repeated below. .turbo matters most: its cache tarballs exceed
+# Vercel's 100 MB per-file upload limit, and the first Path B attempt failed on 1.9 GB of it.
+#
+# Syntax is .gitignore's, so a leading slash anchors a pattern to the repository root. Every
+# directory pattern here is anchored to where that directory is actually produced: an unanchored
+# `build`, `dist` or `out` would also strip a tracked source directory of that name at any depth.
+# Add a line when an app is added; nothing checks this file against the .gitignore files it mirrors.
+
+# Turborepo caches: one at the root, one per app.
+/.turbo
+/apps/web/.turbo
+/apps/playground/.turbo
+/.pnpm-store
+
+# Build output. .next is on the CLI's built-in list; .next-e2e is the local e2e dist dir (ADR 0014).
+/apps/web/.next-e2e
+/apps/web/out
+/apps/web/build
+/apps/playground/dist
+/build
+/out
+/dist
+
+# Test output.
+/apps/web/coverage
+/apps/web/test-results
+/apps/web/playwright-report
+/.playwright-mcp
+
+# Environment files. apps/web/.gitignore ignores `.env*`; the CLI's built-in list covers only
+# .env.local and .env.*.local, so `apps/web/.env.production` would otherwise be uploaded. The
+# tracked .env.example is kept, which is why this is not a bare `.env*`.
+.env*
+!.env.example
+*.pem
+
+# Generated type and build metadata.
 *.tsbuildinfo
 next-env.d.ts
-.env
-*.pem
-.idea
-.vscode
+
+# Editor, OS and agent state. .remember holds session logs (~1.4 MB) and is hidden from git only by
+# its own untracked .gitignore, so a root `vercel deploy` would upload it.
+/.idea
+/.vscode
+/.vercel
+/.claude/settings.local.json
+/.worktrees
+/.claude/worktrees
+.remember
+*.swp
 *.swo
 Thumbs.db
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-.claude/settings.local.json
-.worktrees
-.claude/worktrees
-.playwright-mcp
