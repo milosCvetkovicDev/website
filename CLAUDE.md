@@ -95,7 +95,8 @@ is there so that a future buildable package is compiled before the apps typechec
 - The AI-facing refusals are gated. `scripts/ai-refusals.test.mjs` runs under `pnpm test:scripts` and
   fails when a mechanism `docs/adr/0017-ai-discoverability-policy.md` refuses reappears: an
   `llms-full.txt`, `ai.txt`, `tdmrep.json`, `ai-plugin.json`, `agents.json`, `cv.json`, `resume.json`
-  or `agent-skills` path anywhere under `apps/web`, an `AGENTS.md` under `apps/web/public`, a
+  or `agent-skills` path anywhere under `apps/web`, an `AGENTS.md` under `apps/web/public` or as a
+  route directory under the app router, a
   `middleware.ts` or `proxy.ts`, a `FAQPage`, `HowTo`, `speakable`, `SearchAction`, `potentialAction`
   or `modelContext` string under `apps/web/src`, an IndexNow reference, a `Content-Signal` line or a
   second `userAgent` group in `robots.ts`, or a `nonce` in `next.config.ts`. It also fails when that

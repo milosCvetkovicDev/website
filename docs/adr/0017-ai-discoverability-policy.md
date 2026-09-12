@@ -68,12 +68,14 @@ There is no training opt-out — no `Google-Extended`, `GPTBot`, `ClaudeBot`, `C
 `Crawl-delay` and no `Host:`. The file itself, and the removal of the `/api/` and `/_next/` disallow
 rules that are in it today, belong to #48; the rules are not restated here.
 
-**The trade-off, in the same breath as the openness.** Every mechanism that earns a citation is the
-mechanism that feeds training. The two arrive over the same request from the same operator, and no
-vendor documents a token that means "cite me but never train on me" which anyone honours. Cloudflare
-measured the exchange rate as crawl-to-refer ratios of 38,065:1 for Anthropic, 1,091:1 for OpenAI,
-195:1 for Perplexity, 40.7:1 for Microsoft and 5.4:1 for Google, with roughly 80% of AI bot activity
-being training, 17% search and 3.2% user actions
+**The trade-off, in the same breath as the openness.** One open group lets in the crawlers that feed
+training along with the ones that earn citations. Google, Apple, OpenAI and Anthropic each document a
+training crawler or token apart from their search crawlers, as the vendor statements below record, so
+the split is available; this policy declines it, and none of those names is disallowed here. The
+openness that earns a citation is therefore, by choice, also the openness that feeds training.
+Cloudflare measured the exchange rate as crawl-to-refer ratios of 38,065:1 for Anthropic, 1,091:1
+for OpenAI, 195:1 for Perplexity, 40.7:1 for Microsoft and 5.4:1 for Google, with roughly 80% of AI
+bot activity being training, 17% search and 3.2% user actions
 ([crawlers-click-ai-bots-training](https://blog.cloudflare.com/crawlers-click-ai-bots-training/),
 2025-08-29). Those are the terms. The owner accepts them because this site is marketing for one
 engineer, not a content business whose revenue depends on visits, and because being quoted by an
@@ -92,15 +94,21 @@ record keeps them apart.
   ([google-common-crawlers](https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers),
   2026-07-14); Apple documents the same separation for Applebot-Extended
   ([support.apple.com/en-us/119829](https://support.apple.com/en-us/119829), 2026-09-04), and
-  DuckDuckGo likewise.
+  DuckDuckGo likewise. OpenAI states that "Each setting is independent of the others", naming the
+  case of allowing OAI-SearchBot while disallowing GPTBot
+  ([developers.openai.com/api/docs/bots](https://developers.openai.com/api/docs/bots), fetched
+  2026-09-12). Anthropic documents a ClaudeBot restriction as excluding a site's future material from
+  training, and states a visibility cost only for blocking Claude-SearchBot or Claude-User
+  ([support.claude.com 8896518](https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler),
+  2026-04-07).
 - The only measurement that exists points the other way and cannot say why. cloro compared 1,058
   domains and found a median 0.003 ChatGPT citations per Google ranking for GPTBot-blockers against
   0.417 for non-blockers ([cloro.dev/research/ai-crawler-blocks](https://cloro.dev/research/ai-crawler-blocks/),
   2026-07-06). It is correlational, and its authors say so in terms: "The data can't prove
   causation." Sites that block crawlers differ from sites that do not in every other way too. This
-  record therefore does not claim that blocking a training crawler costs citations; it claims that
-  the openness which earns them is the same openness that feeds training, which is a different and
-  documented statement.
+  record therefore does not claim that blocking a training crawler costs citations; it claims only
+  that this file, by disallowing none of the training names above, accepts training along with
+  citations, which is a statement about the policy and not about what blocking would cost.
 
 **Why one `*` group and not a per-bot list.** RFC 9309 (September 2022) makes a crawler obey the most
 specific `User-agent` group that matches it, to the exclusion of `*`. A per-bot `Allow: /` group
@@ -231,13 +239,14 @@ part 1's trade-off is the first thing to reopen.
 
 ## Alternatives considered
 
-**Block the training crawlers and keep the search ones.** Google, Apple and DuckDuckGo all document
-that their training tokens are separable from search, so this is technically available and costs
-nothing they document. Rejected on two grounds. The separation exists for three operators and not for
-the ones that matter most here: OpenAI documents OAI-SearchBot's opt-out as removing a site from
-ChatGPT search answers, and there is no documented token that keeps Anthropic's citations while
-refusing its training. And the shape of the decision is wrong for this site — it optimises against a
-cost the owner has decided to accept, for a site whose whole purpose is being quoted.
+**Block the training crawlers and keep the search ones.** Google, Apple and DuckDuckGo document that
+their training tokens are separable from search, OpenAI documents its crawler settings as independent
+of each other, and Anthropic names ClaudeBot as its training crawler apart from Claude-SearchBot and
+Claude-User, stating a visibility cost only for blocking the latter two. So this is technically
+available for every operator the record names, and none of them documents a cost to search or
+citations for it. It is rejected on the shape of the decision, which is wrong for this site: it
+optimises against a cost the owner has decided to accept, for a site whose whole purpose is being
+quoted.
 
 **An allowlist: deny `*`, allow the named operators.** Rejected, and the reasons compound. It is
 honoured only by crawlers that honour `robots.txt` at all, which are the ones that were never the

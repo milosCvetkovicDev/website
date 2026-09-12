@@ -206,6 +206,24 @@ const inPublic =
       )
       .map((entry) => entry.path);
 
+/**
+ * A directory under the app router carrying one of these names. `app/AGENTS.md/route.ts` serves
+ * `/AGENTS.md` just as a file in `public/` does. Only directories count, so a Markdown note that is
+ * not a route segment stays silent, and so does an un-served `apps/web/AGENTS.md`, which is the
+ * repository hygiene the record's row permits.
+ */
+const routeDirectory =
+  (...names) =>
+  () =>
+    webTree
+      .filter(
+        (entry) =>
+          entry.directory &&
+          [`${WEB}/app/`, `${WEB}/src/app/`].some((root) => entry.path.startsWith(root)) &&
+          names.includes(basename(entry.path)),
+      )
+      .map((entry) => entry.path);
+
 const exactly =
   (...paths) =>
   () =>
@@ -243,7 +261,13 @@ const CHECKS = [
   { key: 'JSON Resume', find: anySegment('cv.json', 'resume.json') },
   { key: 'agent-skills', find: anySegment('agent-skills') },
   { key: 'IndexNow', find: nameUnderWeb('indexnow') },
-  { key: 'AGENTS.md', find: inPublic('AGENTS.md', 'agents.md') },
+  {
+    key: 'AGENTS.md',
+    find: () => [
+      ...inPublic('AGENTS.md', 'agents.md')(),
+      ...routeDirectory('AGENTS.md', 'agents.md')(),
+    ],
+  },
   {
     key: 'middleware.ts',
     find: exactly(
