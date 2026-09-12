@@ -30,7 +30,7 @@ perform an operation.
 | 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)                                                        | Accepted                                  | 2026-09-08 |
 | 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)                                                | Accepted                                  | 2026-09-08 |
 | 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)                                                      | Accepted                                  | 2026-09-08 |
-| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                                                                              | Accepted                                  | 2026-09-08 |
+| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                                                                              | Superseded by ADR-0016                    | 2026-09-08 |
 | 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)                                                          | Accepted                                  | 2026-09-08 |
 | 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)                                                  | Superseded by 0013 (corrected 2026-09-10) | 2026-09-09 |
 | 0008 | [Accent colour roles](0008-accent-colour-roles.md)                                                                          | Superseded by 0011                        | 2026-09-09 |
@@ -41,10 +41,14 @@ perform an operation.
 | 0013 | [Dependency build scripts stay disabled, and the reviewed versions are enforced](0013-dependency-build-scripts-reviewed.md) | Accepted                                  | 2026-09-10 |
 | 0014 | [Playwright starts the server it tests, on a port of its own](0014-playwright-owns-its-server.md)                           | Accepted                                  | 2026-09-10 |
 | 0015 | [Case-study slugs are fixed at build time](0015-static-case-study-params.md)                                                | Accepted                                  | 2026-09-10 |
+| 0016 | [Dependabot branches never deploy, and unaffected commits never build](0016-vercel-deployment-budget.md)                    | Accepted                                  | 2026-09-12 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
-[docs/runbooks/deploy.md](../runbooks/deploy.md). The bodies of 0002 and 0005
+[docs/runbooks/deploy.md](../runbooks/deploy.md). It is marked superseded for one sentence only, the
+one that said no `vercel.json` is added, which [ADR 0016](0016-vercel-deployment-budget.md) replaces;
+the hosting decision itself stands, and 0005's own status line says which part went. The bodies of
+0002 and 0005
 still describe the state on 2026-09-08, when they were accepted. A record's decision is never
 edited afterwards, and its other sections only to correct a claim that is untrue, which
 [ADR 0007](0007-dependency-build-scripts.md) carries an example of.
