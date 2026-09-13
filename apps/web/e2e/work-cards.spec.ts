@@ -43,7 +43,7 @@ const cardFor = (page: Page, slug: string) => page.locator(`a[href="/work/${slug
  * One element's `color`, normalised to sRGB.
  *
  * Comparing the computed strings directly does not work and would leave R39 unsatisfiable: Chromium
- * serialises a colour in the space it was authored in. `--tmux-status-ok` is a hex (`globals.css:43`) and
+ * serialises a colour in the space it was authored in. `--tmux-status-ok` is a hex (`globals.css:65`) and
  * reads back as `rgb(21, 128, 61)`, while `--status-ok` is `theme(--color-green-800)` (`:32`) and Tailwind
  * v4's palette is OKLCH, so it reads back as `lab(…)`. Two spellings of one colour would fail a string
  * comparison and the test would be measuring syntax rather than colour. Painting each value on a 1x1
