@@ -15,7 +15,6 @@
     "clean": "rm -rf .next .next-e2e .turbo node_modules"
   },
   "dependencies": {
-    "@gsap/react": "^2.1.2",
     "gsap": "^3.14.2",
     "next": "16.3.4",
     "react": "19.2.8",
@@ -28,11 +27,11 @@
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^5.1.1",
-    "eslint": "^9",
+    "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^9.39.5",
     "eslint-config-next": "16.3.4",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4",

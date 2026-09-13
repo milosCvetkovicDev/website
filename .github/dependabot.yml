@@ -7,7 +7,43 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     versioning-strategy: increase-if-necessary
+    # The same one-day window as `minimumReleaseAge` in pnpm-workspace.yaml, so that the bot never
+    # proposes a version pnpm would refuse to install. `cooldown` covers version updates only, not
+    # security updates, which is the behaviour this repository wants: a security fix should arrive
+    # the day it is published.
+    cooldown:
+      default-days: 1
+    # Majors that cannot pass this repository's gates, so that a failing pull request does not
+    # reopen every release and hold one of the five slots a security fix will need. Each entry
+    # names the upstream event that reopens the question. See
+    # docs/adr/0018-dependency-update-policy.md.
+    ignore:
+      # ESLint 10: eslint-config-next 16.3.4 depends on eslint-plugin-react ^7.37.0, and 7.37.5
+      # calls the context.getFilename() that ESLint 10 removed, so `web#lint` fails with
+      # "contextOrFilename.getFilename is not a function". Revisit when
+      # jsx-eslint/eslint-plugin-react#3977 ships.
+      - dependency-name: eslint
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@eslint/js'
+        update-types: ['version-update:semver-major']
+      # TypeScript 7's root export carries no classic compiler API, and typescript-eslint 8 peers
+      # typescript <6.1.0. Revisit when typescript-eslint raises that peer; 6.0.x is the reachable
+      # next step and gets its own pull request.
+      - dependency-name: typescript
+        versions: ['>=7']
+      # Node types follow the runtime major in .nvmrc and move with it, by hand, so that a types
+      # major cannot arrive ahead of the runtime. Revisit when .nvmrc changes major.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
+      # Security updates are triggered by alerts, not the Monday schedule. This batches each run's
+      # security updates into one pull request, so several advisories arriving together cannot fill
+      # the five-slot cap. Automated security updates are switched on in the repository settings only
+      # after the pull request that cleared the lockfile's advisories (#71) has merged; see
+      # docs/adr/0018-dependency-update-policy.md.
+      security:
+        applies-to: security-updates
+        patterns: ['*']
       minor-and-patch:
         update-types: [minor, patch]
     commit-message:

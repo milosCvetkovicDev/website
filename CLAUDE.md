@@ -5,11 +5,18 @@ Personal portfolio site. A Turborepo 2 + pnpm monorepo whose only shipping app i
 
 ## Architecture
 
-pnpm 10.33 workspace (`apps/*`, `packages/*`, per `pnpm-workspace.yaml`) driven by Turborepo 2.10.
-Node 22 is pinned in `.nvmrc` only; `engines.node` sets a `>=22` floor and `packageManager` pins
-pnpm (`pnpm@10.33.0`), not Node. CI reads Node from `.nvmrc` and pnpm from `packageManager`.
+pnpm 10.34 workspace (`apps/*`, `packages/*`, per `pnpm-workspace.yaml`) driven by Turborepo 2.10.
+Node 22 is pinned in `.nvmrc` only; `engines.node` is
+`^22.22.2 || ^24.15.0 || >=26.0.0` and `packageManager` pins pnpm
+(`pnpm@10.34.5`), not Node. CI reads Node from `.nvmrc` and pnpm from `packageManager`. The range is
+not a bare floor. It is the intersection of the `engines: {node: …}` ranges of the lockfile's
+packages that install on linux x64 (CI, Vercel) or macOS, and it is re-derived whenever the lockfile
+moves. Skip the optional binaries for other platforms (entries with `os`/`cpu`):
+`@img/sharp-win32-ia32` declares `^20.9.0`, so an intersection over every entry is empty. A local
+Node below the range makes pnpm print `WARN Unsupported engine` and carry on; `nvm install 22`
+fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 
-- `apps/web` — the site. Next.js 16 (App Router), React 19, Tailwind v4, GSAP + `@gsap/react`.
+- `apps/web` — the site. Next.js 16 (App Router), React 19, Tailwind v4, GSAP.
   Source in `src/{app,components,data,hooks,lib,test}`, e2e specs in `e2e/`.
 - `apps/playground` — Vite 7 + React sandbox. Not deployed, no tests.
 - `packages/prettier-config` — `@repo/prettier-config`. Referenced by `prettier.config.mjs` at the
@@ -74,11 +81,19 @@ is there so that a future buildable package is compiled before the apps typechec
   message if it is still not on PATH.
 - lint-staged has a config per package. The root one only runs `prettier --write`; `apps/web` and
   `apps/playground` run `eslint --fix --max-warnings 0` then `prettier --write` on TS/JS files.
-- CI is `.github/workflows/ci.yml`, two jobs. `quality`: install, `check:allowbuilds`,
-  `test:scripts`, `format:check`, `lint`, `typecheck`, `test`, `build`. `e2e`: install chromium and
-  webkit, build web, run the Playwright specs on all three projects; the report is uploaded as an
-  artifact on failure or cancellation. Actions are SHA-pinned, `permissions: contents: read`, and
-  concurrency cancels superseded runs on pull requests only.
+- CI is `.github/workflows/ci.yml`, two jobs. `quality`: dependency review
+  (`actions/dependency-review-action`, on pull requests only, straight after checkout; it fails a
+  pull request that adds a dependency with a known advisory, dev tooling included, because GitHub's
+  dependency graph scopes every `pnpm-lock.yaml` entry `runtime`, the action's default), then
+  install, `check:allowbuilds`, `test:scripts`, `format:check`, `lint`, `typecheck`, `test`, `build`.
+  `e2e`: install chromium and webkit, build web, run the Playwright specs on all three projects; the
+  report is uploaded as an artifact on failure or cancellation. Actions are SHA-pinned,
+  `permissions: contents: read`, and concurrency cancels superseded runs on pull requests only.
+  CodeQL default setup is on as well (ADR 0018): GitHub manages it, so it has no workflow file here,
+  and branch protection does not require its checks. An alert on a line a pull request changes is
+  also posted as a review thread, though, and the resolved-threads rule below blocks the merge until
+  that thread is resolved: GitHub resolves it once the flagged code changes, and a writer can
+  resolve it by hand or dismiss the alert.
 - `main` has branch protection on, and both CI jobs are required checks. A required check is stored
   as the job's display name, so the two required contexts are the `name:` values in
   `.github/workflows/ci.yml` character for character, and a comment above each says so: renaming
@@ -127,7 +142,20 @@ is there so that a future buildable package is compiled before the apps typechec
   act: supersede the record and delete the matching assertion in the same pull request.
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
   grouped into one pull request and open npm pull requests are capped at five; github-actions bumps
-  are not grouped.
+  are not grouped. Dependabot alerts are on; automated security updates stay off until the owner
+  switches them on after #71, which clears the lockfile's advisories, has merged, so until then an
+  alert opens no pull request. Once they are on, they are triggered by alerts rather than the Monday
+  schedule, and a `security` group (`applies-to: security-updates`, `patterns: ['*']`) batches the
+  security updates of each run into one pull request so they cannot fill the five-slot cap. Three
+  majors are ignored, each with the upstream event that reopens it: `eslint` and `@eslint/js`
+  (eslint-config-next pulls an eslint-plugin-react that ESLint 10 breaks —
+  jsx-eslint/eslint-plugin-react#3977), `typescript` `>=7` (no classic compiler API at the root;
+  typescript-eslint peers `<6.1.0`) and `@types/node` majors (they follow `.nvmrc` by hand). Adding
+  one is a policy change, so read `docs/adr/0018-dependency-update-policy.md` first; deleting one
+  without the trigger having fired puts the red pull request back. A `vite` group (`vite`,
+  `@vitejs/*`, `vitest`, `@vitest/*`, majors included) goes ahead of `minor-and-patch` in the same
+  pull request that makes `apps/web` declare `vite` directly, and not before: added now it would
+  regenerate a red grouped pull request.
 
 ## Conventions
 
@@ -316,6 +344,20 @@ is there so that a future buildable package is compiled before the apps typechec
   pnpm re-reports the builds recorded in `node_modules/.modules.yaml` until
   `pnpm clean && pnpm install`. Do not add `strictDepBuilds`, which turns that stale warning into a
   failed install (ADR 0013, `docs/adr/0013-dependency-build-scripts-reviewed.md`, superseding 0007).
+- `minimumReleaseAge: 1440` in `pnpm-workspace.yaml` refuses any version published less than a day
+  ago, so a non-frozen `pnpm install` or `pnpm update` can fail with
+  `ERR_PNPM_NO_MATURE_MATCHING_VERSION` naming a package released hours earlier — including an
+  optional platform binary such as `@rollup/rollup-<platform>`, whose release tracks its parent's. The
+  fix is to re-resolve that package (`pnpm update -r <name>`) so pnpm picks the newest mature version,
+  not to add it to `minimumReleaseAgeExclude`, which is for a named, justified exception such as a
+  security fix published the same day. CI's `pnpm install --frozen-lockfile` skips resolution and is
+  unaffected. Dependabot mirrors the window with `cooldown.default-days: 1`, which applies to version
+  updates only. ADR 0018.
+- On pnpm 10.34.5, `pnpm update -r <patterns>` did not reach transitive copies without
+  `--depth Infinity`, whatever the documented default says. A refresh aimed at an advisory in a transitive package will add the
+  patched version for some dependents and silently leave the vulnerable copy pinned under others
+  whose own ranges admitted the fix. Always pass `--depth Infinity` and re-run `pnpm audit` to confirm
+  the count actually moved.
 - `apps/web/README.md` is untouched `create-next-app` boilerplate: it says `npm run dev` and
   `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
   authoritative documents.
