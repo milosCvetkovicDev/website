@@ -2,9 +2,10 @@ name: Commit messages
 
 # commitlint ran only in .husky/commit-msg, which the squash commits GitHub writes to `main` never
 # pass through. Four commits on `main` since commitlint arrived in #3, #3's own included, already
-# fail the repository's own convention because of it. This lints the messages that actually land:
-# the pull request title as the subject of the squash commit, every commit on the branch, and every
-# commit a push lands on `main`.
+# fail the repository's own convention because of it. This lints what reaches `main`: before the
+# merge, the pull request title as the squash commit's subject and every commit on the branch; after
+# it, every commit a push lands on `main`. Only that last lint sees a squash body typed in the merge
+# dialog, because no pull request event carries it.
 #
 # A workflow of its own rather than a step in ci.yml: a title edit then re-runs this alone instead
 # of the build and the e2e suite, and ci.yml keeps exactly the gates the docs list for its two jobs.
@@ -97,20 +98,22 @@ jobs:
 
       - name: Lint every commit pushed to main
         if: github.event_name == 'push'
-        # Every commit the push landed, from the previous tip of `main` to the new one, so a push that
-        # lands several is linted in full rather than only its last commit. The commits on `main` that
-        # predate this check, 28 of which fail it, sit behind the first `before` and are never linted:
-        # `main` is never rewritten, so the range is deliberately not the whole history.
+        # Every commit the push landed, from the previous tip of `main` to the new one. While squash
+        # is the only merge method enabled that is one commit, but a push that lands several is
+        # linted in full rather than only its last. The commits on `main` that predate this check,
+        # 28 of which fail it, sit behind the first `before` and are never linted: `main` is never
+        # rewritten, so the range is deliberately not the whole history.
         #
         # `before` is all zeros when the push created the branch. There is no previous tip then, and
-        # `--from` would reject it as an invalid revision, so only the new tip is linted, from its full
-        # message (`HEAD~1` would not exist for a root commit). `^0+$` rather than forty zeros, so a
-        # SHA-256 repository matches too.
+        # `--from` would reject it as an invalid revision, so only the new tip is linted, from its
+        # full message (`HEAD~1` would not exist for a root commit). `^0+$` rather than forty zeros,
+        # so a SHA-256 repository matches too.
         #
-        # Anything that is not a hex SHA fails first: commitlint reads `--from ""` as no `--from` at
-        # all and lints the whole history, which fails on the old commits for the wrong reason.
-        # `pipefail` because the default `bash -e` reports only the last command of a pipeline, so a
-        # failing `git log` would otherwise be judged by commitlint on empty input.
+        # A `before` that is not hex, an empty one included, fails first: commitlint reads
+        # `--from ""` as no `--from` at all and lints the whole history, which fails on the old
+        # commits for the wrong reason. `pipefail` because the default `bash -e` reports only the
+        # last command of a pipeline, so a failing `git log` would otherwise be judged by commitlint
+        # on empty input.
         env:
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
