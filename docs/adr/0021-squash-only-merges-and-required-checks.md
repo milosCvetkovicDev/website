@@ -95,18 +95,18 @@ Repository merge settings:
 
 Protection on `main`:
 
-| Setting                          | Value                                                                                                                                                                                                                                                                    |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Required status checks           | `Format, lint, typecheck, unit tests, build`, `End-to-end (Playwright against the production build)` and `Commit messages`                                                                                                                                               |
-| Strict (branch up to date)       | Yes — a pull request must be up to date with the current `main` before it can merge; bring it up to date with a signed local rebase or merge, because GitHub's rebase update rewrites the branch's commits without their signatures and the pull request is then blocked |
-| Pull request required            | Yes — pull request reviews are configured, so changes reach `main` only through a pull request                                                                                                                                                                           |
-| Required signatures              | Yes — a commit pushed to `main` must carry a verified signature; GitHub signs the squash commits it writes                                                                                                                                                               |
-| Required linear history          | Yes — merge commits are refused; with merge commits and rebase merging also off, a pull request can only land as a squash                                                                                                                                                |
-| Enforce for administrators       | Yes — the owner is subject to all of the above                                                                                                                                                                                                                           |
-| Force pushes                     | Not allowed                                                                                                                                                                                                                                                              |
-| Branch deletion                  | Not allowed                                                                                                                                                                                                                                                              |
-| Required conversation resolution | Yes — open review threads block the merge                                                                                                                                                                                                                                |
-| Required approving reviews       | 0, with stale reviews dismissed on a new push                                                                                                                                                                                                                            |
+| Setting                          | Value                                                                                                                                                                                                                                         |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Required status checks           | `Format, lint, typecheck, unit tests, build`, `End-to-end (Playwright against the production build)` and `Commit messages`                                                                                                                    |
+| Strict (branch up to date)       | Yes — a pull request must be up to date with the current `main` before it can merge; do not bring it up to date with GitHub's rebase update, which rewrites the branch's commits without their signatures and leaves the pull request blocked |
+| Pull request required            | Yes — pull request reviews are configured, so changes reach `main` only through a pull request                                                                                                                                                |
+| Required signatures              | Yes — a commit pushed to `main` must carry a verified signature; GitHub signs the squash commits it writes                                                                                                                                    |
+| Required linear history          | Yes — merge commits are refused; with merge commits and rebase merging also off, a pull request can only land as a squash                                                                                                                     |
+| Enforce for administrators       | Yes — the owner is subject to all of the above                                                                                                                                                                                                |
+| Force pushes                     | Not allowed                                                                                                                                                                                                                                   |
+| Branch deletion                  | Not allowed                                                                                                                                                                                                                                   |
+| Required conversation resolution | Yes — open review threads block the merge                                                                                                                                                                                                     |
+| Required approving reviews       | 0, with stale reviews dismissed on a new push                                                                                                                                                                                                 |
 
 Three rules follow from it:
 
@@ -114,12 +114,17 @@ Three rules follow from it:
   contexts are the `name:` values of the jobs in `.github/workflows/ci.yml` and
   `.github/workflows/commitlint.yml`. Renaming one of those jobs, turning it into a matrix or a
   reusable-workflow call, dropping its `pull_request` trigger or adding a branch or path filter that
-  can skip its workflow each strands a required check. Renaming or removing a required job therefore
-  takes three steps, in order: the owner removes the old context, which leaves only the other checks
-  enforced until the last step; the change merges and the job reports on `main` under its new name;
-  the owner adds the new context. A new job becomes required from the second step, as
-  `Commit messages` did in #72: it merges and reports first, and only then is its context added,
-  because a required context that no job reports blocks every pull request.
+  can skip its workflow each strands a required check. Each change to the set of required jobs
+  therefore has an order:
+  - **Rename.** The pull request that renames the job goes green, reporting the new name. The owner
+    then replaces the old context with the new one and merges that pull request straight away. No
+    check goes unenforced: strict mode makes every other pull request come up to date with `main`
+    before it can merge, and from then on it reports the new name.
+  - **Remove.** The owner removes the context, then the pull request that deletes the job merges.
+    Until it does, the job still runs on other pull requests but is not enforced.
+  - **Add.** The job merges and reports on `main` first, and only then does the owner add its
+    context, as `Commit messages` did in #72, because a required context that no job reports blocks
+    every pull request.
 
   The check that the contexts and the job names agree exits 0 when they do. Reading protection needs
   a token with administration read access, which in practice means the owner's:
@@ -133,15 +138,17 @@ Three rules follow from it:
 
   The `grep` matches only lines indented exactly four spaces, which in these two files are the job
   names; step names and action inputs such as an artifact's `name:` sit deeper, under `steps:`. The
-  check holds only while every job in the two files is required and sets an unquoted `name:` with no
-  trailing comment and no matrix. A job added to either file that is not meant to be required makes
-  it fail, which is the moment that choice has to be made.
+  check holds only while every required context comes from a job in these two files, every job in
+  them is required, and each sets an unquoted `name:` with no trailing comment and no matrix. A job
+  added to either file that is not meant to be required makes it fail, which is the moment that
+  choice has to be made, and so would a required check from anywhere else, such as CodeQL.
 
 - **A pull request lands as a single squash commit, by setting rather than by convention.** Its
   subject defaults to the pull request title, and its body to empty. Every squash subject on `main`
   so far also carries a ` (#NN)` suffix, which no merge under `PR_TITLE` has yet confirmed or
-  contradicted; with it, the subject on `main` is a few characters longer than the title `Commit messages` linted on
-  the pull request, so a title close to the header length limit can pass there and fail on `main`.
+  contradicted. While it holds, the subject on `main` is a few characters longer than the title
+  `Commit messages` linted on the pull request, so a title close to the header length limit can
+  pass there and fail on `main`.
   Both are defaults: the person merging can edit them in the merge dialog, `gh pr merge --subject`
   and `--body` override them, and a title edited just before merging can land before its re-lint has
   registered. The lint that runs on a push to `main` sees the commit as it actually landed, and
@@ -149,7 +156,8 @@ Three rules follow from it:
 - **This record is descriptive, not authoritative over the live settings.** They live in GitHub,
   where only the owner can change them. When they and this record disagree, the API is what is
   true. A setting changed after this record was accepted is recorded by a new record that
-  supersedes this one; only a value that was already wrong on 2026-09-13 is corrected under ADR 0012.
+  supersedes this one; only a value that was already wrong on 2026-09-13 is corrected under
+  ADR 0012.
 
 ## Consequences
 
@@ -157,11 +165,12 @@ Three rules follow from it:
 
 - The squash-only rule that `CLAUDE.md` and `README.md` state is now enforced by GitHub, so a
   contributor or agent can no longer land a pull request as a rebase of its branch commits.
-- The commit on `main` defaults to the linted title plus ` (#NN)`, so the pull request lint and the
-  history agree unless someone overrides the message while merging or the suffix pushes the subject
-  past the header length limit.
-- The hazard is written down for all three jobs and for every way a job can stop reporting, with the
-  order that renames one safely, and the agreement check covers both workflow files in one command.
+- The commit on `main` defaults to the linted title, plus the ` (#NN)` suffix squashes have carried
+  so far, so the pull request lint and the history agree unless someone overrides the message while
+  merging or the suffix pushes the subject past the header length limit.
+- The hazard is written down for all three jobs and for every way a job can stop reporting, with an
+  order for renaming, removing or adding one, and the agreement check covers both workflow files in
+  one command.
 - The current protection is one record with one pair of tables, and the rule for recording the next
   settings change now agrees with ADR 0012 instead of pointing at a mechanism it forbids.
 
@@ -174,10 +183,10 @@ Three rules follow from it:
 - A table of live settings is superseded whenever the owner changes one. ADR 0020 lasted a day. That
   is the price of ADR 0012 keeping `corrected` for claims that were wrong from the start, and it is
   paid in one file per change.
-- Renaming or removing a required job opens a window, between the owner removing its context and
-  adding the new one, in which only the other checks are enforced.
+- Removing a required job leaves it unenforced from the moment the owner removes its context until
+  the pull request that deletes the job merges.
 - A merge can still put an unlinted title or body on `main`, and a title within a few characters of
-  the header length limit fails only once suffixed. The push lint reports either after it has
+  the header length limit can fail once suffixed. The push lint reports either after it has
   landed, and because `main` is never rewritten, such a commit stays as accepted history.
 - `required_approving_review_count` is still 0, so the rule in `CLAUDE.md` that someone other than
   the author reviews the diff remains a convention.

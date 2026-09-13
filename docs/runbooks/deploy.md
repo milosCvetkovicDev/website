@@ -66,9 +66,8 @@ Playwright always starts the server it tests and never attaches to one that is a
 a local run is unaffected by whatever holds 3000 ([ADR 0014](../adr/0014-playwright-owns-its-server.md)).
 Both jobs, and the `Commit messages` job in `.github/workflows/commitlint.yml`, must be green before
 a pull request can merge ([ADR 0021](../adr/0021-squash-only-merges-and-required-checks.md)), and
-merging to `main` is what deploys. Vercel runs none of
-them: it runs the install command and `turbo run build`, which is `next build` for `web`, and
-nothing else.
+merging to `main` is what deploys. Vercel runs none of them: it runs the install command and
+`turbo run build`, which is `next build` for `web`, and nothing else.
 
 ## One-time project setup
 

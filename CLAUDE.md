@@ -100,13 +100,13 @@ is there so that a future buildable package is compiled before the apps typechec
   `.github/workflows/commitlint.yml` character for character, and a comment near each says so.
   Renaming any of those jobs strands a required check that never reports and blocks every pull
   request, and so does anything else that stops the job reporting under that name on every pull
-  request, such as a matrix, a reusable-workflow call or a branch or path filter on its trigger; the
-  ADR below gives the order for renaming or removing one. Protection also requires the branch to be
-  up to date with `main`, signed commits, linear history (merge commits are refused) and resolved
-  review threads, and it applies to administrators. Squash is the only merge method the repository
-  allows, with merge commits and rebase merging switched off; the squash commit defaults to the pull
-  request title and an empty body, which the merge dialog or `gh pr merge --subject` and `--body`
-  can still override. Approving reviews required: 0, so the
+  request, such as a matrix, a reusable-workflow call or a branch or path filter on its trigger;
+  ADR 0021 gives the order for renaming, removing or adding one. Protection also requires the
+  branch to be up to date with `main`, signed commits, linear history (merge commits are refused)
+  and resolved review threads, and it applies to administrators. Squash is the only merge method
+  the repository allows, with merge commits and rebase merging switched off; the squash commit
+  defaults to the pull request title and an empty body, which the merge dialog or
+  `gh pr merge --subject` and `--body` can still override. Approving reviews required: 0, so the
   reviewer rule below is convention, not enforcement. See
   `docs/adr/0021-squash-only-merges-and-required-checks.md`.
 - Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
