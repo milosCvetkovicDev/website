@@ -55,7 +55,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm --filter web exec playwright install --with-deps chromium   # once per machine
+pnpm --filter web exec playwright install --with-deps chromium webkit   # once per machine
 pnpm --filter web test:e2e
 ```
 
@@ -467,8 +467,9 @@ from `apps/web` with `pnpm start` serving the build, which listens on 3000 and i
 it is a different server from the one the e2e suite runs on 3210. `--headless=new` follows the machine's
 appearance setting for `prefers-color-scheme`, so on a Mac in dark mode this is a dark-theme audit;
 the light theme is checked with Playwright and axe-core instead. The same rule set now runs in CI on
-every pull request: `apps/web/e2e/accessibility.spec.ts` audits both pages in both colour schemes at
-the desktop viewport, at rest, and fails the `e2e` job on any violation.
+every pull request: `apps/web/e2e/accessibility.spec.ts` audits every page route in both colour
+schemes at the desktop viewport, and `apps/web/e2e/mobile/accessibility.spec.ts` audits both of these
+pages at rest on two phone viewports; either fails the `e2e` job on any violation.
 
 ## Routine deployments
 

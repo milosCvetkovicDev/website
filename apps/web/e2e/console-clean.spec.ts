@@ -1,11 +1,18 @@
 import { expect, test, type Page } from '@playwright/test';
 import { caseStudies } from '../src/data/case-studies';
+import { PAGE_ROUTES, expectedStatus } from './routes';
 
 /**
  * Every route must load without the browser reporting anything: no console errors, no console
  * warnings, no uncaught page errors. React hydration mismatches surface here too. In production
  * React logs "Minified React error #418" (markup mismatch) or "#423" (an error React recovered from
  * while hydrating); the dev server spells it out as "Hydration failed".
+ *
+ * Every route, in both colour schemes. Until 2026-09-12 the only `emulateMedia` in this file was the
+ * reduced-motion one, so all fifteen tests ran in Playwright's default light scheme and a component
+ * that threw only under the dark theme would have shipped green. The route list used to be a
+ * hand-written copy of `src/app/sitemap.ts`'s; it now comes from `e2e/routes.ts`, which the
+ * accessibility gate reads too, so a new route reaches both gates without an edit to either.
  */
 
 interface Route {
@@ -15,15 +22,15 @@ interface Route {
 }
 
 const routes: Route[] = [
-  ...['/', '/about', '/work', '/skills', '/blog', '/contact'].map((path) => ({
-    path,
-    status: 200,
-  })),
-  // Derived from the data file, so a new case study is covered without touching this spec.
-  ...caseStudies.map(({ slug }) => ({ path: `/work/${slug}`, status: 200 })),
-  { path: '/no-such-page', status: 404 },
+  // The shared list: the six static routes, every case study derived from the data file, and a 404.
+  ...PAGE_ROUTES.map((path) => ({ path, status: expectedStatus(path) })),
+  // The second 404 shape, which the shared list does not carry: an unknown *slug* is kept at the
+  // routing layer by `dynamicParams = false` rather than reaching a render-time notFound() (ADR 0015),
+  // so it is a different path through the app from an unknown route.
   { path: '/work/does-not-exist', status: 404 },
 ];
+
+const colorSchemes = ['light', 'dark'] as const;
 
 // Effects, GSAP timelines and React's deferred error reporting all run after the network goes idle.
 const SETTLE_MS = 1_000;
@@ -201,10 +208,21 @@ test.describe('Every route', () => {
   // this spec exists to prevent. The budget covers the navigation and loader waits (30 s each).
   test.describe.configure({ retries: 0, timeout: 90_000 });
 
-  for (const route of routes) {
-    test(`${route.path} loads with a clean console`, async ({ page }) => {
-      await expectCleanConsole(page, route);
-    });
+  for (const colorScheme of colorSchemes) {
+    for (const route of routes) {
+      test(`${route.path} loads with a clean console in the ${colorScheme} theme`, async ({
+        page,
+      }) => {
+        // Before the navigation: the theme init script in <head> reads prefers-color-scheme for the
+        // first paint, so the page hydrates in the scheme a visitor with that preference sees. A
+        // component that throws only under one theme is invisible to a single-scheme run.
+        await page.emulateMedia({ colorScheme });
+        await expectCleanConsole(page, route);
+        // Playwright ignores an unknown emulation option silently, and the whole point of doubling
+        // these tests is that the two runs differ: prove the scheme reached the page.
+        await expect(page.locator('html')).toContainClass(colorScheme);
+      });
+    }
   }
 
   test('/ loads with a clean console under reduced motion', async ({ page }) => {

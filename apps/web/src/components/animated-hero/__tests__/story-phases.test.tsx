@@ -5,6 +5,7 @@ import { DiscoveryPhase } from '../discovery-phase';
 import { StrategyPhase } from '../strategy-phase';
 import { ExecutionPhase } from '../execution-phase';
 import { GauntletPhase } from '../gauntlet-phase';
+import { LoopPhase } from '../loop-phase';
 import { GameComplete } from '../game-complete';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
@@ -43,11 +44,15 @@ const media = vi.hoisted(() => {
   return state;
 });
 
+// All six story sections, so the shared lifecycle below covers every one of them. LoopPhase was the
+// one omission: its own defects are pinned in `loop-phase.test.tsx` (rows R20 and R21), and this list
+// is what says its build/teardown/rebuild behaves like its five siblings'.
 const phases = [
   { name: 'DiscoveryPhase', Phase: DiscoveryPhase },
   { name: 'StrategyPhase', Phase: StrategyPhase },
   { name: 'ExecutionPhase', Phase: ExecutionPhase },
   { name: 'GauntletPhase', Phase: GauntletPhase },
+  { name: 'LoopPhase', Phase: LoopPhase },
   { name: 'GameComplete', Phase: GameComplete },
 ];
 

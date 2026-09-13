@@ -1,10 +1,26 @@
-import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { PAGE_ROUTES, expectedStatus } from './routes';
+// The rule map and the result readers are shared with e2e/mobile/accessibility.spec.ts: only
+// e2e/mobile/ is selected by the two phone projects, and importing one spec file from another would
+// register its tests twice, so they live in their own module.
+import {
+  audit,
+  describeIncomplete,
+  describeViolations,
+  incompleteNodes,
+  passingNodes,
+  ruleIdsThatRan,
+} from './axe';
 
 /**
- * Accessibility regression gate: `/` and `/work/self-healing-agent` must produce zero axe-core
- * violations in both colour schemes, at rest, and `/` again after the whole story has been
- * scrolled through.
+ * Accessibility regression gate: every page route must produce zero axe-core violations in both colour
+ * schemes, at rest; `/` again after the whole story has been scrolled through, and again with a header
+ * link hovered and with one focused. `e2e/mobile/accessibility.spec.ts` runs the at-rest pass on `/` and
+ * one case study under the two phone projects.
+ *
+ * The route list was `['/', '/work/self-healing-agent']` until 2026-09-12 — two of ten — which is why
+ * every defect the audit found on `/about`, `/skills`, `/contact`, `/blog` or a 404 was invisible to a
+ * green gate. It now comes from `e2e/routes.ts`, the one list `console-clean.spec.ts` reads too.
  *
  * On 2026-09-09 Lighthouse scored both pages 96 on accessibility, for `color-contrast` (the accent
  * used as text, labels dimmed with opacity modifiers, a GSAP reveal parked at 30% opacity) and
@@ -18,6 +34,13 @@ import { expect, test, type Page } from '@playwright/test';
  * `violations` fail the test. `incomplete` results (axe could not decide, typically a background it
  * cannot resolve behind the hero island) do not, exactly as Lighthouse scores them; both lists are
  * attached to the test report for every run.
+ *
+ * Counting `incomplete` as neither pass nor failure was the hole the audit found (tests-1): on `/` at
+ * rest it is over a hundred nodes, more than half the page's at-rest text, and the hero island ships at
+ * 2.6:1 with four green tests here. Deciding those colours needs a different instrument and is #47's
+ * work — `e2e/hero-contrast.spec.ts` does it by computed style. What this gate now holds is
+ * `INCOMPLETE_CONTRAST_BUDGET`: a per-route, per-scheme ceiling on the undecidable region, so it can
+ * shrink but never grow.
  *
  * Two axe behaviours worth knowing before touching a failure (ADR 0008): `aria-hidden` does not
  * exempt an element from `color-contrast`, because axe measures what is on screen, not what a
@@ -73,83 +96,102 @@ import { expect, test, type Page } from '@playwright/test';
  * true and the loader only ever renders its first message. What the loader looks like is held by
  * the token rules in CLAUDE.md and by review, not by this gate.
  *
- * Both passes run at the project's desktop viewport. A mobile viewport, which is what Lighthouse
- * emulates by default, is still not covered.
+ * Every pass in this file runs at the project's desktop viewport. The phone viewports — which is what
+ * Lighthouse emulates by default — are covered by `e2e/mobile/accessibility.spec.ts`, which the two
+ * phone projects select and this one does not.
  */
 
-type AxeRunOptions = Parameters<AxeBuilder['options']>[0];
-type AxeResults = Awaited<ReturnType<AxeBuilder['analyze']>>;
-type Violation = AxeResults['violations'][number];
-
-// https://github.com/GoogleChrome/lighthouse/blob/v13.4.1/core/gather/gatherers/accessibility.js
-// Every id below exists in axe-core 4.13.0 (checked with `axe.getRules()`). axe throws
-// "unknown rule" for an id it does not know, which would fail every audit and the control at once,
-// so re-check the map after an axe-core or Lighthouse upgrade. The `enabled: false` entries are
-// load-bearing too: a rule the tags select runs regardless of its default flag, so dropping one
-// would switch a deprecated rule such as `audio-caption` back on.
-const LIGHTHOUSE_AXE_OPTIONS: AxeRunOptions = {
-  runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] },
-  rules: {
-    accesskeys: { enabled: true },
-    'area-alt': { enabled: false },
-    'aria-allowed-role': { enabled: true },
-    'aria-braille-equivalent': { enabled: false },
-    'aria-conditional-attr': { enabled: true },
-    'aria-deprecated-role': { enabled: true },
-    'aria-dialog-name': { enabled: true },
-    'aria-prohibited-attr': { enabled: true },
-    'aria-roledescription': { enabled: false },
-    'aria-treeitem-name': { enabled: true },
-    'aria-text': { enabled: true },
-    'autocomplete-valid': { enabled: true },
-    'audio-caption': { enabled: false },
-    blink: { enabled: false },
-    'duplicate-id': { enabled: false },
-    'empty-heading': { enabled: true },
-    'frame-focusable-content': { enabled: false },
-    'frame-title-unique': { enabled: false },
-    'heading-order': { enabled: true },
-    'html-xml-lang-mismatch': { enabled: true },
-    'identical-links-same-purpose': { enabled: true },
-    'image-redundant-alt': { enabled: true },
-    'input-button-name': { enabled: true },
-    'label-content-name-mismatch': { enabled: true },
-    'landmark-one-main': { enabled: true },
-    'link-in-text-block': { enabled: true },
-    marquee: { enabled: false },
-    'meta-viewport': { enabled: true },
-    'nested-interactive': { enabled: false },
-    'no-autoplay-audio': { enabled: false },
-    'presentation-role-conflict': { enabled: true },
-    'role-img-alt': { enabled: false },
-    'scrollable-region-focusable': { enabled: false },
-    'select-name': { enabled: true },
-    'server-side-image-map': { enabled: false },
-    'skip-link': { enabled: true },
-    'summary-name': { enabled: false },
-    'svg-img-alt': { enabled: true },
-    tabindex: { enabled: true },
-    'table-duplicate-name': { enabled: true },
-    'table-fake-caption': { enabled: true },
-    'target-size': { enabled: true },
-    'td-has-header': { enabled: true },
-    'aria-tab-name': { enabled: false },
-  },
-};
-
-const pages = ['/', '/work/self-healing-agent'];
+/**
+ * Every page route, from the one shared list in `e2e/routes.ts`: the six static routes, the three case
+ * studies and a 404. This used to be `['/', '/work/self-healing-agent']` — two of ten — which is why
+ * every defect the audit found on `/about`, `/skills`, `/contact`, `/blog` or a 404 was invisible to a
+ * green gate. `console-clean.spec.ts` reads the same module, so a new route reaches both gates at once.
+ */
+const pages = PAGE_ROUTES;
 
 /**
  * Fewest colour-contrast nodes each page must still measure at rest. A floor, not a target: the
  * point is that a change which unmounts content or hides it behind `opacity: 0` fails here instead
- * of silently shrinking the audit, which is what happened while `DeferredSection` existed. Measured
- * against the production build on 2026-09-10: 103 on `/` and 48 on the case study, identical in
- * both colour schemes. Set with room for ordinary copy edits; raise them if a page genuinely grows.
+ * of silently shrinking the audit, which is what happened while `DeferredSection` existed.
+ *
+ * Measured on 2026-09-10 for `/` and the case study (103 and 48) and on 2026-09-12 for the eight routes
+ * added then; identical in both colour schemes throughout, and identical between the dev server and the
+ * production build. Each floor is set well under its measured count so ordinary copy edits do not trip
+ * it, and well over zero so a page that stopped rendering does. Raise one only when the page has
+ * genuinely grown, and never to quieten a failure. Measured, then floor:
+ *
+ *   /  103 → 80      /about  61 → 45     /work  8 → 5        /skills  88 → 65
+ *   /blog  11 → 8    /contact  21 → 15   /no-such-page  12 → 8
+ *   /work/self-healing-agent  48 → 40    /work/enterprise-b2b-platform  59 → 40
+ *   /work/nx-remote-cache  43 → 35
+ *
+ * `/work` measuring 8 is not a mistake and is worth knowing: its cards are `backdrop-blur-sm`
+ * (`work/page.tsx:54`), so axe cannot resolve what is behind their text and puts 55 of its 63 nodes in
+ * `incomplete` instead. The floor there is nearly meaningless; the budget below is the number that
+ * matters for that route.
  */
-const AT_REST_CONTRAST_FLOOR: Record<(typeof pages)[number], number> = {
+const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
   '/': 80,
+  '/about': 45,
+  '/work': 5,
+  '/skills': 65,
+  '/blog': 8,
+  '/contact': 15,
   '/work/self-healing-agent': 40,
+  '/work/enterprise-b2b-platform': 40,
+  '/work/nx-remote-cache': 35,
+  '/no-such-page': 8,
 };
+
+/**
+ * Most `incomplete` colour-contrast nodes each route may report, per scheme.
+ *
+ * This is the assertion that closes the hole the audit found (tests-1): only `violations` fail this
+ * gate, exactly as Lighthouse scores it, so the hero island's alpha-dimmed accent text ships green
+ * although it misses AA. It is `incomplete` — axe cannot resolve the background behind a
+ * `backdrop-filter` over a gradient, and answers with messageKey `bgGradient` — and `incomplete` was
+ * simply not counted. On `/` at rest that is 114 nodes in light and 113 in dark against 103 passing:
+ * more than half the at-rest text on the page was unmeasured.
+ *
+ * Turning those into failures is not this task's to do — the colours are #47's, and
+ * `e2e/hero-contrast.spec.ts` decides them by computed style, which is the only instrument that can.
+ * What this budget does is stop the undecidable region *growing*: a new blurred panel or a new gradient
+ * behind text pushes a route over its number and fails here, so the unmeasured surface can only shrink.
+ * #47's fix should let several of these drop.
+ *
+ * Measured on 2026-09-12, and this is the whole recorded baseline:
+ *
+ *   /       light 112   dark 111-112   the hero island, `backdrop-filter: blur(28px)` over a gradient
+ *   /work   light  55   dark  55       the archive cards, `backdrop-blur-sm` (work/page.tsx:54)
+ *   every other route: 0 in both schemes
+ *
+ * Eight of the ten routes have a budget of **zero**, which is the strongest form this can take: on those
+ * pages axe decides every text node, and the first blurred panel or gradient put behind text fails here.
+ * The two that are not zero are the two surfaces the audit already found, and between them they account
+ * for every undecidable node on the site — 167 of them, against 103 and 8 decided.
+ *
+ * `/` gets a margin of a few nodes and the others do not, for a measured reason rather than out of
+ * caution: the hero's tmux chrome animates its tab labels and status line through `opacity`, and axe
+ * skips a node at `opacity: 0`, so the count depends on which frame the audit samples. Two consecutive
+ * dark-theme runs gave 111 and 112. `/work` and the eight zeroes are static and were identical across
+ * every run. Never widen a margin to quieten a failure: read the nodes the message names first, because
+ * a genuinely new blurred surface looks exactly like this.
+ *
+ * The positive control at the bottom of this file proves the comparison can fail at all.
+ */
+const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }> = {
+  '/': { light: 118, dark: 118 },
+  '/about': { light: 0, dark: 0 },
+  '/work': { light: 55, dark: 55 },
+  '/skills': { light: 0, dark: 0 },
+  '/blog': { light: 0, dark: 0 },
+  '/contact': { light: 0, dark: 0 },
+  '/work/self-healing-agent': { light: 0, dark: 0 },
+  '/work/enterprise-b2b-platform': { light: 0, dark: 0 },
+  '/work/nx-remote-cache': { light: 0, dark: 0 },
+  '/no-such-page': { light: 0, dark: 0 },
+};
+
 const colorSchemes = ['light', 'dark'] as const;
 
 /**
@@ -162,7 +204,7 @@ const colorSchemes = ['light', 'dark'] as const;
  * Under `reduce` each phase renders its finished state on mount (ADR 0009) and no `ScrollTrigger`
  * is created, so a single jump to the bottom would measure the same nodes. The walk is kept
  * because it is the only form that would also drive the `ScrollTrigger`s if a `no-preference`
- * pass is ever added, and because it fails loudly on a page that cannot scroll.
+ * pass is ever added, and because a page that cannot scroll makes it throw loudly.
  *
  * This used to describe `DeferredSection`, a hydration gate that kept each section out of the
  * document until it approached the viewport. PR #22 removed it; the sections have been in the DOM
@@ -201,34 +243,6 @@ async function scrollThroughStory(page: Page) {
   });
 }
 
-const audit = (page: Page) =>
-  new AxeBuilder({ page })
-    // AxeBuilder keeps the reference and its other setters write into it: never hand it the constant.
-    .options(structuredClone(LIGHTHOUSE_AXE_OPTIONS))
-    // The dev server's tools indicator, a custom element with a shadow root that never ships.
-    // Without this a local run against `next dev` audits a different DOM from CI.
-    .exclude('nextjs-portal')
-    .analyze();
-
-const passingNodes = (results: AxeResults, ruleId: string) =>
-  results.passes.find(({ id }) => id === ruleId)?.nodes.length ?? 0;
-
-const ruleIdsThatRan = ({ passes, violations, incomplete, inapplicable }: AxeResults) =>
-  [...passes, ...violations, ...incomplete, ...inapplicable].map(({ id }) => id);
-
-/** One entry per violated rule: the rule, then every offending node with axe's own explanation. */
-function describeViolations(violations: Violation[]): string[] {
-  return violations.map(({ id, impact, help, helpUrl, nodes }) =>
-    [
-      `${id} (${impact ?? 'unknown impact'}): ${help}. ${helpUrl}`,
-      ...nodes.map(
-        ({ target, html, failureSummary }) =>
-          `  ${target.flat().join(' >> ')}\n    ${html}\n    ${failureSummary ?? ''}`,
-      ),
-    ].join('\n'),
-  );
-}
-
 /**
  * Navigates and proves the page is the one we mean and is ready to audit. `reducedMotion` is passed
  * through for the scrolled pass; the at-rest pass leaves it at Playwright's default of `no-preference`.
@@ -249,8 +263,12 @@ async function openPage(
   const response = await page.goto(path, { waitUntil: 'networkidle', timeout: 30_000 });
   // A renamed slug or a rendering error would serve the not-found or the error page, whose
   // title also matches below; the status and the path catch that. The title is left as a
-  // smoke check that this application rendered at all (ADR 0014).
-  expect(response?.status(), `${path} should answer 200`).toBe(200);
+  // smoke check that this application rendered at all (ADR 0014). The 404 route in the list
+  // answers 404 by design, which is why the expected status comes from the shared module rather
+  // than being hard-coded to 200.
+  expect(response?.status(), `${path} should answer ${expectedStatus(path)}`).toBe(
+    expectedStatus(path),
+  );
   expect(new URL(page.url()).pathname, `${path} should not redirect`).toBe(path);
   await expect(page).toHaveTitle(/Milos Cvetkovic/);
   // `/` shows a boot loader until React has hydrated and removes it 600 ms later; the audit
@@ -305,11 +323,93 @@ test.describe('Accessibility', () => {
             'stopped being rendered, or became transparent, is no longer being audited: find what ' +
             'left the page before adjusting this floor.',
         ).toBeGreaterThan(AT_REST_CONTRAST_FLOOR[path]);
+        // The undecidable region may shrink but never grow. See INCOMPLETE_CONTRAST_BUDGET above for
+        // why this is a budget rather than a failure, and the positive control at the bottom of this
+        // file for the proof that the comparison can fail at all.
+        expect(
+          incompleteNodes(results, 'color-contrast'),
+          `${path} in the ${colorScheme} theme has more colour-contrast nodes axe cannot decide ` +
+            'than its recorded budget. Something was added whose background axe cannot resolve — ' +
+            'usually text over a gradient, or inside an element with a backdrop-filter. Those ' +
+            'nodes are unmeasured, not passing: give the text a resolvable background instead of ' +
+            `raising the budget.\nFirst few:\n${describeIncomplete(results, 'color-contrast')}`,
+        ).toBeLessThanOrEqual(INCOMPLETE_CONTRAST_BUDGET[path][colorScheme]);
         expect(ruleIdsThatRan(results)).toEqual(
           expect.arrayContaining(['document-title', 'label-content-name-mismatch']),
         );
       });
     }
+  }
+
+  /**
+   * `/` audited with a header link hovered and with one focused.
+   *
+   * Every other pass measures the page at rest, and a hover colour is a colour like any other. Before
+   * this, no hovered or focused state was audited anywhere in the suite: the only `hover()` calls were
+   * in `featured-work.spec.ts`, which asserts `data-active` rather than colour.
+   *
+   * The subject is a header nav link, not a Featured Work card, and that was settled by measurement
+   * rather than by preference. Two things rule the card out:
+   *
+   * - An audit scoped to the Featured Work section decides **nothing**. Measured on 2026-09-12: 0
+   *   passing colour-contrast nodes against 45 `incomplete`. Its cards are `backdrop-blur-md`
+   *   (`featured-work.tsx:67`), so axe cannot resolve what is behind any of their text — the same
+   *   mechanism as the hero island's, and the reason a scoped pass there would be a gate that cannot
+   *   fail. The card's hover behaviour is covered instead by `featured-work.spec.ts` (`data-active`, the
+   *   diagram) and its colours by `e2e/hero-contrast.spec.ts` (computed style).
+   * - Scrolling the section into view to hover it puts the sticky header over the architecture-diagram
+   *   background. The header is `bg-[var(--background)]/80` with `backdrop-blur-sm`, so axe composites
+   *   `--muted` (#636363) against #cbcbcd and reports every desktop nav link at 3.7:1. That is a real
+   *   violation, found by writing this pass, and it belongs to no row of this task's manifest: it
+   *   depends only on the scroll position and appears at neither offset the at-rest pass (top) or the
+   *   scrolled pass (bottom) samples. It is reported in this task's pull request as an out-of-scope
+   *   discovery rather than quietly gated or quietly excluded here.
+   *
+   * So: whole document, at scroll 0, where the header overlaps only the hero. A nav link's hover moves
+   * it from `--muted` to `--foreground` and its focus draws the focus-visible ring, both of which axe
+   * decides. Under `reduce`, for the same reason the scrolled pass is — every phase renders its finished
+   * state on mount, so nothing can be sampled mid-tween, and the audit sees the whole story: 429 nodes
+   * measured against the at-rest pass's 103.
+   */
+  for (const state of ['hovered', 'focused'] as const) {
+    test(`/ has no axe violations with a header link ${state}`, async ({ page }) => {
+      await openPage(page, '/', 'light', { reducedMotion: 'reduce' });
+
+      const link = page.getByRole('banner').getByRole('link', { name: 'About' });
+      await expect(link).toBeVisible();
+      if (state === 'hovered') await link.hover();
+      else await link.focus();
+      // `transition-colors` on the link; settle so axe does not sample a colour half way between the
+      // two states, which is neither the resting colour nor the hover one.
+      await page.waitForTimeout(600);
+      // Prove the state applied: Playwright reports focus directly, and a hover that landed on nothing
+      // would leave the page exactly as the at-rest pass already measures it.
+      if (state === 'focused') await expect(link).toBeFocused();
+      else await expect(link).toHaveCSS('color', 'rgb(23, 23, 23)');
+
+      const results = await audit(page);
+      await test.info().attach('axe-results', {
+        body: JSON.stringify(
+          { violations: results.violations, incomplete: results.incomplete },
+          null,
+          2,
+        ),
+        contentType: 'application/json',
+      });
+      expect(
+        describeViolations(results.violations),
+        `/ with a header link ${state} must have no axe violations. A hover or focus colour is a ` +
+          'colour like any other: read the token roles in ' +
+          'docs/adr/0011-colour-roles-on-scoped-surfaces.md.',
+      ).toEqual([]);
+      // Real content was measured, so a green run is not a page that failed to render. Measured 429 on
+      // 2026-09-12; the floor matches the scrolled pass's, because `reduce` renders the same content.
+      expect(
+        passingNodes(results, 'color-contrast'),
+        `the ${state} pass measured far fewer nodes than it should: content stopped being rendered ` +
+          'or became transparent. Find what left the page before adjusting this floor.',
+      ).toBeGreaterThan(350);
+    });
   }
 
   test.describe('the whole story', () => {
@@ -395,5 +495,45 @@ test.describe('Accessibility', () => {
     expect(results.violations.map(({ id }) => id)).toEqual(
       expect.arrayContaining(['color-contrast', 'label-content-name-mismatch']),
     );
+  });
+
+  test('positive control: the incomplete-contrast budget fails when the count exceeds it', async ({
+    page,
+  }) => {
+    // The budget above is the whole answer to tests-1, so it needs its own control: a budget that
+    // could never be exceeded would be a comment. This is the shape that makes axe answer
+    // `incomplete` rather than pass or fail — text over a background gradient, which axe cannot
+    // resolve to a single colour, reported with messageKey `bgGradient`. It is the same mechanism as
+    // the hero island's, reproduced without a server.
+    await page.setContent(`<!doctype html>
+      <html lang="en">
+        <head><title>Control</title></head>
+        <body>
+          <main>
+            <h1>Control</h1>
+            <div style="background: linear-gradient(90deg, #000, #fff); padding: 1rem">
+              <p style="color: #888">Text axe cannot decide</p>
+              <p style="color: #777">Nor this one</p>
+              <p style="color: #666">Nor this one either</p>
+            </div>
+          </main>
+        </body>
+      </html>`);
+
+    const results = await audit(page);
+    const undecided = incompleteNodes(results, 'color-contrast');
+    // First: axe really does report these as undecided rather than as passes or violations. If this
+    // ever stops being true, every budget above becomes a no-op and this is where it surfaces.
+    expect(
+      undecided,
+      'axe no longer reports text on a gradient as incomplete: the per-route budgets above are ' +
+        'measuring nothing. Check what changed in axe-core before touching them.',
+    ).toBeGreaterThan(0);
+
+    // Then: the comparison the at-rest pass makes fails on a count over budget, and passes under it.
+    // Written as the assertion itself, inverted, rather than described in a comment.
+    const pretendBudget = undecided - 1;
+    expect(() => expect(undecided, 'over budget').toBeLessThanOrEqual(pretendBudget)).toThrow();
+    expect(undecided).toBeLessThanOrEqual(undecided);
   });
 });
