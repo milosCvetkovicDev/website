@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (corrected 2026-09-12)
 
 ## Date
 
@@ -85,8 +85,10 @@ payload is JSON-escaped, so only the real inline tag matches the source string.
 - Unknown case-study URLs lose their tailored copy and get the site-level 404.
 - Next logs `Error: Internal: NoFallbackError` on the server for each unknown `/work/*` request.
   It is the internal signal that routes the request to the 404, the response is still a correct
-  404, and no browser console entry results — but it lands on the error channel, so production
-  logs carry one such line per bad case-study URL. Measured on `next start`: one line per request,
+  404, and no browser console entry results — but it lands on the error channel, so a self-hosted
+  `next start` and the CI end-to-end log carry one such line per bad case-study URL. The Vercel
+  production log does not: the platform answers an unknown path from the cached static 404 without
+  invoking the route. Measured on `next start`: one line per request,
   none for `/no-such-page` and none for a valid slug.
 - Any future case-study source that is not known at build time — a CMS, say — would have
   to revisit this, because `dynamicParams = false` would 404 slugs it could serve. Such a
@@ -105,3 +107,27 @@ payload is JSON-escaped, so only the real inline tag matches the source string.
 - **A `prefers-color-scheme` fallback in CSS**, to survive the missing script. It treats
   the symptom, and it would override an explicit stored preference on first paint, which
   is the flash the script exists to prevent.
+
+## Corrections
+
+### 2026-09-12
+
+One clause in `### Trade-offs` claimed a production log line that Vercel never writes. It sits
+outside `## Decision`, it was false on 2026-09-10 as well — the site had been live on Vercel since
+2026-09-09 — and removing it changes neither the decision nor any guidance, so it is corrected in
+place under [ADR 0012](0012-correcting-accepted-records.md).
+
+**Where the `NoFallbackError` line appears**, in `### Trade-offs`. The bullet read: "but it lands
+on the error channel, so production logs carry one such line per bad case-study URL". It now reads:
+"but it lands on the error channel, so a self-hosted `next start` and the CI end-to-end log carry
+one such line per bad case-study URL. The Vercel production log does not: the platform answers an
+unknown path from the cached static 404 without invoking the route." What was wrong: the measurement
+was taken on `next start` and generalised to production, which is a different serving model. On
+Vercel an unknown `/work/*` path is served from the cached static 404 and `/work/[slug]` is never
+invoked, so there is no request for the error channel to log.
+
+Evidence: a live probe of a never-requested slug,
+`curl -D - https://miloscvetkovic.dev/work/<a never-requested slug>`, answers `HTTP/2 404` with
+`x-matched-path: /404` and `x-vercel-cache: HIT` — a cache hit on the static 404, with the same
+content length as `/no-such-page`, which the record already notes never produced a line. The
+measured `next start` sentence in the same bullet is accurate and is unchanged.

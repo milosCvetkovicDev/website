@@ -1427,10 +1427,10 @@ gh pr create --title "chore: repo tooling, quality gates and CI" --body-file /tm
 
 The body lists the stop-condition commands with their actual output and links this plan.
 
-- [ ] **Step 3: Watch CI**
+- [x] **Step 3: Watch CI**
 
 Run: `gh pr checks --watch`
 Expected: `quality` and `e2e` both pass. If not, fix on the branch (never `--no-verify`, never skip a test) and push again.
 
-- [ ] **Step 4: Maker ≠ checker** — run the `adversarial-reviewer` agent on `git diff main...HEAD` (diff only) and `edge-case-hunter` on the changed files; triage findings in the PR description (fixed / deferred with reason / rejected with reason).
-- [ ] **Step 5: Hand-off** — report the PR link and the merge question (design §7.1) to Milos. Do not merge without an answer.
+- [x] **Step 4: Maker ≠ checker** — run the `adversarial-reviewer` agent on `git diff main...HEAD` (diff only) and `edge-case-hunter` on the changed files; triage findings in the PR description (fixed / deferred with reason / rejected with reason).
+- [x] **Step 5: Hand-off** — report the PR link and the merge question (design §7.1) to Milos. Do not merge without an answer.

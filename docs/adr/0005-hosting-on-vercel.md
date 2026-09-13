@@ -2,7 +2,7 @@
 
 ## Status
 
-Superseded by ADR-0016
+Superseded by ADR-0016 (corrected 2026-09-12)
 
 No longer applies: "No `vercel.json` is added". See [ADR 0016](0016-vercel-deployment-budget.md).
 
@@ -140,3 +140,29 @@ Everything below follows once the project exists. None of it is true yet.
   keep everything on one cloud. Rejected here: a container image, registry, ingress, certificates
   and their upkeep are out of proportion to 14 prerendered pages, and it costs money where the
   alternative does not.
+
+## Corrections
+
+### 2026-09-12
+
+One clause inside `## Decision` is false about the response headers the site ships with, and it was
+false on 2026-09-08 too: Vercel's default already included HSTS. `## Decision` is never rewritten,
+so it is annotated here, under [ADR 0012](0012-correcting-accepted-records.md).
+
+**HSTS is set, by Vercel's default**, in `## Decision`. The record reads: "the site ships with only
+what Vercel sets by default, and with no HSTS, no CSP, no `X-Content-Type-Options` and no
+`Referrer-Policy`". What is true: the site ships with only what Vercel sets by default, and that
+default includes HSTS. What was wrong: the clause lists HSTS among the headers that are absent, while
+it is one of the headers the platform default supplies. The other three clauses are accurate and are
+not corrected, and the surrounding statement that the repository sets no headers of its own is
+accurate as well: `apps/web/next.config.ts` declares no `headers()`.
+
+Evidence: `curl -sSI https://miloscvetkovic.dev/ | grep -i strict-transport-security` prints
+`strict-transport-security: max-age=63072000`, a two-year max-age the repository sets nowhere. That
+it is the platform default rather than a later configuration change follows from that same absence:
+no `headers()` in `apps/web/next.config.ts` and no `vercel.json` setting headers, so no commit
+between acceptance and the probe could have added it.
+
+This correction changes nothing about the decision it annotates. The place to add a header is still
+`headers()` in `next.config.ts`, and the reasoning for adding none was not conditional on the HSTS
+clause being right.

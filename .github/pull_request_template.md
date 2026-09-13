@@ -15,6 +15,14 @@
 - [ ] `pnpm build`
 - [ ] `pnpm --filter web test:e2e` (when the UI changed)
 
+## Screenshots
+
+<!-- Required when the UI changed: the affected section in light, dark and mobile viewports. Delete this section for a change that renders nothing. -->
+
+- [ ] Light
+- [ ] Dark
+- [ ] Mobile
+
 ## Review
 
-- [ ] A reviewer other than the author (human, or the `adversarial-reviewer` / `edge-case-hunter` agents) has looked at the diff; findings are addressed or listed here.
+- [ ] A reviewer other than the author has looked at the diff; findings are addressed or listed here. For a change under `apps/web/src/components`, that includes the `ui-reviewer` agent.

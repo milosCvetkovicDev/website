@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (corrected 2026-09-12)
 
 ## Date
 
@@ -145,3 +145,32 @@ The configuration surface is larger than the problem.
 ending the sharing. Rejected because the config packages exist precisely so the sandbox and the site
 can stay consistent, and because a single repository keeps one CI pipeline, one lockfile and one
 place to review changes.
+
+## Corrections
+
+### 2026-09-12
+
+One sentence inside `## Decision` is false about where Vercel takes the Node version from, and it
+was already false on 2026-09-08. `## Decision` is never rewritten, so it is annotated here instead,
+under [ADR 0012](0012-correcting-accepted-records.md).
+
+**Where Vercel reads the Node version**, in `## Decision`. The record reads: "Vercel reads
+`packageManager` and `engines.node` from the same manifest, so a connected project would build on
+the same pins; that path is not yet exercised, because the site is not deployed (see
+[ADR 0005](0005-hosting-on-vercel.md))." What is true: Vercel reads neither of the root manifest's
+pins. It resolves the Node version from the Root Directory's own `package.json` or, failing that,
+from the project setting, and `apps/web/package.json` declares no `engines` field, so the version
+comes from the project setting alone, where it is `22.x`. What was wrong: the sentence generalises
+the CI mechanism, which really does read the root manifest, to Vercel, which does not read the
+repository root when a Root Directory is configured. The clause about the path not being exercised
+was true when written and is not corrected: the site was undeployed until 2026-09-09.
+
+Evidence, none of it this record's own assertion: [ADR 0005](0005-hosting-on-vercel.md), accepted the
+same day, already states it at `:48` — "Node version | 22.x, set in the project settings. Vercel
+does not read `.nvmrc`, and `apps/web/package.json` has no `engines` field, so the repository's
+pins do not reach the build"; [docs/runbooks/deploy.md](../runbooks/deploy.md) `:106-109` says the
+same and gives the command that sets it,
+`vercel project update portfolio --node-version 22.x`; and the live project setting reads back with
+`vercel api /v9/projects/<project-id> --raw | jq '{nodeVersion, rootDirectory}'`. Two records
+accepted on the same date disagreed, and the false half is the one the runbook written to be executed
+contradicts.

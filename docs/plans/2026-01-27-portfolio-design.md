@@ -173,11 +173,20 @@ Placeholder with:
 
 ### Featured Projects
 
-| Internal Name              | Public Name             | Hook                                                        |
-| -------------------------- | ----------------------- | ----------------------------------------------------------- |
-| Self-Healing Agent         | Self-Healing Agent      | "Built an AI that fixes its own bugs"                       |
-| Commodity Trading Platform | Enterprise B2B Platform | "Modernized legacy to cloud-native with Clean Architecture" |
-| Build Cache Server         | Nx Remote Cache Server  | "High-performance build infrastructure with Bun"            |
+| Public Name             | Hook                                                        |
+| ----------------------- | ----------------------------------------------------------- |
+| Self-Healing Agent      | "Built an AI that fixes its own bugs"                       |
+| Enterprise B2B Platform | "Modernized legacy to cloud-native with Clean Architecture" |
+| Nx Remote Cache Server  | "High-performance build infrastructure with Bun"            |
+
+> **Redacted 2026-09-12.** This table had a third column naming, for each public case study, the
+> internal employer project it stands for, and the Content Sources section below cited a CV PDF
+> tracked under `docs/` that carried personal contact details. Both were removed, and the PDF was
+> deleted from the repository, because this repository is public and each contradicted the Data
+> Protection Rules stated immediately above and the "No email displayed" rule under Contact Page.
+> The public names and hooks are unchanged. This is a Shipped design document kept as history, so
+> the redaction is recorded here rather than made silently; see
+> [ADR 0012](../adr/0012-correcting-accepted-records.md) for the lifecycle rule.
 
 ### Case Study 1: Self-Healing Agent
 
@@ -288,5 +297,5 @@ High-performance remote cache server for Nx build artifacts, dramatically reduci
 
 ## Content Sources
 
-- CV: `docs/Milos_Cvetkovic_-_Senior_Full_Stack_Software_Engineer.pdf`
-- All content derived from CV, sanitized for public display
+- All content derived from the author’s CV, sanitized for public display. The CV itself is not
+  tracked in this repository (see the redaction note under Featured Projects).

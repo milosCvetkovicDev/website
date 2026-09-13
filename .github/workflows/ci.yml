@@ -20,6 +20,8 @@ env:
 
 jobs:
   quality:
+    # Required-check name: main's branch protection requires this exact string (ADR 0020).
+    # Renaming the job strands that check and blocks every PR until the protection is updated.
     name: Format, lint, typecheck, unit tests, build
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -61,6 +63,8 @@ jobs:
         run: pnpm build
 
   e2e:
+    # Required-check name: main's branch protection requires this exact string (ADR 0020).
+    # Renaming the job strands that check and blocks every PR until the protection is updated.
     name: End-to-end (Playwright against the production build)
     runs-on: ubuntu-latest
     timeout-minutes: 20

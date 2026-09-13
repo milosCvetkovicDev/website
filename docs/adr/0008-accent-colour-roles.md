@@ -2,7 +2,9 @@
 
 ## Status
 
-Superseded by [ADR 0011](0011-colour-roles-on-scoped-surfaces.md)
+Superseded by ADR-0011
+
+Two of the rules below no longer apply, both replaced by [ADR 0011](0011-colour-roles-on-scoped-surfaces.md): scoping the `dark` class is not enough on a hard-coded dark surface, because `color` inherits already resolved, so that element must set `color` as well; and `--muted` does not pass "on every surface it is used on", because it measures 4.40:1 on a `/10` tint stacked on a `/5` panel.
 
 ## Date
 
