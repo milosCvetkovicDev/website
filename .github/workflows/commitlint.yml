@@ -76,13 +76,19 @@ jobs:
         # that passes as written over `header-max-length`. And once as written, because the suffix
         # hides the rules that read the end of the header: `feat: add thing.` fails
         # `subject-full-stop`, `feat: add thing. (#NN)` passes.
+        #
+        # Both with commitlint.squash.config.mjs, which turns commitlint's default ignores off. With
+        # them on, a title such as `revert everything` or `Merge branch x into y` is skipped, exits 0
+        # and lands on `main` as it is. The branch commits below keep commitlint.config.mjs, whose
+        # ignores `git commit --fixup` and GitHub's "Update branch" need, because a squash merge
+        # discards them.
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           status=0
-          printf '%s\n' "$PR_TITLE" | pnpm exec commitlint --verbose || status=1
-          printf '%s (#%s)\n' "$PR_TITLE" "$PR_NUMBER" | pnpm exec commitlint --verbose || status=1
+          printf '%s\n' "$PR_TITLE" | pnpm exec commitlint --config commitlint.squash.config.mjs --verbose || status=1
+          printf '%s (#%s)\n' "$PR_TITLE" "$PR_NUMBER" | pnpm exec commitlint --config commitlint.squash.config.mjs --verbose || status=1
           exit "$status"
 
       - name: Lint every commit on the branch
@@ -114,6 +120,10 @@ jobs:
         # commits for the wrong reason. `pipefail` because the default `bash -e` reports only the
         # last command of a pipeline, so a failing `git log` would otherwise be judged by commitlint
         # on empty input.
+        #
+        # With commitlint.squash.config.mjs, like the title: everything here has landed on `main`. It
+        # matters beyond the subject, because commitlint's merge ignore pattern matches any line, so
+        # a `Merge branch x` line in a body typed in the merge dialog would skip the whole commit.
         env:
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
@@ -124,7 +134,7 @@ jobs:
             exit 1
           fi
           if [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
-            git log -1 --format=%B "$AFTER_SHA" | pnpm exec commitlint --verbose
+            git log -1 --format=%B "$AFTER_SHA" | pnpm exec commitlint --config commitlint.squash.config.mjs --verbose
           else
-            pnpm exec commitlint --from "$BEFORE_SHA" --to "$AFTER_SHA" --verbose
+            pnpm exec commitlint --config commitlint.squash.config.mjs --from "$BEFORE_SHA" --to "$AFTER_SHA" --verbose
           fi
