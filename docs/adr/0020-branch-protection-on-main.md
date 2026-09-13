@@ -4,8 +4,9 @@
 
 Superseded by ADR-0021
 
-No longer applies: the protection table and both rules, now that three checks are required and
-rebase merging is off. See [ADR 0021](0021-squash-only-merges-and-required-checks.md).
+No longer applies: all of its decision, the protection table, both rules and the note on ADR 0004,
+now that three checks are required and rebase merging is off. See
+[ADR 0021](0021-squash-only-merges-and-required-checks.md).
 
 ## Date
 
