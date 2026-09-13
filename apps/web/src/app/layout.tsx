@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+// Self-hosted through next/font/local rather than fetched from Google Fonts at build time: outside
+// dev, Next turns a failed Google Fonts fetch into a build error, so an outage or a network block on a
+// runner blocked every production deploy. The files are subsets of Geist; see fonts/README.md.
+import localFont from 'next/font/local';
 import './globals.css';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 // Imported from their own modules, not the `@/components` barrel: every client module reachable
@@ -12,14 +15,23 @@ import { PersonJsonLd, WebsiteJsonLd } from '@/components/json-ld';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
 
-const geistSans = Geist({
+// Characters Geist lacks fall back to the faces globals.css declares with Google Fonts' override
+// values, so they keep the size they had; the faces next/font/local would compute differ by a
+// percent or two.
+const geistSans = localFont({
+  src: './fonts/geist-latin.woff2',
   variable: '--font-geist-sans',
-  subsets: ['latin'],
+  weight: '100 900',
+  adjustFontFallback: false,
+  fallback: ['Geist Fallback'],
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: './fonts/geist-mono-latin-symbols.woff2',
   variable: '--font-geist-mono',
-  subsets: ['latin'],
+  weight: '100 900',
+  adjustFontFallback: false,
+  fallback: ['Geist Mono Fallback'],
 });
 
 export const metadata: Metadata = {
