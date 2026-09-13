@@ -104,6 +104,15 @@ is there so that a future buildable package is compiled before the apps typechec
   resolved review threads, and it applies to administrators. Approving reviews required: 0, so the
   reviewer rule below is convention, not enforcement. See
   `docs/adr/0020-branch-protection-on-main.md`.
+- Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
+  `main` never passes through the local hook. `.github/workflows/commitlint.yml`, job
+  `Commit messages`, lints the pull request title (the squash commit's subject), every commit
+  between the pull request's base and head, and on a push to `main` the new HEAD, all with
+  `commitlint.config.mjs`. It re-runs on every `edited` event, a body edit included, and has no
+  job-level `if`: GitHub reports a job skipped by a condition as Success, which would satisfy a
+  required check on a title nobody linted. Commits on `main` from before the check stay as accepted
+  history, because `main` is never rewritten: 28 of them fail it, and the four since commitlint
+  arrived in #3 (54b8b80, d7d058d, a8b4a91, 3e98c14) each fail `body-max-line-length`.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
