@@ -969,7 +969,7 @@ test.describe('Featured Work', () => {
 
 - [x] **Step 1:** `pnpm --filter web build && pnpm --filter web start &` then `pnpm --filter web exec playwright screenshot --viewport-size=1280,900 --full-page http://localhost:3000 <scratch>/home-light.png`, the same with `--color-scheme dark`, and `--device "iPhone 13"`; inspect the Featured Work section in each; stop the server.
 - [x] **Step 2:** Run the `ui-reviewer` agent on `apps/web/src/components/featured-work.tsx` and `apps/web/src/components/featured-work/*`; fix or record each finding.
-- [ ] **Step 3:** Run the adversarial review (diff only) and the edge-case trace; triage in the PR.
+- [x] **Step 3:** Run the adversarial review (diff only) and the edge-case trace; triage in the PR.
 
 ---
 
@@ -977,4 +977,4 @@ test.describe('Featured Work', () => {
 
 - [x] **Step 1:** Full gate (`pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build`, then `pnpm --filter web test:e2e`).
 - [x] **Step 2:** Tick this plan, `git push -u origin feat/featured-work-architecture-diagram`, `gh pr create --base chore/tooling-and-quality-gates` (retarget to `main` after PR #3 merges).
-- [ ] **Step 3:** Watch CI; hand off with screenshots.
+- [x] **Step 3:** Watch CI; hand off with screenshots.

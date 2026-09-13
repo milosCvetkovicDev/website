@@ -10,11 +10,15 @@ Node 22 is pinned in `.nvmrc` only; `engines.node` sets a `>=22` floor and `pack
 pnpm (`pnpm@10.33.0`), not Node. CI reads Node from `.nvmrc` and pnpm from `packageManager`.
 
 - `apps/web` — the site. Next.js 16 (App Router), React 19, Tailwind v4, GSAP + `@gsap/react`.
-  Source in `src/{app,components,data,hooks,test}`, e2e specs in `e2e/`.
+  Source in `src/{app,components,data,hooks,lib,test}`, e2e specs in `e2e/`.
 - `apps/playground` — Vite 7 + React sandbox. Not deployed, no tests.
 - `packages/prettier-config` — `@repo/prettier-config`. Referenced by `prettier.config.mjs` at the
   repo root and by `apps/web/prettier.config.mjs`, which adds
   `tailwindStylesheet: './src/app/globals.css'` so the class sorter sees the theme.
+- `scripts/` at the repository root holds the scripts that run outside the apps:
+  `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `vercel-ignore-build.mjs` (Vercel's
+  ignored build step, ADR 0016), and the `node:test` suites that `pnpm test:scripts` runs, one for
+  each of those two plus `ai-refusals.test.mjs`. It is not a workspace and Turbo does not see it.
 - `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
   `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
   has its own `tsconfig.json`.
@@ -30,28 +34,28 @@ pnpm (`pnpm@10.33.0`), not Node. CI reads Node from `.nvmrc` and pnpm from `pack
 
 ## Commands
 
-| Command                                                                 | What it does                                                            |
-| ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `pnpm dev`                                                              | `turbo dev` across every app                                            |
-| `pnpm dev:web`                                                          | Next.js dev server on port 3000                                         |
-| `pnpm dev:playground`                                                   | Vite dev server for the sandbox                                         |
-| `pnpm build`                                                            | `next build` (web) and `tsc -b && vite build` (playground)              |
-| `pnpm lint`                                                             | ESLint in each app with `--max-warnings 0`                              |
-| `pnpm lint:fix`                                                         | `eslint --fix` in each app, without `--max-warnings 0`                  |
-| `pnpm typecheck`                                                        | `next typegen && tsc --noEmit` (web), `tsc -b` (playground)             |
-| `pnpm test`                                                             | Vitest unit tests (web only)                                            |
-| `pnpm test:e2e`                                                         | Playwright specs in `apps/web/e2e`                                      |
-| `pnpm format`                                                           | Prettier over the whole repo, writing changes                           |
-| `pnpm format:check`                                                     | Prettier in check mode, no writes                                       |
-| `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves |
-| `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/` gates                         |
-| `pnpm clean`                                                            | `turbo clean` in both apps, then `rm -rf node_modules` at the root      |
-| `pnpm prepare`                                                          | `husky`; runs on install and is what creates the git hooks              |
-| `pnpm --filter web test:e2e`                                            | Playwright without going through Turborepo                              |
-| `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`                       | Playwright on a port other than the default 3210                        |
-| `pnpm --filter web test:watch`                                          | Vitest in watch mode                                                    |
-| `pnpm --filter web exec vitest run <path>`                              | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx` |
-| `pnpm --filter web exec playwright install --with-deps chromium webkit` | Needed once before the first e2e run; the phone projects need webkit    |
+| Command                                                                 | What it does                                                                                                                                                                         |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm dev`                                                              | `turbo dev` across every app                                                                                                                                                         |
+| `pnpm dev:web`                                                          | Next.js dev server on port 3000                                                                                                                                                      |
+| `pnpm dev:playground`                                                   | Vite dev server for the sandbox                                                                                                                                                      |
+| `pnpm build`                                                            | `next build` (web) and `tsc -b && vite build` (playground)                                                                                                                           |
+| `pnpm lint`                                                             | ESLint in each app with `--max-warnings 0`                                                                                                                                           |
+| `pnpm lint:fix`                                                         | `eslint --fix` in each app, without `--max-warnings 0`                                                                                                                               |
+| `pnpm typecheck`                                                        | `next typegen && tsc --noEmit` (web), `tsc -b` (playground)                                                                                                                          |
+| `pnpm test`                                                             | Vitest unit tests (web only)                                                                                                                                                         |
+| `pnpm test:e2e`                                                         | Playwright specs in `apps/web/e2e`; `turbo.json` gives it `dependsOn: ["build"]`, so the root script builds `web` first. Prefer `pnpm --filter web test:e2e` locally, which does not |
+| `pnpm format`                                                           | Prettier over the whole repo, writing changes                                                                                                                                        |
+| `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                    |
+| `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                              |
+| `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/` gates                                                                                                                                      |
+| `pnpm clean`                                                            | `turbo clean` in both apps, then `rm -rf node_modules` at the root                                                                                                                   |
+| `pnpm prepare`                                                          | `husky`; runs on install and is what creates the git hooks                                                                                                                           |
+| `pnpm --filter web test:e2e`                                            | Playwright without going through Turborepo                                                                                                                                           |
+| `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`                       | Playwright on a port other than the default 3210                                                                                                                                     |
+| `pnpm --filter web test:watch`                                          | Vitest in watch mode                                                                                                                                                                 |
+| `pnpm --filter web exec vitest run <path>`                              | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx`                                                                                                              |
+| `pnpm --filter web exec playwright install --with-deps chromium webkit` | Needed once before the first e2e run; the phone projects need webkit                                                                                                                 |
 
 `pnpm lint:fix` drops `--max-warnings 0`, so it exits 0 on warnings that `pnpm lint` and CI fail on.
 Always finish with `pnpm lint`.
@@ -75,6 +79,16 @@ is there so that a future buildable package is compiled before the apps typechec
   webkit, build web, run the Playwright specs on all three projects; the report is uploaded as an
   artifact on failure or cancellation. Actions are SHA-pinned, `permissions: contents: read`, and
   concurrency cancels superseded runs on pull requests only.
+- `main` has branch protection on, and both CI jobs are required checks. A required check is stored
+  as the job's display name, so the two required contexts are the `name:` values in
+  `.github/workflows/ci.yml` character for character, and a comment above each says so: renaming
+  either job strands a required check that never reports and blocks every pull request. Protection
+  also requires the branch to be up to date with `main`, signed commits, linear history (merge
+  commits are refused; landing as a squash is the convention below, and rebase merging is also
+  enabled) and
+  resolved review threads, and it applies to administrators. Approving reviews required: 0, so the
+  reviewer rule below is convention, not enforcement. See
+  `docs/adr/0020-branch-protection-on-main.md`.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
@@ -100,7 +114,7 @@ is there so that a future buildable package is compiled before the apps typechec
   grow. The budget is zero on eight of the ten routes, so the first blurred panel put behind text
   there fails; never widen a budget or lower a floor to quieten a failure. A new
   `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
-  Conventions and ADR 0008.
+  Conventions and ADR 0011, which superseded 0008.
 - The AI-facing refusals are gated. `scripts/ai-refusals.test.mjs` runs under `pnpm test:scripts` and
   fails when a mechanism `docs/adr/0017-ai-discoverability-policy.md` refuses reappears: an
   `llms-full.txt`, `ai.txt`, `tdmrep.json`, `ai-plugin.json`, `agents.json`, `cv.json`, `resume.json`
@@ -228,13 +242,14 @@ is there so that a future buildable package is compiled before the apps typechec
   those. Other extensions, `.mdx` and `.svg` among them, are left exactly as written. The
   Prettier call ends in `|| true`, so a formatting failure is silent and only surfaces at
   `pnpm format:check`.
+- `.mcp.json` is tracked and configures one MCP server for this project, over HTTP. It needs
+  authorising once per machine before its tools work, and nothing in the repository depends on it.
 - `.claude/agents/ui-reviewer.md` is a read-only review agent for `apps/web/src/components`: visual
   quality, GSAP cleanup and reduced motion, accessibility, component structure. Run it after
   changing a component.
-- Before opening a pull request, work the checklist in `.github/pull_request_template.md`:
-  `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, plus
-  `pnpm --filter web test:e2e` when the UI changed. Paste the commands and their real output into
-  the Verification section; "seems fine" is not evidence.
+- Before opening a pull request, work the checklist in `.github/pull_request_template.md`, which
+  lists every gate in CI order; do not keep a second copy of it here. Paste the commands and their
+  real output into the Verification section; "seems fine" is not evidence.
 - A reviewer other than the author reads the diff before it is merged: a person, or a review agent
   such as `ui-reviewer` for components. Findings go in the Review section of the pull request,
   written down rather than asserted.
@@ -339,6 +354,13 @@ is there so that a future buildable package is compiled before the apps typechec
   URLs redirect to a Vercel login; the production alias `portfolio-theta-gold-77.vercel.app` is
   public. `vercel curl <path> --deployment <url>` fetches the protected ones but creates a
   project-wide protection-bypass secret on first use, see `docs/runbooks/deploy.md`.
+- The CI e2e log prints a three-line `[WebServer] Error: Internal: NoFallbackError` stack twice per
+  run and still passes. It is the internal signal that routes an unknown `/work/*` slug to the
+  site-level 404, once before `not-found-shell` and again when `console-clean` walks
+  `/work/does-not-exist`; the response is a correct 404 and no browser console entry results. Do
+  not chase it. The Vercel production log carries no such line, because the platform answers an
+  unknown path from the cached static 404 without invoking the route
+  (`docs/adr/0015-static-case-study-params.md`).
 - Claude Code's in-app Browser pane logs React error #418 (hydration mismatch) on every page of the
   deployed site, while an unmodified headless Chromium (Playwright from `apps/web`) reports none
   across schemes, viewports and reduced motion. Judge console cleanliness with Playwright, not the

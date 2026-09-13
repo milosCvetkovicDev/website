@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (corrected 2026-09-12)
 
 ## Date
 
@@ -128,3 +128,42 @@ developer is using.
   conventional port for the production build. CI matching them is worth one line of `env`.
 - **An opt-in `PLAYWRIGHT_REUSE_SERVER=1`.** Rejected as YAGNI: it re-opens the silent-wrong-build
   path for whoever sets it, and Playwright starting the server is what makes the run trustworthy.
+
+## Corrections
+
+### 2026-09-12
+
+Two sentences inside `## Decision` misstate how `NEXT_DIST_DIR` is read and set. Both were false
+when this record was accepted: the code they describe landed in the same commit, `5a02529`, already
+written the other way, and this record's own `## Consequences` describes the real behaviour
+correctly at `:104-110`. `## Decision` is never rewritten, so both are annotated here, under
+[ADR 0012](0012-correcting-accepted-records.md).
+
+**How the variable is read.** The record reads: "`apps/web/next.config.ts` reads
+`distDir: process.env.NEXT_DIST_DIR ?? '.next'`". What is true: it reads
+`distDir: process.env.NEXT_DIST_DIR || '.next'`. What was wrong: the operator. `??` falls back only
+on `null` and `undefined`, so it would take an empty string — an unset variable expanded by a shell
+— as a build directory named by the empty string. `||` falls back on that too, which is why the code
+uses it. Evidence: `apps/web/next.config.ts:42`, and this record's `## Consequences` at `:108`,
+which already says "An empty value falls back to `.next` (`||`, not `??`)" — the two halves of the
+record disagreed from the day it was accepted.
+
+**Whether the variable is left unset for `pnpm start`.** The record reads: "The variable is left
+unset for `pnpm start`, which has to serve what `next build` wrote to `.next`." What is true:
+Playwright pins the variable on both branches. `apps/web/playwright.config.ts:64` is
+`NEXT_DIST_DIR: isCI ? '.next' : '.next-e2e'`, so the CI branch that runs `pnpm start` sets it
+explicitly to `.next` rather than omitting it. What was wrong: "left unset" describes a draft that
+the review rejected. Omitting the key would let Playwright, which merges `webServer.env` over
+`process.env`, inherit an ambient `NEXT_DIST_DIR` from the shell and serve `pnpm start` a
+directory `next build` never wrote. The record's intent — that `pnpm start` serves `.next` — is
+what the code achieves; it achieves it by pinning, not by omitting. Evidence:
+`apps/web/playwright.config.ts:64` and the comment above it; `## Consequences` at `:106-108`
+("`webServer.env` therefore pins it on both branches rather than omitting it on one"); and
+[the local Playwright port plan](../plans/2026-09-10-local-playwright-port-plan.md) Task 6, whose
+review round records the change as an accepted finding: "`webServer.env` omitted `NEXT_DIST_DIR`
+on the CI branch rather than pinning it. Playwright merges that object over `process.env`, so an
+ambient value would have reached `pnpm start`".
+
+The comment at `apps/web/next.config.ts:40` repeats the second error, calling the variable "Unset
+everywhere else, CI included". Correcting a comment in `apps/web` is not this record's to make and
+is left to the pull request that owns that file; the code beside it is right.
