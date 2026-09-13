@@ -100,10 +100,10 @@ is there so that a future buildable package is compiled before the apps typechec
   `.github/workflows/ci.yml` character for character, and a comment above each says so: renaming
   either job strands a required check that never reports and blocks every pull request. Protection
   also requires the branch to be up to date with `main`, signed commits, linear history (merge
-  commits are refused; landing as a squash is the convention below, and rebase merging is also
-  enabled) and
-  resolved review threads, and it applies to administrators. Approving reviews required: 0, so the
-  reviewer rule below is convention, not enforcement. See
+  commits are refused, and squash is the only merge method enabled in the repository settings, with
+  the pull request title as the squash subject and a blank body) and resolved review threads, and
+  it applies to administrators. Approving reviews required: 0, so the reviewer rule below is
+  convention, not enforcement. See
   `docs/adr/0020-branch-protection-on-main.md`.
 - Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
   `main` never passes through the local hook. `.github/workflows/commitlint.yml`, job
@@ -117,15 +117,22 @@ is there so that a future buildable package is compiled before the apps typechec
   `commitlint.squash.config.mjs`, which sets `defaultIgnores: false`: commitlint otherwise skips,
   and passes, any message shaped like `revert …`, `Reapply …`, `fixup! …`, `Merge branch … into …`
   or a bare version, and its merge pattern matches a line anywhere in the body. Its one exception
-  is GitHub's revert title, `Revert "<conventional header>"`, nested or not. The branch commits and
-  `.husky/commit-msg` keep `commitlint.config.mjs` with the default ignores, because
-  `git commit --fixup`, `git merge` and GitHub's "Update branch" write those shapes and a squash
-  merge discards them. `scripts/commitlint-config.test.mjs` pins both configs and which step uses
-  which. The workflow re-runs on every `edited` event, a body edit included, and has no job-level
-  `if`: GitHub reports a job skipped by a condition as Success, which would satisfy a required check
-  on a title nobody linted. Commits on `main` from before the check stay as accepted history,
-  because `main` is never rewritten: 28 of them fail it, and the four since commitlint arrived
-  in #3 (54b8b80, d7d058d, a8b4a91, 3e98c14) each fail `body-max-line-length`.
+  is a revert with nothing else in the message (no body, or only `git revert`'s own line):
+  `Revert "<header>"` as GitHub's revert button and `git revert` write it, or `Reapply "<header>"`,
+  nested or not, where `<header>` has a type from `type-enum`, no trailing full stop, no `"` and
+  fits `header-max-length`. That header is checked for shape, not linted (`subject-case` is not
+  re-checked), and a revert with any other body is linted like any other message. Anything else, a
+  revert of a non-conventional title included, is retitled as a conventional `revert: …` header.
+  The branch commits and `.husky/commit-msg` keep `commitlint.config.mjs` with the default ignores,
+  because `git commit --fixup`, `git merge` and GitHub's "Update branch" write those shapes. That
+  split holds only while squash is the one merge method enabled, so that a squash merge discards
+  the branch commits; were rebase merging turned on, the branch step would need the squash config
+  too. `scripts/commitlint-config.test.mjs` pins both configs, the hook, and which workflow step
+  uses which. The workflow re-runs on every `edited` event, a body edit included, and has no
+  job-level `if`: GitHub reports a job skipped by a condition as Success, which would satisfy a
+  required check on a title nobody linted. Commits on `main` from before the check stay as accepted
+  history, because `main` is never rewritten: 28 of them fail it, and the four since commitlint
+  arrived in #3 (54b8b80, d7d058d, a8b4a91, 3e98c14) each fail `body-max-line-length`.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
