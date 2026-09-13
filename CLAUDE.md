@@ -106,9 +106,12 @@ is there so that a future buildable package is compiled before the apps typechec
   `docs/adr/0020-branch-protection-on-main.md`.
 - Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
   `main` never passes through the local hook. `.github/workflows/commitlint.yml`, job
-  `Commit messages`, lints the pull request title (the squash commit's subject), every commit
-  between the pull request's base and head, and on a push to `main` the new HEAD, all with
-  `commitlint.config.mjs`. It re-runs on every `edited` event, a body edit included, and has no
+  `Commit messages`, lints with `commitlint.config.mjs`: the pull request title twice, as written
+  and with the ` (#NN)` GitHub appends to the squash commit's subject (the suffix alone can break
+  `header-max-length`, and it hides `subject-full-stop`); every commit between the pull request's
+  base and head, which still runs when the title fails, so one failure cannot hide another; and on a
+  push to `main` every commit from the previous tip to the new one, or only the new tip when the
+  push created the branch. It re-runs on every `edited` event, a body edit included, and has no
   job-level `if`: GitHub reports a job skipped by a condition as Success, which would satisfy a
   required check on a title nobody linted. Commits on `main` from before the check stay as accepted
   history, because `main` is never rewritten: 28 of them fail it, and the four since commitlint

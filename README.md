@@ -60,7 +60,7 @@ The site runs on `http://localhost:3000`. `pnpm dev:playground` starts the sandb
 
 ## Quality gates
 
-CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, commitlint runs in a workflow of its own, `.github/workflows/commitlint.yml`, over the pull request title and every commit, or over the new commit on a push to `main`. Of the rest, the `quality` job runs the first eight in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message.
+CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, commitlint runs in a workflow of its own, `.github/workflows/commitlint.yml`, over the pull request title (as written, and with the ` (#NN)` suffix the squash commit gets) and every commit on the branch, or over every commit a push to `main` lands. Of the rest, the `quality` job runs the first eight in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message.
 
 | Command                      | What it checks                                                                                           | Pre-commit         | CI  |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------ | --- |
