@@ -22,7 +22,10 @@ You are reviewing a Next.js 16 + React 19 + Tailwind v4 + GSAP portfolio site. C
 ## GSAP Animation Quality
 
 - ScrollTrigger animations should have `scrub` or proper `start`/`end` values
-- useGSAP hook usage (not raw useEffect for GSAP)
+- GSAP work runs inside `gsap.context()` in a `useEffect`, and the context is reverted in that
+  effect's cleanup (`ctx.revert()`) — the pattern every phase component uses, for example
+  `apps/web/src/components/animated-hero/discovery-phase.tsx`, `execution-phase.tsx` and
+  `loop-phase.tsx`. Nothing here wraps GSAP in a React hook package, so do not ask for one.
 - Cleanup: GSAP context or timeline.kill() in cleanup function
 - No layout shift: animated elements should have explicit dimensions
 - Reduced motion: check for `prefers-reduced-motion` media query support

@@ -2,6 +2,16 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# A package version published less than a day ago is not installed. Most supply-chain compromises of
+# an npm package are found and unpublished within hours, and nothing here needs a release the day it
+# ships: ADR 0013 stops a dependency's install script from running, but not a compromised build of
+# something that runs in-process at build or test time (vite, an ESLint plugin, @babel/core), and
+# Dependabot refreshes the lockfile every Monday. Read
+# docs/adr/0018-dependency-update-policy.md before lowering this or adding a
+# `minimumReleaseAgeExclude` entry; an exclusion needs a named package and a reason, and a security
+# fix published the same day is the one case that earns one.
+minimumReleaseAge: 1440
+
 # pnpm 10 runs no dependency lifecycle scripts unless the package is allowed here, and warns about
 # every package it skipped. `false` records a deliberate denial and silences that warning, `true`
 # would approve the script. Read docs/adr/0013-dependency-build-scripts-reviewed.md before adding
