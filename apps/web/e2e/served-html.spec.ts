@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /**
  * What `/` looks like with JavaScript switched off.
@@ -59,19 +59,49 @@ const SERVED_MARKERS = [
  * A plain `html.includes('EXECUTION')` does not work on this page and never will: `AnimatedText` wraps
  * every character in its own `<span>`, so the label arrives as `E</span><span …>X</span>…` and no
  * contiguous substring of the response contains the word. That is R14's mechanism showing up in a
- * second place. Stripping the tags recovers the text, which is the right question anyway — the row is
- * about the content being served, not about how it is marked up.
+ * second place. Reading the text nodes recovers the text, which is the right question anyway — the row
+ * is about the content being served, not about how it is marked up.
+ *
+ * The browser parses the markup; regular expressions do not. The hand-rolled stripper this replaces
+ * produced wrong text for inputs that are legal HTML, which is the one thing a measuring instrument
+ * cannot do: `</script >` left script source in the text, or deleted visible copy up to the next
+ * `</script>`; a `>` inside a comment or a bare `<` in text cut the text in the wrong place; and entity
+ * decoding was a short list applied in sequence, so `&gt;` stayed encoded (the Discovery prompt glyph
+ * on `/` read as `&gt;`) while `&amp;nbsp;` was decoded twice, into a space. `DOMParser` runs the HTML
+ * parsing algorithm, so tags, comments and character references come out as a browser reads them.
+ *
+ * A document created by `DOMParser` has scripting disabled: none of its scripts run and none of its
+ * event handler attributes fire, so parsing the response cannot act on the page doing the parsing.
+ * `page.evaluate` works with `javaScriptEnabled: false`, for the reason given in the second test.
+ *
+ * - `script`, `style` and `template` contribute one space and none of their content. Script and style
+ *   text is code rather than copy, and a template's content is inert until a script clones it (on `/`,
+ *   React's pending Suspense placeholder `<template id="B:0">` is one). The space keeps the words either
+ *   side apart, as the regular expressions did for script and style.
+ * - `noscript` is kept. With scripting disabled the parser reads its content as ordinary markup, which
+ *   is exactly what a crawler that runs no JavaScript does with it. None of the ten routes serves one
+ *   today, but a fallback added later is copy written for that very reader, so it has to count.
+ * - Text nodes are joined with nothing, because an element boundary is not a word boundary: that is how
+ *   the `AnimatedText` spans read back as `EXECUTION`. Whitespace runs then collapse to a single space;
+ *   `\s` matches U+00A0, so a non-breaking space collapses with them.
  */
-function servedText(html: string): string {
-  return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;|&apos;|&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&nbsp;| /g, ' ')
-    .replace(/\s+/g, ' ');
+async function servedText(page: Page, html: string): Promise<string> {
+  return page.evaluate((markup) => {
+    const skipped = new Set(['script', 'style', 'template']);
+    const parts: string[] = [];
+    const walk = (parent: Node) => {
+      for (const node of parent.childNodes) {
+        if (node instanceof Text) {
+          parts.push(node.data);
+        } else if (node instanceof Element) {
+          if (skipped.has(node.localName)) parts.push(' ');
+          else walk(node);
+        }
+      }
+    };
+    walk(new DOMParser().parseFromString(markup, 'text/html'));
+    return parts.join('').replace(/\s+/g, ' ');
+  }, html);
 }
 
 test('the whole story is in the served markup with JavaScript off', async ({ page, request }) => {
@@ -79,7 +109,7 @@ test('the whole story is in the served markup with JavaScript off', async ({ pag
   // crawler reads, and in the rendered document, which is what a reader without JavaScript gets.
   const response = await request.get('/');
   expect(response.status()).toBe(200);
-  const text = servedText(await response.text());
+  const text = await servedText(page, await response.text());
   for (const marker of SERVED_MARKERS) {
     expect(text, `${marker} must be in the served HTML`).toContain(marker);
   }
