@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { caseStudies } from '../src/data/case-studies';
+import { warmRoutes } from './support/warm-routes';
 
 /**
  * The `/work` archive cards, and the one thing they disagree with the home page about.
@@ -32,6 +33,17 @@ import { caseStudies } from '../src/data/case-studies';
  */
 
 test.describe.configure({ retries: 0 });
+
+// The two card tests click into every case study. On the dev server the first request for
+// `/work/[slug]` took 2 to 7 s, longer than the 5 s `toHaveURL` window under load, so each route is
+// served once before any test here navigates to it (e2e/support/warm-routes.ts).
+test.beforeAll(async ({ playwright }, testInfo) => {
+  await warmRoutes(
+    playwright,
+    testInfo,
+    caseStudies.map(({ slug }) => `/work/${slug}`),
+  );
+});
 
 const colorSchemes = ['light', 'dark'] as const;
 const MAX_LINK_NAME = 80;
@@ -134,6 +146,11 @@ test('a case study status reads as one colour on / and on /work, in both themes'
 }) => {
   test.fail();
   test.info().annotations.push({ type: 'fixed-by', description: 'R39, #49' });
+  // Four navigations and two waits on the home page's loader, each allowed 30 s on its own: the
+  // shape `client-navigation.spec.ts` budgets at 90 s. Under the 30 s default the dev server ran
+  // out of time before the colour comparison on 4 of 5 loaded runs (2026-09-13), and a timeout is
+  // not the failure `test.fail()` expects, so this row went red without measuring anything.
+  test.setTimeout(90_000);
 
   const [study] = caseStudies;
   const status = study.highlight.status;
