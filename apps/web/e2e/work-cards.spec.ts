@@ -34,17 +34,6 @@ import { warmRoutes } from './support/warm-routes';
 
 test.describe.configure({ retries: 0 });
 
-// The two card tests click into every case study. On the dev server the first request for
-// `/work/[slug]` took 2 to 7 s, longer than the 5 s `toHaveURL` window under load, so each route is
-// served once before any test here navigates to it (e2e/support/warm-routes.ts).
-test.beforeAll(async ({ playwright }, testInfo) => {
-  await warmRoutes(
-    playwright,
-    testInfo,
-    caseStudies.map(({ slug }) => `/work/${slug}`),
-  );
-});
-
 const colorSchemes = ['light', 'dark'] as const;
 const MAX_LINK_NAME = 80;
 
@@ -87,33 +76,48 @@ async function resolvedColor(page: Page, locator: ReturnType<Page['locator']>): 
   }, authored);
 }
 
-test('every /work card reaches its case study by pointer', async ({ page }) => {
-  // Green, and the regression floor R36's fix has to keep. Replacing a whole-card link with a stretched
-  // title link can very easily leave the card body unclickable, which is a worse outcome than the long
-  // accessible name: clicking a card is the archive's only job.
-  for (const { slug, title } of caseStudies) {
-    await page.goto('/work');
-    const card = cardFor(page, slug);
-    await expect(card, `/work must have a card linking to ${slug}`).toHaveCount(1);
-    // Clicked on the title, which is inside the card whichever way the link is structured.
-    await card.getByText(title, { exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/work/${slug}$`));
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(title);
-  }
-});
+// The two card tests click into every case study. On the dev server the first request for
+// `/work/[slug]` took 2 to 7 s, longer than the 5 s `toHaveURL` window under load, so each route is
+// served once before either test navigates (e2e/support/warm-routes.ts). The group is anonymous, so
+// the tests keep their titles, and it holds only these two, so a route that cannot be served fails
+// them without taking the rest of the file down with it.
+test.describe(() => {
+  test.beforeAll(async ({ playwright }, testInfo) => {
+    await warmRoutes(
+      playwright,
+      testInfo,
+      caseStudies.map(({ slug }) => `/work/${slug}`),
+    );
+  });
 
-test('every /work card reaches its case study by keyboard', async ({ page }) => {
-  // The other half of the floor. A stretched-link refactor that puts the overlay above the link itself
-  // breaks pointer and keyboard access independently, so both are pinned.
-  for (const { slug, title } of caseStudies) {
-    await page.goto('/work');
-    const card = cardFor(page, slug);
-    await card.focus();
-    await expect(card).toBeFocused();
-    await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(new RegExp(`/work/${slug}$`));
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(title);
-  }
+  test('every /work card reaches its case study by pointer', async ({ page }) => {
+    // Green, and the regression floor R36's fix has to keep. Replacing a whole-card link with a
+    // stretched title link can very easily leave the card body unclickable, which is a worse outcome
+    // than the long accessible name: clicking a card is the archive's only job.
+    for (const { slug, title } of caseStudies) {
+      await page.goto('/work');
+      const card = cardFor(page, slug);
+      await expect(card, `/work must have a card linking to ${slug}`).toHaveCount(1);
+      // Clicked on the title, which is inside the card whichever way the link is structured.
+      await card.getByText(title, { exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`/work/${slug}$`));
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(title);
+    }
+  });
+
+  test('every /work card reaches its case study by keyboard', async ({ page }) => {
+    // The other half of the floor. A stretched-link refactor that puts the overlay above the link
+    // itself breaks pointer and keyboard access independently, so both are pinned.
+    for (const { slug, title } of caseStudies) {
+      await page.goto('/work');
+      const card = cardFor(page, slug);
+      await card.focus();
+      await expect(card).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(new RegExp(`/work/${slug}$`));
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(title);
+    }
+  });
 });
 
 test('the first /work card link is named for its title alone', async ({ page }) => {
@@ -144,12 +148,11 @@ test('the first /work card link is named for its title alone', async ({ page }) 
 test('a case study status reads as one colour on / and on /work, in both themes', async ({
   page,
 }) => {
-  test.fail();
   test.info().annotations.push({ type: 'fixed-by', description: 'R39, #49' });
-  // Four navigations and two waits on the home page's loader, each allowed 30 s on its own: the
-  // shape `client-navigation.spec.ts` budgets at 90 s. Under the 30 s default the dev server ran
-  // out of time before the colour comparison on 4 of 5 loaded runs (2026-09-13), and a timeout is
-  // not the failure `test.fail()` expects, so this row went red without measuring anything.
+  // Four navigations and two waits on the home page's loader, and the loader waits alone may take
+  // 30 s each: more than the 30 s default holds, which is why `client-navigation.spec.ts` gives the
+  // same shape 90 s. Under the default this ran out of time before the colour comparison on 4 of 5
+  // dev-server runs under load (2026-09-13).
   test.setTimeout(90_000);
 
   const [study] = caseStudies;
@@ -182,6 +185,10 @@ test('a case study status reads as one colour on / and on /work, in both themes'
     }
   }
 
+  // Expected to fail from here on only. Declared at the top, a prerequisite that fails above (a
+  // loader that never hides, a theme class that never lands) would count as the disagreement this
+  // row records and pass the run; under the 30 s default it timed out instead, which did not.
+  test.fail();
   expect(
     disagreements,
     'the featured card uses --tmux-status-ok (featured-work.tsx:100) and the archive card ' +

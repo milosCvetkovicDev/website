@@ -10,16 +10,17 @@ import { expect, type PlaywrightWorkerArgs, type TestInfo } from '@playwright/te
  * the new URL only once the destination's RSC payload has arrived, so a click into a route nobody
  * has requested yet spends its `toHaveURL` window waiting on the server. Measured on 2026-09-13 for
  * `/work/[slug]`: 2 to 7 s from the click to the URL depending on machine load, against the 5 s
- * local expect timeout, and about 0.1 s once the route had been served.
+ * local expect timeout. One document request for the route beforehand brought the RSC request the
+ * click makes down to about 0.1 s, from a deleted `.next-e2e` too.
  *
  * Only the dev server needs it. The production build CI serves prerenders the route and
  * `next/link` prefetches it, which development builds never do, so there it costs one static
  * response per path.
  *
- * Call it from `test.beforeAll`, whose timeout is separate from each test's, so the work is paid
- * outside the budget of the test that navigates. It prepares the server and nothing else: the
- * navigation under test still has to happen by the spec's own means, inside the default expect
- * timeout.
+ * Call it from a `test.beforeAll` inside a `test.describe` holding only the tests that navigate, so
+ * a route that cannot be served fails those tests and no others. A hook's time is not taken from
+ * any test's budget. It prepares the server and nothing else: the navigation under test still has
+ * to happen by the spec's own means, inside the default expect timeout.
  */
 
 /** How long one first request may take locally: a cold compile plus the static-params worker. */
@@ -30,11 +31,23 @@ export async function warmRoutes(
   testInfo: TestInfo,
   paths: readonly string[],
 ): Promise<void> {
-  // The `request` fixture is test-scoped and so unavailable in `beforeAll`.
-  const request = await playwright.request.newContext({ baseURL: testInfo.project.use.baseURL });
+  // The `request` fixture is test-scoped and so unavailable in `beforeAll`, which leaves the
+  // project's `baseURL` as the record of which server the tests use.
+  const { baseURL } = testInfo.project.use;
+  if (!baseURL) {
+    throw new Error('warmRoutes needs `use.baseURL` in playwright.config.ts to find the server.');
+  }
+  // Sized so that a request's own timeout, which names its path, fires before the hook's would.
+  // Measured under a load average of 160 to 270, the whole warm-up took 2 to 5 s.
+  testInfo.setTimeout(paths.length * FIRST_REQUEST_TIMEOUT_MS);
+  const request = await playwright.request.newContext({ baseURL });
   try {
     for (const path of paths) {
-      const response = await request.get(path, { timeout: FIRST_REQUEST_TIMEOUT_MS });
+      // A redirect is not the route being served, whatever its target answers.
+      const response = await request.get(path, {
+        maxRedirects: 0,
+        timeout: FIRST_REQUEST_TIMEOUT_MS,
+      });
       // An error here would otherwise surface later as a navigation that never arrived, which reads
       // like the slow first request this exists to remove.
       await expect(response, `${path} must be served before a spec navigates to it`).toBeOK();
