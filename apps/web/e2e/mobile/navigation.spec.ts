@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { STATIC_ROUTES } from '../routes';
+import { warmRoutes } from '../support/warm-routes';
 
 /**
  * The mobile header and its menu, on a real phone viewport.
@@ -92,16 +93,29 @@ test.describe('the mobile header', () => {
     await expect(menuButton(page)).toBeVisible();
   });
 
-  test('navigates by a menu link and closes the menu', async ({ page }) => {
-    await open(page, '/');
-    await openMenu(page);
+  // The About tap is a client-side navigation, whose URL changes only once the RSC payload for
+  // `/about` has arrived. Run alone from a deleted `.next-e2e`, it was the dev server's first
+  // request for that route: 2.1 s for the payload, 1.7 s of it in Next.js itself (42 ms with the
+  // cache kept), against under 0.4 s for later taps (2026-09-13). It passed all 40 runs on both phone
+  // projects, but the same kind of first-request wait failed `case-study.spec.ts`. The route is
+  // requested before the test, once per worker (e2e/support/warm-routes.ts), from an anonymous group
+  // holding only this test.
+  test.describe(() => {
+    test.beforeAll(async ({ playwright }, testInfo) => {
+      await warmRoutes(playwright, testInfo, ['/about']);
+    });
 
-    await drawer(page).getByRole('link', { name: 'About' }).tap();
+    test('navigates by a menu link and closes the menu', async ({ page }) => {
+      await open(page, '/');
+      await openMenu(page);
 
-    await expect(page).toHaveURL(/\/about$/);
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    // The link's own onClick closes the menu; the panel must not survive the navigation.
-    await expect(closeButton(page)).toBeHidden();
+      await drawer(page).getByRole('link', { name: 'About' }).tap();
+
+      await expect(page).toHaveURL(/\/about$/);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      // The link's own onClick closes the menu; the panel must not survive the navigation.
+      await expect(closeButton(page)).toBeHidden();
+    });
   });
 
   test('switches the theme from the mobile toggle', async ({ page }) => {
