@@ -100,10 +100,10 @@ is there so that a future buildable package is compiled before the apps typechec
   `.github/workflows/ci.yml` character for character, and a comment above each says so: renaming
   either job strands a required check that never reports and blocks every pull request. Protection
   also requires the branch to be up to date with `main`, signed commits, linear history (merge
-  commits are refused, and squash is the only merge method enabled in the repository settings, with
-  the pull request title as the squash subject and a blank body) and resolved review threads, and
-  it applies to administrators. Approving reviews required: 0, so the reviewer rule below is
-  convention, not enforcement. See
+  commits are refused; landing as a squash is the convention below, and rebase merging is also
+  enabled) and
+  resolved review threads, and it applies to administrators. Approving reviews required: 0, so the
+  reviewer rule below is convention, not enforcement. See
   `docs/adr/0020-branch-protection-on-main.md`.
 - Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
   `main` never passes through the local hook. `.github/workflows/commitlint.yml`, job
