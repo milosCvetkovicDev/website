@@ -1,5 +1,27 @@
 @import 'tailwindcss';
 
+/* Geist's fallback faces, with the override values Next generated for the Google Fonts copy of
+   Geist before the fonts were self-hosted. Characters Geist lacks, such as arrows and circles,
+   render in these, so they keep the size they had. layout.tsx turns off the faces
+   next/font/local would generate instead. */
+@font-face {
+  font-family: 'Geist Fallback';
+  src: local('Arial');
+  ascent-override: 95.94%;
+  descent-override: 28.16%;
+  line-gap-override: 0%;
+  size-adjust: 104.76%;
+}
+
+@font-face {
+  font-family: 'Geist Mono Fallback';
+  src: local('Arial');
+  ascent-override: 74.67%;
+  descent-override: 21.92%;
+  line-gap-override: 0%;
+  size-adjust: 134.59%;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
