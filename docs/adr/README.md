@@ -30,7 +30,7 @@ perform an operation.
 | 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)                                                        | Superseded by ADR-0018 (corrected 2026-09-13) | 2026-09-08 |
 | 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)                                                | Accepted                                      | 2026-09-08 |
 | 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)                                                      | Accepted                                      | 2026-09-08 |
-| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                                                                              | Superseded by ADR-0016 (corrected 2026-09-12) | 2026-09-08 |
+| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                                                                              | Superseded by ADR-0016 (corrected 2026-09-13) | 2026-09-08 |
 | 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)                                                          | Accepted                                      | 2026-09-08 |
 | 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)                                                  | Superseded by ADR-0013 (corrected 2026-09-10) | 2026-09-09 |
 | 0008 | [Accent colour roles](0008-accent-colour-roles.md)                                                                          | Superseded by ADR-0011                        | 2026-09-09 |
