@@ -3,8 +3,8 @@ name: Commit messages
 # commitlint ran only in .husky/commit-msg, which the squash commits GitHub writes to `main` never
 # pass through. Four commits on `main` since commitlint arrived in #3, #3's own included, already
 # fail the repository's own convention because of it. This lints the messages that actually land:
-# the pull request title, which becomes the subject of the squash commit, every commit on the
-# branch, and the new HEAD on `main` after the merge.
+# the pull request title as the subject of the squash commit, every commit on the branch, and every
+# commit a push lands on `main`.
 #
 # A workflow of its own rather than a step in ci.yml: a title edit then re-runs this alone instead
 # of the build and the e2e suite, and ci.yml keeps exactly the gates the docs list for its two jobs.
@@ -61,26 +61,67 @@ jobs:
           cache: pnpm
 
       - name: Install
+        id: install
         run: pnpm install --frozen-lockfile
 
       - name: Lint the pull request title
         if: github.event_name == 'pull_request'
         # The title is attacker-controlled input, so it arrives through the environment and is never
-        # interpolated into the script. `printf` rather than `echo`, which would eat a leading `-`.
+        # interpolated into the script; the number comes the same way. `printf` rather than `echo`,
+        # which would eat a leading `-`.
+        #
+        # Linted twice, and the second runs even when the first fails. Once as the squash commit's
+        # subject reads on `main`, where GitHub appends ` (#NN)`: the suffix alone can push a title
+        # that passes as written over `header-max-length`. And once as written, because the suffix
+        # hides the rules that read the end of the header: `feat: add thing.` fails
+        # `subject-full-stop`, `feat: add thing. (#NN)` passes.
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          status=0
+          printf '%s\n' "$PR_TITLE" | pnpm exec commitlint --verbose || status=1
+          printf '%s (#%s)\n' "$PR_TITLE" "$PR_NUMBER" | pnpm exec commitlint --verbose || status=1
+          exit "$status"
 
       - name: Lint every commit on the branch
-        if: github.event_name == 'pull_request'
+        # `!cancelled()` so a failing title does not skip this step and hide a second failure. The
+        # install outcome keeps a failed install, or anything before it, from being reported here a
+        # second time as a missing commitlint. The expression is wrapped because a bare `if:` that
+        # starts with `!` is a YAML tag, not a string.
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && github.event_name == 'pull_request' }}
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
 
-      - name: Lint the new commit on main
+      - name: Lint every commit pushed to main
         if: github.event_name == 'push'
-        # One commit: whatever the merge just wrote. The commits on `main` that predate this check,
-        # 28 of which fail it, stay as they are — `main` is never rewritten — so the range is
-        # deliberately not the whole history.
-        run: pnpm exec commitlint --from HEAD~1 --to HEAD --verbose
+        # Every commit the push landed, from the previous tip of `main` to the new one, so a push that
+        # lands several is linted in full rather than only its last commit. The commits on `main` that
+        # predate this check, 28 of which fail it, sit behind the first `before` and are never linted:
+        # `main` is never rewritten, so the range is deliberately not the whole history.
+        #
+        # `before` is all zeros when the push created the branch. There is no previous tip then, and
+        # `--from` would reject it as an invalid revision, so only the new tip is linted, from its full
+        # message (`HEAD~1` would not exist for a root commit). `^0+$` rather than forty zeros, so a
+        # SHA-256 repository matches too.
+        #
+        # Anything that is not a hex SHA fails first: commitlint reads `--from ""` as no `--from` at
+        # all and lints the whole history, which fails on the old commits for the wrong reason.
+        # `pipefail` because the default `bash -e` reports only the last command of a pipeline, so a
+        # failing `git log` would otherwise be judged by commitlint on empty input.
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          set -o pipefail
+          if [[ ! "$BEFORE_SHA" =~ ^[0-9a-f]+$ ]]; then
+            echo "::error::github.event.before is not a commit SHA: '$BEFORE_SHA'"
+            exit 1
+          fi
+          if [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            git log -1 --format=%B "$AFTER_SHA" | pnpm exec commitlint --verbose
+          else
+            pnpm exec commitlint --from "$BEFORE_SHA" --to "$AFTER_SHA" --verbose
+          fi
