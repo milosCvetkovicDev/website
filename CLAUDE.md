@@ -117,18 +117,21 @@ is there so that a future buildable package is compiled before the apps typechec
   `commitlint.squash.config.mjs`, which sets `defaultIgnores: false`: commitlint otherwise skips,
   and passes, any message shaped like `revert …`, `Reapply …`, `fixup! …`, `Merge branch … into …`
   or a bare version, and its merge pattern matches a line anywhere in the body. Its one exception
-  is a revert with nothing else in the message (no body, or only `git revert`'s own line):
-  `Revert "<header>"` as GitHub's revert button and `git revert` write it, or `Reapply "<header>"`,
-  nested or not, where `<header>` has a type from `type-enum`, no trailing full stop, no `"` and
-  fits `header-max-length`. That header is checked for shape, not linted (`subject-case` is not
-  re-checked), and a revert with any other body is linted like any other message. Anything else, a
-  revert of a non-conventional title included, is retitled as a conventional `revert: …` header.
-  The branch commits and `.husky/commit-msg` keep `commitlint.config.mjs` with the default ignores,
-  because `git commit --fixup`, `git merge` and GitHub's "Update branch" write those shapes. That
-  split holds only while squash is the one merge method enabled, so that a squash merge discards
-  the branch commits; were rebase merging turned on, the branch step would need the squash config
-  too. `scripts/commitlint-config.test.mjs` pins both configs, the hook, and which workflow step
-  uses which. The workflow re-runs on every `edited` event, a body edit included, and has no
+  is a revert with nothing else in the message (no body beyond `git revert`'s own line and
+  `Co-authored-by:` trailers): `Revert "<header>"` as GitHub's revert button and `git revert` write
+  it, or `Reapply "<header>"`, nested or not, up to 1000 characters. `<header>` needs a type from
+  `type-enum`, a subject that starts and ends with a non-space and does not start with a capital,
+  no trailing full stop, no `"`, and at most `header-max-length` characters. That approximates the
+  rules rather than linting the header (checked against the rules on a table of wrapped headers),
+  and a revert with any other body is linted like any other message. Anything else, a revert of a
+  non-conventional title included, is retitled as a conventional `revert: …` header. The branch
+  commits and `.husky/commit-msg` keep `commitlint.config.mjs` with the default ignores, because
+  `git commit --fixup`, `git merge` and GitHub's "Update branch" write those shapes. That split
+  relies on squash being the only merge method, which the repository settings enforce, so that a
+  squash merge discards the branch commits; were rebase merging turned on, the branch step would
+  need the squash config too. `scripts/commitlint-config.test.mjs` pins both configs against the
+  rules commitlint loads, the hook, and which workflow step uses which config. The workflow re-runs
+  on every `edited` event, a body edit included, and has no
   job-level `if`: GitHub reports a job skipped by a condition as Success, which would satisfy a
   required check on a title nobody linted. Commits on `main` from before the check stay as accepted
   history, because `main` is never rewritten: 28 of them fail it, and the four since commitlint

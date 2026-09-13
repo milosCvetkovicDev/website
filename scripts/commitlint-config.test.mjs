@@ -13,7 +13,14 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { devNull, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -24,7 +31,8 @@ const BASE_CONFIG = 'commitlint.config.mjs';
 const SQUASH_CONFIG = 'commitlint.squash.config.mjs';
 
 // Neither package is a direct dependency, so they are imported from where the CLI imports them:
-// pnpm links a package's dependencies next to it in the store.
+// pnpm links a package's dependencies next to it in the store. A file that moves fails its import
+// with the path; an export that changes shape fails the assertions below by name.
 const sibling = async (from, name, file) => {
   const dir = join(realpathSync(from), '..', name);
   return { dir, module: await import(pathToFileURL(join(dir, file)).href) };
@@ -33,12 +41,17 @@ const cli = join(root, 'node_modules', '@commitlint', 'cli');
 const { module: loadModule } = await sibling(cli, 'load', 'lib/load.js');
 const { dir: lintDir, module: lintModule } = await sibling(cli, 'lint', 'lib/lint.js');
 const { module: isIgnoredDefaults } = await sibling(lintDir, 'is-ignored', 'lib/defaults.js');
-// A commitlint release that reshapes these fails here, by name, not as a TypeError further down.
 assert.equal(typeof loadModule.default, 'function', '@commitlint/load has no default export');
 assert.equal(typeof lintModule.default, 'function', '@commitlint/lint has no default export');
 assert.ok(Array.isArray(isIgnoredDefaults.wildcards), '@commitlint/is-ignored has no wildcards');
 
-// Mirrors the options @commitlint/cli 21 builds in lib/cli.js before it calls `lint`.
+// `loadConfig` mirrors the options @commitlint/cli 21 builds in lib/cli.js. A new major has to be
+// checked against that file before this number moves.
+const cliVersion = JSON.parse(
+  readFileSync(join(realpathSync(cli), 'package.json'), 'utf8'),
+).version;
+assert.equal(cliVersion.split('.')[0], '21', `@commitlint/cli ${cliVersion}: re-check loadConfig`);
+
 const loadConfig = async (file) => {
   const loaded = await loadModule.default({}, { cwd: root, file });
   const parserOpts = loaded.parserPreset?.parserOpts;
@@ -51,6 +64,11 @@ const loadConfig = async (file) => {
   // stdin reaches the CLI with its trailing newline.
   return { loaded, lint: (message) => lintModule.default(`${message}\n`, loaded.rules, opts) };
 };
+
+// The revert exception itself, for inputs too long to put through commitlint's parser, which
+// needs minutes for a header of a hundred kilobytes.
+const { default: squashModule } = await import(pathToFileURL(join(root, SQUASH_CONFIG)).href);
+const ignoresRevert = squashModule.ignores.at(-1);
 
 // The title step lints a title as written and with the ` (#NN)` GitHub appends to the subject, so
 // each shape is checked in both forms.
@@ -141,6 +159,7 @@ describe('commitlint.squash.config.mjs (the title and the push lint on main)', (
         ]),
         `Revert "feat: add thing"\n\nThis reverts commit ${SHA}.`,
         `Revert "feat: add thing" (#81)\r\n\r\nThis reverts commit ${SHA}.\r`,
+        'Revert "feat: add thing" (#81)\n\nCo-authored-by: Someone Else <someone@example.invalid>',
       ],
       true,
     );
@@ -160,13 +179,65 @@ describe('commitlint.squash.config.mjs (the title and the push lint on main)', (
         'Revert "Feat: x"',
         'Revert "123: x"',
         'Revert "feat: x."',
+        'Revert "feat: x. (#80)"',
+        'Revert "feat:  "',
+        'Revert "feat: x "',
+        'Revert "feat: x. "',
+        'Revert "feat: x "',
+        'Revert "feat: Add thing"',
         `Revert "feat: ${'a'.repeat(95)}"`,
+        `Revert "feat: ${'a'.repeat(94)} (#80)"`,
         'Revert "feat: x" and more',
         'Revert "feat: x" and "y"',
         'Revert "feat: x" anything I like "',
       ]),
       false,
     );
+  });
+
+  it('agrees with the rules on every wrapped header in its table', async () => {
+    // The rules are the oracle: a header passes when it lints as a title in both forms.
+    const headers = [
+      'feat: add thing',
+      'fix(web)!: add thing',
+      'fix: a',
+      `feat: ${'a'.repeat(88)}`,
+      `feat: ${'a'.repeat(95)}`,
+      'feat: x.',
+      'feat: ',
+      'feat:  ',
+      'feat: x ',
+      'feat: x ',
+      'wip: x',
+      'Feat: x',
+      'feat: Add thing',
+      'feat: ADD THING',
+      'feat: API change',
+      'feat: iOS support',
+      'feat: 2FA login',
+      'feat: _private field',
+    ];
+    const disagreements = [];
+    for (const header of headers) {
+      const rules =
+        (await squash.lint(header)).valid && (await squash.lint(withSuffix(header))).valid;
+      const exception = ignoresRevert(`Revert "${header}"\n`);
+      if (rules !== exception) {
+        disagreements.push(`${JSON.stringify(header)}: rules ${rules}, exception ${exception}`);
+      }
+    }
+    assert.deepEqual(disagreements, []);
+  });
+
+  it('reads type-enum and header-max-length as commitlint loads them', () => {
+    const types = squash.loaded.rules['type-enum'][2];
+    const max = squash.loaded.rules['header-max-length'][2];
+    assert.ok(types.length > 0, 'no types loaded');
+    for (const type of types) assert.equal(ignoresRevert(`Revert "${type}: x"\n`), true, type);
+    assert.equal(ignoresRevert('Revert "notatype: x"\n'), false);
+    const header = (length) => `feat: ${'a'.repeat(length - 'feat: '.length)}`;
+    assert.equal(ignoresRevert(`Revert "${header(max)}"\n`), true);
+    assert.equal(ignoresRevert(`Revert "${header(max + 1)}"\n`), false);
   });
 
   it('lints a revert that carries any other body, so the body rules still apply', async () => {
@@ -181,13 +252,14 @@ describe('commitlint.squash.config.mjs (the title and the push lint on main)', (
     );
   });
 
-  it('refuses a pathologically nested revert without overflowing the stack', async () => {
-    // The ignore is called directly: commitlint's own parser needs minutes for a header this long,
-    // which is commitlint's cost and not this exception's.
-    const { default: config } = await import(pathToFileURL(join(root, SQUASH_CONFIG)).href);
-    const ignoresRevert = config.ignores.at(-1);
-    const depth = 20_000;
-    assert.equal(ignoresRevert(`${'Revert "'.repeat(depth)}feat: x${'"'.repeat(depth)}\n`), false);
+  it('unwraps nesting up to 1000 characters and refuses anything longer at once', () => {
+    // `Revert "` and `"` add nine characters a level: 110 levels around a 10-character header come
+    // to exactly 1000.
+    const nest = (depth, core) => `${'Revert "'.repeat(depth)}${core}${'"'.repeat(depth)}`;
+    assert.equal(nest(110, 'feat: abcd').length, 1000);
+    assert.equal(ignoresRevert(`${nest(110, 'feat: abcd')}\n`), true);
+    assert.equal(ignoresRevert(`${nest(110, 'feat: abcde')}\n`), false);
+    assert.equal(ignoresRevert(`${nest(20_000, 'feat: x')}\n`), false);
   });
 
   it('still passes a conventional subject and still fails a plain one', async () => {
@@ -244,27 +316,33 @@ describe('the commitlint CLI', () => {
     assert.equal(code, 1, output);
     assert.match(output, /found [1-9]\d* problems?/);
   };
-  const assertPass = ({ code, output }) => assert.equal(code, 0, output);
+  // An empty range exits 0 having read nothing, so a pass has to report each message it linted.
+  const assertLinted = ({ code, output }, messages) => {
+    assert.equal(code, 0, output);
+    assert.equal(output.match(/found 0 problems/g)?.length ?? 0, messages, output);
+  };
 
   it('reads the ignore settings from --config on stdin, as the title step runs it', async () => {
-    const stdin = (config, title) => run(['--config', config], { input: `${title}\n` });
+    const stdin = (config, title) =>
+      run(['--config', config, '--verbose'], { input: `${title}\n` });
     const [strict, lax, revert] = await Promise.all([
       stdin(SQUASH_CONFIG, 'revert everything I dislike (#81)'),
       stdin(BASE_CONFIG, 'revert everything I dislike (#81)'),
       stdin(SQUASH_CONFIG, 'Revert "feat: add thing" (#81)'),
     ]);
     assertRuleFailure(strict);
-    assertPass(lax);
-    assertPass(revert);
+    assertLinted(lax, 1);
+    assertLinted(revert, 1);
   });
 
-  describe('over a --from/--to range, as the push lint on main runs it', () => {
+  describe('in a git repository, as the push lint on main runs it', () => {
     let scratch;
     const sha = {};
-    // Hermetic: no user or system git config (signing, hooks, templates), and git may not walk up
-    // out of the scratch directory into a real repository.
+    // Hermetic: no inherited GIT_* variable (git exports GIT_DIR to hooks, and it would point these
+    // commits at the real repository), no user or system git config (signing, hooks, templates),
+    // and no walking up out of the scratch directory.
     const env = () => ({
-      ...process.env,
+      ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
       GIT_CONFIG_GLOBAL: devNull,
       GIT_CONFIG_NOSYSTEM: '1',
       GIT_CEILING_DIRECTORIES: scratch,
@@ -277,18 +355,21 @@ describe('the commitlint CLI', () => {
           args,
         ),
         { cwd: scratch, env: env(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-      ).trim();
+      );
     const commit = (message) => {
       git('commit', '-q', '--allow-empty', '--cleanup=verbatim', '-m', message);
-      return git('rev-parse', 'HEAD');
+      return git('rev-parse', 'HEAD').trim();
     };
-    const range = (config, from, to) =>
-      run(['--cwd', scratch, '--config', join(root, config), '--from', from, '--to', to], {
-        env: env(),
-      });
+    // As the workflow runs it: from the repository root, with the config path relative to it.
+    const lintHere = (config, args, input) =>
+      run(['--config', config, '--verbose', ...args], { cwd: scratch, env: env(), input });
 
     before(() => {
       scratch = realpathSync(mkdtempSync(join(tmpdir(), 'commitlint-config-')));
+      for (const file of [BASE_CONFIG, SQUASH_CONFIG]) {
+        copyFileSync(join(root, file), join(scratch, file));
+      }
+      symlinkSync(join(root, 'node_modules'), join(scratch, 'node_modules'));
       git('init', '-q');
       sha.base = commit('feat: base');
       sha.revert = commit('Revert "feat: base" (#81)');
@@ -300,36 +381,52 @@ describe('the commitlint CLI', () => {
       if (scratch) rmSync(scratch, { recursive: true, force: true });
     });
 
-    it('passes a revert and fails a default-ignored shape or a revert with a body', async () => {
-      const [revert, fixup, fixupLax, typedBody] = await Promise.all([
+    it('lints every commit of a --from/--to range', async () => {
+      const range = (config, from, to) => lintHere(config, ['--from', from, '--to', to]);
+      const [revert, fixup, fixupLax, typedBody, both] = await Promise.all([
         range(SQUASH_CONFIG, sha.base, sha.revert),
         range(SQUASH_CONFIG, sha.revert, sha.fixup),
         range(BASE_CONFIG, sha.revert, sha.fixup),
         range(SQUASH_CONFIG, sha.fixup, sha.typedBody),
+        range(SQUASH_CONFIG, sha.base, sha.fixup),
       ]);
-      assertPass(revert);
+      assertLinted(revert, 1);
       assertRuleFailure(fixup);
-      assertPass(fixupLax);
+      assertLinted(fixupLax, 1);
+      assertRuleFailure(typedBody);
+      assertRuleFailure(both);
+    });
+
+    it('lints the tip read with git log, as it does when the push created the branch', async () => {
+      const tip = (ref) => lintHere(SQUASH_CONFIG, [], git('log', '-1', '--format=%B', ref));
+      const [revert, typedBody] = await Promise.all([tip(sha.revert), tip(sha.typedBody)]);
+      assertLinted(revert, 1);
       assertRuleFailure(typedBody);
     });
   });
 });
 
 // Every line that runs commitlint, found as a command word (so `commitlint.squash.config.mjs` is
-// not one), with comment lines dropped and backslash continuations joined first.
-const COMMITLINT = /(?:^|[\s|;&(`/])commitlint(?=\s|$)/;
+// not one and `@commitlint/cli` is), with comment lines dropped before backslash continuations are
+// joined: a comment ends at its newline, whatever it ends with.
+const COMMITLINT = /(?:^|[\s|;&(`/@])commitlint(?=[\s/]|$)/;
 const shellLines = (text) =>
   text
-    .replace(/\\\n\s*/g, ' ')
     .split('\n')
-    .filter((line) => !/^\s*#/.test(line));
+    .filter((line) => !/^\s*#/.test(line))
+    .join('\n')
+    .replace(/\\\n\s*/g, ' ')
+    .split('\n');
 const invocations = (lines) => lines.filter((line) => COMMITLINT.test(line));
+// Every config a line passes, through `--config` or its alias `-g`, with a space or `=`.
+const configsOf = (line) =>
+  [...line.matchAll(/(?:^|\s)(?:--config|-g)(?:=|\s+)(\S+)/g)].map((match) => match[1]);
 
 describe('.husky/commit-msg', () => {
   it('lints with commitlint.config.mjs', () => {
     const lines = invocations(shellLines(readFileSync(join(root, '.husky', 'commit-msg'), 'utf8')));
     assert.ok(lines.length > 0, 'no commitlint invocation in the hook');
-    for (const line of lines) assert.ok(!line.includes('--config'), line.trim());
+    for (const line of lines) assert.deepEqual(configsOf(line), [], line.trim());
   });
 });
 
@@ -352,21 +449,22 @@ describe('.github/workflows/commitlint.yml', () => {
   const TITLE = 'Lint the pull request title';
   const BRANCH = 'Lint every commit on the branch';
   const PUSH = 'Lint every commit pushed to main';
+  const found = (name) => {
+    const lines = invocations(step(name).lines);
+    assert.ok(lines.length > 0, `no commitlint invocation in "${name}"`);
+    return lines;
+  };
 
   it('lints what lands on main with the squash config, in every invocation', () => {
     for (const name of [TITLE, PUSH]) {
-      const found = invocations(step(name).lines);
-      assert.ok(found.length > 0, `no commitlint invocation in "${name}"`);
-      for (const line of found) {
-        assert.match(line, /--config commitlint\.squash\.config\.mjs\s/, `${name}: ${line.trim()}`);
+      for (const line of found(name)) {
+        assert.deepEqual(configsOf(line), [SQUASH_CONFIG], `${name}: ${line.trim()}`);
       }
     }
   });
 
   it('lints the branch commits with the default config', () => {
-    const found = invocations(step(BRANCH).lines);
-    assert.ok(found.length > 0, `no commitlint invocation in "${BRANCH}"`);
-    for (const line of found) assert.ok(!line.includes('--config'), line.trim());
+    for (const line of found(BRANCH)) assert.deepEqual(configsOf(line), [], line.trim());
   });
 
   it('runs commitlint in no other step', () => {
@@ -376,14 +474,26 @@ describe('.github/workflows/commitlint.yml', () => {
         invocations(s.lines).map((line) => `${s.name ?? '(unnamed)'}: ${line.trim()}`),
       );
     assert.deepEqual(elsewhere, []);
+    assert.doesNotMatch(lines.join('\n'), /uses:.*commitlint/i);
   });
 
-  it('lets no lint failure through and runs the title and push lints on their events', () => {
+  it('lets no lint failure through', () => {
     const text = lines.join('\n');
     assert.doesNotMatch(text, /continue-on-error/);
-    assert.doesNotMatch(text, /\|\|\s*true\b/);
     assert.doesNotMatch(text, /\bexit 0\b/);
+    // The title step collects both results and exits with them; nothing else may follow a lint.
+    for (const line of found(TITLE))
+      assert.match(line, /\| pnpm exec commitlint [^|;]*\|\| status=1$/);
     assert.ok(step(TITLE).lines.some((line) => line.trim() === 'exit "$status"'));
+    for (const line of [...found(BRANCH), ...found(PUSH)]) {
+      assert.doesNotMatch(line, /\|\||;|&&/, line.trim());
+    }
+    assert.ok(step(PUSH).lines.some((line) => line.trim() === 'set -o pipefail'));
+  });
+
+  it('runs on a retitle and on a push to main, and each lint on its own event', () => {
+    assert.ok(lines.includes('    types: [opened, edited, synchronize, reopened]'));
+    assert.ok(lines.includes('    branches: [main]'));
     assert.ok(step(TITLE).lines.includes("        if: github.event_name == 'pull_request'"));
     assert.ok(step(PUSH).lines.includes("        if: github.event_name == 'push'"));
   });
