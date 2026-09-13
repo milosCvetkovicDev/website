@@ -111,11 +111,13 @@ is there so that a future buildable package is compiled before the apps typechec
   `header-max-length`, and it hides `subject-full-stop`); every commit between the pull request's
   base and head, which still runs when the title fails, so one failure cannot hide another; and on a
   push to `main` every commit from the previous tip to the new one, or only the new tip when the
-  push created the branch. It re-runs on every `edited` event, a body edit included, and has no
-  job-level `if`: GitHub reports a job skipped by a condition as Success, which would satisfy a
-  required check on a title nobody linted. Commits on `main` from before the check stay as accepted
-  history, because `main` is never rewritten: 28 of them fail it, and the four since commitlint
-  arrived in #3 (54b8b80, d7d058d, a8b4a91, 3e98c14) each fail `body-max-line-length`.
+  push created the branch. That push lint is the only one to see a squash body typed in the merge
+  dialog, which no pull request event carries. It re-runs on every `edited` event, a body edit
+  included, and has no job-level `if`: GitHub reports a job skipped by a condition as Success,
+  which would satisfy a required check on a title nobody linted. Commits on `main` from before the
+  check stay as accepted history, because `main` is never rewritten: 28 of them fail it, and the
+  four since commitlint arrived in #3 (54b8b80, d7d058d, a8b4a91, 3e98c14) each fail
+  `body-max-line-length`.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
