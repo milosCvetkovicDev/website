@@ -44,7 +44,8 @@ perform an operation.
 | 0016 | [Dependabot branches never deploy, and unaffected commits never build](0016-vercel-deployment-budget.md)                    | Accepted                                      | 2026-09-12 |
 | 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)                          | Accepted                                      | 2026-09-12 |
 | 0018 | [Dependency update policy](0018-dependency-update-policy.md)                                                                | Accepted                                      | 2026-09-12 |
-| 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)                      | Accepted                                      | 2026-09-12 |
+| 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)                      | Superseded by ADR-0021                        | 2026-09-12 |
+| 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)      | Accepted                                      | 2026-09-13 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
