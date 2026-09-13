@@ -60,20 +60,20 @@ The site runs on `http://localhost:3000`. `pnpm dev:playground` starts the sandb
 
 ## Quality gates
 
-CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, the `quality` job runs the first eight in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message; commitlint does not run in CI.
+CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, commitlint runs in a workflow of its own, `.github/workflows/commitlint.yml`, over the pull request title and every commit, or over the new commit on a push to `main`. Of the rest, the `quality` job runs the first eight in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message.
 
-| Command                      | What it checks                                                                      | Pre-commit         | CI  |
-| ---------------------------- | ----------------------------------------------------------------------------------- | ------------------ | --- |
-| dependency review            | Lockfile dependencies a pull request adds with a known advisory                     | -                  | yes |
-| `pnpm check:allowbuilds`     | `allowBuilds` entries against the versions the lockfile resolves                    | -                  | yes |
-| `pnpm test:scripts`          | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step | -                  | yes |
-| `pnpm format:check`          | Prettier, shared config, Tailwind class order                                       | yes (staged files) | yes |
-| `pnpm lint`                  | ESLint with `--max-warnings 0` in every app                                         | yes (staged files) | yes |
-| commitlint                   | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...)                  | yes                | -   |
-| `pnpm typecheck`             | `next typegen && tsc --noEmit` (web), `tsc -b` (playground)                         | -                  | yes |
-| `pnpm test`                  | Vitest unit tests                                                                   | -                  | yes |
-| `pnpm build`                 | Production builds of both apps                                                      | -                  | yes |
-| `pnpm --filter web test:e2e` | Playwright against the production build                                             | -                  | yes |
+| Command                      | What it checks                                                                                           | Pre-commit         | CI  |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------ | --- |
+| dependency review            | Lockfile dependencies a pull request adds with a known advisory                                          | -                  | yes |
+| `pnpm check:allowbuilds`     | `allowBuilds` entries against the versions the lockfile resolves                                         | -                  | yes |
+| `pnpm test:scripts`          | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step                      | -                  | yes |
+| `pnpm format:check`          | Prettier, shared config, Tailwind class order                                                            | yes (staged files) | yes |
+| `pnpm lint`                  | ESLint with `--max-warnings 0` in every app                                                              | yes (staged files) | yes |
+| commitlint                   | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...); in CI, the PR title and every commit | yes                | yes |
+| `pnpm typecheck`             | `next typegen && tsc --noEmit` (web), `tsc -b` (playground)                                              | -                  | yes |
+| `pnpm test`                  | Vitest unit tests                                                                                        | -                  | yes |
+| `pnpm build`                 | Production builds of both apps                                                                           | -                  | yes |
+| `pnpm --filter web test:e2e` | Playwright against the production build                                                                  | -                  | yes |
 
 CodeQL default setup is on as well. GitHub manages it outside `.github/workflows`, and it reports on pull requests beside these checks.
 
