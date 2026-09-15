@@ -101,7 +101,7 @@ Expected: `lsof -ti tcp:3219` prints nothing.
 - Create: `apps/web/src/components/hydration-marker.tsx`
 - Test: `apps/web/src/components/__tests__/hydration-marker.test.tsx`
 
-- [ ] **Step 1: Write the failing unit test**
+- [x] **Step 1: Write the failing unit test**
 
 Create `apps/web/src/components/__tests__/hydration-marker.test.tsx`:
 
@@ -163,12 +163,12 @@ describe('HydrationMarker', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter web exec vitest run src/components/__tests__/hydration-marker.test.tsx`
 Expected: FAIL, with Vite unable to resolve `@/lib/hydration-marker` or `../hydration-marker`.
 
-- [ ] **Step 3: Add the id module**
+- [x] **Step 3: Add the id module**
 
 Create `apps/web/src/lib/hydration-marker.ts`:
 
@@ -183,7 +183,7 @@ Create `apps/web/src/lib/hydration-marker.ts`:
 export const HYDRATION_MARKER_ID = 'hydration-marker';
 ```
 
-- [ ] **Step 4: Add the component**
+- [x] **Step 4: Add the component**
 
 Create `apps/web/src/components/hydration-marker.tsx`:
 
@@ -212,12 +212,12 @@ export function HydrationMarker() {
 }
 ```
 
-- [ ] **Step 5: Run the test and watch it pass**
+- [x] **Step 5: Run the test and watch it pass**
 
 Run: `pnpm --filter web exec vitest run src/components/__tests__/hydration-marker.test.tsx`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/web/src/lib/hydration-marker.ts apps/web/src/components/hydration-marker.tsx apps/web/src/components/__tests__/hydration-marker.test.tsx docs/plans/2026-09-15-route-hydration-marker-plan.md
