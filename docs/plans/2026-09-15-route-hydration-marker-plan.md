@@ -266,16 +266,28 @@ import { HYDRATION_MARKER_ID } from '../../src/lib/hydration-marker';
  * marker times out here instead of passing at once.
  *
  * The marker hydrates with the layout. Content a page wraps in `<Suspense>`, or puts under a
- * `loading.tsx`, hydrates in a later pass, after the marker flips. No route does either today.
+ * `loading.tsx`, hydrates in a later pass, after the marker flips. No route puts `<main>` inside a
+ * boundary today. The one boundary, the decorative `TmuxBackground` on `/`, may hydrate after the
+ * marker, and no spec interacts with it.
  */
 
-/** How long hydration may take. Locally, the dev server compiles a route on its first request. */
+/**
+ * How long the marker may take to read `true`. Locally, the dev server compiles a route on its first
+ * request. The test's own timeout, 30 s by default, still bounds the whole test.
+ */
 const HYDRATION_TIMEOUT_MS = 30_000;
+
+/** How long the home page's boot loader may stay once the page has hydrated. It unmounts after 600 ms. */
+const LOADER_TIMEOUT_MS = 10_000;
 
 /** The marker itself, for a spec that asserts on it rather than waiting through it. */
 export const hydrationMarker = (page: Page) => page.locator(`#${HYDRATION_MARKER_ID}`);
 
-/** Waits until the current page has hydrated. Call it after a navigation or a reload. */
+/**
+ * Waits until the current page has hydrated. Call it after `page.goto` or `page.reload`. A soft
+ * navigation, such as a `<Link>` click, keeps the layout mounted and the marker `true`, so it needs no
+ * wait, and this one would prove nothing there.
+ */
 export async function expectHydrated(page: Page): Promise<void> {
   await expect(
     hydrationMarker(page),
@@ -285,7 +297,7 @@ export async function expectHydrated(page: Page): Promise<void> {
   // behind it. So the wait includes it, until #47 (hero-9) deletes the loader and this line with it.
   // On other routes the locator matches nothing and this passes at once.
   await expect(page.getByText('System Boot', { exact: true })).toBeHidden({
-    timeout: HYDRATION_TIMEOUT_MS,
+    timeout: LOADER_TIMEOUT_MS,
   });
 }
 
@@ -332,9 +344,9 @@ const ROUTES = [...PAGE_ROUTES, UNKNOWN_SLUG];
 const statusOf = (path: string) => (path === UNKNOWN_SLUG ? 404 : expectedStatus(path));
 
 /**
- * The `data-hydrated` value of every `#hydration-marker` in `html`, parsed the way a browser parses
- * it. A document made by `DOMParser` runs no scripts, so parsing the response hydrates nothing. See
- * `served-html.spec.ts` for why markup is parsed here rather than matched with a regular expression.
+ * The `data-hydrated` value of every `#hydration-marker` in `html`, parsed the way a browser parses it,
+ * so that only an element with that id counts and not the id's text elsewhere in the response, such as
+ * a script. A document made by `DOMParser` runs no scripts, so parsing the response hydrates nothing.
  */
 function servedMarkers(page: Page, html: string): Promise<(string | null)[]> {
   return page.evaluate(
@@ -358,23 +370,27 @@ for (const path of ROUTES) {
     const response = await page.goto(path);
     expect(response?.status(), `${path} should answer ${statusOf(path)}`).toBe(statusOf(path));
     await expectHydrated(page);
-    await expect(hydrationMarker(page)).toBeHidden();
+    // `hidden` must take the marker out of layout. A box-based visibility check cannot tell, because
+    // an empty span has no height whether or not it is hidden.
+    expect(await hydrationMarker(page).evaluate((el) => getComputedStyle(el).display)).toBe('none');
   });
 }
 
-test('the marker stays unhydrated with JavaScript off', async ({ browser, baseURL }) => {
-  const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
-  try {
-    const page = await context.newPage();
+test.describe('with JavaScript off', () => {
+  test.use({ javaScriptEnabled: false });
+
+  test('the marker stays unhydrated', async ({ page }) => {
     await page.goto('/work');
     // Proof that no script in the document ran: the theme init script classes <html> before first
-    // paint, and the layout renders it with no class. `page.evaluate` still works, because the
-    // driver injects it.
-    expect(await page.evaluate(() => document.documentElement.className)).toBe('');
+    // paint, and the layout renders it with no class. `page.evaluate` still works, because the driver
+    // injects it.
+    expect(
+      await page.evaluate(() => document.documentElement.className),
+      'the theme init script added a class, so scripts are running: `javaScriptEnabled: false` did ' +
+        'not take effect and this test is not measuring what it claims to',
+    ).toBe('');
     await expect(hydrationMarker(page)).toHaveAttribute('data-hydrated', 'false');
-  } finally {
-    await context.close();
-  }
+  });
 });
 ```
 
@@ -435,7 +451,7 @@ to
 - [x] **Step 3: Run the marker spec and watch it pass**
 
 Run: `pnpm --filter web exec playwright test e2e/hydration-marker.spec.ts --project chromium`
-Expected: PASS, 12 tests (ten `PAGE_ROUTES`, `/work/does-not-exist`, JavaScript off).
+Expected: PASS, 12 tests (ten `PAGE_ROUTES`, `/work/does-not-exist`, and the JavaScript-off test).
 
 - [x] **Step 4: Run the console gate, which catches a hydration mismatch the marker could introduce**
 
@@ -641,8 +657,9 @@ with
   `e2e/support/hydration.ts` rather than writing a wait of your own. The helper also waits out the
   home page's `System Boot` loader until #47 deletes it, and the inline loader waits that remain
   move into it with #74 and #47. The marker hydrates with the layout, so content a page wraps in
-  `<Suspense>` or puts under a `loading.tsx` would hydrate after it flips; no route does either
-  today. `e2e/hero.spec.ts` also asserts the page title.
+  `<Suspense>` or puts under a `loading.tsx` would hydrate after it flips. No route puts `<main>`
+  inside a boundary; the one boundary today, the decorative `TmuxBackground` on `/`, may hydrate
+  after the marker. `e2e/hero.spec.ts` also asserts the page title.
 ```
 
 The rest of that bullet, from "That assertion is only a smoke check", stays as it is.

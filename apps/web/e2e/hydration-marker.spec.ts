@@ -21,9 +21,9 @@ const ROUTES = [...PAGE_ROUTES, UNKNOWN_SLUG];
 const statusOf = (path: string) => (path === UNKNOWN_SLUG ? 404 : expectedStatus(path));
 
 /**
- * The `data-hydrated` value of every `#hydration-marker` in `html`, parsed the way a browser parses
- * it. A document made by `DOMParser` runs no scripts, so parsing the response hydrates nothing. See
- * `served-html.spec.ts` for why markup is parsed here rather than matched with a regular expression.
+ * The `data-hydrated` value of every `#hydration-marker` in `html`, parsed the way a browser parses it,
+ * so that only an element with that id counts and not the id's text elsewhere in the response, such as
+ * a script. A document made by `DOMParser` runs no scripts, so parsing the response hydrates nothing.
  */
 function servedMarkers(page: Page, html: string): Promise<(string | null)[]> {
   return page.evaluate(
@@ -47,21 +47,25 @@ for (const path of ROUTES) {
     const response = await page.goto(path);
     expect(response?.status(), `${path} should answer ${statusOf(path)}`).toBe(statusOf(path));
     await expectHydrated(page);
-    await expect(hydrationMarker(page)).toBeHidden();
+    // `hidden` must take the marker out of layout. A box-based visibility check cannot tell, because
+    // an empty span has no height whether or not it is hidden.
+    expect(await hydrationMarker(page).evaluate((el) => getComputedStyle(el).display)).toBe('none');
   });
 }
 
-test('the marker stays unhydrated with JavaScript off', async ({ browser, baseURL }) => {
-  const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
-  try {
-    const page = await context.newPage();
+test.describe('with JavaScript off', () => {
+  test.use({ javaScriptEnabled: false });
+
+  test('the marker stays unhydrated', async ({ page }) => {
     await page.goto('/work');
     // Proof that no script in the document ran: the theme init script classes <html> before first
-    // paint, and the layout renders it with no class. `page.evaluate` still works, because the
-    // driver injects it.
-    expect(await page.evaluate(() => document.documentElement.className)).toBe('');
+    // paint, and the layout renders it with no class. `page.evaluate` still works, because the driver
+    // injects it.
+    expect(
+      await page.evaluate(() => document.documentElement.className),
+      'the theme init script added a class, so scripts are running: `javaScriptEnabled: false` did ' +
+        'not take effect and this test is not measuring what it claims to',
+    ).toBe('');
     await expect(hydrationMarker(page)).toHaveAttribute('data-hydrated', 'false');
-  } finally {
-    await context.close();
-  }
+  });
 });
