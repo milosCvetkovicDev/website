@@ -260,13 +260,15 @@ is there so that a future buildable package is compiled before the apps typechec
 - e2e specs must wait for hydration before interacting, because events fired before it are lost.
   The root layout renders `HydrationMarker` (`src/components/hydration-marker.tsx`) on every route:
   a hidden `#hydration-marker` whose `data-hydrated` is `false` in the served HTML and `true` once
-  React has hydrated. Wait through `expectHydrated(page)` or `gotoHydrated(page, path)` from
-  `e2e/support/hydration.ts` rather than writing a wait of your own. The helper also waits out the
-  home page's `System Boot` loader until #47 deletes it, and the inline loader waits that remain
-  move into it with #74 and #47. The marker hydrates with the layout, so content a page wraps in
-  `<Suspense>` or puts under a `loading.tsx` would hydrate after it flips. No route puts `<main>`
-  inside a boundary; the one boundary with content today, the decorative `TmuxBackground` on `/`,
-  may hydrate after the marker. `e2e/hero.spec.ts` also asserts the page title.
+  React has hydrated. Wait through `e2e/support/hydration.ts` rather than writing a wait of your
+  own: `gotoHydrated(page, path)` for a navigation, `expectHydrated(page)` after `page.reload()`. A
+  soft navigation needs neither, and a spec with JavaScript off must call neither, because the
+  marker never flips. The helper also waits out the home page's `System Boot` loader until #47
+  deletes it; #74 moves six of the inline loader waits into the helper, and #47 removes the rest
+  with the loader. The marker hydrates with the layout, so content a page wraps in `<Suspense>` or
+  puts under a `loading.tsx` would hydrate after it flips. No route puts `<main>` inside a
+  boundary; the one boundary with content today, the decorative `TmuxBackground` on `/`, may
+  hydrate after the marker. `e2e/hero.spec.ts` asserts the page title.
   That assertion is only a smoke check that the app rendered: it never could catch a second
   checkout of this site, which serves the same title character for character, and the not-found and
   error pages carry it too. Status and path are what catch a wrong page.
@@ -436,10 +438,11 @@ is there so that a future buildable package is compiled before the apps typechec
   URLs redirect to a Vercel login; the production alias `portfolio-theta-gold-77.vercel.app` is
   public. `vercel curl <path> --deployment <url>` fetches the protected ones but creates a
   project-wide protection-bypass secret on first use, see `docs/runbooks/deploy.md`.
-- The CI e2e log prints a three-line `[WebServer] Error: Internal: NoFallbackError` stack twice per
-  run and still passes. It is the internal signal that routes an unknown `/work/*` slug to the
-  site-level 404, once before `not-found-shell` and again when `console-clean` walks
-  `/work/does-not-exist`; the response is a correct 404 and no browser console entry results. Do
+- The CI e2e log prints a three-line `[WebServer] Error: Internal: NoFallbackError` stack once for
+  every request of an unknown `/work/*` slug, so several times per run, and still passes. It is the
+  internal signal that routes such a slug to the site-level 404, and `not-found-shell`,
+  `not-found`, `console-clean` and `hydration-marker` all request `/work/does-not-exist`;
+  the response is a correct 404 and no browser console entry results. Do
   not chase it. The Vercel production log carries no such line, because the platform answers an
   unknown path from the cached static 404 without invoking the route
   (`docs/adr/0015-static-case-study-params.md`).
