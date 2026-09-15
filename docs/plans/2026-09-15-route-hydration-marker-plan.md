@@ -640,7 +640,7 @@ git commit -m "test(web): wait for hydration before interacting off the home pag
 - Modify: `CLAUDE.md` (Testing, the hydration bullet)
 - Modify: `README.md:85`
 
-- [ ] **Step 1: Rewrite the CLAUDE.md Testing bullet**
+- [x] **Step 1: Rewrite the CLAUDE.md Testing bullet**
 
 Replace
 
@@ -667,7 +667,7 @@ with
 
 The rest of that bullet, from "That assertion is only a smoke check", stays as it is.
 
-- [ ] **Step 2: Rewrite the last sentence of README.md:85**
+- [x] **Step 2: Rewrite the last sentence of README.md:85**
 
 Replace
 
@@ -681,12 +681,12 @@ with
 Interactions must wait for hydration, because event listeners only exist after React mounts: the root layout renders a hidden `#hydration-marker` that reads `false` in the served HTML and `true` once React has hydrated, on every route, and `apps/web/e2e/support/hydration.ts` waits on it.
 ```
 
-- [ ] **Step 3: Format check**
+- [x] **Step 3: Format check**
 
 Run: `pnpm format:check`
 Expected: exit 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add CLAUDE.md README.md docs/plans/2026-09-15-route-hydration-marker-plan.md
