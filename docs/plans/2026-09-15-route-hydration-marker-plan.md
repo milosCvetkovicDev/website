@@ -785,11 +785,11 @@ fixes, run the unit test, `e2e/hydration-marker.spec.ts` and the five adopted sp
 
 **Files:** `docs/plans/README.md` (the design's and the plan's rows name the pull request number)
 
-- [ ] **Step 1: Push**
+- [x] **Step 1: Push**
 
 Run: `git push -u origin test/route-hydration-marker`
 
-- [ ] **Step 2: Open it from `.github/pull_request_template.md`**
+- [x] **Step 2: Open it from `.github/pull_request_template.md`**
 
 Title: `test(web): wait for hydration on every route, not only the home page`. The body carries:
 
@@ -804,7 +804,7 @@ Title: `test(web): wait for hydration on every route, not only the home page`. T
 
 No local paths and no personal data.
 
-- [ ] **Step 3: Put the pull request number in the Index rows and push**
+- [x] **Step 3: Put the pull request number in the Index rows and push**
 
 ```bash
 git add docs/plans/README.md docs/plans/2026-09-15-route-hydration-marker-plan.md
