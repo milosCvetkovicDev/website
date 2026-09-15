@@ -64,17 +64,17 @@ come from this commit, before any code changes.
 
 **Files:** none (the figures go into the pull request description)
 
-- [ ] **Step 1: Build the base commit**
+- [x] **Step 1: Build the base commit**
 
 Run: `pnpm --filter web build`
 Expected: exit 0 and a route table listing `/` and `/work` as static.
 
-- [ ] **Step 2: Serve it on a private port**
+- [x] **Step 2: Serve it on a private port**
 
 Run in a second shell: `pnpm --filter web exec next start -p 3219`
 Expected: `Ready` on `http://localhost:3219`.
 
-- [ ] **Step 3: Sum the gzip size of every script each document references**
+- [x] **Step 3: Sum the gzip size of every script each document references**
 
 ```bash
 for p in / /work; do
@@ -86,7 +86,7 @@ done
 
 Expected: two lines, `/ <n> bytes gzip` and `/work <n> bytes gzip`. Keep both for the pull request.
 
-- [ ] **Step 4: Stop the server**
+- [x] **Step 4: Stop the server**
 
 Run: `lsof -ti tcp:3219 | xargs kill`
 Expected: `lsof -ti tcp:3219` prints nothing.
@@ -113,52 +113,60 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HYDRATION_MARKER_ID } from '@/lib/hydration-marker';
 import { HydrationMarker } from '../hydration-marker';
 
-let container: HTMLDivElement;
+let container: HTMLDivElement | undefined;
 let root: Root | undefined;
 
 /**
- * A container holding exactly the markup the server sends for the marker. The markup is parsed with
- * `DOMParser`, which runs no scripts, and its nodes are moved into the container, as a browser does
- * with the response before React hydrates it.
+ * Exactly the markup the server sends for the marker, in a container attached to the document. The
+ * markup is parsed with `DOMParser`, which runs no scripts, and its nodes are moved into the container,
+ * as a browser does with the response before React hydrates it.
  */
-function serverRendered(): Element {
+function serverRendered(): { host: HTMLDivElement; marker: Element } {
   const served = new DOMParser().parseFromString(renderToString(<HydrationMarker />), 'text/html');
-  container = document.createElement('div');
-  container.append(...served.body.childNodes);
-  document.body.append(container);
-  const marker = container.querySelector(`#${HYDRATION_MARKER_ID}`);
+  const host = document.createElement('div');
+  host.append(...served.body.childNodes);
+  document.body.append(host);
+  container = host;
+  const marker = host.querySelector(`#${HYDRATION_MARKER_ID}`);
   if (!marker) throw new Error(`the server render has no #${HYDRATION_MARKER_ID}`);
-  return marker;
+  return { host, marker };
 }
 
 afterEach(() => {
   act(() => root?.unmount());
   root = undefined;
-  container.remove();
+  container?.remove();
+  container = undefined;
+  vi.restoreAllMocks();
 });
 
 describe('HydrationMarker', () => {
   it('is unhydrated and hidden in the server-rendered markup', () => {
-    const marker = serverRendered();
+    const { host, marker } = serverRendered();
 
-    expect(container.querySelectorAll(`#${HYDRATION_MARKER_ID}`)).toHaveLength(1);
+    expect(host.querySelectorAll(`#${HYDRATION_MARKER_ID}`)).toHaveLength(1);
     expect(marker).toHaveAttribute('data-hydrated', 'false');
     expect(marker).toHaveAttribute('hidden');
   });
 
   it('reads hydrated once React hydrates that markup, without a mismatch', async () => {
-    const marker = serverRendered();
+    const { host, marker } = serverRendered();
     const onRecoverableError = vi.fn();
+    // React reports a text or structure mismatch through `onRecoverableError` and renders that subtree
+    // anew. An attribute-only mismatch, the only kind this component could produce, is left unpatched
+    // and reported through `console.error` alone, so both channels are watched.
+    const consoleError = vi.spyOn(console, 'error');
 
     await act(async () => {
-      root = hydrateRoot(container, <HydrationMarker />, { onRecoverableError });
+      root = hydrateRoot(host, <HydrationMarker />, { onRecoverableError });
     });
 
-    // The same node: React hydrated the server markup rather than throwing it away and rendering anew,
-    // which is what a mismatch would have done.
-    expect(container.querySelector(`#${HYDRATION_MARKER_ID}`)).toBe(marker);
+    // The same node, so the server markup was hydrated rather than replaced.
+    expect(host.querySelector(`#${HYDRATION_MARKER_ID}`)).toBe(marker);
     expect(marker).toHaveAttribute('data-hydrated', 'true');
+    expect(marker).toHaveAttribute('hidden');
     expect(onRecoverableError).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
   });
 });
 ```
