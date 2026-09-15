@@ -418,6 +418,10 @@ Expected: FAIL after 30 s, with the message
 Paste that line into the pull request, then restore the `expect` (`git diff` on the spec shows only the
 new file).
 
+This records the red run as it happened. After the final review, `expectHydrated` first asserts that
+exactly one marker exists, so the same probe now fails earlier, with
+`the root layout did not render #hydration-marker exactly once on this page`.
+
 ---
 
 ### Task 4: Render the marker from the root layout (green)

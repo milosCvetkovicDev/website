@@ -97,14 +97,17 @@ new route's content is rendered on the client rather than hydrated.
 
 - **Unit:** `src/components/__tests__/hydration-marker.test.tsx`. `renderToString` gives
   `data-hydrated="false"`. `hydrateRoot` over that same markup reaches `data-hydrated="true"`, and
-  `onRecoverableError` is never called, so the flip is not a hydration mismatch.
+  neither `onRecoverableError` nor `console.error` fires, so the flip is not a hydration mismatch.
+  React reports an attribute-only mismatch, the only kind this component could produce, through
+  `console.error` alone.
 - **e2e:** `e2e/hydration-marker.spec.ts` on the desktop project, with `retries: 0`.
   - For every route in `PAGE_ROUTES`, plus `/work/does-not-exist`, the served document (read through
-    `request.get` and parsed with `DOMParser`, as `served-html.spec.ts` does) holds exactly one
+    the body of the `page.goto` response, so it is the document the browser navigated to, and parsed
+    with `DOMParser`, as `served-html.spec.ts` does) holds exactly one
     `#hydration-marker` with `data-hydrated="false"`.
   - Loaded in the browser, each of those routes reaches `"true"` through `expectHydrated`.
-  - With JavaScript disabled, `/work` keeps `"false"`, so nothing except hydration can satisfy the
-    wait.
+  - With JavaScript disabled, `/work` keeps `"false"`, so the served markup alone cannot satisfy the
+    wait; the unit test is what shows that React's hydration is what flips it.
 - **Red first:** the unit test and the served-HTML test fail before the component exists. The
   helper's positive wait is also shown failing once against a layout that does not render the marker.
 
