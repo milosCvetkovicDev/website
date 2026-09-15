@@ -245,7 +245,7 @@ so the branch never carries a red e2e spec.
 - Create: `apps/web/e2e/support/hydration.ts`
 - Create: `apps/web/e2e/hydration-marker.spec.ts`
 
-- [ ] **Step 1: Add the helper with #74's exact exports and signatures**
+- [x] **Step 1: Add the helper with #74's exact exports and signatures**
 
 Create `apps/web/e2e/support/hydration.ts`:
 
@@ -304,7 +304,7 @@ export async function gotoHydrated(
 }
 ```
 
-- [ ] **Step 2: Add the marker spec**
+- [x] **Step 2: Add the marker spec**
 
 Create `apps/web/e2e/hydration-marker.spec.ts`:
 
@@ -378,14 +378,14 @@ test('the marker stays unhydrated with JavaScript off', async ({ browser, baseUR
 });
 ```
 
-- [ ] **Step 3: Run it against the unchanged layout and watch it fail**
+- [x] **Step 3: Run it against the unchanged layout and watch it fail**
 
 Run: `pnpm --filter web exec playwright test e2e/hydration-marker.spec.ts --project chromium`
 Expected: FAIL. Every route test fails at the served-markers assertion, with `Received: []` against
 `Expected: ["false"]`, and the JavaScript-off test fails waiting for `#hydration-marker`. Paste the
 first failure line into the pull request.
 
-- [ ] **Step 4: Show the positive wait failing on its own**
+- [x] **Step 4: Show the positive wait failing on its own**
 
 Temporarily comment out the served-markers `expect` in the route test, then run
 `pnpm --filter web exec playwright test e2e/hydration-marker.spec.ts --project chromium -g "/work serves"`.
@@ -402,7 +402,7 @@ new file).
 
 - Modify: `apps/web/src/app/layout.tsx:11-14` (import) and `:122-123` (render)
 
-- [ ] **Step 1: Import the component from its own module**
+- [x] **Step 1: Import the component from its own module**
 
 In `apps/web/src/app/layout.tsx`, after `import { ThemeProvider } from '@/components/theme-provider';`,
 add:
@@ -413,7 +413,7 @@ import { HydrationMarker } from '@/components/hydration-marker';
 
 It must not come through the `@/components` barrel: the ADR 0009 lint rule on layouts fails on that.
 
-- [ ] **Step 2: Render it after `ThemeProvider`**
+- [x] **Step 2: Render it after `ThemeProvider`**
 
 Change
 
@@ -432,22 +432,22 @@ to
       </body>
 ```
 
-- [ ] **Step 3: Run the marker spec and watch it pass**
+- [x] **Step 3: Run the marker spec and watch it pass**
 
 Run: `pnpm --filter web exec playwright test e2e/hydration-marker.spec.ts --project chromium`
 Expected: PASS, 12 tests (ten `PAGE_ROUTES`, `/work/does-not-exist`, JavaScript off).
 
-- [ ] **Step 4: Run the console gate, which catches a hydration mismatch the marker could introduce**
+- [x] **Step 4: Run the console gate, which catches a hydration mismatch the marker could introduce**
 
 Run: `pnpm --filter web exec playwright test e2e/console-clean.spec.ts --project chromium`
 Expected: PASS.
 
-- [ ] **Step 5: Lint and type-check**
+- [x] **Step 5: Lint and type-check**
 
 Run: `pnpm lint && pnpm typecheck`
 Expected: exit 0.
 
-- [ ] **Step 6: Commit Tasks 3 and 4 together**
+- [x] **Step 6: Commit Tasks 3 and 4 together**
 
 ```bash
 git add apps/web/e2e/support/hydration.ts apps/web/e2e/hydration-marker.spec.ts apps/web/src/app/layout.tsx docs/plans/2026-09-15-route-hydration-marker-plan.md
