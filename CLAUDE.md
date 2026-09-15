@@ -95,16 +95,21 @@ is there so that a future buildable package is compiled before the apps typechec
   also posted as a review thread, though, and the resolved-threads rule below blocks the merge until
   that thread is resolved: GitHub resolves it once the flagged code changes, and a writer can
   resolve it by hand or dismiss the alert.
-- `main` has branch protection on, and both CI jobs are required checks. A required check is stored
-  as the job's display name, so the two required contexts are the `name:` values in
-  `.github/workflows/ci.yml` character for character, and a comment above each says so: renaming
-  either job strands a required check that never reports and blocks every pull request. Protection
-  also requires the branch to be up to date with `main`, signed commits, linear history (merge
-  commits are refused; landing as a squash is the convention below, and rebase merging is also
-  enabled) and
-  resolved review threads, and it applies to administrators. Approving reviews required: 0, so the
+- `main` has branch protection on, and three checks are required: both CI jobs and
+  `Commit messages`. A required check is stored as the job's display name, so the three required
+  contexts are the `name:` values in `.github/workflows/ci.yml` and
+  `.github/workflows/commitlint.yml` character for character, and a comment near each says so.
+  Renaming any of those jobs strands a required check that never reports and blocks every pull
+  request, and so does anything else that stops the job reporting under that name on every pull
+  request, such as a matrix, a reusable-workflow call or a branch or path filter on its trigger;
+  ADR 0021 gives the order for renaming, removing or adding one. Protection also requires the
+  branch to be up to date with `main`, signed commits, linear history (merge commits are refused)
+  and resolved review threads, and it applies to administrators. Squash is the only merge method
+  the repository allows, with merge commits and rebase merging switched off; the squash commit
+  defaults to the pull request title and an empty body, which the merge dialog or
+  `gh pr merge --subject` and `--body` can still override. Approving reviews required: 0, so the
   reviewer rule below is convention, not enforcement. See
-  `docs/adr/0020-branch-protection-on-main.md`.
+  `docs/adr/0021-squash-only-merges-and-required-checks.md`.
 - Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
   `main` never passes through the local hook. `.github/workflows/commitlint.yml`, job
   `Commit messages`, lints three things. The pull request title, twice: as written and with the
