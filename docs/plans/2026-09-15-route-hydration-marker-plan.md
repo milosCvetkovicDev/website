@@ -19,7 +19,7 @@ jsdom and Testing Library, Playwright 1.63.
 **Design:** [2026-09-13-route-hydration-marker-design.md](2026-09-13-route-hydration-marker-design.md)
 (decisions D1-D7).
 
-**Branch:** `test/route-hydration-marker`, from `main` at `8447d9c`. Not stacked on #73 or #74.
+**Branch:** `test/route-hydration-marker`, from `main` at `da4021e`. Not stacked on #73 or #74.
 
 **Stop condition for the whole plan (all must hold):**
 
@@ -267,8 +267,8 @@ import { HYDRATION_MARKER_ID } from '../../src/lib/hydration-marker';
  *
  * The marker hydrates with the layout. Content a page wraps in `<Suspense>`, or puts under a
  * `loading.tsx`, hydrates in a later pass, after the marker flips. No route puts `<main>` inside a
- * boundary today. The one boundary, the decorative `TmuxBackground` on `/`, may hydrate after the
- * marker, and no spec interacts with it.
+ * boundary today. The one boundary with content, the decorative `TmuxBackground` on `/`, may
+ * hydrate after the marker, and no spec interacts with it.
  */
 
 /**
@@ -277,7 +277,10 @@ import { HYDRATION_MARKER_ID } from '../../src/lib/hydration-marker';
  */
 const HYDRATION_TIMEOUT_MS = 30_000;
 
-/** How long the home page's boot loader may stay once the page has hydrated. It unmounts after 600 ms. */
+/**
+ * How long the home page's boot loader may stay once the page has hydrated.
+ * It unmounts after 600 ms.
+ */
 const LOADER_TIMEOUT_MS = 10_000;
 
 /** The marker itself, for a spec that asserts on it rather than waiting through it. */
@@ -658,8 +661,8 @@ with
   home page's `System Boot` loader until #47 deletes it, and the inline loader waits that remain
   move into it with #74 and #47. The marker hydrates with the layout, so content a page wraps in
   `<Suspense>` or puts under a `loading.tsx` would hydrate after it flips. No route puts `<main>`
-  inside a boundary; the one boundary today, the decorative `TmuxBackground` on `/`, may hydrate
-  after the marker. `e2e/hero.spec.ts` also asserts the page title.
+  inside a boundary; the one boundary with content today, the decorative `TmuxBackground` on `/`,
+  may hydrate after the marker. `e2e/hero.spec.ts` also asserts the page title.
 ```
 
 The rest of that bullet, from "That assertion is only a smoke check", stays as it is.

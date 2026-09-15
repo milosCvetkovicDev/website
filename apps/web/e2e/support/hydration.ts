@@ -15,8 +15,8 @@ import { HYDRATION_MARKER_ID } from '../../src/lib/hydration-marker';
  *
  * The marker hydrates with the layout. Content a page wraps in `<Suspense>`, or puts under a
  * `loading.tsx`, hydrates in a later pass, after the marker flips. No route puts `<main>` inside a
- * boundary today. The one boundary, the decorative `TmuxBackground` on `/`, may hydrate after the
- * marker, and no spec interacts with it.
+ * boundary today. The one boundary with content, the decorative `TmuxBackground` on `/`, may
+ * hydrate after the marker, and no spec interacts with it.
  */
 
 /**
@@ -25,7 +25,10 @@ import { HYDRATION_MARKER_ID } from '../../src/lib/hydration-marker';
  */
 const HYDRATION_TIMEOUT_MS = 30_000;
 
-/** How long the home page's boot loader may stay once the page has hydrated. It unmounts after 600 ms. */
+/**
+ * How long the home page's boot loader may stay once the page has hydrated.
+ * It unmounts after 600 ms.
+ */
 const LOADER_TIMEOUT_MS = 10_000;
 
 /** The marker itself, for a spec that asserts on it rather than waiting through it. */
