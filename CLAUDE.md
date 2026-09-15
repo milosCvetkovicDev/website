@@ -25,7 +25,8 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 - `scripts/` at the repository root holds the scripts that run outside the apps:
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `vercel-ignore-build.mjs` (Vercel's
   ignored build step, ADR 0016), and the `node:test` suites that `pnpm test:scripts` runs, one for
-  each of those two plus `ai-refusals.test.mjs`. It is not a workspace and Turbo does not see it.
+  each of those two plus `ai-refusals.test.mjs` and `commitlint-config.test.mjs`. It is not a
+  workspace and Turbo does not see it.
 - `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
   `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
   has its own `tsconfig.json`.
@@ -106,18 +107,35 @@ is there so that a future buildable package is compiled before the apps typechec
   `docs/adr/0020-branch-protection-on-main.md`.
 - Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
   `main` never passes through the local hook. `.github/workflows/commitlint.yml`, job
-  `Commit messages`, lints with `commitlint.config.mjs`: the pull request title twice, as written
-  and with the ` (#NN)` GitHub appends to the squash commit's subject (the suffix alone can break
-  `header-max-length`, and it hides `subject-full-stop`); every commit between the pull request's
-  base and head, which still runs when the title fails, so one failure cannot hide another; and on a
+  `Commit messages`, lints three things. The pull request title, twice: as written and with the
+  ` (#NN)` GitHub appends to the squash commit's subject (the suffix alone can break
+  `header-max-length`, and it hides `subject-full-stop`). Every commit between the pull request's
+  base and head, which still runs when the title fails, so one failure cannot hide another. And on a
   push to `main` every commit from the previous tip to the new one, or only the new tip when the
   push created the branch. That push lint is the only one to see a squash body typed in the merge
-  dialog, which no pull request event carries. It re-runs on every `edited` event, a body edit
-  included, and has no job-level `if`: GitHub reports a job skipped by a condition as Success,
-  which would satisfy a required check on a title nobody linted. Commits on `main` from before the
-  check stay as accepted history, because `main` is never rewritten: 28 of them fail it, and the
-  four since commitlint arrived in #3 (54b8b80, d7d058d, a8b4a91, 3e98c14) each fail
-  `body-max-line-length`.
+  dialog, which no pull request event carries. The title and the push lint use
+  `commitlint.squash.config.mjs`, which sets `defaultIgnores: false`: commitlint otherwise skips,
+  and passes, any message shaped like `revert …`, `Reapply …`, `fixup! …`, `Merge branch … into …`
+  or a bare version, and its merge pattern matches a line anywhere in the body. Its one exception
+  is a revert with nothing else in the message (no body beyond `git revert`'s own line and
+  `Co-authored-by:` trailers): `Revert "<header>"` as GitHub's revert button and `git revert` write
+  it, or `Reapply "<header>"`, nested or not, up to 1000 characters. `<header>` needs a type from
+  `type-enum`, a subject that starts and ends with a non-space and does not start with a capital,
+  no trailing full stop, no `"`, and at most `header-max-length` characters. That approximates the
+  rules rather than linting the header (checked against the rules on a table of wrapped headers),
+  and a revert with any other body is linted like any other message. Anything else, a revert of a
+  non-conventional title included, is retitled as a conventional `revert: …` header. The branch
+  commits and `.husky/commit-msg` keep `commitlint.config.mjs` with the default ignores, because
+  `git commit --fixup`, `git merge` and GitHub's "Update branch" write those shapes. That split
+  relies on squash being the only merge method, which the repository settings enforce, so that a
+  squash merge discards the branch commits; were rebase merging turned on, the branch step would
+  need the squash config too. `scripts/commitlint-config.test.mjs` pins both configs against the
+  rules commitlint loads, the hook, and which workflow step uses which config. The workflow re-runs
+  on every `edited` event, a body edit included, and has no
+  job-level `if`: GitHub reports a job skipped by a condition as Success, which would satisfy a
+  required check on a title nobody linted. Commits on `main` from before the check stay as accepted
+  history, because `main` is never rewritten: 28 of them fail it, and the four since commitlint
+  arrived in #3 (54b8b80, d7d058d, a8b4a91, 3e98c14) each fail `body-max-line-length`.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
