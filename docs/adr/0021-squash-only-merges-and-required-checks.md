@@ -144,11 +144,10 @@ Three rules follow from it:
   choice has to be made, and so would a required check from anywhere else, such as CodeQL.
 
 - **A pull request lands as a single squash commit, by setting rather than by convention.** Its
-  subject defaults to the pull request title, and its body to empty. Every squash subject on `main`
-  so far also carries a ` (#NN)` suffix, which no merge under `PR_TITLE` has yet confirmed or
-  contradicted. While it holds, the subject on `main` is a few characters longer than the title
-  `Commit messages` linted on the pull request, so a title close to the header length limit can
-  pass there and fail on `main`.
+  subject defaults to the pull request title, and its body to empty. Every squash under `PR_TITLE`,
+  from #75 on, has also carried GitHub's ` (#NN)` suffix. `Commit messages` lints the title as
+  written and with that suffix, so a title the pull request check passes also fits the header length
+  limit on `main`.
   Both are defaults: the person merging can edit them in the merge dialog, `gh pr merge --subject`
   and `--body` override them, and a title edited just before merging can land before its re-lint has
   registered. The lint that runs on a push to `main` sees the commit as it actually landed, and
@@ -165,9 +164,8 @@ Three rules follow from it:
 
 - The squash-only rule that `CLAUDE.md` and `README.md` state is now enforced by GitHub, so a
   contributor or agent can no longer land a pull request as a rebase of its branch commits.
-- The commit on `main` defaults to the linted title, plus the ` (#NN)` suffix squashes have carried
-  so far, so the pull request lint and the history agree unless someone overrides the message while
-  merging or the suffix pushes the subject past the header length limit.
+- The commit on `main` defaults to the title `Commit messages` linted, suffix included, so the pull
+  request lint and the history agree unless someone overrides the message while merging.
 - The hazard is written down for all three jobs and for every way a job can stop reporting, with an
   order for renaming, removing or adding one, and the agreement check covers both workflow files in
   one command.
@@ -185,9 +183,9 @@ Three rules follow from it:
   paid in one file per change.
 - Removing a required job leaves it unenforced from the moment the owner removes its context until
   the pull request that deletes the job merges.
-- A merge can still put an unlinted title or body on `main`, and a title within a few characters of
-  the header length limit can fail once suffixed. The push lint reports either after it has
-  landed, and because `main` is never rewritten, such a commit stays as accepted history.
+- A merge can still put an unlinted title or body on `main` through the merge dialog or
+  `gh pr merge`. The push lint reports it after it has landed, and because `main` is never
+  rewritten, such a commit stays as accepted history.
 - `required_approving_review_count` is still 0, so the rule in `CLAUDE.md` that someone other than
   the author reviews the diff remains a convention.
 
