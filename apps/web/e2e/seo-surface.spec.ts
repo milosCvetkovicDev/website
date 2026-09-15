@@ -124,7 +124,7 @@ test('every route serves an og:image that answers with an image', async ({ reque
     // Reachability, once per distinct URL: a card that references a 404 renders as a bare link.
     //
     // Fetched by *path* against the server this run started, not by the absolute URL in the tag.
-    // `metadataBase` (`layout.tsx:26`) makes every metadata URL absolute to https://miloscvetkovic.dev,
+    // `metadataBase` (`layout.tsx:38`) makes every metadata URL absolute to https://miloscvetkovic.dev,
     // so once #48 adds an `og:image` the tag will name the production origin — and fetching that would
     // check the deployed site rather than this build, would fail whenever production lags the branch,
     // and would make the suite need the network. The path is what this server can answer for. A tag
@@ -149,7 +149,7 @@ test('every route serves an og:image that answers with an image', async ({ reque
   expect(
     problems,
     'no metadata sets `images:`, there is no `opengraph-image` file under src/app and ' +
-      '/opengraph-image answers 404, while layout.tsx:63 promises `summary_large_image`. Every ' +
+      '/opengraph-image answers 404, while layout.tsx:75 promises `summary_large_image`. Every ' +
       'shared link renders as a bare URL.',
   ).toEqual([]);
 });
@@ -173,7 +173,7 @@ test('every route serves the full Open Graph set and its own twitter:title', asy
   }
 
   // A sub-page that serves the home page's twitter:title is a second bug with the same cause: an
-  // `openGraph: { title, description }` on a route *replaces* the root object from layout.tsx:53-61
+  // `openGraph: { title, description }` on a route *replaces* the root object from layout.tsx:65-73
   // rather than merging into it, so the inherited fields vanish and the card falls back to the root.
   const home = twitterTitles.get('/');
   const borrowed = [...twitterTitles]
@@ -243,7 +243,7 @@ test('a 404 serves exactly one robots tag, and it says noindex', async ({ reques
   const robots = head.meta.get('robots') ?? [];
 
   // Two tags that contradict each other are worse than the wrong one: the root `robots` block
-  // (layout.tsx:69-79) applies to the not-found page too, and not-found.tsx exports no metadata of its
+  // (layout.tsx:81-91) applies to the not-found page too, and not-found.tsx exports no metadata of its
   // own, so `index, follow` is emitted alongside whatever else — plus a googlebot `index, follow`.
   expect(
     { robots, googlebot: head.meta.get('googlebot') ?? [] },
