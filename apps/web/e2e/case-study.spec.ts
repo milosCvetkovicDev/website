@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { caseStudies, formatMetric } from '../src/data/case-studies';
+import { gotoHydrated } from './support/hydration';
 
 /**
  * What each `/work/[slug]` page actually renders.
@@ -57,7 +58,7 @@ test('the back link reaches /work as a client-side navigation', async ({ page })
   // Green. The back link is the only way off this page other than the header, and a broken href would
   // otherwise only surface as a 404 nobody runs into.
   const [study] = caseStudies;
-  await page.goto(`/work/${study.slug}`);
+  await gotoHydrated(page, `/work/${study.slug}`);
 
   await page.getByRole('link', { name: /Back to Work/i }).click();
 

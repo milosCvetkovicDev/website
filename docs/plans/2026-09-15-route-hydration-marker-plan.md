@@ -488,7 +488,7 @@ annotations.
 - Modify: `apps/web/e2e/theme.spec.ts:1-2`, `:97`, `:110`
 - Modify: `apps/web/e2e/mobile/navigation.spec.ts:1-2`, `:30-34`
 
-- [ ] **Step 1: `work-cards.spec.ts`**
+- [x] **Step 1: `work-cards.spec.ts`**
 
 Add after the `case-studies` import:
 
@@ -528,7 +528,7 @@ to
 await gotoHydrated(page, '/');
 ```
 
-- [ ] **Step 2: `case-study.spec.ts`**
+- [x] **Step 2: `case-study.spec.ts`**
 
 Add after the `case-studies` import:
 
@@ -542,7 +542,7 @@ In the back-link test (`:60`), change ``await page.goto(`/work/${study.slug}`);`
 await gotoHydrated(page, `/work/${study.slug}`);
 ```
 
-- [ ] **Step 3: `not-found.spec.ts`**
+- [x] **Step 3: `not-found.spec.ts`**
 
 Add after the `routes` import:
 
@@ -556,7 +556,7 @@ In the recovery-links test (`:56`), change `await page.goto(NOT_FOUND_ROUTE);` t
 await gotoHydrated(page, NOT_FOUND_ROUTE);
 ```
 
-- [ ] **Step 4: `theme.spec.ts`**
+- [x] **Step 4: `theme.spec.ts`**
 
 Add after the `theme` import:
 
@@ -581,7 +581,7 @@ await expectHydrated(page);
 
 The nav-link click after the reload needs the same wait.
 
-- [ ] **Step 5: `mobile/navigation.spec.ts`**
+- [x] **Step 5: `mobile/navigation.spec.ts`**
 
 Add after the `routes` import:
 
@@ -608,23 +608,23 @@ async function open(page: Page, path: string) {
 }
 ```
 
-- [ ] **Step 6: Run the four desktop specs**
+- [x] **Step 6: Run the four desktop specs**
 
 Run: `pnpm --filter web exec playwright test e2e/work-cards.spec.ts e2e/case-study.spec.ts e2e/not-found.spec.ts e2e/theme.spec.ts --project chromium`
 Expected: exit 0. The `test.fail()` rows (R35, R36, R39) are reported as expected failures, not as
 passes.
 
-- [ ] **Step 7: Run the phone spec on both phone projects**
+- [x] **Step 7: Run the phone spec on both phone projects**
 
 Run: `pnpm --filter web exec playwright test e2e/mobile/navigation.spec.ts --project mobile-chrome --project mobile-safari`
 Expected: exit 0, with R1-R9 still expected failures.
 
-- [ ] **Step 8: Confirm no spec here still writes its own wait**
+- [x] **Step 8: Confirm no spec here still writes its own wait**
 
 Run: `grep -n "System Boot" apps/web/e2e/work-cards.spec.ts apps/web/e2e/case-study.spec.ts apps/web/e2e/not-found.spec.ts apps/web/e2e/theme.spec.ts apps/web/e2e/mobile/navigation.spec.ts`
 Expected: exit 1, no output.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add apps/web/e2e/work-cards.spec.ts apps/web/e2e/case-study.spec.ts apps/web/e2e/not-found.spec.ts apps/web/e2e/theme.spec.ts apps/web/e2e/mobile/navigation.spec.ts docs/plans/2026-09-15-route-hydration-marker-plan.md

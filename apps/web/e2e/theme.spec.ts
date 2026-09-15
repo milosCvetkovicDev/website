@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { THEME_STORAGE_KEY } from '../src/lib/theme';
+import { expectHydrated, gotoHydrated } from './support/hydration';
 
 /**
  * A stored theme choice must beat the OS preference before React hydrates.
@@ -94,7 +95,7 @@ test.describe('the pre-paint theme script', () => {
 
   test('a choice made in the UI survives a reload and a soft navigation', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.goto('/about');
+    await gotoHydrated(page, '/about');
     const html = page.locator('html');
     await expect(html).toContainClass('dark');
 
@@ -108,6 +109,7 @@ test.describe('the pre-paint theme script', () => {
     );
 
     await page.reload();
+    await expectHydrated(page);
     await expect(html).toContainClass('light');
     await expect(html).not.toContainClass('dark');
 
