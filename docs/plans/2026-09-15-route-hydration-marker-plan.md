@@ -19,7 +19,7 @@ jsdom and Testing Library, Playwright 1.63.
 **Design:** [2026-09-13-route-hydration-marker-design.md](2026-09-13-route-hydration-marker-design.md)
 (decisions D1-D7).
 
-**Branch:** `test/route-hydration-marker`, from `main` at `da4021e`. Not stacked on #73 or #74.
+**Branch:** `test/route-hydration-marker`, from `main` at `567b8de`. Not stacked on #73 or #74.
 
 **Stop condition for the whole plan (all must hold):**
 
@@ -150,12 +150,13 @@ describe('HydrationMarker', () => {
   });
 
   it('reads hydrated once React hydrates that markup, without a mismatch', async () => {
-    const { host, marker } = serverRendered();
-    const onRecoverableError = vi.fn();
     // React reports a text or structure mismatch through `onRecoverableError` and renders that subtree
     // anew. An attribute-only mismatch, the only kind this component could produce, is left unpatched
-    // and reported through `console.error` alone, so both channels are watched.
+    // and reported through `console.error` alone, so both channels are watched, from the server
+    // render on.
     const consoleError = vi.spyOn(console, 'error');
+    const { host, marker } = serverRendered();
+    const onRecoverableError = vi.fn();
 
     await act(async () => {
       root = hydrateRoot(host, <HydrationMarker />, { onRecoverableError });
@@ -202,17 +203,11 @@ import { useIsHydrated } from '@/hooks/use-is-hydrated';
 import { HYDRATION_MARKER_ID } from '@/lib/hydration-marker';
 
 /**
- * A hidden element whose `data-hydrated` reads `false` in the served HTML and `true` once React has
- * hydrated the page. The root layout renders it on every route, so an e2e spec can wait for
- * hydration anywhere, not only on `/` (see `e2e/support/hydration.ts`).
- *
- * The value is `useIsHydrated`'s. Its server snapshot is what both the server render and the hydration
- * render read, and React re-renders from the client snapshot straight after the hydration commit, so
- * the attribute changes with no effect and no mismatch (ADR 0006).
- *
- * `hidden` keeps it out of layout, out of the accessibility tree and out of the tab order. It hydrates
- * with the layout, so content a page wraps in `<Suspense>`, or puts under a `loading.tsx`, would
- * hydrate after it flips.
+ * A hidden element whose `data-hydrated` is `false` in the served HTML and `true` once React has
+ * hydrated the root layout, so an e2e spec can wait for hydration on any route. What that wait
+ * cannot see is documented in `e2e/support/hydration.ts`. The value comes from `useIsHydrated`, so
+ * the flip needs no effect of its own and causes no mismatch (ADR 0006). `hidden` computes to
+ * `display: none`: no box, no accessibility-tree node.
  */
 export function HydrationMarker() {
   const hydrated = useIsHydrated();
@@ -272,16 +267,10 @@ import { HYDRATION_MARKER_ID } from '../../src/lib/hydration-marker';
  */
 
 /**
- * How long the marker may take to read `true`. Locally, the dev server compiles a route on its first
- * request. The test's own timeout, 30 s by default, still bounds the whole test.
+ * How long each wait may take. Locally, the dev server compiles a route on its first request. The
+ * test's own timeout, 30 s by default, still bounds the whole test.
  */
 const HYDRATION_TIMEOUT_MS = 30_000;
-
-/**
- * How long the home page's boot loader may stay once the page has hydrated.
- * It unmounts after 600 ms.
- */
-const LOADER_TIMEOUT_MS = 10_000;
 
 /** The marker itself, for a spec that asserts on it rather than waiting through it. */
 export const hydrationMarker = (page: Page) => page.locator(`#${HYDRATION_MARKER_ID}`);
@@ -292,21 +281,29 @@ export const hydrationMarker = (page: Page) => page.locator(`#${HYDRATION_MARKER
  * wait, and this one would prove nothing there.
  */
 export async function expectHydrated(page: Page): Promise<void> {
+  const marker = hydrationMarker(page);
   await expect(
-    hydrationMarker(page),
-    `the root layout renders #${HYDRATION_MARKER_ID} on every route, and it never read data-hydrated="true"`,
+    marker,
+    `the root layout did not render #${HYDRATION_MARKER_ID} exactly once on this page`,
+  ).toHaveCount(1, { timeout: HYDRATION_TIMEOUT_MS });
+  await expect(
+    marker,
+    `#${HYDRATION_MARKER_ID} is on the page but never read data-hydrated="true": ` +
+      'hydration did not complete',
   ).toHaveAttribute('data-hydrated', 'true', { timeout: HYDRATION_TIMEOUT_MS });
   // `/` also keeps its boot loader in the DOM for 600 ms after hydration, and the gates audit the page
-  // behind it. So the wait includes it, until #47 (hero-9) deletes the loader and this line with it.
-  // On other routes the locator matches nothing and this passes at once.
+  // behind it. That timer runs late on a busy machine, so this waits as long as the inline waits it
+  // replaced. #47 (hero-9) deletes the loader and this wait with it; on other routes the locator
+  // matches nothing and this passes at once.
   await expect(page.getByText('System Boot', { exact: true })).toBeHidden({
-    timeout: LOADER_TIMEOUT_MS,
+    timeout: HYDRATION_TIMEOUT_MS,
   });
 }
 
 /**
  * Navigates to `path` and waits until the page has hydrated. Returns the navigation's response, so
- * a caller can still assert the status and the path it landed on.
+ * a caller can still assert the status and the path it landed on. A 5xx answer fails at once rather
+ * than as a hydration timeout.
  */
 export async function gotoHydrated(
   page: Page,
@@ -314,6 +311,12 @@ export async function gotoHydrated(
   options?: Parameters<Page['goto']>[1],
 ): Promise<Response | null> {
   const response = await page.goto(path, options);
+  const status = response?.status();
+  if (status !== undefined && status >= 500) {
+    throw new Error(
+      `${path} answered ${status}: the page failed on the server, so it cannot hydrate`,
+    );
+  }
   await expectHydrated(page);
   return response;
 }
@@ -334,7 +337,8 @@ import { expectHydrated, hydrationMarker } from './support/hydration';
  *
  * A wait on a marker that is never `false` proves nothing. So the served document must carry exactly
  * one `#hydration-marker` reading `false`, and the live page must reach `true`. With JavaScript off it
- * stays `false`, so nothing but hydration can satisfy `expectHydrated`.
+ * stays `false`, so the served markup alone cannot satisfy `expectHydrated`; the unit test is what
+ * shows that React's hydration is what flips it.
  *
  * `/work/does-not-exist` joins `PAGE_ROUTES` because an unknown slug 404s at the routing layer, by a
  * different path from an unknown URL (ADR 0015), and both have to render the root layout.
@@ -362,16 +366,16 @@ function servedMarkers(page: Page, html: string): Promise<(string | null)[]> {
 }
 
 for (const path of ROUTES) {
-  test(`${path} serves the marker unhydrated and hydrates it`, async ({ page, request }) => {
-    const served = await request.get(path);
-    expect(served.status(), `${path} should answer ${statusOf(path)}`).toBe(statusOf(path));
+  test(`${path} serves the marker unhydrated and hydrates it`, async ({ page }) => {
+    const response = await page.goto(path);
+    if (!response) throw new Error(`${path}: the navigation returned no response`);
+    expect(response.status(), `${path} should answer ${statusOf(path)}`).toBe(statusOf(path));
+    // The body of the document the browser navigated to, not a second request for the same path.
     expect(
-      await servedMarkers(page, await served.text()),
+      await servedMarkers(page, await response.text()),
       `the served HTML of ${path} must carry exactly one #${HYDRATION_MARKER_ID} reading "false"`,
     ).toEqual(['false']);
 
-    const response = await page.goto(path);
-    expect(response?.status(), `${path} should answer ${statusOf(path)}`).toBe(statusOf(path));
     await expectHydrated(page);
     // `hidden` must take the marker out of layout. A box-based visibility check cannot tell, because
     // an empty span has no height whether or not it is hidden.
@@ -384,14 +388,15 @@ test.describe('with JavaScript off', () => {
 
   test('the marker stays unhydrated', async ({ page }) => {
     await page.goto('/work');
-    // Proof that no script in the document ran: the theme init script classes <html> before first
-    // paint, and the layout renders it with no class. `page.evaluate` still works, because the driver
-    // injects it.
+    // Proof that no script in the document ran: the theme init script adds `light` or `dark` to
+    // <html> before first paint. `page.evaluate` still works, because the driver injects it.
     expect(
-      await page.evaluate(() => document.documentElement.className),
-      'the theme init script added a class, so scripts are running: `javaScriptEnabled: false` did ' +
-        'not take effect and this test is not measuring what it claims to',
-    ).toBe('');
+      await page.evaluate(() =>
+        ['light', 'dark'].filter((theme) => document.documentElement.classList.contains(theme)),
+      ),
+      'the theme init script classed <html>, so scripts are running: `javaScriptEnabled: false` ' +
+        'did not take effect and this test is not measuring what it claims to',
+    ).toEqual([]);
     await expect(hydrationMarker(page)).toHaveAttribute('data-hydrated', 'false');
   });
 });
@@ -709,35 +714,42 @@ git commit -m "docs: describe the route-wide hydration marker and the shared wai
 
 **Files:** `docs/plans/2026-09-15-route-hydration-marker-plan.md` (ticks only)
 
-- [ ] **Step 1: The seven CI gates**
+- [x] **Step 1: The seven CI gates**
 
 Run: `pnpm check:allowbuilds && pnpm test:scripts && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build`
 Expected: exit 0. Paste the tail of each into the pull request's Verification section.
 
-- [ ] **Step 2: The whole e2e suite against the dev server**
+- [x] **Step 2: The whole e2e suite against the dev server**
 
 Run: `pnpm --filter web test:e2e`
 Expected: exit 0, no unexpected passes. If port 3210 is held by an orphan, clear it with
 `lsof -ti tcp:3210 | xargs kill` rather than moving to another port.
 
-- [ ] **Step 3: The whole e2e suite against the production build**
+- [x] **Step 3: The whole e2e suite against the production build**
 
 Run: `pnpm --filter web build && CI=true pnpm --filter web test:e2e`
 Expected: exit 0.
 
-- [ ] **Step 4: First-load JS after the change**
+- [x] **Step 4: First-load JS after the change**
 
 Repeat Task 1 Steps 2-4 against this build. Expected: `/` and `/work` each grow by the marker
 component alone, a few hundred bytes gzip at most. Record both before-and-after pairs in the pull
 request.
 
-- [ ] **Step 5: The working tree is clean**
+- [x] **Step 4b: Screenshots showing no visual change**
+
+#50 AC 29 asks for light, dark and mobile screenshots for a pull request that adds a test hook to a
+rendered component. On the production build, capture `/work` hydrated in light and dark at
+1280x720 and on a Pixel 7 viewport, remove `#hydration-marker`, capture again, and compare: the
+two captures must be byte-identical and the marker's computed `display` must be `none`.
+
+- [x] **Step 5: The working tree is clean**
 
 Run: `git status --porcelain apps/web`
 Expected: no output. `next dev` writes untracked `apps/web/AGENTS.md` and `apps/web/CLAUDE.md` in an
 agent session; delete them, never commit them.
 
-- [ ] **Step 6: Commit the ticks**
+- [x] **Step 6: Commit the ticks**
 
 ```bash
 git add docs/plans/2026-09-15-route-hydration-marker-plan.md
@@ -750,12 +762,18 @@ git commit -m "docs(plans): record the hydration marker verification"
 
 **Files:** none (findings go into the pull request's Review section)
 
-- [ ] **Step 1: `ui-reviewer`** on `apps/web/src/components/hydration-marker.tsx` and
+- [x] **Step 1: `ui-reviewer`** on `apps/web/src/components/hydration-marker.tsx` and
       `apps/web/src/app/layout.tsx`, given the file list.
-- [ ] **Step 2: `adversarial-reviewer`**, given only `git diff origin/main...HEAD`.
-- [ ] **Step 3: `edge-case-hunter`**, given the changed files.
-- [ ] **Step 4: Triage every finding** as fixed, deferred with a reason, or rejected with a reason. A fix
+- [x] **Step 2: `adversarial-reviewer`**, given only `git diff origin/main...HEAD`.
+- [x] **Step 3: `edge-case-hunter`**, given the changed files.
+- [x] **Step 4: Triage every finding** as fixed, deferred with a reason, or rejected with a reason. A fix
       re-runs the task's own stop condition and the affected e2e spec.
+- [x] **Step 5: Re-verify after the accepted fixes**
+
+The findings and how each was handled are in the pull request's Review section. After the accepted
+fixes, run the unit test, `e2e/hydration-marker.spec.ts` and the five adopted specs on chromium,
+`e2e/mobile/navigation.spec.ts` on both phone projects, `pnpm lint`, `pnpm typecheck` and
+`pnpm format:check`. Each must exit 0.
 
 ---
 

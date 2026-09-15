@@ -42,12 +42,13 @@ describe('HydrationMarker', () => {
   });
 
   it('reads hydrated once React hydrates that markup, without a mismatch', async () => {
-    const { host, marker } = serverRendered();
-    const onRecoverableError = vi.fn();
     // React reports a text or structure mismatch through `onRecoverableError` and renders that subtree
     // anew. An attribute-only mismatch, the only kind this component could produce, is left unpatched
-    // and reported through `console.error` alone, so both channels are watched.
+    // and reported through `console.error` alone, so both channels are watched, from the server
+    // render on.
     const consoleError = vi.spyOn(console, 'error');
+    const { host, marker } = serverRendered();
+    const onRecoverableError = vi.fn();
 
     await act(async () => {
       root = hydrateRoot(host, <HydrationMarker />, { onRecoverableError });

@@ -4,17 +4,11 @@ import { useIsHydrated } from '@/hooks/use-is-hydrated';
 import { HYDRATION_MARKER_ID } from '@/lib/hydration-marker';
 
 /**
- * A hidden element whose `data-hydrated` reads `false` in the served HTML and `true` once React has
- * hydrated the page. The root layout renders it on every route, so an e2e spec can wait for
- * hydration anywhere, not only on `/` (see `e2e/support/hydration.ts`).
- *
- * The value is `useIsHydrated`'s. Its server snapshot is what both the server render and the hydration
- * render read, and React re-renders from the client snapshot straight after the hydration commit, so
- * the attribute changes with no effect and no mismatch (ADR 0006).
- *
- * `hidden` keeps it out of layout, out of the accessibility tree and out of the tab order. It hydrates
- * with the layout, so content a page wraps in `<Suspense>`, or puts under a `loading.tsx`, would
- * hydrate after it flips.
+ * A hidden element whose `data-hydrated` is `false` in the served HTML and `true` once React has
+ * hydrated the root layout, so an e2e spec can wait for hydration on any route. What that wait
+ * cannot see is documented in `e2e/support/hydration.ts`. The value comes from `useIsHydrated`, so
+ * the flip needs no effect of its own and causes no mismatch (ADR 0006). `hidden` computes to
+ * `display: none`: no box, no accessibility-tree node.
  */
 export function HydrationMarker() {
   const hydrated = useIsHydrated();
