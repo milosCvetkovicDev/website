@@ -4093,9 +4093,9 @@
       "id": "adr-0014-cite-playwright-config-64",
       "doc": "docs/adr/0014-playwright-owns-its-server.md",
       "anchor": "apps/web/playwright.config.ts:64",
-      "claim": "playwright.config.ts:64 pins NEXT_DIST_DIR on both branches, at 4c02b40, the commit that merged the correction.",
+      "claim": "The 2026-09-12 entry cites apps/web/playwright.config.ts:64 for the NEXT_DIST_DIR pin; at 4c02b40, which merged it, the pin is at :104, and the 2026-09-16 entry records that.",
       "method": "file-line",
-      "evaluation": "historical",
+      "evaluation": "live",
       "covers": [
         {
           "kind": "citation",
@@ -4103,11 +4103,48 @@
         }
       ],
       "check": {
+        "path": "docs/adr/0014-playwright-owns-its-server.md",
+        "matches": "`trace: 'on-first-retry',` and the pinned line is\\s+`apps/web/playwright\\.config\\.ts:104`\\."
+      }
+    },
+    {
+      "id": "adr-0014-cite-playwright-config-104",
+      "doc": "docs/adr/0014-playwright-owns-its-server.md",
+      "anchor": "the pinned line is `apps/web/playwright.config.ts:104`",
+      "claim": "At 4c02b40, the commit that merged the 2026-09-12 entry, playwright.config.ts:104 pins NEXT_DIST_DIR.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "asOf": "4c02b40906b7d8d6f0d528899338b549e4e42fb3",
+      "covers": [
+        {
+          "kind": "citation",
+          "token": "apps/web/playwright.config.ts:104"
+        }
+      ],
+      "check": {
         "path": "apps/web/playwright.config.ts",
-        "line": 64,
+        "line": 104,
         "contains": "NEXT_DIST_DIR: isCI ? '.next' : '.next-e2e'"
-      },
-      "asOf": "4c02b40906b7d8d6f0d528899338b549e4e42fb3"
+      }
+    },
+    {
+      "id": "adr-0014-script-check-docs-drift",
+      "doc": "docs/adr/0014-playwright-owns-its-server.md",
+      "anchor": "`pnpm check:docs-drift`",
+      "claim": "`pnpm check:docs-drift` is a script in the root package.json. A link or script must resolve whenever it is read, so it is checked live even inside Corrections.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:docs-drift"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:docs-drift",
+        "runs": "scripts/check-docs-drift.ts"
+      }
     },
     {
       "id": "adr-0014-cite-next-config-40",
@@ -4821,24 +4858,24 @@
       "anchor": "| 0006 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0006's record carries the status line \"Accepted\".",
+      "claim": "ADR 0006's record carries the status line \"Accepted (corrected 2026-09-16)\".",
       "check": {
         "file": "docs/adr/0006-hydration-safe-client-state.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-09-16)"
       }
     },
     {
       "id": "adr-index-0006-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0006 |",
-      "claim": "The index row for ADR 0006 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0006 gives the record's status line, \"Accepted (corrected 2026-09-16)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0006 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-09-16)"
       }
     },
     {
@@ -5445,24 +5482,24 @@
       "anchor": "| 0014 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0014's record carries the status line \"Accepted (corrected 2026-09-12)\".",
+      "claim": "ADR 0014's record carries the status line \"Accepted (corrected 2026-09-16)\".",
       "check": {
         "file": "docs/adr/0014-playwright-owns-its-server.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted (corrected 2026-09-12)"
+        "equals": "Accepted (corrected 2026-09-16)"
       }
     },
     {
       "id": "adr-index-0014-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0014 |",
-      "claim": "The index row for ADR 0014 gives the record's status line, \"Accepted (corrected 2026-09-12)\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0014 gives the record's status line, \"Accepted (corrected 2026-09-16)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0014 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted (corrected 2026-09-12)"
+        "equals": "Accepted (corrected 2026-09-16)"
       }
     },
     {
@@ -7273,10 +7310,70 @@
       "anchor": "`themeInitScript` in `apps/web/src/app/layout.tsx` runs in `<head>`",
       "method": "file-line",
       "evaluation": "live",
-      "claim": "layout.tsx carries themeInitScript and suppressHydrationWarning.",
+      "claim": "As corrected on 2026-09-16: layout.tsx renders THEME_INIT_SCRIPT, imported from @/lib/theme, and html and body carry suppressHydrationWarning.",
       "check": {
         "path": "apps/web/src/app/layout.tsx",
-        "matches": "themeInitScript[\\s\\S]*suppressHydrationWarning"
+        "matches": "import \\{ THEME_INIT_SCRIPT \\} from '@/lib/theme';[\\s\\S]*suppressHydrationWarning[\\s\\S]*__html: THEME_INIT_SCRIPT[\\s\\S]*suppressHydrationWarning"
+      }
+    },
+    {
+      "id": "adr-0006-theme-init-script-defined",
+      "doc": "docs/adr/0006-hydration-safe-client-state.md",
+      "anchor": "`themeInitScript` in `apps/web/src/app/layout.tsx` runs in `<head>`",
+      "claim": "As corrected on 2026-09-16: THEME_INIT_SCRIPT is exported from apps/web/src/lib/theme.ts.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/lib/theme.ts",
+        "contains": "export const THEME_INIT_SCRIPT = "
+      }
+    },
+    {
+      "id": "adr-0006-decision-annotated",
+      "doc": "docs/adr/0006-hydration-safe-client-state.md",
+      "anchor": "`themeInitScript` in `apps/web/src/app/layout.tsx` runs in `<head>`",
+      "claim": "The false themeInitScript sentence in the Decision carries a Corrections entry, since the Decision itself is never rewritten.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "docs/adr/0006-hydration-safe-client-state.md",
+        "matches": "^## Corrections\\n\\n### 2026-09-16\\n[\\s\\S]*\\*\\*The script's name and file\\*\\*, in `## Decision`"
+      }
+    },
+    {
+      "id": "adr-0006-link-0012",
+      "doc": "docs/adr/0006-hydration-safe-client-state.md",
+      "anchor": "](0012-correcting-accepted-records.md)",
+      "claim": "The link to 0012-correcting-accepted-records.md resolves. Checked live even inside Corrections: a link must resolve whenever it is read.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0012-correcting-accepted-records.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0012-correcting-accepted-records.md"
+      }
+    },
+    {
+      "id": "adr-0006-script-check-docs-drift",
+      "doc": "docs/adr/0006-hydration-safe-client-state.md",
+      "anchor": "`pnpm check:docs-drift`",
+      "claim": "`pnpm check:docs-drift` is a script in the root package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:docs-drift"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:docs-drift",
+        "runs": "scripts/check-docs-drift.ts"
       }
     },
     {
