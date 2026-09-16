@@ -9,6 +9,7 @@ import { THEME_INIT_SCRIPT } from '@/lib/theme';
 // from a server component's imports is bundled into that layout's client chunk whether it renders
 // or not, and through the barrel that meant FeaturedWork shipping to every route.
 import { ThemeProvider } from '@/components/theme-provider';
+import { HydrationMarker } from '@/components/hydration-marker';
 import { Navigation } from '@/components/navigation';
 import { Footer } from '@/components/footer';
 import { PersonJsonLd, WebsiteJsonLd } from '@/components/json-ld';
@@ -120,6 +121,7 @@ export default function RootLayout({
           </main>
           <Footer />
         </ThemeProvider>
+        <HydrationMarker />
       </body>
     </html>
   );
