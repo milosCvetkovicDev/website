@@ -4003,7 +4003,7 @@
         "line": 94,
         "contains": "bg-[var(--accent)]/5"
       },
-      "asOf": "b17a343"
+      "asOf": "b17a343ef4bade5a0b4ac9a54a24c358eb1e4c65"
     },
     {
       "id": "adr-0010-cite-loop-phase-175-200",
@@ -4024,7 +4024,7 @@
         "contains": "border-[var(--status-err)]/50",
         "lineEnd": 200
       },
-      "asOf": "b17a343"
+      "asOf": "b17a343ef4bade5a0b4ac9a54a24c358eb1e4c65"
     },
     {
       "id": "adr-0010-cite-loop-phase-159",
@@ -4044,7 +4044,7 @@
         "line": 159,
         "contains": "MONITORING DASHBOARD"
       },
-      "asOf": "b17a343"
+      "asOf": "b17a343ef4bade5a0b4ac9a54a24c358eb1e4c65"
     },
     {
       "id": "adr-0010-cite-work-page-78",
@@ -4064,7 +4064,7 @@
         "line": 78,
         "contains": "text-green-500/80"
       },
-      "asOf": "b037b75"
+      "asOf": "b037b75c26a3d214bec144aea08b2221f42de852"
     },
     {
       "id": "adr-0010-cite-gauntlet-phase-246",
@@ -4084,7 +4084,7 @@
         "line": 246,
         "contains": "opacity-80"
       },
-      "asOf": "b037b75"
+      "asOf": "b037b75c26a3d214bec144aea08b2221f42de852"
     },
     {
       "id": "adr-0010-cite-loop-phase-230",
@@ -4104,7 +4104,7 @@
         "line": 230,
         "contains": "opacity-80"
       },
-      "asOf": "b037b75"
+      "asOf": "b037b75c26a3d214bec144aea08b2221f42de852"
     },
     {
       "id": "adr-0010-cite-hero-content-24",
@@ -4124,7 +4124,7 @@
         "line": 24,
         "contains": "bg-white/95"
       },
-      "asOf": "b17a343"
+      "asOf": "b17a343ef4bade5a0b4ac9a54a24c358eb1e4c65"
     },
     {
       "id": "adr-0014-cite-next-config-42",
@@ -4144,7 +4144,7 @@
         "line": 42,
         "contains": "distDir: process.env.NEXT_DIST_DIR || '.next'"
       },
-      "asOf": "4c02b40"
+      "asOf": "4c02b40906b7d8d6f0d528899338b549e4e42fb3"
     },
     {
       "id": "adr-0014-cite-playwright-config-64",
@@ -4164,7 +4164,7 @@
         "line": 64,
         "contains": "NEXT_DIST_DIR: isCI ? '.next' : '.next-e2e'"
       },
-      "asOf": "4c02b40"
+      "asOf": "4c02b40906b7d8d6f0d528899338b549e4e42fb3"
     },
     {
       "id": "adr-0014-cite-next-config-40",
@@ -4184,7 +4184,7 @@
         "line": 40,
         "contains": "Unset everywhere else, CI included"
       },
-      "asOf": "4c02b40"
+      "asOf": "4c02b40906b7d8d6f0d528899338b549e4e42fb3"
     },
     {
       "id": "plan-hydration-marker-cite-layout",
@@ -4205,7 +4205,7 @@
         "contains": "import { Footer } from '@/components/footer';",
         "lineEnd": 14
       },
-      "asOf": "08cfcfd"
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6"
     },
     {
       "id": "plan-hydration-marker-cite-work-cards",
@@ -4226,7 +4226,7 @@
         "contains": "from '@playwright/test'",
         "lineEnd": 2
       },
-      "asOf": "08cfcfd"
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6"
     },
     {
       "id": "plan-hydration-marker-cite-case-study",
@@ -4247,7 +4247,7 @@
         "contains": "from '@playwright/test'",
         "lineEnd": 2
       },
-      "asOf": "08cfcfd"
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6"
     },
     {
       "id": "plan-hydration-marker-cite-not-found",
@@ -4268,7 +4268,7 @@
         "contains": "from '@playwright/test'",
         "lineEnd": 2
       },
-      "asOf": "08cfcfd"
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6"
     },
     {
       "id": "plan-hydration-marker-cite-theme",
@@ -4289,7 +4289,7 @@
         "contains": "from '@playwright/test'",
         "lineEnd": 2
       },
-      "asOf": "08cfcfd"
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6"
     },
     {
       "id": "plan-hydration-marker-cite-mobile-navigation",
@@ -4310,7 +4310,7 @@
         "contains": "from '@playwright/test'",
         "lineEnd": 2
       },
-      "asOf": "08cfcfd"
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6"
     },
     {
       "id": "plan-hydration-marker-cite-readme",
@@ -4330,7 +4330,7 @@
         "line": 85,
         "contains": "End-to-end tests"
       },
-      "asOf": "08cfcfd"
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6"
     },
     {
       "id": "plan-hydration-marker-cite-layout-render",
@@ -4339,7 +4339,7 @@
       "claim": "layout.tsx:122-123 close ThemeProvider and body, where the marker renders. Read at 08cfcfd.",
       "method": "file-line",
       "evaluation": "historical",
-      "asOf": "08cfcfd",
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6",
       "check": {
         "path": "apps/web/src/app/layout.tsx",
         "line": 122,
@@ -4354,7 +4354,7 @@
       "claim": "work-cards.spec.ts:83 is a goto to /work. Read at 08cfcfd.",
       "method": "file-line",
       "evaluation": "historical",
-      "asOf": "08cfcfd",
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6",
       "check": {
         "path": "apps/web/e2e/work-cards.spec.ts",
         "line": 83,
@@ -4369,7 +4369,7 @@
       "claim": "work-cards.spec.ts:97 is a goto to /work. Read at 08cfcfd.",
       "method": "file-line",
       "evaluation": "historical",
-      "asOf": "08cfcfd",
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6",
       "check": {
         "path": "apps/web/e2e/work-cards.spec.ts",
         "line": 97,
@@ -4384,7 +4384,7 @@
       "claim": "work-cards.spec.ts:147-148 are a goto plus the System Boot wait. Read at 08cfcfd.",
       "method": "file-line",
       "evaluation": "historical",
-      "asOf": "08cfcfd",
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6",
       "check": {
         "path": "apps/web/e2e/work-cards.spec.ts",
         "line": 147,
@@ -4399,7 +4399,7 @@
       "claim": "work-cards.spec.ts:183-184 are a goto plus the System Boot wait. Read at 08cfcfd.",
       "method": "file-line",
       "evaluation": "historical",
-      "asOf": "08cfcfd",
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6",
       "check": {
         "path": "apps/web/e2e/work-cards.spec.ts",
         "line": 183,
@@ -4414,7 +4414,7 @@
       "claim": "case-study.spec.ts:60 is its goto. Read at 08cfcfd.",
       "method": "file-line",
       "evaluation": "historical",
-      "asOf": "08cfcfd",
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6",
       "check": {
         "path": "apps/web/e2e/case-study.spec.ts",
         "line": 60,
@@ -4429,7 +4429,7 @@
       "claim": "not-found.spec.ts:56 is its goto. Read at 08cfcfd.",
       "method": "file-line",
       "evaluation": "historical",
-      "asOf": "08cfcfd",
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6",
       "check": {
         "path": "apps/web/e2e/not-found.spec.ts",
         "line": 56,
@@ -4444,7 +4444,7 @@
       "claim": "theme.spec.ts:97 is a goto to /about. Read at 08cfcfd.",
       "method": "file-line",
       "evaluation": "historical",
-      "asOf": "08cfcfd",
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6",
       "check": {
         "path": "apps/web/e2e/theme.spec.ts",
         "line": 97,
@@ -4459,7 +4459,7 @@
       "claim": "theme.spec.ts:110 is a reload. Read at 08cfcfd.",
       "method": "file-line",
       "evaluation": "historical",
-      "asOf": "08cfcfd",
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6",
       "check": {
         "path": "apps/web/e2e/theme.spec.ts",
         "line": 110,
@@ -4474,7 +4474,7 @@
       "claim": "mobile/navigation.spec.ts:30-34 is the open() helper with the System Boot wait. Read at 08cfcfd.",
       "method": "file-line",
       "evaluation": "historical",
-      "asOf": "08cfcfd",
+      "asOf": "08cfcfdf23456a28ec697edfbdfe126a556f27b6",
       "check": {
         "path": "apps/web/e2e/mobile/navigation.spec.ts",
         "line": 30,
