@@ -425,6 +425,16 @@ describe('anchors and coverage', () => {
     assert.equal(run.report.findings[0].line, 5);
   });
 
+  it('matches an anchor across re-padded whitespace, but not across a changed word', () => {
+    write('docs/doc.md', '| 0004 |   Accepted     | 2026-09-08 |\n');
+    write('src/app.ts', 'hello\n');
+    const padded = check([entry({ anchor: '| 0004 | Accepted | 2026-09-08 |' })]);
+    assert.equal(padded.status, 0, JSON.stringify(padded.report));
+    const changed = check([entry({ anchor: '| 0004 | Superseded | 2026-09-08 |' })]);
+    assert.equal(changed.status, 1);
+    assert.equal(changed.report.findings[0].status, 'stale');
+  });
+
   it('reports every link, pnpm script and citation that no entry covers', () => {
     write(
       'docs/doc.md',

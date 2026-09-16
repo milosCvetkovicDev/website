@@ -398,12 +398,26 @@ function validate(manifest: Manifest): string[] {
 
 // -------------------------------------------------------------------------------------------------
 
+/**
+ * Where an anchor starts in a doc, or -1. Runs of whitespace match any run of whitespace, so
+ * Prettier re-padding a table or re-wrapping a paragraph does not make an entry stale; any other
+ * change to the anchored text does.
+ */
+function findAnchor(doc: string, anchor: string): number {
+  const pattern = anchor
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('\\s+');
+  return doc.search(new RegExp(pattern));
+}
+
 function run(root: string, manifest: Manifest, skipRequires: Set<string>): Result[] {
   const docs = new Map<string, string | null>();
   return manifest.assertions.map((assertion) => {
     if (!docs.has(assertion.doc)) docs.set(assertion.doc, readAt(root, null, assertion.doc));
     const doc = docs.get(assertion.doc) ?? null;
-    const index = doc === null ? -1 : doc.indexOf(assertion.anchor);
+    const index = doc === null ? -1 : findAnchor(doc, assertion.anchor);
     const line = index < 0 || doc === null ? null : doc.slice(0, index).split('\n').length;
     const base = {
       id: assertion.id,
