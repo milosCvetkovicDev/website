@@ -10,8 +10,10 @@
 //   0  every assertion holds (entries skipped by --skip-requires are listed, not counted as holds)
 //   1  drift: an assertion is false, its anchor is gone from the doc (stale), or the docs contain a
 //      link, script or path:line citation that no assertion covers (uncatalogued)
-//   2  a check could not run (gh unauthenticated, a 5xx after retries, a missing commit), or the
-//      manifest itself is invalid. Takes precedence over 1; the report still lists the drift.
+//   2  a check could not run (gh unauthenticated, a 5xx after retries, a missing commit), the
+//      manifest itself is invalid, the command line is (an unknown flag, an --only id that names
+//      no assertion), or the checker failed in any other way. Takes precedence over 1; the report
+//      still lists the drift. Nothing that goes wrong inside the checker exits 1.
 //
 // Node 22 runs this file directly: type stripping is on by default from 22.18, and CI resolves
 // .nvmrc's `22` to a later release. Only erasable TypeScript syntax is used for that reason.
@@ -90,16 +92,40 @@ function git(root: string, args: string[]): string {
 function readAt(root: string, ref: string | null, path: string): string | null {
   if (ref === null) {
     const full = join(root, path);
-    return existsSync(full) ? readFileSync(full, 'utf8') : null;
+    if (!existsSync(full)) return null;
+    try {
+      return readFileSync(full, 'utf8');
+    } catch (error) {
+      throw new Unrunnable(`cannot read ${path}: ${(error as Error).message}`);
+    }
   }
+  // Tell "the commit is not here" (unrunnable) from "the file was not there" (a finding).
+  ensureCommit(root, ref);
   const exists = spawnSync('git', ['-C', root, 'cat-file', '-e', `${ref}:${path}`]);
-  if (exists.status !== 0) {
-    // Tell "the file was not there" from "the commit is not here": only the first is a finding.
-    const commit = spawnSync('git', ['-C', root, 'cat-file', '-e', `${ref}^{commit}`]);
-    if (commit.status !== 0) throw new Unrunnable(`commit ${ref} is not in this clone`);
-    return null;
-  }
+  if (exists.status !== 0) return null;
   return git(root, ['show', `${ref}:${path}`]);
+}
+
+const fetchAttempted = new Set<string>();
+
+/**
+ * Makes sure a commit an assertion is read at is present. A commit that only ever lived on a
+ * squash-merged branch is on no remote ref, so even a full clone lacks it, while GitHub still
+ * serves it by its full SHA. Fetch it once, and without `--depth`, which would make a developer's
+ * clone shallow.
+ */
+function ensureCommit(root: string, ref: string): void {
+  const present = () =>
+    spawnSync('git', ['-C', root, 'cat-file', '-e', `${ref}^{commit}`]).status === 0;
+  if (present()) return;
+  if (!fetchAttempted.has(ref)) {
+    fetchAttempted.add(ref);
+    spawnSync('git', ['-C', root, 'fetch', '--quiet', '--no-tags', 'origin', ref], {
+      timeout: 120_000,
+    });
+    if (present()) return;
+  }
+  throw new Unrunnable(`commit ${ref} is not in this clone, and fetching it from origin failed`);
 }
 
 function refFor(assertion: Assertion): string | null {
@@ -110,6 +136,12 @@ function refFor(assertion: Assertion): string | null {
 // The four methods. Each returns [holds, claimed, actual, detail] or throws Unrunnable.
 
 type Outcome = [boolean, unknown, unknown, string];
+
+/** The number of lines in a file, not counting the empty string after a final newline. */
+function lineCount(text: string): number {
+  const lines = text.split('\n');
+  return text.endsWith('\n') ? lines.length - 1 : lines.length;
+}
 
 function lineSpan(text: string, line: number, lineEnd: number): string {
   return text
@@ -141,10 +173,16 @@ function fileLine(root: string, assertion: Assertion): Outcome {
     return [holds, claimed, holds ? claimed : `not in ${path}`, ''];
   }
   const lineEnd = typeof check.lineEnd === 'number' ? check.lineEnd : check.line;
-  const span = lineSpan(text, check.line, lineEnd);
-  const [holds, claimed] = expectText(span, check);
   const where =
     lineEnd === check.line ? `${path}:${check.line}` : `${path}:${check.line}-${lineEnd}`;
+  const lines = lineCount(text);
+  // A cited line past the end of the file is a wrong citation, whatever the expectation says: an
+  // empty span would otherwise satisfy `absent`.
+  if (lineEnd > lines) {
+    return [false, `${where} exists`, `${path} has ${lines} lines`, where];
+  }
+  const span = lineSpan(text, check.line, lineEnd);
+  const [holds, claimed] = expectText(span, check);
   return [holds, claimed, span.trim(), where];
 }
 
@@ -225,8 +263,22 @@ function command(root: string, assertion: Assertion): Outcome {
 }
 
 const GH_ATTEMPTS = 3;
-// Overridable so the tests do not sleep through real backoff.
-const backoffMs = Number(process.env.DOCS_DRIFT_GH_BACKOFF_MS ?? 1000);
+// Overridable so the tests do not sleep through real backoff. Anything but a finite, non-negative
+// number falls back to the default: Atomics.wait with NaN would block forever.
+const backoffRaw = Number(process.env.DOCS_DRIFT_GH_BACKOFF_MS ?? 1000);
+const backoffMs = Number.isFinite(backoffRaw) && backoffRaw >= 0 ? backoffRaw : 1000;
+
+/**
+ * Whether a failed `gh api` call is worth another attempt: GitHub's intermittent server errors and
+ * rate limiting (HTTP 5xx, 429), or a network failure that never got an HTTP status at all. Any
+ * other HTTP status (401, 403, 404, 422, ...) is an answer, and asking again changes nothing.
+ */
+export function retryable(stderr: string, spawnErrorCode?: string): boolean {
+  if (spawnErrorCode === 'ETIMEDOUT') return true;
+  const status = /\(HTTP (\d{3})\)|\bHTTP (\d{3})\b/.exec(stderr);
+  if (status) return /^(5\d\d|429)$/.test(status[1] ?? status[2]);
+  return /timeout|timed out|connection reset|unexpected EOF/i.test(stderr);
+}
 
 function sleep(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -241,16 +293,19 @@ function ghApi(repository: string, endpoint: string, jq: string): unknown {
       encoding: 'utf8',
       timeout: 30_000,
     });
-    if (run.error) throw new Unrunnable(`gh api ${path}: ${run.error.message}`);
-    if (run.status === 0) {
+    const code = (run.error as NodeJS.ErrnoException | undefined)?.code;
+    if (run.error && code !== 'ETIMEDOUT') {
+      throw new Unrunnable(`gh api ${path}: ${run.error.message}`);
+    }
+    if (!run.error && run.status === 0) {
       try {
         return JSON.parse(run.stdout);
       } catch {
         throw new Unrunnable(`gh api ${path} printed something that is not JSON: ${run.stdout}`);
       }
     }
-    lastError = run.stderr.trim();
-    if (!/HTTP 5\d\d|timeout|connection reset|EOF/i.test(lastError)) break;
+    lastError = run.error ? `timed out after 30 s` : (run.stderr ?? '').trim();
+    if (!retryable(run.stderr ?? '', code)) break;
     if (attempt < GH_ATTEMPTS) sleep(backoffMs * 2 ** (attempt - 1));
   }
   throw new Unrunnable(`gh api ${path}: ${lastError || 'failed'}`);
@@ -260,6 +315,14 @@ function ghCheck(root: string, repository: string, assertion: Assertion): Outcom
   if (assertion.evaluation === 'historical') return adrChain(root, assertion);
   const check = assertion.check;
   const actual = ghApi(repository, String(check.endpoint), String(check.jq));
+  // Without admin rights GitHub leaves admin-only fields out of the response instead of refusing,
+  // so jq yields null: that is a check that could not run, not a setting that changed.
+  if (assertion.requires === 'admin' && actual === null) {
+    throw new Unrunnable(
+      `gh api ${String(check.endpoint)} returned null for an admin-only field: this token has no ` +
+        `admin access (use the owner's token, or pass --skip-requires admin)`,
+    );
+  }
   return [sameValue(actual, check.equals), check.equals, actual, String(check.endpoint)];
 }
 
@@ -275,7 +338,13 @@ function adrChain(root: string, assertion: Assertion): Outcome {
   }
   const doc = readAt(root, null, assertion.doc) ?? '';
   const status = /## Status\s+([^\n]+)/.exec(doc)?.[1] ?? '';
-  const successor = readdirSync(join(root, 'docs/adr')).find((name) => name.startsWith(`${by}-`));
+  let names: string[];
+  try {
+    names = readdirSync(join(root, 'docs/adr'));
+  } catch (error) {
+    throw new Unrunnable(`cannot list docs/adr: ${(error as Error).message}`);
+  }
+  const successor = names.find((name) => name.startsWith(`${by}-`));
   const holds = status.includes(`Superseded by ADR-${by}`) && successor !== undefined;
   return [
     holds,
@@ -288,50 +357,113 @@ function adrChain(root: string, assertion: Assertion): Outcome {
 // -------------------------------------------------------------------------------------------------
 // Coverage: the tokens in docs/ that a manifest entry has to account for.
 
-const LINK = /\]\(([^)\s]+)\)/g;
-const CITATION =
-  /(?<![\w/.-])((?:\.{1,2}\/|[\w@-]+\/)*[\w@.[\]-]+\.(?:tsx?|mjs|cjs|js|json|ya?ml|md|css|sh)):(\d+(?:-\d+)?)\b/g;
+// An inline link's destination, bare or in <angle brackets>, with an optional title after it.
+const LINK = /\]\(\s*(<[^>\n]*>|[^)\s]+)(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\)))?\s*\)/g;
+// A link reference definition: `[label]: destination`.
+const REFERENCE = /^ {0,3}\[[^\]\n]+\]:\s*(<[^>\n]*>|\S+)/;
+// `path/file.ext:12` or `:12-20`. Directories may start with a dot (`.github/`); the file needs one
+// of these extensions, so `host:3000` and extensionless files such as `.husky/pre-commit` are not
+// citations.
+const CITATION = new RegExp(
+  String.raw`(?<![\w/.-])((?:\.{1,2}\/|\.?[\w@-]+\/)*[\w@.[\]-]+` +
+    String.raw`\.(?:tsx?|mjs|cjs|js|json|ya?ml|md|css|sh)):(\d+(?:-\d+)?)\b`,
+  'g',
+);
 const INLINE_CODE = /`([^`\n]+)`/g;
+// A fence opens with three or more backticks or tildes and closes with a run of the same
+// character at least as long (CommonMark), so a ```` fence can hold ``` lines.
+const FENCE = /^\s*(`{3,}|~{3,})(.*)$/;
 
 function markdownFiles(root: string, dir: string): string[] {
   const full = join(root, dir);
   if (!existsSync(full)) return [];
-  return readdirSync(full, { withFileTypes: true, recursive: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
-    .map((entry) => relative(root, join(entry.parentPath, entry.name)))
-    .sort();
+  try {
+    return readdirSync(full, { withFileTypes: true, recursive: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+      .map((entry) => relative(root, join(entry.parentPath, entry.name)))
+      .sort();
+  } catch (error) {
+    throw new Unrunnable(`cannot list the coverage root ${dir}: ${(error as Error).message}`);
+  }
+}
+
+function linkTarget(raw: string): string {
+  return raw.startsWith('<') ? raw.slice(1, -1) : raw;
+}
+
+/**
+ * The package script a backticked command runs, as a coverage token, or null when it is not a
+ * `pnpm` script. Recognised: leading `NAME=value` assignments, `--filter <pkg>`, `--filter=<pkg>`,
+ * `-F <pkg>`, `-r` / `--recursive`, and `run <script>`.
+ */
+export function scriptToken(code: string, pnpmBuiltins: readonly string[]): string | null {
+  const words = code.trim().split(/\s+/);
+  let at = 0;
+  while (at < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[at])) at += 1;
+  if (words[at] !== 'pnpm') return null;
+  at += 1;
+  let pkg = '.';
+  let recursive = false;
+  for (;;) {
+    const word = words[at];
+    if ((word === '--filter' || word === '-F') && words[at + 1]) {
+      pkg = words[at + 1];
+      at += 2;
+    } else if (word?.startsWith('--filter=') && word.length > '--filter='.length) {
+      pkg = word.slice('--filter='.length);
+      at += 1;
+    } else if (word === '-r' || word === '--recursive') {
+      recursive = true;
+      at += 1;
+    } else {
+      break;
+    }
+  }
+  if (words[at] === 'run') at += 1;
+  const name = words[at];
+  if (!name || name.startsWith('-') || pnpmBuiltins.includes(name)) return null;
+  if (recursive) return `-r ${name}`;
+  return pkg === '.' ? name : `${pkg} ${name}`;
 }
 
 export function tokensIn(doc: string, text: string, pnpmBuiltins: readonly string[]): Token[] {
   const tokens: Token[] = [];
-  let inFence = false;
+  let fence: string | null = null;
   text.split('\n').forEach((content, index) => {
     const line = index + 1;
-    if (/^\s*```/.test(content)) {
-      inFence = !inFence;
-      return;
+    const marker = FENCE.exec(content);
+    if (marker) {
+      const run = marker[1];
+      if (fence === null) {
+        // A backtick fence's info string may not contain a backtick.
+        if (!(run[0] === '`' && marker[2].includes('`'))) {
+          fence = run;
+          return;
+        }
+      } else if (run[0] === fence[0] && run.length >= fence.length && marker[2].trim() === '') {
+        fence = null;
+        return;
+      }
     }
     for (const match of content.matchAll(LINK)) {
-      const target = match[1];
-      if (/^(?:[a-z]+:|#)/i.test(target)) continue;
+      const target = linkTarget(match[1]);
+      if (target === '' || /^(?:[a-z]+:|#)/i.test(target)) continue;
       tokens.push({ doc, line, kind: 'link', token: target });
+    }
+    const reference = fence === null ? REFERENCE.exec(content) : null;
+    if (reference) {
+      const target = linkTarget(reference[1]);
+      if (target !== '' && !/^(?:[a-z]+:|#)/i.test(target)) {
+        tokens.push({ doc, line, kind: 'link', token: target });
+      }
     }
     for (const match of content.matchAll(CITATION)) {
       tokens.push({ doc, line, kind: 'citation', token: `${match[1]}:${match[2]}` });
     }
-    if (inFence) return;
+    if (fence !== null) return;
     for (const match of content.matchAll(INLINE_CODE)) {
-      const words = match[1].trim().split(/\s+/);
-      if (words[0] !== 'pnpm') continue;
-      let at = 1;
-      let pkg = '.';
-      if (words[at] === '--filter' && words[at + 1]) {
-        pkg = words[at + 1];
-        at += 2;
-      }
-      const name = words[at];
-      if (!name || name.startsWith('-') || pnpmBuiltins.includes(name)) continue;
-      tokens.push({ doc, line, kind: 'script', token: pkg === '.' ? name : `${pkg} ${name}` });
+      const token = scriptToken(match[1], pnpmBuiltins);
+      if (token !== null) tokens.push({ doc, line, kind: 'script', token });
     }
   });
   return tokens;
@@ -360,21 +492,122 @@ function uncatalogued(root: string, manifest: Manifest): Token[] {
 // -------------------------------------------------------------------------------------------------
 // Manifest validation: a malformed entry is an error, never a silently skipped check.
 
+/** A repository-relative path that stays inside the checkout: no absolute path, no `..`. */
+function insideRoot(path: unknown): boolean {
+  if (typeof path !== 'string' || path === '' || path.startsWith('/') || path.includes('\\')) {
+    return false;
+  }
+  return !normalize(path)
+    .split('/')
+    .some((segment) => segment === '..');
+}
+
+function compiles(pattern: unknown, flags: string): boolean {
+  try {
+    new RegExp(String(pattern), flags);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const nonEmpty = (value: unknown) => typeof value === 'string' && value !== '';
+const positiveInteger = (value: unknown) => Number.isInteger(value) && (value as number) >= 1;
+
+/** What each method's `check` must look like; one message per problem. */
+function checkProblems(a: Assertion): string[] {
+  const check = a.check;
+  const problems: string[] = [];
+  const has = (key: string) => Object.hasOwn(check, key);
+  if (a.method === 'file-line') {
+    if (!insideRoot(check.path)) problems.push('check.path must be a path inside the repository');
+    const expectations = ['contains', 'matches', 'absent'].filter(has);
+    if (expectations.length > 1) problems.push('check takes one of contains, matches, absent');
+    for (const key of expectations) {
+      if (!nonEmpty(check[key])) problems.push(`check.${key} must be a non-empty string`);
+    }
+    if (has('matches') && !compiles(check.matches, 'm')) {
+      problems.push('check.matches is not a valid regular expression');
+    }
+    if (has('exists') && check.exists !== false) problems.push('check.exists can only be false');
+    if (has('line') && !positiveInteger(check.line)) {
+      problems.push('check.line must be a positive integer');
+    }
+    if (has('lineEnd')) {
+      const end = check.lineEnd as number;
+      if (!has('line')) problems.push('check.lineEnd needs check.line');
+      else if (!positiveInteger(end) || end < (check.line as number)) {
+        problems.push('check.lineEnd must be an integer no smaller than check.line');
+      }
+    }
+  } else if (a.method === 'config-value') {
+    if (!insideRoot(check.file)) problems.push('check.file must be a path inside the repository');
+    const sources = ['json', 'regex', 'text'].filter(has);
+    if (sources.length !== 1) problems.push('check needs exactly one of json, regex, text');
+    if (has('json') && typeof check.json !== 'string') problems.push('check.json must be a string');
+    if (has('regex') && (!nonEmpty(check.regex) || !compiles(check.regex, 'gm'))) {
+      problems.push('check.regex must be a valid, non-empty regular expression');
+    }
+    if (has('text') && check.text !== true) problems.push('check.text can only be true');
+    if (has('equals') === has('equalsAll')) {
+      problems.push('check needs exactly one of equals, equalsAll');
+    }
+    if (has('equalsAll') && !has('regex')) problems.push('check.equalsAll needs check.regex');
+  } else if (a.method === 'command') {
+    if (!nonEmpty(check.script)) problems.push('check.script must be a non-empty string');
+    if (has('package') && !insideRoot(check.package)) {
+      problems.push('check.package must be a path inside the repository');
+    }
+    if (has('runs') && !nonEmpty(check.runs)) problems.push('check.runs must be non-empty');
+  } else if (a.method === 'gh-api' && a.evaluation === 'live') {
+    // An endpoint is one positional argument to `gh api`: never an option, never a URL.
+    if (!nonEmpty(check.endpoint) || !/^[A-Za-z0-9{}_.\/?=&%,-]+$/.test(String(check.endpoint))) {
+      problems.push('check.endpoint must be an API path such as repos/{repo}/pulls/1');
+    } else if (String(check.endpoint).startsWith('-')) {
+      problems.push('check.endpoint must not start with "-"');
+    }
+    if (!nonEmpty(check.jq)) problems.push('check.jq must be a non-empty string');
+    // gh evaluates the filter with jq's `env` and `$ENV`, which hold GH_TOKEN, and the checker
+    // prints what the filter returns. A manifest edited by the drift agent must not be able to put
+    // a token into the report or the pull request body built from it.
+    else if (/\benv\b|\$ENV\b/.test(String(check.jq))) {
+      problems.push('check.jq must not read the environment (env, $ENV)');
+    }
+    if (!has('equals')) problems.push('check.equals is missing');
+  }
+  return problems;
+}
+
 function validate(manifest: Manifest): string[] {
   const problems: string[] = [];
+  if (manifest === null || typeof manifest !== 'object') return ['the manifest must be an object'];
   if (manifest.schemaVersion !== 1) problems.push(`schemaVersion must be 1`);
-  if (typeof manifest.repository !== 'string') problems.push(`repository must be "owner/name"`);
-  if (!Array.isArray(manifest.rules?.coverage?.roots))
-    problems.push(`rules.coverage.roots missing`);
+  if (typeof manifest.repository !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(manifest.repository)) {
+    problems.push(`repository must be "owner/name"`);
+  }
+  const coverage = manifest.rules?.coverage;
+  if (!Array.isArray(coverage?.roots) || !coverage.roots.every(insideRoot)) {
+    problems.push(`rules.coverage.roots must list paths inside the repository`);
+  }
+  if (!Array.isArray(coverage?.pnpmBuiltins)) problems.push(`rules.coverage.pnpmBuiltins missing`);
   if (!Array.isArray(manifest.assertions)) return [...problems, 'assertions must be an array'];
   const ids = new Set<string>();
   for (const [index, a] of manifest.assertions.entries()) {
+    if (a === null || typeof a !== 'object') {
+      problems.push(`assertions[${index}]: must be an object`);
+      continue;
+    }
     const at = `assertions[${index}]${a?.id ? ` (${a.id})` : ''}`;
     if (typeof a.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(a.id)) problems.push(`${at}: id`);
     if (ids.has(a.id)) problems.push(`${at}: duplicate id`);
     ids.add(a.id);
     for (const field of ['doc', 'anchor', 'claim'] as const) {
-      if (typeof a[field] !== 'string' || a[field] === '') problems.push(`${at}: ${field} missing`);
+      if (typeof a[field] !== 'string' || a[field].trim() === '') {
+        problems.push(`${at}: ${field} missing`);
+      }
+    }
+    if (typeof a.doc === 'string' && a.doc !== '' && !insideRoot(a.doc)) {
+      problems.push(`${at}: doc must be a path inside the repository`);
     }
     if (!METHODS.includes(a.method))
       problems.push(`${at}: method must be one of ${METHODS.join(', ')}`);
@@ -384,14 +617,23 @@ function validate(manifest: Manifest): string[] {
     if (
       a.evaluation === 'historical' &&
       a.method !== 'gh-api' &&
-      !/^[0-9a-f]{7,40}$/.test(a.asOf ?? '')
+      !/^[0-9a-f]{40}$/.test(a.asOf ?? '')
     ) {
-      problems.push(`${at}: a historical ${a.method} assertion needs asOf, a commit SHA`);
+      problems.push(
+        `${at}: a historical ${a.method} assertion needs asOf, a full 40-character commit SHA`,
+      );
     }
     if (a.evaluation === 'historical' && a.method === 'gh-api' && !a.supersededBy) {
       problems.push(`${at}: a historical gh-api assertion needs supersededBy`);
     }
-    if (typeof a.check !== 'object' || a.check === null) problems.push(`${at}: check missing`);
+    if (a.requires !== undefined && a.requires !== 'admin') {
+      problems.push(`${at}: requires can only be "admin"`);
+    }
+    if (typeof a.check !== 'object' || a.check === null || Array.isArray(a.check)) {
+      problems.push(`${at}: check missing`);
+      continue;
+    }
+    for (const problem of checkProblems(a)) problems.push(`${at}: ${problem}`);
   }
   return problems;
 }
@@ -481,20 +723,36 @@ function run(root: string, manifest: Manifest, skipRequires: Set<string>): Resul
 }
 
 function show(value: unknown): string {
+  if (value === undefined) return 'undefined';
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
+const REQUIRES = ['admin'];
+
+class UsageError extends Error {}
+
 function main(): number {
-  const { values } = parseArgs({
-    options: {
-      root: { type: 'string' },
-      manifest: { type: 'string' },
-      json: { type: 'boolean', default: false },
-      'skip-requires': { type: 'string', multiple: true, default: [] },
-      only: { type: 'string', multiple: true, default: [] },
-      'no-coverage': { type: 'boolean', default: false },
-    },
-  });
+  let values;
+  try {
+    ({ values } = parseArgs({
+      options: {
+        root: { type: 'string' },
+        manifest: { type: 'string' },
+        json: { type: 'boolean', default: false },
+        'skip-requires': { type: 'string', multiple: true, default: [] },
+        only: { type: 'string', multiple: true, default: [] },
+        'no-coverage': { type: 'boolean', default: false },
+        'validate-only': { type: 'boolean', default: false },
+      },
+    }));
+  } catch (error) {
+    throw new UsageError((error as Error).message);
+  }
+  for (const value of values['skip-requires']) {
+    if (!REQUIRES.includes(value)) {
+      throw new UsageError(`--skip-requires takes ${REQUIRES.join(', ')}, not "${value}"`);
+    }
+  }
   const root = resolve(
     values.root ??
       execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim(),
@@ -513,8 +771,19 @@ function main(): number {
     for (const problem of problems) console.error(`  ${problem}`);
     return 2;
   }
+  if (values['validate-only']) {
+    console.log(`check-docs-drift: ${manifest.assertions.length} assertions, manifest valid`);
+    return 0;
+  }
   const only = new Set(values.only);
-  if (only.size > 0) manifest.assertions = manifest.assertions.filter((a) => only.has(a.id));
+  if (only.size > 0) {
+    const known = new Set(manifest.assertions.map((a) => a.id));
+    const unknown = [...only].filter((id) => !known.has(id));
+    if (unknown.length > 0) {
+      throw new UsageError(`--only names no assertion with the id ${unknown.join(', ')}`);
+    }
+    manifest.assertions = manifest.assertions.filter((a) => only.has(a.id));
+  }
   const results = run(root, manifest, new Set(values['skip-requires']));
   const missing = values['no-coverage'] || only.size > 0 ? [] : uncatalogued(root, manifest);
 
@@ -534,17 +803,18 @@ function main(): number {
     console.log(JSON.stringify({ summary, findings, uncatalogued: missing }, null, 2));
   } else {
     console.log(
-      `docs drift: ${summary.assertions} assertions, ${summary.pass} hold, ${summary.drift} drift, ` +
-        `${summary.stale} stale, ${summary.uncatalogued} uncatalogued, ${summary.skipped} skipped, ` +
-        `${summary.unrunnable} could not run`,
+      `docs drift: ${summary.assertions} assertions, ${summary.pass} hold, ` +
+        `${summary.drift} drift, ${summary.stale} stale, ${summary.uncatalogued} uncatalogued, ` +
+        `${summary.skipped} skipped, ${summary.unrunnable} could not run`,
     );
     for (const r of results.filter((result) => result.status !== 'pass')) {
-      console.log(
-        `\n${r.status.toUpperCase()}  ${r.id}  ${r.doc}:${r.line ?? '?'}  ${r.method} (${r.evaluation})`,
-      );
+      const where = `${r.doc}:${r.line ?? '?'}`;
+      console.log(`\n${r.status.toUpperCase()}  ${r.id}  ${where}  ${r.method} (${r.evaluation})`);
       console.log(`  claim:   ${r.claim}`);
-      if (r.claimed !== null) console.log(`  claimed: ${show(r.claimed)}`);
-      if (r.actual !== null) console.log(`  actual:  ${show(r.actual)}`);
+      // A drift always shows both sides, a null actual included; the other statuses have no
+      // actual value to show.
+      if (r.status === 'drift' || r.claimed !== null) console.log(`  claimed: ${show(r.claimed)}`);
+      if (r.status === 'drift' || r.actual !== null) console.log(`  actual:  ${show(r.actual)}`);
       if (r.detail) console.log(`  ${r.detail}`);
     }
     for (const token of missing) {
@@ -556,6 +826,18 @@ function main(): number {
   return summary.drift + summary.stale + summary.uncatalogued > 0 ? 1 : 0;
 }
 
+/** Exit 2 for anything that goes wrong inside the checker, so no failure can pass for drift. */
+export function exitCode(body: () => number): number {
+  try {
+    return body();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const kind = error instanceof UsageError ? 'usage' : 'could not run';
+    console.error(`check-docs-drift: ${kind}: ${message}`);
+    return 2;
+  }
+}
+
 if (resolve(process.argv[1] ?? '') === resolve(new URL(import.meta.url).pathname)) {
-  process.exitCode = main();
+  process.exitCode = exitCode(main);
 }
