@@ -184,6 +184,15 @@ importers:
 
   packages/typescript-config: {}
 
+  scripts:
+    devDependencies:
+      '@types/node':
+        specifier: ^22
+        version: 22.20.2
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
 packages:
 
   '@adobe/css-tools@4.4.4':

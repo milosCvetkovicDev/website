@@ -12,12 +12,14 @@
 # Syntax is .gitignore's, so a leading slash anchors a pattern to the repository root. Every
 # directory pattern here is anchored to where that directory is actually produced: an unanchored
 # `build`, `dist` or `out` would also strip a tracked source directory of that name at any depth.
-# Add a line when an app is added; nothing checks this file against the .gitignore files it mirrors.
+# Add a line when an app or a workspace package with a task is added; nothing checks this file
+# against the .gitignore files it mirrors.
 
-# Turborepo caches: one at the root, one per app.
+# Turborepo caches: one at the root, one per workspace package that runs a task.
 /.turbo
 /apps/web/.turbo
 /apps/playground/.turbo
+/scripts/.turbo
 /.pnpm-store
 
 # Build output. .next is on the CLI's built-in list; .next-e2e is the local e2e dist dir (ADR 0014).

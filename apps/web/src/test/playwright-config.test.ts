@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import type { PlaywrightTestConfig } from '@playwright/test';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import config, { MOBILE_SPECS, resolvePort } from '../../playwright.config';
 
 const FALLBACK = 3210;
@@ -111,5 +112,38 @@ describe('the Playwright projects', () => {
     // Three projects share one `webServer`, and it is still never reused: a run that attached to
     // someone else's server would test a build that is not this working tree (ADR 0014).
     expect(config.webServer).toEqual(expect.objectContaining({ reuseExistingServer: false }));
+  });
+});
+
+/**
+ * Loads playwright.config.ts fresh under the current environment. The module reads `process.env`
+ * while it is evaluated, so each mode needs its own module instance.
+ */
+async function loadConfig(ci: string | undefined): Promise<PlaywrightTestConfig> {
+  vi.stubEnv('CI', ci);
+  // The suite's own port must not leak into the assertions: a developer or CI runner that exported
+  // PLAYWRIGHT_PORT would otherwise change what the config comes out as.
+  vi.stubEnv('PLAYWRIGHT_PORT', '');
+  vi.resetModules();
+  return (await import('../../playwright.config')).default;
+}
+
+describe('playwright.config.ts flaky tests', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  // CI retries twice (ADR 0004). Without this a test that passed only on a retry left the job green,
+  // and the report and its retry trace are uploaded only when the job fails, so both were discarded.
+  // The setting is run-wide, so it covers all three projects, the two phone ones included.
+  // Both spellings the config documents as CI, so a runner that exports CI=1 is not left out.
+  it.each(['true', '1'])('fails the run on a flaky test under CI=%s', async (ci) => {
+    expect((await loadConfig(ci)).failOnFlakyTests).toBe(true);
+  });
+
+  // Locally there are no retries, so nothing can pass on one. A stray CI=false or CI=0 is local too.
+  it.each([undefined, 'false', '0'])('leaves it off with CI=%s', async (ci) => {
+    expect((await loadConfig(ci)).failOnFlakyTests).toBeFalsy();
   });
 });
