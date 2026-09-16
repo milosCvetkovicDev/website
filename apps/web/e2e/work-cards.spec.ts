@@ -177,6 +177,14 @@ test('a case study status reads as one colour on / and on /work, in both themes'
 test('both routes render the same status string for the same case study', async ({ page }) => {
   // Green, and the premise of R39: the two elements exist and carry the same text, so the row above is
   // about their colour and not about one of them being absent.
+
+  // Under load on the dev server this test passed in up to 23 s and twice ran out of the 30 s
+  // default (2 of 20 runs, 2026-09-16), each time with a bare "Test timeout" naming no step: the
+  // call pending at the deadline finished before teardown closed the page, so nothing was left to
+  // blame. The largest share of its time goes on the wait for the home page's loader, which may
+  // take 30 s on its own, so the test gets room past that wait, and a loader that never hides
+  // still fails on its own assertion.
+  test.setTimeout(60_000);
   const [study] = caseStudies;
   const status = study.highlight.status;
 
