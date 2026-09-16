@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0021
+
+No longer applies: the paragraph opening "CI is not yet a merge gate"; the rest of its decision
+stands. See [ADR 0021](0021-squash-only-merges-and-required-checks.md).
 
 ## Date
 

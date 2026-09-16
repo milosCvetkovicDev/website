@@ -60,13 +60,13 @@ The site runs on `http://localhost:3000`. `pnpm dev:playground` starts the sandb
 
 ## Quality gates
 
-CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, commitlint runs in a workflow of its own, `.github/workflows/commitlint.yml`, over the pull request title and every commit, or over the new commit on a push to `main`. Of the rest, the `quality` job runs the first eight in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message.
+CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, commitlint runs in a workflow of its own, `.github/workflows/commitlint.yml`, over the pull request title (as written, and with the ` (#NN)` suffix the squash commit gets) and every commit on the branch, or over every commit a push to `main` lands. The title and the push to `main` are linted without commitlint's default ignores, so a title such as `revert everything` or `Merge branch x into y` fails there although the local hook would accept it as a commit. Of the rest, the `quality` job runs the first eight in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message.
 
 | Command                      | What it checks                                                                                           | Pre-commit         | CI  |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------ | --- |
 | dependency review            | Lockfile dependencies a pull request adds with a known advisory                                          | -                  | yes |
 | `pnpm check:allowbuilds`     | `allowBuilds` entries against the versions the lockfile resolves                                         | -                  | yes |
-| `pnpm test:scripts`          | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step                      | -                  | yes |
+| `pnpm test:scripts`          | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step, commitlint configs  | -                  | yes |
 | `pnpm format:check`          | Prettier, shared config, Tailwind class order                                                            | yes (staged files) | yes |
 | `pnpm lint`                  | ESLint with `--max-warnings 0` in every app                                                              | yes (staged files) | yes |
 | commitlint                   | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...); in CI, the PR title and every commit | yes                | yes |

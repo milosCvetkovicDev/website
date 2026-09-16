@@ -25,7 +25,8 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 - `scripts/` at the repository root holds the scripts that run outside the apps:
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `vercel-ignore-build.mjs` (Vercel's
   ignored build step, ADR 0016), and the `node:test` suites that `pnpm test:scripts` runs, one for
-  each of those two plus `ai-refusals.test.mjs`. It is not a workspace and Turbo does not see it.
+  each of those two plus `ai-refusals.test.mjs` and `commitlint-config.test.mjs`. It is not a
+  workspace and Turbo does not see it.
 - `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
   `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
   has its own `tsconfig.json`.
@@ -94,21 +95,48 @@ is there so that a future buildable package is compiled before the apps typechec
   also posted as a review thread, though, and the resolved-threads rule below blocks the merge until
   that thread is resolved: GitHub resolves it once the flagged code changes, and a writer can
   resolve it by hand or dismiss the alert.
-- `main` has branch protection on, and both CI jobs are required checks. A required check is stored
-  as the job's display name, so the two required contexts are the `name:` values in
-  `.github/workflows/ci.yml` character for character, and a comment above each says so: renaming
-  either job strands a required check that never reports and blocks every pull request. Protection
-  also requires the branch to be up to date with `main`, signed commits, linear history (merge
-  commits are refused; landing as a squash is the convention below, and rebase merging is also
-  enabled) and
-  resolved review threads, and it applies to administrators. Approving reviews required: 0, so the
+- `main` has branch protection on, and three checks are required: both CI jobs and
+  `Commit messages`. A required check is stored as the job's display name, so the three required
+  contexts are the `name:` values in `.github/workflows/ci.yml` and
+  `.github/workflows/commitlint.yml` character for character, and a comment near each says so.
+  Renaming any of those jobs strands a required check that never reports and blocks every pull
+  request, and so does anything else that stops the job reporting under that name on every pull
+  request, such as a matrix, a reusable-workflow call or a branch or path filter on its trigger;
+  ADR 0021 gives the order for renaming, removing or adding one. Protection also requires the
+  branch to be up to date with `main`, signed commits, linear history (merge commits are refused)
+  and resolved review threads, and it applies to administrators. Squash is the only merge method
+  the repository allows, with merge commits and rebase merging switched off; the squash commit
+  defaults to the pull request title and an empty body, which the merge dialog or
+  `gh pr merge --subject` and `--body` can still override. Approving reviews required: 0, so the
   reviewer rule below is convention, not enforcement. See
-  `docs/adr/0020-branch-protection-on-main.md`.
+  `docs/adr/0021-squash-only-merges-and-required-checks.md`.
 - Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
   `main` never passes through the local hook. `.github/workflows/commitlint.yml`, job
-  `Commit messages`, lints the pull request title (the squash commit's subject), every commit
-  between the pull request's base and head, and on a push to `main` the new HEAD, all with
-  `commitlint.config.mjs`. It re-runs on every `edited` event, a body edit included, and has no
+  `Commit messages`, lints three things. The pull request title, twice: as written and with the
+  ` (#NN)` GitHub appends to the squash commit's subject (the suffix alone can break
+  `header-max-length`, and it hides `subject-full-stop`). Every commit between the pull request's
+  base and head, which still runs when the title fails, so one failure cannot hide another. And on a
+  push to `main` every commit from the previous tip to the new one, or only the new tip when the
+  push created the branch. That push lint is the only one to see a squash body typed in the merge
+  dialog, which no pull request event carries. The title and the push lint use
+  `commitlint.squash.config.mjs`, which sets `defaultIgnores: false`: commitlint otherwise skips,
+  and passes, any message shaped like `revert …`, `Reapply …`, `fixup! …`, `Merge branch … into …`
+  or a bare version, and its merge pattern matches a line anywhere in the body. Its one exception
+  is a revert with nothing else in the message (no body beyond `git revert`'s own line and
+  `Co-authored-by:` trailers): `Revert "<header>"` as GitHub's revert button and `git revert` write
+  it, or `Reapply "<header>"`, nested or not, up to 1000 characters. `<header>` needs a type from
+  `type-enum`, a subject that starts and ends with a non-space and does not start with a capital,
+  no trailing full stop, no `"`, and at most `header-max-length` characters. That approximates the
+  rules rather than linting the header (checked against the rules on a table of wrapped headers),
+  and a revert with any other body is linted like any other message. Anything else, a revert of a
+  non-conventional title included, is retitled as a conventional `revert: …` header. The branch
+  commits and `.husky/commit-msg` keep `commitlint.config.mjs` with the default ignores, because
+  `git commit --fixup`, `git merge` and GitHub's "Update branch" write those shapes. That split
+  relies on squash being the only merge method, which the repository settings enforce, so that a
+  squash merge discards the branch commits; were rebase merging turned on, the branch step would
+  need the squash config too. `scripts/commitlint-config.test.mjs` pins both configs against the
+  rules commitlint loads, the hook, and which workflow step uses which config. The workflow re-runs
+  on every `edited` event, a body edit included, and has no
   job-level `if`: GitHub reports a job skipped by a condition as Success, which would satisfy a
   required check on a title nobody linted. Commits on `main` from before the check stay as accepted
   history, because `main` is never rewritten: 28 of them fail it, and the four since commitlint
