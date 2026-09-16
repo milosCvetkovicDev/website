@@ -4485,10 +4485,10 @@
     {
       "id": "adr-index-0001-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0001 | [Record architecture decisions](0001-record-architecture-decisions.md)",
+      "anchor": "| 0001 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0001 is indexed as \"Superseded by ADR-0012\", which is the status line of the record itself.",
+      "claim": "ADR 0001's record carries the status line \"Superseded by ADR-0012\".",
       "check": {
         "file": "docs/adr/0001-record-architecture-decisions.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4496,12 +4496,25 @@
       }
     },
     {
-      "id": "adr-index-0001-date",
+      "id": "adr-index-0001-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0001 | [Record architecture decisions](0001-record-architecture-decisions.md)",
+      "anchor": "| 0001 |",
+      "claim": "The index row for ADR 0001 gives the record's status line, \"Superseded by ADR-0012\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0001 is indexed with the date 2026-09-08, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0001 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Superseded by ADR-0012"
+      }
+    },
+    {
+      "id": "adr-index-0001-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0001 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0001's record carries the Date \"2026-09-08\".",
       "check": {
         "file": "docs/adr/0001-record-architecture-decisions.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4509,12 +4522,25 @@
       }
     },
     {
-      "id": "adr-index-0001-title",
+      "id": "adr-index-0001-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0001 | [Record architecture decisions](0001-record-architecture-decisions.md)",
+      "anchor": "| 0001 |",
+      "claim": "The index row for ADR 0001 gives the record's Date, \"2026-09-08\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0001 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0001 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-08"
+      }
+    },
+    {
+      "id": "adr-index-0001-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0001 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0001's record carries the H1 title \"Record architecture decisions\".",
       "check": {
         "file": "docs/adr/0001-record-architecture-decisions.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4522,12 +4548,25 @@
       }
     },
     {
-      "id": "adr-index-0002-status",
+      "id": "adr-index-0001-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)",
+      "anchor": "| 0001 |",
+      "claim": "The index row for ADR 0001 gives the record's H1 title, \"Record architecture decisions\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0002 is indexed as \"Superseded by ADR-0018 (corrected 2026-09-13)\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0001 \\| \\[(.+?)\\]\\(0001-",
+        "equals": "Record architecture decisions"
+      }
+    },
+    {
+      "id": "adr-index-0002-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0002 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0002's record carries the status line \"Superseded by ADR-0018 (corrected 2026-09-13)\".",
       "check": {
         "file": "docs/adr/0002-monorepo-toolchain.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4535,12 +4574,25 @@
       }
     },
     {
-      "id": "adr-index-0002-date",
+      "id": "adr-index-0002-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)",
+      "anchor": "| 0002 |",
+      "claim": "The index row for ADR 0002 gives the record's status line, \"Superseded by ADR-0018 (corrected 2026-09-13)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0002 is indexed with the date 2026-09-08, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0002 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Superseded by ADR-0018 (corrected 2026-09-13)"
+      }
+    },
+    {
+      "id": "adr-index-0002-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0002 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0002's record carries the Date \"2026-09-08\".",
       "check": {
         "file": "docs/adr/0002-monorepo-toolchain.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4548,12 +4600,25 @@
       }
     },
     {
-      "id": "adr-index-0002-title",
+      "id": "adr-index-0002-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)",
+      "anchor": "| 0002 |",
+      "claim": "The index row for ADR 0002 gives the record's Date, \"2026-09-08\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0002 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0002 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-08"
+      }
+    },
+    {
+      "id": "adr-index-0002-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0002 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0002's record carries the H1 title \"Monorepo toolchain and version pinning\".",
       "check": {
         "file": "docs/adr/0002-monorepo-toolchain.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4561,12 +4626,25 @@
       }
     },
     {
-      "id": "adr-index-0003-status",
+      "id": "adr-index-0002-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)",
+      "anchor": "| 0002 |",
+      "claim": "The index row for ADR 0002 gives the record's H1 title, \"Monorepo toolchain and version pinning\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0003 is indexed as \"Accepted\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0002 \\| \\[(.+?)\\]\\(0002-",
+        "equals": "Monorepo toolchain and version pinning"
+      }
+    },
+    {
+      "id": "adr-index-0003-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0003 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0003's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0003-formatting-and-linting-standards.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4574,12 +4652,25 @@
       }
     },
     {
-      "id": "adr-index-0003-date",
+      "id": "adr-index-0003-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)",
+      "anchor": "| 0003 |",
+      "claim": "The index row for ADR 0003 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0003 is indexed with the date 2026-09-08, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0003 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0003-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0003 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0003's record carries the Date \"2026-09-08\".",
       "check": {
         "file": "docs/adr/0003-formatting-and-linting-standards.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4587,12 +4678,25 @@
       }
     },
     {
-      "id": "adr-index-0003-title",
+      "id": "adr-index-0003-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)",
+      "anchor": "| 0003 |",
+      "claim": "The index row for ADR 0003 gives the record's Date, \"2026-09-08\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0003 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0003 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-08"
+      }
+    },
+    {
+      "id": "adr-index-0003-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0003 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0003's record carries the H1 title \"Formatting and linting standards\".",
       "check": {
         "file": "docs/adr/0003-formatting-and-linting-standards.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4600,12 +4704,25 @@
       }
     },
     {
-      "id": "adr-index-0004-status",
+      "id": "adr-index-0003-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)",
+      "anchor": "| 0003 |",
+      "claim": "The index row for ADR 0003 gives the record's H1 title, \"Formatting and linting standards\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0004 is indexed as \"Superseded by ADR-0021\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0003 \\| \\[(.+?)\\]\\(0003-",
+        "equals": "Formatting and linting standards"
+      }
+    },
+    {
+      "id": "adr-index-0004-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0004 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0004's record carries the status line \"Superseded by ADR-0021\".",
       "check": {
         "file": "docs/adr/0004-ci-pipeline-and-quality-gates.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4613,12 +4730,25 @@
       }
     },
     {
-      "id": "adr-index-0004-date",
+      "id": "adr-index-0004-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)",
+      "anchor": "| 0004 |",
+      "claim": "The index row for ADR 0004 gives the record's status line, \"Superseded by ADR-0021\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0004 is indexed with the date 2026-09-08, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0004 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Superseded by ADR-0021"
+      }
+    },
+    {
+      "id": "adr-index-0004-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0004 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0004's record carries the Date \"2026-09-08\".",
       "check": {
         "file": "docs/adr/0004-ci-pipeline-and-quality-gates.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4626,12 +4756,25 @@
       }
     },
     {
-      "id": "adr-index-0004-title",
+      "id": "adr-index-0004-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)",
+      "anchor": "| 0004 |",
+      "claim": "The index row for ADR 0004 gives the record's Date, \"2026-09-08\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0004 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0004 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-08"
+      }
+    },
+    {
+      "id": "adr-index-0004-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0004 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0004's record carries the H1 title \"CI pipeline and quality gates\".",
       "check": {
         "file": "docs/adr/0004-ci-pipeline-and-quality-gates.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4639,12 +4782,25 @@
       }
     },
     {
-      "id": "adr-index-0005-status",
+      "id": "adr-index-0004-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)",
+      "anchor": "| 0004 |",
+      "claim": "The index row for ADR 0004 gives the record's H1 title, \"CI pipeline and quality gates\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0005 is indexed as \"Superseded by ADR-0016 (corrected 2026-09-13)\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0004 \\| \\[(.+?)\\]\\(0004-",
+        "equals": "CI pipeline and quality gates"
+      }
+    },
+    {
+      "id": "adr-index-0005-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0005 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0005's record carries the status line \"Superseded by ADR-0016 (corrected 2026-09-13)\".",
       "check": {
         "file": "docs/adr/0005-hosting-on-vercel.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4652,12 +4808,25 @@
       }
     },
     {
-      "id": "adr-index-0005-date",
+      "id": "adr-index-0005-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)",
+      "anchor": "| 0005 |",
+      "claim": "The index row for ADR 0005 gives the record's status line, \"Superseded by ADR-0016 (corrected 2026-09-13)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0005 is indexed with the date 2026-09-08, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0005 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Superseded by ADR-0016 (corrected 2026-09-13)"
+      }
+    },
+    {
+      "id": "adr-index-0005-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0005 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0005's record carries the Date \"2026-09-08\".",
       "check": {
         "file": "docs/adr/0005-hosting-on-vercel.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4665,12 +4834,25 @@
       }
     },
     {
-      "id": "adr-index-0005-title",
+      "id": "adr-index-0005-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)",
+      "anchor": "| 0005 |",
+      "claim": "The index row for ADR 0005 gives the record's Date, \"2026-09-08\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0005 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0005 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-08"
+      }
+    },
+    {
+      "id": "adr-index-0005-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0005 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0005's record carries the H1 title \"Hosting on Vercel\".",
       "check": {
         "file": "docs/adr/0005-hosting-on-vercel.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4678,12 +4860,25 @@
       }
     },
     {
-      "id": "adr-index-0006-status",
+      "id": "adr-index-0005-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)",
+      "anchor": "| 0005 |",
+      "claim": "The index row for ADR 0005 gives the record's H1 title, \"Hosting on Vercel\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0006 is indexed as \"Accepted\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0005 \\| \\[(.+?)\\]\\(0005-",
+        "equals": "Hosting on Vercel"
+      }
+    },
+    {
+      "id": "adr-index-0006-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0006 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0006's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0006-hydration-safe-client-state.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4691,12 +4886,25 @@
       }
     },
     {
-      "id": "adr-index-0006-date",
+      "id": "adr-index-0006-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)",
+      "anchor": "| 0006 |",
+      "claim": "The index row for ADR 0006 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0006 is indexed with the date 2026-09-08, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0006 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0006-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0006 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0006's record carries the Date \"2026-09-08\".",
       "check": {
         "file": "docs/adr/0006-hydration-safe-client-state.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4704,12 +4912,25 @@
       }
     },
     {
-      "id": "adr-index-0006-title",
+      "id": "adr-index-0006-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)",
+      "anchor": "| 0006 |",
+      "claim": "The index row for ADR 0006 gives the record's Date, \"2026-09-08\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0006 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0006 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-08"
+      }
+    },
+    {
+      "id": "adr-index-0006-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0006 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0006's record carries the H1 title \"Hydration-safe client state\".",
       "check": {
         "file": "docs/adr/0006-hydration-safe-client-state.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4717,12 +4938,25 @@
       }
     },
     {
-      "id": "adr-index-0007-status",
+      "id": "adr-index-0006-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)",
+      "anchor": "| 0006 |",
+      "claim": "The index row for ADR 0006 gives the record's H1 title, \"Hydration-safe client state\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0007 is indexed as \"Superseded by ADR-0013 (corrected 2026-09-10)\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0006 \\| \\[(.+?)\\]\\(0006-",
+        "equals": "Hydration-safe client state"
+      }
+    },
+    {
+      "id": "adr-index-0007-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0007 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0007's record carries the status line \"Superseded by ADR-0013 (corrected 2026-09-10)\".",
       "check": {
         "file": "docs/adr/0007-dependency-build-scripts.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4730,12 +4964,25 @@
       }
     },
     {
-      "id": "adr-index-0007-date",
+      "id": "adr-index-0007-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)",
+      "anchor": "| 0007 |",
+      "claim": "The index row for ADR 0007 gives the record's status line, \"Superseded by ADR-0013 (corrected 2026-09-10)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0007 is indexed with the date 2026-09-09, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0007 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Superseded by ADR-0013 (corrected 2026-09-10)"
+      }
+    },
+    {
+      "id": "adr-index-0007-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0007 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0007's record carries the Date \"2026-09-09\".",
       "check": {
         "file": "docs/adr/0007-dependency-build-scripts.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4743,12 +4990,25 @@
       }
     },
     {
-      "id": "adr-index-0007-title",
+      "id": "adr-index-0007-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)",
+      "anchor": "| 0007 |",
+      "claim": "The index row for ADR 0007 gives the record's Date, \"2026-09-09\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0007 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0007 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-09"
+      }
+    },
+    {
+      "id": "adr-index-0007-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0007 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0007's record carries the H1 title \"Dependency build scripts stay disabled\".",
       "check": {
         "file": "docs/adr/0007-dependency-build-scripts.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4756,12 +5016,25 @@
       }
     },
     {
-      "id": "adr-index-0008-status",
+      "id": "adr-index-0007-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0008 | [Accent colour roles](0008-accent-colour-roles.md)",
+      "anchor": "| 0007 |",
+      "claim": "The index row for ADR 0007 gives the record's H1 title, \"Dependency build scripts stay disabled\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0008 is indexed as \"Superseded by ADR-0011\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0007 \\| \\[(.+?)\\]\\(0007-",
+        "equals": "Dependency build scripts stay disabled"
+      }
+    },
+    {
+      "id": "adr-index-0008-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0008 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0008's record carries the status line \"Superseded by ADR-0011\".",
       "check": {
         "file": "docs/adr/0008-accent-colour-roles.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4769,12 +5042,25 @@
       }
     },
     {
-      "id": "adr-index-0008-date",
+      "id": "adr-index-0008-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0008 | [Accent colour roles](0008-accent-colour-roles.md)",
+      "anchor": "| 0008 |",
+      "claim": "The index row for ADR 0008 gives the record's status line, \"Superseded by ADR-0011\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0008 is indexed with the date 2026-09-09, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0008 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Superseded by ADR-0011"
+      }
+    },
+    {
+      "id": "adr-index-0008-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0008 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0008's record carries the Date \"2026-09-09\".",
       "check": {
         "file": "docs/adr/0008-accent-colour-roles.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4782,12 +5068,25 @@
       }
     },
     {
-      "id": "adr-index-0008-title",
+      "id": "adr-index-0008-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0008 | [Accent colour roles](0008-accent-colour-roles.md)",
+      "anchor": "| 0008 |",
+      "claim": "The index row for ADR 0008 gives the record's Date, \"2026-09-09\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0008 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0008 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-09"
+      }
+    },
+    {
+      "id": "adr-index-0008-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0008 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0008's record carries the H1 title \"Accent colour roles\".",
       "check": {
         "file": "docs/adr/0008-accent-colour-roles.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4795,12 +5094,25 @@
       }
     },
     {
-      "id": "adr-index-0009-status",
+      "id": "adr-index-0008-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md)",
+      "anchor": "| 0008 |",
+      "claim": "The index row for ADR 0008 gives the record's H1 title, \"Accent colour roles\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0009 is indexed as \"Accepted (corrected 2026-09-10)\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0008 \\| \\[(.+?)\\]\\(0008-",
+        "equals": "Accent colour roles"
+      }
+    },
+    {
+      "id": "adr-index-0009-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0009 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0009's record carries the status line \"Accepted (corrected 2026-09-10)\".",
       "check": {
         "file": "docs/adr/0009-animation-performance-rules.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4808,12 +5120,25 @@
       }
     },
     {
-      "id": "adr-index-0009-date",
+      "id": "adr-index-0009-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md)",
+      "anchor": "| 0009 |",
+      "claim": "The index row for ADR 0009 gives the record's status line, \"Accepted (corrected 2026-09-10)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0009 is indexed with the date 2026-09-09, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0009 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted (corrected 2026-09-10)"
+      }
+    },
+    {
+      "id": "adr-index-0009-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0009 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0009's record carries the Date \"2026-09-09\".",
       "check": {
         "file": "docs/adr/0009-animation-performance-rules.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4821,12 +5146,25 @@
       }
     },
     {
-      "id": "adr-index-0009-title",
+      "id": "adr-index-0009-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md)",
+      "anchor": "| 0009 |",
+      "claim": "The index row for ADR 0009 gives the record's Date, \"2026-09-09\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0009 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0009 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-09"
+      }
+    },
+    {
+      "id": "adr-index-0009-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0009 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0009's record carries the H1 title \"Animation performance rules for the home page\".",
       "check": {
         "file": "docs/adr/0009-animation-performance-rules.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4834,12 +5172,25 @@
       }
     },
     {
-      "id": "adr-index-0010-status",
+      "id": "adr-index-0009-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0010 | [Status colour tokens](0010-status-colour-tokens.md)",
+      "anchor": "| 0009 |",
+      "claim": "The index row for ADR 0009 gives the record's H1 title, \"Animation performance rules for the home page\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0010 is indexed as \"Accepted (corrected 2026-09-10)\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0009 \\| \\[(.+?)\\]\\(0009-",
+        "equals": "Animation performance rules for the home page"
+      }
+    },
+    {
+      "id": "adr-index-0010-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0010 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0010's record carries the status line \"Accepted (corrected 2026-09-10)\".",
       "check": {
         "file": "docs/adr/0010-status-colour-tokens.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4847,12 +5198,25 @@
       }
     },
     {
-      "id": "adr-index-0010-date",
+      "id": "adr-index-0010-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0010 | [Status colour tokens](0010-status-colour-tokens.md)",
+      "anchor": "| 0010 |",
+      "claim": "The index row for ADR 0010 gives the record's status line, \"Accepted (corrected 2026-09-10)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0010 is indexed with the date 2026-09-09, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0010 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted (corrected 2026-09-10)"
+      }
+    },
+    {
+      "id": "adr-index-0010-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0010 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0010's record carries the Date \"2026-09-09\".",
       "check": {
         "file": "docs/adr/0010-status-colour-tokens.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4860,12 +5224,25 @@
       }
     },
     {
-      "id": "adr-index-0010-title",
+      "id": "adr-index-0010-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0010 | [Status colour tokens](0010-status-colour-tokens.md)",
+      "anchor": "| 0010 |",
+      "claim": "The index row for ADR 0010 gives the record's Date, \"2026-09-09\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0010 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0010 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-09"
+      }
+    },
+    {
+      "id": "adr-index-0010-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0010 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0010's record carries the H1 title \"Status colour tokens\".",
       "check": {
         "file": "docs/adr/0010-status-colour-tokens.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4873,12 +5250,25 @@
       }
     },
     {
-      "id": "adr-index-0011-status",
+      "id": "adr-index-0010-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0011 | [Colour roles, corrected for scoped surfaces and stacked tints](0011-colour-roles-on-scoped-surfaces.md)",
+      "anchor": "| 0010 |",
+      "claim": "The index row for ADR 0010 gives the record's H1 title, \"Status colour tokens\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0011 is indexed as \"Accepted\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0010 \\| \\[(.+?)\\]\\(0010-",
+        "equals": "Status colour tokens"
+      }
+    },
+    {
+      "id": "adr-index-0011-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0011 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0011's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0011-colour-roles-on-scoped-surfaces.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4886,12 +5276,25 @@
       }
     },
     {
-      "id": "adr-index-0011-date",
+      "id": "adr-index-0011-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0011 | [Colour roles, corrected for scoped surfaces and stacked tints](0011-colour-roles-on-scoped-surfaces.md)",
+      "anchor": "| 0011 |",
+      "claim": "The index row for ADR 0011 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0011 is indexed with the date 2026-09-10, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0011 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0011-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0011 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0011's record carries the Date \"2026-09-10\".",
       "check": {
         "file": "docs/adr/0011-colour-roles-on-scoped-surfaces.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4899,12 +5302,25 @@
       }
     },
     {
-      "id": "adr-index-0011-title",
+      "id": "adr-index-0011-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0011 | [Colour roles, corrected for scoped surfaces and stacked tints](0011-colour-roles-on-scoped-surfaces.md)",
+      "anchor": "| 0011 |",
+      "claim": "The index row for ADR 0011 gives the record's Date, \"2026-09-10\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0011 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0011 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-10"
+      }
+    },
+    {
+      "id": "adr-index-0011-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0011 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0011's record carries the H1 title \"Colour roles, corrected for scoped surfaces and stacked tints\".",
       "check": {
         "file": "docs/adr/0011-colour-roles-on-scoped-surfaces.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4912,12 +5328,25 @@
       }
     },
     {
-      "id": "adr-index-0012-status",
+      "id": "adr-index-0011-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0012 | [Correcting factual errors in accepted records](0012-correcting-accepted-records.md)",
+      "anchor": "| 0011 |",
+      "claim": "The index row for ADR 0011 gives the record's H1 title, \"Colour roles, corrected for scoped surfaces and stacked tints\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0012 is indexed as \"Accepted\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0011 \\| \\[(.+?)\\]\\(0011-",
+        "equals": "Colour roles, corrected for scoped surfaces and stacked tints"
+      }
+    },
+    {
+      "id": "adr-index-0012-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0012 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0012's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0012-correcting-accepted-records.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4925,12 +5354,25 @@
       }
     },
     {
-      "id": "adr-index-0012-date",
+      "id": "adr-index-0012-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0012 | [Correcting factual errors in accepted records](0012-correcting-accepted-records.md)",
+      "anchor": "| 0012 |",
+      "claim": "The index row for ADR 0012 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0012 is indexed with the date 2026-09-10, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0012 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0012-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0012 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0012's record carries the Date \"2026-09-10\".",
       "check": {
         "file": "docs/adr/0012-correcting-accepted-records.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4938,12 +5380,25 @@
       }
     },
     {
-      "id": "adr-index-0012-title",
+      "id": "adr-index-0012-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0012 | [Correcting factual errors in accepted records](0012-correcting-accepted-records.md)",
+      "anchor": "| 0012 |",
+      "claim": "The index row for ADR 0012 gives the record's Date, \"2026-09-10\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0012 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0012 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-10"
+      }
+    },
+    {
+      "id": "adr-index-0012-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0012 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0012's record carries the H1 title \"Correcting factual errors in accepted records\".",
       "check": {
         "file": "docs/adr/0012-correcting-accepted-records.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4951,12 +5406,25 @@
       }
     },
     {
-      "id": "adr-index-0013-status",
+      "id": "adr-index-0012-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0013 | [Dependency build scripts stay disabled, and the reviewed versions are enforced](0013-dependency-build-scripts-reviewed.md)",
+      "anchor": "| 0012 |",
+      "claim": "The index row for ADR 0012 gives the record's H1 title, \"Correcting factual errors in accepted records\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0013 is indexed as \"Accepted\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0012 \\| \\[(.+?)\\]\\(0012-",
+        "equals": "Correcting factual errors in accepted records"
+      }
+    },
+    {
+      "id": "adr-index-0013-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0013 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0013's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0013-dependency-build-scripts-reviewed.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -4964,12 +5432,25 @@
       }
     },
     {
-      "id": "adr-index-0013-date",
+      "id": "adr-index-0013-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0013 | [Dependency build scripts stay disabled, and the reviewed versions are enforced](0013-dependency-build-scripts-reviewed.md)",
+      "anchor": "| 0013 |",
+      "claim": "The index row for ADR 0013 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0013 is indexed with the date 2026-09-10, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0013 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0013-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0013 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0013's record carries the Date \"2026-09-10\".",
       "check": {
         "file": "docs/adr/0013-dependency-build-scripts-reviewed.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -4977,12 +5458,25 @@
       }
     },
     {
-      "id": "adr-index-0013-title",
+      "id": "adr-index-0013-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0013 | [Dependency build scripts stay disabled, and the reviewed versions are enforced](0013-dependency-build-scripts-reviewed.md)",
+      "anchor": "| 0013 |",
+      "claim": "The index row for ADR 0013 gives the record's Date, \"2026-09-10\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0013 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0013 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-10"
+      }
+    },
+    {
+      "id": "adr-index-0013-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0013 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0013's record carries the H1 title \"Dependency build scripts stay disabled, and the reviewed versions are enforced\".",
       "check": {
         "file": "docs/adr/0013-dependency-build-scripts-reviewed.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -4990,12 +5484,25 @@
       }
     },
     {
-      "id": "adr-index-0014-status",
+      "id": "adr-index-0013-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0014 | [Playwright starts the server it tests, on a port of its own](0014-playwright-owns-its-server.md)",
+      "anchor": "| 0013 |",
+      "claim": "The index row for ADR 0013 gives the record's H1 title, \"Dependency build scripts stay disabled, and the reviewed versions are enforced\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0014 is indexed as \"Accepted (corrected 2026-09-12)\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0013 \\| \\[(.+?)\\]\\(0013-",
+        "equals": "Dependency build scripts stay disabled, and the reviewed versions are enforced"
+      }
+    },
+    {
+      "id": "adr-index-0014-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0014 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0014's record carries the status line \"Accepted (corrected 2026-09-12)\".",
       "check": {
         "file": "docs/adr/0014-playwright-owns-its-server.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -5003,12 +5510,25 @@
       }
     },
     {
-      "id": "adr-index-0014-date",
+      "id": "adr-index-0014-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0014 | [Playwright starts the server it tests, on a port of its own](0014-playwright-owns-its-server.md)",
+      "anchor": "| 0014 |",
+      "claim": "The index row for ADR 0014 gives the record's status line, \"Accepted (corrected 2026-09-12)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0014 is indexed with the date 2026-09-10, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0014 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted (corrected 2026-09-12)"
+      }
+    },
+    {
+      "id": "adr-index-0014-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0014 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0014's record carries the Date \"2026-09-10\".",
       "check": {
         "file": "docs/adr/0014-playwright-owns-its-server.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -5016,12 +5536,25 @@
       }
     },
     {
-      "id": "adr-index-0014-title",
+      "id": "adr-index-0014-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0014 | [Playwright starts the server it tests, on a port of its own](0014-playwright-owns-its-server.md)",
+      "anchor": "| 0014 |",
+      "claim": "The index row for ADR 0014 gives the record's Date, \"2026-09-10\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0014 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0014 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-10"
+      }
+    },
+    {
+      "id": "adr-index-0014-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0014 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0014's record carries the H1 title \"Playwright starts the server it tests, on a port of its own\".",
       "check": {
         "file": "docs/adr/0014-playwright-owns-its-server.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -5029,12 +5562,25 @@
       }
     },
     {
-      "id": "adr-index-0015-status",
+      "id": "adr-index-0014-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0015 | [Case-study slugs are fixed at build time, so unknown ones 404 at the router](0015-static-case-study-params.md)",
+      "anchor": "| 0014 |",
+      "claim": "The index row for ADR 0014 gives the record's H1 title, \"Playwright starts the server it tests, on a port of its own\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0015 is indexed as \"Accepted (corrected 2026-09-12)\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0014 \\| \\[(.+?)\\]\\(0014-",
+        "equals": "Playwright starts the server it tests, on a port of its own"
+      }
+    },
+    {
+      "id": "adr-index-0015-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0015 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0015's record carries the status line \"Accepted (corrected 2026-09-12)\".",
       "check": {
         "file": "docs/adr/0015-static-case-study-params.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -5042,12 +5588,25 @@
       }
     },
     {
-      "id": "adr-index-0015-date",
+      "id": "adr-index-0015-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0015 | [Case-study slugs are fixed at build time, so unknown ones 404 at the router](0015-static-case-study-params.md)",
+      "anchor": "| 0015 |",
+      "claim": "The index row for ADR 0015 gives the record's status line, \"Accepted (corrected 2026-09-12)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0015 is indexed with the date 2026-09-10, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0015 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted (corrected 2026-09-12)"
+      }
+    },
+    {
+      "id": "adr-index-0015-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0015 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0015's record carries the Date \"2026-09-10\".",
       "check": {
         "file": "docs/adr/0015-static-case-study-params.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -5055,12 +5614,25 @@
       }
     },
     {
-      "id": "adr-index-0015-title",
+      "id": "adr-index-0015-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0015 | [Case-study slugs are fixed at build time, so unknown ones 404 at the router](0015-static-case-study-params.md)",
+      "anchor": "| 0015 |",
+      "claim": "The index row for ADR 0015 gives the record's Date, \"2026-09-10\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0015 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0015 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-10"
+      }
+    },
+    {
+      "id": "adr-index-0015-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0015 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0015's record carries the H1 title \"Case-study slugs are fixed at build time, so unknown ones 404 at the router\".",
       "check": {
         "file": "docs/adr/0015-static-case-study-params.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -5068,25 +5640,51 @@
       }
     },
     {
-      "id": "adr-index-0016-status",
+      "id": "adr-index-0015-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0016 | [Dependabot branches never deploy, and unaffected commits never build](0016-vercel-deployment-budget.md)",
+      "anchor": "| 0015 |",
+      "claim": "The index row for ADR 0015 gives the record's H1 title, \"Case-study slugs are fixed at build time, so unknown ones 404 at the router\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0016 is indexed as \"Accepted\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0015 \\| \\[(.+?)\\]\\(0015-",
+        "equals": "Case-study slugs are fixed at build time, so unknown ones 404 at the router"
+      }
+    },
+    {
+      "id": "adr-index-0016-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0016 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0016's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0016-vercel-deployment-budget.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0016-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0016 |",
+      "claim": "The index row for ADR 0016 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0016 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
         "equals": "Accepted"
       }
     },
     {
       "id": "adr-index-0016-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0016 | [Dependabot branches never deploy, and unaffected commits never build](0016-vercel-deployment-budget.md)",
+      "anchor": "| 0016 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0016 is indexed with the date 2026-09-12, which is the record's own Date.",
+      "claim": "ADR 0016's record carries the Date \"2026-09-12\".",
       "check": {
         "file": "docs/adr/0016-vercel-deployment-budget.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -5094,25 +5692,51 @@
       }
     },
     {
-      "id": "adr-index-0016-title",
+      "id": "adr-index-0016-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0016 | [Dependabot branches never deploy, and unaffected commits never build](0016-vercel-deployment-budget.md)",
+      "anchor": "| 0016 |",
+      "claim": "The index row for ADR 0016 gives the record's Date, \"2026-09-12\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0016 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0016 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-12"
+      }
+    },
+    {
+      "id": "adr-index-0016-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0016 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0016's record carries the H1 title \"Dependabot branches never deploy, and commits that change nothing the site is built from never build\".",
       "check": {
         "file": "docs/adr/0016-vercel-deployment-budget.md",
         "regex": "^# \\d{4}\\. (.+)$",
-        "equals": "Dependabot branches never deploy, and unaffected commits never build"
+        "equals": "Dependabot branches never deploy, and commits that change nothing the site is built from never build"
+      }
+    },
+    {
+      "id": "adr-index-0016-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0016 |",
+      "claim": "The index row for ADR 0016 gives the record's H1 title, \"Dependabot branches never deploy, and commits that change nothing the site is built from never build\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0016 \\| \\[(.+?)\\]\\(0016-",
+        "equals": "Dependabot branches never deploy, and commits that change nothing the site is built from never build"
       }
     },
     {
       "id": "adr-index-0017-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)",
+      "anchor": "| 0017 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0017 is indexed as \"Accepted\", which is the status line of the record itself.",
+      "claim": "ADR 0017's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0017-ai-discoverability-policy.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -5120,12 +5744,25 @@
       }
     },
     {
-      "id": "adr-index-0017-date",
+      "id": "adr-index-0017-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)",
+      "anchor": "| 0017 |",
+      "claim": "The index row for ADR 0017 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0017 is indexed with the date 2026-09-12, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0017 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0017-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0017 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0017's record carries the Date \"2026-09-12\".",
       "check": {
         "file": "docs/adr/0017-ai-discoverability-policy.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -5133,12 +5770,25 @@
       }
     },
     {
-      "id": "adr-index-0017-title",
+      "id": "adr-index-0017-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)",
+      "anchor": "| 0017 |",
+      "claim": "The index row for ADR 0017 gives the record's Date, \"2026-09-12\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0017 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0017 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-12"
+      }
+    },
+    {
+      "id": "adr-index-0017-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0017 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0017's record carries the H1 title \"AI discoverability policy, and what is deliberately not built\".",
       "check": {
         "file": "docs/adr/0017-ai-discoverability-policy.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -5146,12 +5796,25 @@
       }
     },
     {
-      "id": "adr-index-0018-status",
+      "id": "adr-index-0017-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0018 | [Dependency update policy](0018-dependency-update-policy.md)",
+      "anchor": "| 0017 |",
+      "claim": "The index row for ADR 0017 gives the record's H1 title, \"AI discoverability policy, and what is deliberately not built\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0018 is indexed as \"Accepted\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0017 \\| \\[(.+?)\\]\\(0017-",
+        "equals": "AI discoverability policy, and what is deliberately not built"
+      }
+    },
+    {
+      "id": "adr-index-0018-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0018 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0018's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0018-dependency-update-policy.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -5159,12 +5822,25 @@
       }
     },
     {
-      "id": "adr-index-0018-date",
+      "id": "adr-index-0018-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0018 | [Dependency update policy](0018-dependency-update-policy.md)",
+      "anchor": "| 0018 |",
+      "claim": "The index row for ADR 0018 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0018 is indexed with the date 2026-09-12, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0018 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0018-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0018 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0018's record carries the Date \"2026-09-12\".",
       "check": {
         "file": "docs/adr/0018-dependency-update-policy.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -5172,12 +5848,25 @@
       }
     },
     {
-      "id": "adr-index-0018-title",
+      "id": "adr-index-0018-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0018 | [Dependency update policy](0018-dependency-update-policy.md)",
+      "anchor": "| 0018 |",
+      "claim": "The index row for ADR 0018 gives the record's Date, \"2026-09-12\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0018 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0018 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-12"
+      }
+    },
+    {
+      "id": "adr-index-0018-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0018 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0018's record carries the H1 title \"Dependency update policy\".",
       "check": {
         "file": "docs/adr/0018-dependency-update-policy.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -5185,12 +5874,25 @@
       }
     },
     {
-      "id": "adr-index-0020-status",
+      "id": "adr-index-0018-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)",
+      "anchor": "| 0018 |",
+      "claim": "The index row for ADR 0018 gives the record's H1 title, \"Dependency update policy\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0020 is indexed as \"Superseded by ADR-0021\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0018 \\| \\[(.+?)\\]\\(0018-",
+        "equals": "Dependency update policy"
+      }
+    },
+    {
+      "id": "adr-index-0020-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0020 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0020's record carries the status line \"Superseded by ADR-0021\".",
       "check": {
         "file": "docs/adr/0020-branch-protection-on-main.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -5198,12 +5900,25 @@
       }
     },
     {
-      "id": "adr-index-0020-date",
+      "id": "adr-index-0020-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)",
+      "anchor": "| 0020 |",
+      "claim": "The index row for ADR 0020 gives the record's status line, \"Superseded by ADR-0021\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0020 is indexed with the date 2026-09-12, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0020 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Superseded by ADR-0021"
+      }
+    },
+    {
+      "id": "adr-index-0020-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0020 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0020's record carries the Date \"2026-09-12\".",
       "check": {
         "file": "docs/adr/0020-branch-protection-on-main.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -5211,12 +5926,25 @@
       }
     },
     {
-      "id": "adr-index-0020-title",
+      "id": "adr-index-0020-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)",
+      "anchor": "| 0020 |",
+      "claim": "The index row for ADR 0020 gives the record's Date, \"2026-09-12\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0020 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0020 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-12"
+      }
+    },
+    {
+      "id": "adr-index-0020-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0020 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0020's record carries the H1 title \"`main` is protected, and the two required checks are CI job names\".",
       "check": {
         "file": "docs/adr/0020-branch-protection-on-main.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -5224,12 +5952,25 @@
       }
     },
     {
-      "id": "adr-index-0021-status",
+      "id": "adr-index-0020-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)",
+      "anchor": "| 0020 |",
+      "claim": "The index row for ADR 0020 gives the record's H1 title, \"`main` is protected, and the two required checks are CI job names\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0021 is indexed as \"Accepted\", which is the status line of the record itself.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0020 \\| \\[(.+?)\\]\\(0020-",
+        "equals": "`main` is protected, and the two required checks are CI job names"
+      }
+    },
+    {
+      "id": "adr-index-0021-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0021 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0021's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
@@ -5237,12 +5978,25 @@
       }
     },
     {
-      "id": "adr-index-0021-date",
+      "id": "adr-index-0021-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)",
+      "anchor": "| 0021 |",
+      "claim": "The index row for ADR 0021 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0021 is indexed with the date 2026-09-13, which is the record's own Date.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0021 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0021-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0021 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0021's record carries the Date \"2026-09-13\".",
       "check": {
         "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
@@ -5250,12 +6004,25 @@
       }
     },
     {
-      "id": "adr-index-0021-title",
+      "id": "adr-index-0021-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)",
+      "anchor": "| 0021 |",
+      "claim": "The index row for ADR 0021 gives the record's Date, \"2026-09-13\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0021 is indexed under the title of its own H1.",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0021 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-13"
+      }
+    },
+    {
+      "id": "adr-index-0021-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0021 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0021's record carries the H1 title \"Squash-only merges, and `main`'s three required checks are job names\".",
       "check": {
         "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
         "regex": "^# \\d{4}\\. (.+)$",
@@ -5263,35 +6030,42 @@
       }
     },
     {
-      "id": "plans-index-route-hydration-marker-design-in-review",
+      "id": "adr-index-0021-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0021 |",
+      "claim": "The index row for ADR 0021 gives the record's H1 title, \"Squash-only merges, and `main`'s three required checks are job names\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0021 \\| \\[(.+?)\\]\\(0021-",
+        "equals": "Squash-only merges, and `main`'s three required checks are job names"
+      }
+    },
+    {
+      "id": "plans-index-route-hydration-marker-design-pr-87-merged",
       "doc": "docs/plans/README.md",
       "anchor": "| [2026-09-13-route-hydration-marker-design.md](2026-09-13-route-hydration-marker-design.md)",
       "method": "gh-api",
       "evaluation": "live",
-      "claim": "2026-09-13-route-hydration-marker-design.md is \"In review\": pull request #87 is open and not merged.",
+      "claim": "Pull request #87, which the index names for this row, is merged.",
       "check": {
         "endpoint": "repos/{repo}/pulls/87",
-        "jq": "{state, merged: (.merged_at != null)}",
-        "equals": {
-          "state": "open",
-          "merged": false
-        }
+        "jq": ".merged_at != null",
+        "equals": true
       }
     },
     {
-      "id": "plans-index-route-hydration-marker-plan-in-review",
+      "id": "plans-index-route-hydration-marker-plan-pr-87-merged",
       "doc": "docs/plans/README.md",
       "anchor": "| [2026-09-15-route-hydration-marker-plan.md](2026-09-15-route-hydration-marker-plan.md)",
       "method": "gh-api",
       "evaluation": "live",
-      "claim": "2026-09-15-route-hydration-marker-plan.md is \"In review\": pull request #87 is open and not merged.",
+      "claim": "Pull request #87, which the index names for this row, is merged.",
       "check": {
         "endpoint": "repos/{repo}/pulls/87",
-        "jq": "{state, merged: (.merged_at != null)}",
-        "equals": {
-          "state": "open",
-          "merged": false
-        }
+        "jq": ".merged_at != null",
+        "equals": true
       }
     },
     {
@@ -6649,6 +7423,305 @@
       "check": {
         "path": "apps/web/src/components/animated-hero/hud-elements.tsx",
         "matches": "dark[^\\n]*text-\\[var\\(--foreground\\)\\]|text-\\[var\\(--foreground\\)\\][^\\n]*dark"
+      }
+    },
+    {
+      "id": "plans-index-2026-01-27-monorepo-design-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-01-27-monorepo-design.md](2026-01-27-monorepo-design.md)",
+      "claim": "The plans index gives 2026-01-27-monorepo-design.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-01\\-27\\-monorepo\\-design\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-01-27-portfolio-design-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-01-27-portfolio-design.md](2026-01-27-portfolio-design.md)",
+      "claim": "The plans index gives 2026-01-27-portfolio-design.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-01\\-27\\-portfolio\\-design\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-01-27-animated-homepage-design-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-01-27-animated-homepage-design.md](2026-01-27-animated-homepage-design.md)",
+      "claim": "The plans index gives 2026-01-27-animated-homepage-design.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-01\\-27\\-animated\\-homepage\\-design\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-02-22-circuit-background-design-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-02-22-circuit-background-design.md](2026-02-22-circuit-background-design.md)",
+      "claim": "The plans index gives 2026-02-22-circuit-background-design.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-02\\-22\\-circuit\\-background\\-design\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-02-22-circuit-background-plan-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-02-22-circuit-background-plan.md](2026-02-22-circuit-background-plan.md)",
+      "claim": "The plans index gives 2026-02-22-circuit-background-plan.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-02\\-22\\-circuit\\-background\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-02-22-hero-section-redesign-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-02-22-hero-section-redesign.md](2026-02-22-hero-section-redesign.md)",
+      "claim": "The plans index gives 2026-02-22-hero-section-redesign.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-02\\-22\\-hero\\-section\\-redesign\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-08-repo-hardening-and-launch-design-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-08-repo-hardening-and-launch-design.md](2026-09-08-repo-hardening-and-launch-design.md)",
+      "claim": "The plans index gives 2026-09-08-repo-hardening-and-launch-design.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-08\\-repo\\-hardening\\-and\\-launch\\-design\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-08-tooling-and-quality-gates-plan-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-08-tooling-and-quality-gates-plan.md](2026-09-08-tooling-and-quality-gates-plan.md)",
+      "claim": "The plans index gives 2026-09-08-tooling-and-quality-gates-plan.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-08\\-tooling\\-and\\-quality\\-gates\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-08-featured-work-plan-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-08-featured-work-plan.md](2026-09-08-featured-work-plan.md)",
+      "claim": "The plans index gives 2026-09-08-featured-work-plan.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-08\\-featured\\-work\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-08-docs-and-deployment-plan-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-08-docs-and-deployment-plan.md](2026-09-08-docs-and-deployment-plan.md)",
+      "claim": "The plans index gives 2026-09-08-docs-and-deployment-plan.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-08\\-docs\\-and\\-deployment\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-09-home-page-performance-plan-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-09-home-page-performance-plan.md](2026-09-09-home-page-performance-plan.md)",
+      "claim": "The plans index gives 2026-09-09-home-page-performance-plan.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-09\\-home\\-page\\-performance\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-10-local-playwright-port-design-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-10-local-playwright-port-design.md](2026-09-10-local-playwright-port-design.md)",
+      "claim": "The plans index gives 2026-09-10-local-playwright-port-design.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-10\\-local\\-playwright\\-port\\-design\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-10-local-playwright-port-plan-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-10-local-playwright-port-plan.md](2026-09-10-local-playwright-port-plan.md)",
+      "claim": "The plans index gives 2026-09-10-local-playwright-port-plan.md the status \"Shipped\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-10\\-local\\-playwright\\-port\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-13-route-hydration-marker-design-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-13-route-hydration-marker-design.md](2026-09-13-route-hydration-marker-design.md)",
+      "claim": "The plans index gives 2026-09-13-route-hydration-marker-design.md the status \"Shipped\" (pull request #87 has merged).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-13\\-route\\-hydration\\-marker\\-design\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-15-route-hydration-marker-plan-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-15-route-hydration-marker-plan.md](2026-09-15-route-hydration-marker-plan.md)",
+      "claim": "The plans index gives 2026-09-15-route-hydration-marker-plan.md the status \"Shipped\" (pull request #87 has merged).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-15\\-route\\-hydration\\-marker\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-audit-remediation-2026-09-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [audit-remediation-2026-09](../../.claude/epics/audit-remediation-2026-09/epic.md)",
+      "claim": "The plans index gives audit-remediation-2026-09 the status \"Planned\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[audit\\-remediation\\-2026\\-09\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Planned"
+      }
+    },
+    {
+      "id": "plans-index-ai-discoverability-2026-09-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [ai-discoverability-2026-09](../../.claude/epics/ai-discoverability-2026-09/epic.md)",
+      "claim": "The plans index gives ai-discoverability-2026-09 the status \"Planned\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[ai\\-discoverability\\-2026\\-09\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Planned"
+      }
+    },
+    {
+      "id": "adr-0021-doc-required-checks",
+      "doc": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+      "anchor": "| Required status checks |",
+      "claim": "The record names the three required contexts exactly as the API and the workflow job names spell them.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+        "regex": "^\\| Required status checks\\s+\\| (.+?)\\s+\\|$",
+        "equals": "`Format, lint, typecheck, unit tests, build`, `End-to-end (Playwright against the production build)` and `Commit messages`"
+      }
+    },
+    {
+      "id": "adr-0021-doc-merge-commit",
+      "doc": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+      "anchor": "| Merge commits (`allow_merge_commit`) |",
+      "claim": "The record states \"Off\" for this merge setting, as the API reads.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+        "regex": "^\\| Merge commits \\(`allow_merge_commit`\\)\\s+\\| (\\S+)",
+        "equals": "Off"
+      }
+    },
+    {
+      "id": "adr-0021-doc-rebase-merge",
+      "doc": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+      "anchor": "| Rebase merging (`allow_rebase_merge`) |",
+      "claim": "The record states \"Off\" for this merge setting, as the API reads.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+        "regex": "^\\| Rebase merging \\(`allow_rebase_merge`\\)\\s+\\| (\\S+)",
+        "equals": "Off"
+      }
+    },
+    {
+      "id": "adr-0021-doc-squash-merge",
+      "doc": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+      "anchor": "| Squash merging (`allow_squash_merge`) |",
+      "claim": "The record states \"On,\" for this merge setting, as the API reads.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+        "regex": "^\\| Squash merging \\(`allow_squash_merge`\\)\\s+\\| (\\S+)",
+        "equals": "On,"
+      }
+    },
+    {
+      "id": "adr-0021-doc-squash-title",
+      "doc": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+      "anchor": "| Squash commit title (`squash_merge_commit_title`) |",
+      "claim": "The record states \"`PR_TITLE`:\" for this merge setting, as the API reads.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+        "regex": "^\\| Squash commit title \\(`squash_merge_commit_title`\\)\\s+\\| (\\S+)",
+        "equals": "`PR_TITLE`:"
+      }
+    },
+    {
+      "id": "adr-0021-doc-squash-message",
+      "doc": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+      "anchor": "| Squash commit message (`squash_merge_commit_message`) |",
+      "claim": "The record states \"`BLANK`:\" for this merge setting, as the API reads.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
+        "regex": "^\\| Squash commit message \\(`squash_merge_commit_message`\\)\\s+\\| (\\S+)",
+        "equals": "`BLANK`:"
       }
     }
   ]
