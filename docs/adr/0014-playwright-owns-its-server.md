@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (corrected 2026-09-12)
+Accepted (corrected 2026-09-16)
 
 ## Date
 
@@ -167,3 +167,23 @@ ambient value would have reached `pnpm start`".
 The comment at `apps/web/next.config.ts:40` repeats the second error, calling the variable "Unset
 everywhere else, CI included". Correcting a comment in `apps/web` is not this record's to make and
 is left to the pull request that owns that file; the code beside it is right.
+
+### 2026-09-16
+
+One citation in the 2026-09-12 entry above names the wrong line. That entry is not edited; this one
+gives the line it should have named, under [ADR 0012](0012-correcting-accepted-records.md).
+
+**The line that pins `NEXT_DIST_DIR`.** The entry reads: "`apps/web/playwright.config.ts:64` is
+`NEXT_DIST_DIR: isCI ? '.next' : '.next-e2e'`", and cites `apps/web/playwright.config.ts:64` again
+among its evidence. At 4c02b40, the commit that merged that entry, line 64 of that file is
+`trace: 'on-first-retry',` and the pinned line is `apps/web/playwright.config.ts:104`. What was
+wrong: the number, not the line it describes. The pin had sat at `:64` since 5a02529, which is the
+tree the entry was written against, but 0f7c673 (#68) added 41 lines above it and merged thirteen
+minutes before 4c02b40. The entry's reading of what that line does is untouched.
+
+Evidence: `git show 4c02b40:apps/web/playwright.config.ts | sed -n '64p;104p'` prints
+`    trace: 'on-first-retry',` and `      NEXT_DIST_DIR: isCI ? '.next' : '.next-e2e',`;
+`git show 5a02529:apps/web/playwright.config.ts | sed -n 64p` prints the `NEXT_DIST_DIR` line; and
+`git log --format='%h %ad %s' --date=iso -2 4c02b40 -- apps/web/playwright.config.ts` lists
+0f7c673 at 2026-09-13 08:28, while 4c02b40 was committed at 08:41 the same day. Found by
+`pnpm check:docs-drift`.
