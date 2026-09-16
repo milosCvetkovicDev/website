@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { NOT_FOUND_ROUTE } from './routes';
+import { gotoHydrated } from './support/hydration';
 import { warmRoutes } from './support/warm-routes';
 
 /**
@@ -65,7 +66,7 @@ test.describe(() => {
   });
 
   test('the recovery links work as client-side navigations', async ({ page }) => {
-    await page.goto(NOT_FOUND_ROUTE);
+    await gotoHydrated(page, NOT_FOUND_ROUTE);
 
     await page.getByRole('link', { name: 'View Work' }).click();
 

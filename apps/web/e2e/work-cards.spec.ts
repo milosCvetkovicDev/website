@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { caseStudies } from '../src/data/case-studies';
+import { gotoHydrated } from './support/hydration';
 import { warmRoutes } from './support/warm-routes';
 
 /**
@@ -95,7 +96,7 @@ test.describe(() => {
     // stretched title link can very easily leave the card body unclickable, which is a worse outcome
     // than the long accessible name: clicking a card is the archive's only job.
     for (const { slug, title } of caseStudies) {
-      await page.goto('/work');
+      await gotoHydrated(page, '/work');
       const card = cardFor(page, slug);
       await expect(card, `/work must have a card linking to ${slug}`).toHaveCount(1);
       // Clicked on the title, which is inside the card whichever way the link is structured.
@@ -109,7 +110,7 @@ test.describe(() => {
     // The other half of the floor. A stretched-link refactor that puts the overlay above the link
     // itself breaks pointer and keyboard access independently, so both are pinned.
     for (const { slug, title } of caseStudies) {
-      await page.goto('/work');
+      await gotoHydrated(page, '/work');
       const card = cardFor(page, slug);
       await card.focus();
       await expect(card).toBeFocused();
@@ -164,8 +165,7 @@ test('a case study status reads as one colour on / and on /work, in both themes'
 
     // The featured card on `/`, inside its own region so a status string used elsewhere on the page
     // cannot answer for it.
-    await page.goto('/');
-    await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+    await gotoHydrated(page, '/');
     await expect(page.locator('html')).toContainClass(colorScheme);
     const featuredSection = page.getByRole('region', { name: /featured work/i });
     await featuredSection.scrollIntoViewIfNeeded();
@@ -204,8 +204,7 @@ test('both routes render the same status string for the same case study', async 
   const [study] = caseStudies;
   const status = study.highlight.status;
 
-  await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await gotoHydrated(page, '/');
   const featuredSection = page.getByRole('region', { name: /featured work/i });
   await featuredSection.scrollIntoViewIfNeeded();
   await expect(featuredSection.getByText(status, { exact: true }).first()).toBeVisible();

@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { STATIC_ROUTES } from '../routes';
+import { gotoHydrated } from '../support/hydration';
 import { warmRoutes } from '../support/warm-routes';
 
 /**
@@ -28,10 +29,9 @@ import { warmRoutes } from '../support/warm-routes';
  * ancestor becomes that containing block is engine-specific.
  */
 
-/** The loader only exists on `/`; elsewhere the locator matches nothing and this resolves at once. */
+/** Every test here interacts, on `/` and on other routes alike, so each one starts hydrated. */
 async function open(page: Page, path: string) {
-  await page.goto(path);
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await gotoHydrated(page, path);
 }
 
 const menuButton = (page: Page) => page.getByRole('button', { name: 'Open menu' });
