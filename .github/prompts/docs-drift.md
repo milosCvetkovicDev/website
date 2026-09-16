@@ -50,6 +50,10 @@ in exactly one of these classes.
 - **The doc states a standing decision and the code has broken it.** That is a regression in the
   code, not drift in the doc. Do not change the doc to match the code. List it in the pull request
   body under "Code that contradicts a standing decision" and leave it for the owner.
+- **An entry is `stale`: its anchor is no longer in the doc.** Read what the doc says now and what
+  the entry's check reads. If the source still agrees with the entry, the doc was edited into a
+  false claim: restore the doc, by the class above that fits it. If the source agrees with the new
+  text, the doc is right and the entry is behind: update the entry as described next.
 - **The manifest entry is wrong** (an anchor that moved, a new link or citation with no entry, an
   expectation that never matched what the doc claims). Update `docs/drift-manifest.json`: keep
   anchors exact, set `covers`, and for a historical entry take `asOf` from `git blame` of the line.
