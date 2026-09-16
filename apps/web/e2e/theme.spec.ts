@@ -1,6 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { THEME_STORAGE_KEY } from '../src/lib/theme';
 import { expectHydrated, gotoHydrated } from './support/hydration';
+import { warmRoutes } from './support/warm-routes';
 
 /**
  * A stored theme choice must beat the OS preference before React hydrates.
@@ -93,30 +94,43 @@ test.describe('the pre-paint theme script', () => {
     }
   });
 
-  test('a choice made in the UI survives a reload and a soft navigation', async ({ page }) => {
-    await page.emulateMedia({ colorScheme: 'dark' });
-    await gotoHydrated(page, '/about');
-    const html = page.locator('html');
-    await expect(html).toContainClass('dark');
+  // The Skills click is a client-side navigation, whose URL changes only once the RSC payload for
+  // `/skills` has arrived. Run alone on the dev server, it was the first request for that route: 1.1 s
+  // for the payload, 0.6 to 0.9 s of it in Next.js itself, against 0.03 to 0.8 s for later ones, with
+  // `.next-e2e` deleted or kept (2026-09-13). It passed all 20 runs, but the same kind of first-request
+  // wait failed `case-study.spec.ts` and `client-navigation.spec.ts`. The route is requested before the
+  // test (e2e/support/warm-routes.ts), from an anonymous group: the other two tests here never navigate
+  // client-side.
+  test.describe(() => {
+    test.beforeAll(async ({ playwright }, testInfo) => {
+      await warmRoutes(playwright, testInfo, ['/skills']);
+    });
 
-    await page
-      .getByRole('button', { name: /Switch to light mode/ })
-      .first()
-      .click();
-    await expect(html).toContainClass('light');
-    expect(await page.evaluate((key) => localStorage.getItem(key), THEME_STORAGE_KEY)).toBe(
-      'light',
-    );
+    test('a choice made in the UI survives a reload and a soft navigation', async ({ page }) => {
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await gotoHydrated(page, '/about');
+      const html = page.locator('html');
+      await expect(html).toContainClass('dark');
 
-    await page.reload();
-    await expectHydrated(page);
-    await expect(html).toContainClass('light');
-    await expect(html).not.toContainClass('dark');
+      await page
+        .getByRole('button', { name: /Switch to light mode/ })
+        .first()
+        .click();
+      await expect(html).toContainClass('light');
+      expect(await page.evaluate((key) => localStorage.getItem(key), THEME_STORAGE_KEY)).toBe(
+        'light',
+      );
 
-    // And across a soft navigation, where the provider is not remounted and the init script does not
-    // run again: the class has to survive in the live document.
-    await page.getByRole('navigation').getByRole('link', { name: 'Skills' }).click();
-    await expect(page).toHaveURL(/\/skills$/);
-    await expect(html).toContainClass('light');
+      await page.reload();
+      await expectHydrated(page);
+      await expect(html).toContainClass('light');
+      await expect(html).not.toContainClass('dark');
+
+      // And across a soft navigation, where the provider is not remounted and the init script does
+      // not run again: the class has to survive in the live document.
+      await page.getByRole('navigation').getByRole('link', { name: 'Skills' }).click();
+      await expect(page).toHaveURL(/\/skills$/);
+      await expect(html).toContainClass('light');
+    });
   });
 });
