@@ -24,28 +24,28 @@ records exist at all. Records here sit beside [docs/plans](../plans/README.md), 
 specific piece of work is executed, and [docs/runbooks](../runbooks/deploy.md), which say how to
 perform an operation.
 
-| ADR  | Title                                                                                                                       | Status                                        | Date       |
-| ---- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------- |
-| 0001 | [Record architecture decisions](0001-record-architecture-decisions.md)                                                      | Superseded by ADR-0012                        | 2026-09-08 |
-| 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)                                                        | Superseded by ADR-0018 (corrected 2026-09-13) | 2026-09-08 |
-| 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)                                                | Accepted                                      | 2026-09-08 |
-| 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)                                                      | Superseded by ADR-0021                        | 2026-09-08 |
-| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                                                                              | Superseded by ADR-0016 (corrected 2026-09-13) | 2026-09-08 |
-| 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)                                                          | Accepted                                      | 2026-09-08 |
-| 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)                                                  | Superseded by ADR-0013 (corrected 2026-09-10) | 2026-09-09 |
-| 0008 | [Accent colour roles](0008-accent-colour-roles.md)                                                                          | Superseded by ADR-0011                        | 2026-09-09 |
-| 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md)                                        | Accepted (corrected 2026-09-10)               | 2026-09-09 |
-| 0010 | [Status colour tokens](0010-status-colour-tokens.md)                                                                        | Accepted (corrected 2026-09-10)               | 2026-09-09 |
-| 0011 | [Colour roles, corrected for scoped surfaces and stacked tints](0011-colour-roles-on-scoped-surfaces.md)                    | Accepted                                      | 2026-09-10 |
-| 0012 | [Correcting factual errors in accepted records](0012-correcting-accepted-records.md)                                        | Accepted                                      | 2026-09-10 |
-| 0013 | [Dependency build scripts stay disabled, and the reviewed versions are enforced](0013-dependency-build-scripts-reviewed.md) | Accepted                                      | 2026-09-10 |
-| 0014 | [Playwright starts the server it tests, on a port of its own](0014-playwright-owns-its-server.md)                           | Accepted (corrected 2026-09-12)               | 2026-09-10 |
-| 0015 | [Case-study slugs are fixed at build time, so unknown ones 404 at the router](0015-static-case-study-params.md)             | Accepted (corrected 2026-09-12)               | 2026-09-10 |
-| 0016 | [Dependabot branches never deploy, and unaffected commits never build](0016-vercel-deployment-budget.md)                    | Accepted                                      | 2026-09-12 |
-| 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)                          | Accepted                                      | 2026-09-12 |
-| 0018 | [Dependency update policy](0018-dependency-update-policy.md)                                                                | Accepted                                      | 2026-09-12 |
-| 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)                      | Superseded by ADR-0021                        | 2026-09-12 |
-| 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)      | Accepted                                      | 2026-09-13 |
+| ADR  | Title                                                                                                                                    | Status                                        | Date       |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------- |
+| 0001 | [Record architecture decisions](0001-record-architecture-decisions.md)                                                                   | Superseded by ADR-0012                        | 2026-09-08 |
+| 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)                                                                     | Superseded by ADR-0018 (corrected 2026-09-13) | 2026-09-08 |
+| 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)                                                             | Accepted                                      | 2026-09-08 |
+| 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)                                                                   | Superseded by ADR-0021                        | 2026-09-08 |
+| 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                                                                                           | Superseded by ADR-0016 (corrected 2026-09-13) | 2026-09-08 |
+| 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)                                                                       | Accepted (corrected 2026-09-16)               | 2026-09-08 |
+| 0007 | [Dependency build scripts stay disabled](0007-dependency-build-scripts.md)                                                               | Superseded by ADR-0013 (corrected 2026-09-10) | 2026-09-09 |
+| 0008 | [Accent colour roles](0008-accent-colour-roles.md)                                                                                       | Superseded by ADR-0011                        | 2026-09-09 |
+| 0009 | [Animation performance rules for the home page](0009-animation-performance-rules.md)                                                     | Accepted (corrected 2026-09-10)               | 2026-09-09 |
+| 0010 | [Status colour tokens](0010-status-colour-tokens.md)                                                                                     | Accepted (corrected 2026-09-10)               | 2026-09-09 |
+| 0011 | [Colour roles, corrected for scoped surfaces and stacked tints](0011-colour-roles-on-scoped-surfaces.md)                                 | Accepted                                      | 2026-09-10 |
+| 0012 | [Correcting factual errors in accepted records](0012-correcting-accepted-records.md)                                                     | Accepted                                      | 2026-09-10 |
+| 0013 | [Dependency build scripts stay disabled, and the reviewed versions are enforced](0013-dependency-build-scripts-reviewed.md)              | Accepted                                      | 2026-09-10 |
+| 0014 | [Playwright starts the server it tests, on a port of its own](0014-playwright-owns-its-server.md)                                        | Accepted (corrected 2026-09-16)               | 2026-09-10 |
+| 0015 | [Case-study slugs are fixed at build time, so unknown ones 404 at the router](0015-static-case-study-params.md)                          | Accepted (corrected 2026-09-12)               | 2026-09-10 |
+| 0016 | [Dependabot branches never deploy, and commits that change nothing the site is built from never build](0016-vercel-deployment-budget.md) | Accepted                                      | 2026-09-12 |
+| 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)                                       | Accepted                                      | 2026-09-12 |
+| 0018 | [Dependency update policy](0018-dependency-update-policy.md)                                                                             | Accepted                                      | 2026-09-12 |
+| 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)                                   | Superseded by ADR-0021                        | 2026-09-12 |
+| 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)                   | Accepted                                      | 2026-09-13 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see

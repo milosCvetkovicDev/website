@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (corrected 2026-09-16)
 
 ## Date
 
@@ -123,8 +123,9 @@ set from its own `eslint-plugin-react-hooks` 7 and is held to the same rule. Ver
 - `getSnapshot` runs on every render, so `readTheme` touches `localStorage` and `matchMedia`
   frequently. Both are cheap, but the functions must stay allocation-free and must keep returning a
   referentially stable value or React will loop.
-- The theme logic exists twice: once as the inline script string in `layout.tsx` and once as
-  `readTheme` in `theme-provider.tsx`. The two must be kept in step by hand.
+- The theme logic exists twice: once as the inline script string `THEME_INIT_SCRIPT` in
+  `apps/web/src/lib/theme.ts`, which `layout.tsx` renders, and once as `readTheme` in
+  `theme-provider.tsx`. The two must be kept in step by hand.
 - `listeners` and `memoryTheme` are module-level state with no reset hook. `theme-provider.test.tsx`
   works around this by ordering its cases so the blocked-storage block runs last; a case added after
   it would inherit a poisoned `memoryTheme`, because once a write has failed `readStoredTheme`
@@ -149,3 +150,38 @@ set from its own `eslint-plugin-react-hooks` 7 and is held to the same rule. Ver
   step by hand is the cheaper cost.
 - **Adopt `next-themes`.** Rejected. It adds a runtime dependency for a two-value toggle, and the
   defensive `localStorage` and `matchMedia` guards would still be needed around it.
+
+## Corrections
+
+### 2026-09-16
+
+Two statements in this record place the theme's inline script in `apps/web/src/app/layout.tsx`, one
+of them under the name `themeInitScript`. Neither was true when the record was accepted: the script
+is the string `THEME_INIT_SCRIPT`, exported from `apps/web/src/lib/theme.ts` and rendered by
+`layout.tsx`. Corrected under [ADR 0012](0012-correcting-accepted-records.md).
+
+**The script's name and file**, in `## Decision`, which is never rewritten and is annotated here.
+The record reads: "`themeInitScript` in `apps/web/src/app/layout.tsx` runs in `<head>` before
+hydration and adds `dark` or `light` to `<html>`". What is true: `THEME_INIT_SCRIPT`, exported from
+`apps/web/src/lib/theme.ts`, is rendered by `apps/web/src/app/layout.tsx` into a `<script>` in
+`<head>`, where it runs before hydration and adds `dark` or `light` to `<html>`. What was wrong: the
+name and the file. No `themeInitScript` exists in the application code of the tree this record was
+accepted in; outside this record, the name appears there only in a draft snippet in
+`docs/plans/2026-09-08-tooling-and-quality-gates-plan.md`. The script string was never defined in
+`layout.tsx`. The rest of that paragraph is not corrected.
+
+**Where the duplicated logic lives**, in `### Trade-offs`. The record read: "The theme logic exists
+twice: once as the inline script string in `layout.tsx` and once as `readTheme` in
+`theme-provider.tsx`." It now reads: "The theme logic exists twice: once as the inline script
+string `THEME_INIT_SCRIPT` in `apps/web/src/lib/theme.ts`, which `layout.tsx` renders, and once as
+`readTheme` in `theme-provider.tsx`." What was wrong: the same file. The trade-off itself, two
+copies kept in step by hand, is unchanged.
+
+Evidence, at a8b4a91, the commit that added this record:
+`git show a8b4a91:apps/web/src/app/layout.tsx | grep -n THEME_INIT_SCRIPT` prints
+`4:import { THEME_INIT_SCRIPT } from '@/lib/theme';` and
+`84:        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />`;
+`git show a8b4a91:apps/web/src/lib/theme.ts | grep -n 'export const THEME_INIT_SCRIPT'` prints line
+13; and `git grep -n themeInitScript a8b4a91 -- apps` prints nothing, while
+`git grep -l themeInitScript a8b4a91` lists only that plan and this record. Found by
+`pnpm check:docs-drift`.
