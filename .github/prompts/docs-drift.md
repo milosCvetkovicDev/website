@@ -2,16 +2,23 @@
 
 You are running headless in a checkout of this repository, started by
 `.github/workflows/docs-drift.yml` (or by hand with the same command). A run of
-`node scripts/check-docs-drift.ts --json` found drift. Its report is the JSON file named by the
-`DRIFT_REPORT` environment variable. Your job is to open **one** pull request that makes the docs
+`node scripts/check-docs-drift.ts --json` found drift. Its report is the JSON file named under
+**This run** at the end of this prompt. Your job is to open **one** pull request that makes the docs
 true again, or to stop and say why you could not. You never merge anything.
 
-Environment:
+The last section of this prompt, **This run**, gives the path of that report, the branch the pull
+request targets, the login to assign, and the run id. Use those values: this run cannot read
+environment variables.
 
-- `DRIFT_REPORT`: path to the checker's JSON report (`summary`, `findings`, `uncatalogued`).
-- `DOCS_DRIFT_BASE`: the branch the pull request targets. Defaults to `main` if unset.
-- `DOCS_DRIFT_ASSIGNEE`: the GitHub login to assign. Defaults to `milosCvetkovicDev` if unset.
-- `GITHUB_RUN_ID`: set in CI; use `local` when it is unset.
+## How commands run here
+
+Headless, only single commands that start with an allowed prefix run: `git ...`,
+`gh pr create ...`, `gh pr list ...`, `gh api ...`, `node scripts/check-docs-drift.ts ...`,
+`pnpm exec prettier ...` and `jq ...`. Node, pnpm, git, gh and jq are already on PATH, so do not
+source nvm, whatever `CLAUDE.md` says about interactive shells. Never chain commands with `&&`, `;`
+or `|`, never use `$(...)` or a redirection, and never put an environment assignment in front of a
+command: any of those is refused. Read files, the report included, with the Read tool, and use
+`git show <commit>:<path>` rather than piping it into another command.
 
 ## Read first
 
@@ -65,8 +72,8 @@ under "Needs the owner" with what you found.
 
 ## Make the change
 
-1. Create the branch `docs-drift/<today in YYYY-MM-DD>-<GITHUB_RUN_ID or local>` from
-   `DOCS_DRIFT_BASE`.
+1. `git fetch origin <base>`, then
+   `git switch -c docs-drift/<today in YYYY-MM-DD>-<run id> origin/<base>`.
 2. Edit only `docs/**` and `docs/drift-manifest.json`. Touch nothing else.
 3. Run `pnpm exec prettier --write` on the files you changed.
 4. Run `node scripts/check-docs-drift.ts --skip-requires admin`. Repeat until the only findings left
@@ -74,19 +81,20 @@ under "Needs the owner" with what you found.
 5. Commit with a Conventional Commit message, for example
    `docs: correct the drift check-docs-drift found`, or `docs(adr): ...` when only records change.
    The commit hooks run lint-staged and commitlint; never pass `--no-verify`.
-6. Push the branch.
+6. `git push -u origin <that branch>`.
 
 ## Open the pull request
 
 Open exactly one:
 
 ```sh
-gh pr create --base "$DOCS_DRIFT_BASE" --assignee "$DOCS_DRIFT_ASSIGNEE" \
-  --title "<the commit subject>" --body-file <file>
+gh pr create --base <base> --assignee <assignee> \
+  --title "<the commit subject>" --body-file .git/docs-drift-pr-body.md
 ```
 
-Before opening it, run `gh pr list --state open --json headRefName` and stop if a branch starting
-with `docs-drift/` is already open. The body has these sections:
+Write the body with the Write tool to `.git/docs-drift-pr-body.md`, inside `.git/` so it can never
+be committed. Before opening the pull request, run `gh pr list --state open --json headRefName` and
+stop if a branch starting with `docs-drift/` is already open. The body has these sections:
 
 - **Summary:** what drifted and what changed, in two or three sentences.
 - **Drift:** a table with the columns claim | source | actual | fix, one row per finding, with the

@@ -159,7 +159,14 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           node scripts/check-docs-drift.ts --json --skip-requires admin > "$DRIFT_REPORT" || true
           npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
-          claude -p "$(cat .github/prompts/docs-drift.md)" \
+          # The agent cannot read the environment, so this run's values are written into the prompt.
+          context=$(printf '\n## This run\n\n- Drift report: `%s`\n- Base branch: `%s`\n' \
+            "$DRIFT_REPORT" "$DOCS_DRIFT_BASE")
+          context+=$(printf '\n- Assignee: `%s`\n- Run id: `%s`\n' \
+            "$DOCS_DRIFT_ASSIGNEE" "${GITHUB_RUN_ID:-local}")
+          prompt="$(cat .github/prompts/docs-drift.md)
+          ${context}"
+          claude -p "$prompt" \
             --max-turns 80 \
             --allowedTools 'Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh api:*),Bash(node scripts/check-docs-drift.ts:*),Bash(pnpm exec prettier:*),Bash(jq:*)'
 
