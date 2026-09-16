@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -30,6 +31,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SESSION_START = join(ROOT, '.claude/hooks/session-start.sh');
 const STOP = join(ROOT, '.claude/hooks/stop.sh');
+const RESUME = join(ROOT, 'scripts/agent-resume.sh');
 const REAL_GIT = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
 
 // Applies the hook's --jq filter to gh.json, as gh does. gh.wrapper makes it behave like a shim
@@ -257,6 +259,72 @@ describe('session-start.sh', () => {
     assert.match(run(SESSION_START).stdout, /^### \.agent-state\/n\.md .*\nshared note$/m);
     writeFileSync(join(repo, '.gitignore'), readFileSync(join(ROOT, '.gitignore')));
     assert.equal(spawnSync('git', ['check-ignore', '-q', '.agent-state'], { cwd: repo }).status, 0);
+  });
+});
+
+describe('session-start.sh with checkpoints', () => {
+  const utc = (secondsAgo = 0) =>
+    new Date(Date.now() - secondsAgo * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+  /** A checkpoint with a long plan; finished when `current` is null. */
+  function task(id, current, secondsAgo, steps = 12) {
+    const plan = Array.from({ length: steps }, (_, i) => `step ${i + 1}: ${'detail '.repeat(8)}`);
+    const done = plan.map((_, i) => i + 1).filter((n) => current === null || n < current);
+    note(
+      `${id}.json`,
+      JSON.stringify({
+        schema_version: 1,
+        goal: `goal of ${id}`,
+        plan_steps: plan,
+        current_step: current,
+        completed_steps: done.map((step) => ({ step, note: 'evidence '.repeat(6) })),
+        artifacts: { branches: [], prs: [], files: [] },
+        blockers: [],
+        next_action: current === null ? '' : `continue ${id}`,
+        updated_at: utc(secondsAgo),
+      }),
+      secondsAgo,
+    );
+  }
+
+  beforeEach(() => {
+    mkdirSync(join(repo, 'scripts'));
+    copyFileSync(RESUME, join(repo, 'scripts/agent-resume.sh'));
+    prs();
+  });
+
+  it('briefs the task in progress before finished ones, and keeps git in view', () => {
+    for (let i = 0; i < 8; i++) task(`a-done-${i}`, null, 3600 + i);
+    task('z-task', 5, 7200);
+    note('handoff.md', 'the note\n');
+    const out = run(SESSION_START).stdout;
+    assert.ok(Buffer.byteLength(out) < 10000, `${Buffer.byteLength(out)} bytes`);
+    const at = (text) => out.indexOf(text);
+    assert.ok(at('--- GIT ---') === 0, out);
+    assert.ok(at('--- MY OPEN PRS ---') < at('--- RESUME BRIEFING'));
+    assert.ok(at('## z-task (updated') > at('--- RESUME BRIEFING'), 'the live task is in full');
+    assert.ok(at('## z-task (updated') < at('Finished tasks'), 'and before the finished ones');
+    assert.match(out, /^Next action: continue z-task$/m);
+    assert.match(out, /^## a-done-0: finished, updated /m);
+    assert.ok(at('Finished tasks') < at('--- SAVED STATE'));
+  });
+
+  it('cuts a briefing that would not fit, and says where the rest is', () => {
+    for (let i = 0; i < 30; i++) task(`live-${i}`, 3, 60 + i);
+    const out = run(SESSION_START).stdout;
+    assert.ok(Buffer.byteLength(out) < 10000, `${Buffer.byteLength(out)} bytes`);
+    assert.match(out, /^\[\.\.\. cut to fit the budget: run scripts\/agent-resume\.sh\]$/m);
+    assert.match(out, /--- SAVED STATE/);
+  });
+
+  it('still prints git, the pull requests and the notes when no temporary file can be made', () => {
+    task('z-task', 5, 60);
+    note('handoff.md', 'the note\n');
+    const result = run(SESSION_START, { TMPDIR: join(root, 'nowhere') });
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /^--- GIT ---\n## main/m);
+    assert.match(result.stdout, /--- MY OPEN PRS ---\n\(none\)/);
+    assert.match(result.stdout, /^### \.agent-state\/handoff\.md .*\nthe note$/m);
   });
 });
 
