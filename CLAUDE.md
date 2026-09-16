@@ -29,14 +29,14 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
   `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22 runs directly),
   `docs-drift-patch.mjs` (the docs drift workflow's check on what its agent changed),
   `agent-resume.sh` (the briefing for agent checkpoints, under Working with this repo in Claude
-  Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates), and
-  the `node:test` suites that `pnpm test:scripts` runs, one for each of those eight plus
-  `docs-drift-workflow.test.mjs`, `ai-refusals.test.mjs`, `commitlint-config.test.mjs` and
-  `claude-hooks.test.mjs` (the session hooks in `.claude/hooks`). It is a private workspace package,
-  `@repo/scripts`, whose only task is `typecheck` (`tsc -p .` against `scripts/tsconfig.json`, which
-  covers the `.mjs` and `.ts` files), so `turbo typecheck` type-checks it alongside the apps. It
-  ships no source anyone imports: nothing depends on it, and the root scripts still call the scripts
-  by path.
+  Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates),
+  `flake-sweep.sh` (`pnpm test:e2e:sweep`, see Testing), and the `node:test` suites that
+  `pnpm test:scripts` runs, one for each of those nine plus `docs-drift-workflow.test.mjs`,
+  `ai-refusals.test.mjs`, `commitlint-config.test.mjs` and `claude-hooks.test.mjs` (the session
+  hooks in `.claude/hooks`). It is a private workspace package, `@repo/scripts`, whose only task is
+  `typecheck` (`tsc -p .` against `scripts/tsconfig.json`, which covers the `.mjs` and `.ts` files),
+  so `turbo typecheck` type-checks it alongside the apps. It ships no source anyone imports: nothing
+  depends on it, and the root scripts still call the scripts by path.
 - `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
   `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
   has its own `tsconfig.json`.
@@ -63,6 +63,7 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 | `pnpm typecheck`                                                        | `turbo typecheck`: `next typegen && tsc --noEmit` (web), `tsc -b` (playground), `tsc -p .` (scripts)                                                                                 |
 | `pnpm test`                                                             | Vitest unit tests (web only)                                                                                                                                                         |
 | `pnpm test:e2e`                                                         | Playwright specs in `apps/web/e2e`; `turbo.json` gives it `dependsOn: ["build"]`, so the root script builds `web` first. Prefer `pnpm --filter web test:e2e` locally, which does not |
+| `pnpm test:e2e:sweep e2e/<spec> [runs] [out-dir]`                       | Runs one spec file N times (10 by default) and summarises every test's outcomes and durations; see `scripts/flake-sweep.sh`                                                          |
 | `pnpm format`                                                           | Prettier over the whole repo, writing changes                                                                                                                                        |
 | `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                    |
 | `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                              |
@@ -388,6 +389,28 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   measured timings. Keep `--retries=0` on the production runs: under `CI=true` the config retries
   a failed test twice, and a run whose only failures passed on a retry is reported as flaky and
   exits 0.
+- To tell a flaky e2e test from a slow or a broken one, sweep its file:
+  `pnpm test:e2e:sweep e2e/<spec> [runs] [out-dir]` runs the whole file that many times (10 by
+  default), into a new directory under `$TMPDIR` unless given one. Type it from the repository root
+  or any directory outside a workspace package; inside one, such as `apps/web`, pnpm does not find
+  the script, so use `pnpm -w test:e2e:sweep` there. It writes `summary.txt` (a line for each run
+  that exited nonzero with no unexpected test or whose report carries errors outside any test, then
+  per test and project: in how many of the runs it ran in it ended other than as declared, the runs
+  it failed in, and its duration in each run), `runs.tsv` (exit code, seconds, load average and
+  test counts per run) and `sweep.txt` (commit, mode, port), and keeps every JSON report and the
+  output of each run with a failed or flaky test. A sweep takes minutes: start it in the background,
+  and do not overlap it with another e2e run in the same checkout. Record the load with the result:
+  parallel sessions on one machine cause timing failures that CI never sees. `COLD=1`, `CI=true`,
+  signals and the exit codes are described at the top of `scripts/flake-sweep.sh`.
+- A bare `Test timeout of Nms exceeded`, with no second error naming a call, means no Playwright
+  call on the test's page, context or `request` was still pending when teardown closed them, because
+  a pending one is named: `page.goto: Test timeout …`, `expect(locator).toBeHidden() failed`, or
+  `apiRequestContext.get: Request context disposed.` for `request`. When every await in the test is
+  such a call, a bare report means the run was slow and its deadline fell in its last steps, not
+  that it was stuck. It proves nothing about an await outside Playwright (a Node `setTimeout` or
+  `fetch`, a promise that never settles), which reports bare while it hangs, nor about an error
+  thrown after the deadline, which is never reported. A setup or hook overrun says so
+  (`while setting up "page"`).
 
 ## Working with this repo in Claude Code
 
