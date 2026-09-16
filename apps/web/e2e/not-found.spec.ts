@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { NOT_FOUND_ROUTE } from './routes';
+import { gotoHydrated } from './support/hydration';
 
 /**
  * The 404 page's own content.
@@ -53,7 +54,7 @@ test('the 404 page keeps the site chrome, so a visitor is not stranded', async (
 });
 
 test('the recovery links work as client-side navigations', async ({ page }) => {
-  await page.goto(NOT_FOUND_ROUTE);
+  await gotoHydrated(page, NOT_FOUND_ROUTE);
 
   await page.getByRole('link', { name: 'View Work' }).click();
 
