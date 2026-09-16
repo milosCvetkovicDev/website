@@ -92,14 +92,34 @@ function readAt(root: string, ref: string | null, path: string): string | null {
     const full = join(root, path);
     return existsSync(full) ? readFileSync(full, 'utf8') : null;
   }
+  // Tell "the commit is not here" (unrunnable) from "the file was not there" (a finding).
+  ensureCommit(root, ref);
   const exists = spawnSync('git', ['-C', root, 'cat-file', '-e', `${ref}:${path}`]);
-  if (exists.status !== 0) {
-    // Tell "the file was not there" from "the commit is not here": only the first is a finding.
-    const commit = spawnSync('git', ['-C', root, 'cat-file', '-e', `${ref}^{commit}`]);
-    if (commit.status !== 0) throw new Unrunnable(`commit ${ref} is not in this clone`);
-    return null;
-  }
+  if (exists.status !== 0) return null;
   return git(root, ['show', `${ref}:${path}`]);
+}
+
+const fetchAttempted = new Set<string>();
+
+/**
+ * Makes sure a commit an assertion is read at is present. A commit that only ever lived on a
+ * squash-merged branch is on no remote ref, so even a full clone lacks it, while GitHub still
+ * serves it by its full SHA. Fetch it once, and without `--depth`, which would make a developer's
+ * clone
+ * shallow.
+ */
+function ensureCommit(root: string, ref: string): void {
+  const present = () =>
+    spawnSync('git', ['-C', root, 'cat-file', '-e', `${ref}^{commit}`]).status === 0;
+  if (present()) return;
+  if (!fetchAttempted.has(ref)) {
+    fetchAttempted.add(ref);
+    spawnSync('git', ['-C', root, 'fetch', '--quiet', '--no-tags', 'origin', ref], {
+      timeout: 120_000,
+    });
+    if (present()) return;
+  }
+  throw new Unrunnable(`commit ${ref} is not in this clone, and fetching it from origin failed`);
 }
 
 function refFor(assertion: Assertion): string | null {
@@ -384,9 +404,11 @@ function validate(manifest: Manifest): string[] {
     if (
       a.evaluation === 'historical' &&
       a.method !== 'gh-api' &&
-      !/^[0-9a-f]{7,40}$/.test(a.asOf ?? '')
+      !/^[0-9a-f]{40}$/.test(a.asOf ?? '')
     ) {
-      problems.push(`${at}: a historical ${a.method} assertion needs asOf, a commit SHA`);
+      problems.push(
+        `${at}: a historical ${a.method} assertion needs asOf, a full 40-character commit SHA`,
+      );
     }
     if (a.evaluation === 'historical' && a.method === 'gh-api' && !a.supersededBy) {
       problems.push(`${at}: a historical gh-api assertion needs supersededBy`);

@@ -192,18 +192,59 @@ describe('file-line', () => {
     assert.match(run.report.findings[0].detail, new RegExp(`at ${then}`));
   });
 
+  it('fetches an asOf commit that is on no branch of the clone from origin by its SHA', () => {
+    // As with a commit of a squash-merged, deleted branch: the remote has it, no ref points at it.
+    const origin = join(root, 'origin');
+    mkdirSync(join(origin, 'src'), { recursive: true });
+    const inOrigin = (...args) => {
+      const run = spawnSync(
+        'git',
+        ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args],
+        { cwd: origin, encoding: 'utf8' },
+      );
+      assert.equal(run.status, 0, run.stderr);
+      return run.stdout.trim();
+    };
+    inOrigin('init', '-q', '-b', 'main');
+    inOrigin('config', 'uploadpack.allowAnySHA1InWant', 'true');
+    writeFileSync(join(origin, 'base.txt'), 'base\n');
+    inOrigin('add', '-A');
+    inOrigin('commit', '-q', '-m', 'base');
+    inOrigin('checkout', '-q', '-b', 'feature');
+    writeFileSync(join(origin, 'src', 'app.ts'), 'one\nhello from the branch\n');
+    inOrigin('add', '-A');
+    inOrigin('commit', '-q', '-m', 'branch work');
+    const branchCommit = inOrigin('rev-parse', 'HEAD');
+    inOrigin('checkout', '-q', 'main');
+    inOrigin('branch', '-q', '-D', 'feature');
+    git('remote', 'add', 'origin', origin);
+    git('fetch', '-q', 'origin');
+    write('docs/doc.md', 'ANCHOR here\n');
+    const run = check([
+      entry({
+        evaluation: 'historical',
+        asOf: branchCommit,
+        check: { path: 'src/app.ts', line: 2, contains: 'hello from the branch' },
+      }),
+    ]);
+    assert.equal(run.status, 0, JSON.stringify(run.report));
+  });
+
   it('cannot run, rather than passing, when the asOf commit is not in the clone', () => {
     commit();
     const run = check([
       entry({
         evaluation: 'historical',
-        asOf: 'deadbeefdeadbeef',
+        asOf: 'deadbeef'.repeat(5),
         check: { path: 'src/app.ts', contains: 'hello' },
       }),
     ]);
     assert.equal(run.status, 2);
     assert.equal(run.report.findings[0].status, 'unrunnable');
-    assert.match(run.report.findings[0].detail, /not in this clone/);
+    assert.match(
+      run.report.findings[0].detail,
+      /not in this clone, and fetching it from origin failed/,
+    );
   });
 });
 
