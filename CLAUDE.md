@@ -25,12 +25,14 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
   `tailwindStylesheet: './src/app/globals.css'` so the class sorter sees the theme.
 - `scripts/` at the repository root holds the scripts that run outside the apps:
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `vercel-ignore-build.mjs` (Vercel's
-  ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log check), and
-  the `node:test` suites that `pnpm test:scripts` runs, one for each of those three plus
-  `ai-refusals.test.mjs` and `commitlint-config.test.mjs`. It is a private workspace package,
-  `@repo/scripts`, whose only task is `typecheck` (`tsc -p .` against `scripts/tsconfig.json`), so
-  `turbo typecheck` type-checks it alongside the apps. It ships no source anyone imports: nothing
-  depends on it, and the root scripts still call the `.mjs` files by path.
+  ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log check),
+  `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22 runs directly),
+  `docs-drift-patch.mjs` (the docs drift workflow's check on what its agent changed), and the
+  `node:test` suites that `pnpm test:scripts` runs, one for each of those five plus
+  `docs-drift-workflow.test.mjs`, `ai-refusals.test.mjs` and `commitlint-config.test.mjs`. It is a
+  private workspace package, `@repo/scripts`, whose only task is `typecheck` (`tsc -p .` against
+  `scripts/tsconfig.json`), so `turbo typecheck` type-checks it alongside the apps. It ships no
+  source anyone imports: nothing depends on it, and the root scripts still call the files by path.
 - `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
   `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
   has its own `tsconfig.json`.
@@ -60,6 +62,7 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 | `pnpm format`                                                           | Prettier over the whole repo, writing changes                                                                                                                                        |
 | `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                    |
 | `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                              |
+| `pnpm check:docs-drift`                                                 | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                  |
 | `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/` gates                                                                                                                                      |
 | `pnpm clean`                                                            | `turbo clean` in both apps, then `rm -rf node_modules` at the root                                                                                                                   |
 | `pnpm prepare`                                                          | `husky`; runs on install and is what creates the git hooks                                                                                                                           |
@@ -173,6 +176,21 @@ measurement behind the choice is in PR 2's entry in `.claude/epics/audit-remedia
   covers them without a step of its own. There is no root `eslint.config.*` on purpose: ADR 0003's
   per-package lint-staged split relies on its absence.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
+- The docs are checked for drift, outside the required checks. `docs/drift-manifest.json` catalogues
+  the machine-verifiable claims in `docs/` that the checker can check (settings read with `gh api`,
+  `path:line` citations, config values, package scripts; its `rules` block lists what is excluded),
+  and `pnpm check:docs-drift` checks them. The `rules` block also says which claims are `live` and
+  which are `historical`, read at the commit that wrote them because ADR 0012 forbids correcting a
+  claim that was true then. A new link, backticked `pnpm` script command or `path:line` citation in
+  `docs/`, in the forms `rules.coverage` lists, without a manifest entry is itself reported, so add
+  the entry with the doc. `.github/workflows/docs-drift.yml` runs the check weekly and on every push
+  to `main` that touches `docs/adr/`. When it finds drift, `claude -p` drafts a correction following
+  `.github/prompts/docs-drift.md` in a job with no GitHub token, no shell and edits confined to
+  `docs/`, and a separate job with no agent checks the change and opens one pull request, assigned
+  to the owner. The workflow needs the `ANTHROPIC_API_KEY` and `DOCS_DRIFT_TOKEN` secrets and stops
+  with a notice without them; it has not yet run with them. Protection and merge settings need an
+  admin token, so CI reports those claims as skipped. The owner's token checks them locally; with
+  any other token they cannot run (exit 2), so pass `--skip-requires admin`.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
   React hydration mismatches included, so a stray `console.warn` fails the `e2e` job. Its routes come
