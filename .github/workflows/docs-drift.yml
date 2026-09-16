@@ -24,7 +24,8 @@ on:
   schedule:
     - cron: '23 6 * * 1'
   push:
-    branches: [main]
+    # TEMPORARY, pipeline validation only: never merged.
+    branches: [main, docs-drift-validate/base]
     paths: ['docs/adr/**']
   workflow_dispatch:
 
