@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { caseStudies, formatMetric } from '../src/data/case-studies';
+import { warmRoutes } from './support/warm-routes';
 
 /**
  * What each `/work/[slug]` page actually renders.
@@ -53,16 +54,27 @@ test('every case study renders the tech stack and impact from the data file', as
   }
 });
 
-test('the back link reaches /work as a client-side navigation', async ({ page }) => {
-  // Green. The back link is the only way off this page other than the header, and a broken href would
-  // otherwise only surface as a 404 nobody runs into.
-  const [study] = caseStudies;
-  await page.goto(`/work/${study.slug}`);
+// The back link is a client-side navigation into `/work`, whose URL changes only once that route's RSC
+// payload has arrived. Run alone from a deleted `.next-e2e`, the click was the dev server's first
+// request for `/work`, which compiled the route: the payload took 4.1 s and the URL had still not
+// changed when the 5 s `toHaveURL` ran out, in 1 of 10 runs (2026-09-13). The route is requested
+// before the test (e2e/support/warm-routes.ts), from an anonymous group so the test keeps its title.
+test.describe(() => {
+  test.beforeAll(async ({ playwright }, testInfo) => {
+    await warmRoutes(playwright, testInfo, ['/work']);
+  });
 
-  await page.getByRole('link', { name: /Back to Work/i }).click();
+  test('the back link reaches /work as a client-side navigation', async ({ page }) => {
+    // Green. The back link is the only way off this page other than the header, and a broken href
+    // would otherwise only surface as a 404 nobody runs into.
+    const [study] = caseStudies;
+    await page.goto(`/work/${study.slug}`);
 
-  await expect(page).toHaveURL(/\/work$/);
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await page.getByRole('link', { name: /Back to Work/i }).click();
+
+    await expect(page).toHaveURL(/\/work$/);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  });
 });
 
 test('every case study states the headline metric its cards advertise', async ({ page }) => {
