@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { caseStudies } from '../src/data/case-studies';
+import { gotoHydrated } from './support/hydration';
 
 /**
  * The `/work` archive cards, and the one thing they disagree with the home page about.
@@ -80,7 +81,7 @@ test('every /work card reaches its case study by pointer', async ({ page }) => {
   // title link can very easily leave the card body unclickable, which is a worse outcome than the long
   // accessible name: clicking a card is the archive's only job.
   for (const { slug, title } of caseStudies) {
-    await page.goto('/work');
+    await gotoHydrated(page, '/work');
     const card = cardFor(page, slug);
     await expect(card, `/work must have a card linking to ${slug}`).toHaveCount(1);
     // Clicked on the title, which is inside the card whichever way the link is structured.
@@ -94,7 +95,7 @@ test('every /work card reaches its case study by keyboard', async ({ page }) => 
   // The other half of the floor. A stretched-link refactor that puts the overlay above the link itself
   // breaks pointer and keyboard access independently, so both are pinned.
   for (const { slug, title } of caseStudies) {
-    await page.goto('/work');
+    await gotoHydrated(page, '/work');
     const card = cardFor(page, slug);
     await card.focus();
     await expect(card).toBeFocused();
@@ -144,8 +145,7 @@ test('a case study status reads as one colour on / and on /work, in both themes'
 
     // The featured card on `/`, inside its own region so a status string used elsewhere on the page
     // cannot answer for it.
-    await page.goto('/');
-    await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+    await gotoHydrated(page, '/');
     await expect(page.locator('html')).toContainClass(colorScheme);
     const featuredSection = page.getByRole('region', { name: /featured work/i });
     await featuredSection.scrollIntoViewIfNeeded();
@@ -177,11 +177,18 @@ test('a case study status reads as one colour on / and on /work, in both themes'
 test('both routes render the same status string for the same case study', async ({ page }) => {
   // Green, and the premise of R39: the two elements exist and carry the same text, so the row above is
   // about their colour and not about one of them being absent.
+
+  // Under load on the dev server this test passed in up to 23 s and twice ran out of the 30 s
+  // default (2 of 20 runs, 2026-09-16), each time with a bare "Test timeout" naming no step: the
+  // call pending at the deadline finished before teardown closed the page, so nothing was left to
+  // blame. The largest share of its time goes on the wait for the home page's loader, which may
+  // take 30 s on its own, so the test gets room past that wait, and a loader that never hides
+  // still fails on its own assertion.
+  test.setTimeout(60_000);
   const [study] = caseStudies;
   const status = study.highlight.status;
 
-  await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await gotoHydrated(page, '/');
   const featuredSection = page.getByRole('region', { name: /featured work/i });
   await featuredSection.scrollIntoViewIfNeeded();
   await expect(featuredSection.getByText(status, { exact: true }).first()).toBeVisible();
