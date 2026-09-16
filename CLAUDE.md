@@ -24,9 +24,10 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
   `tailwindStylesheet: './src/app/globals.css'` so the class sorter sees the theme.
 - `scripts/` at the repository root holds the scripts that run outside the apps:
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `vercel-ignore-build.mjs` (Vercel's
-  ignored build step, ADR 0016), and the `node:test` suites that `pnpm test:scripts` runs, one for
-  each of those two plus `ai-refusals.test.mjs` and `commitlint-config.test.mjs`. It is not a
-  workspace and Turbo does not see it.
+  ignored build step, ADR 0016), `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that
+  Node 22 runs directly), and the `node:test` suites that `pnpm test:scripts` runs, one for each of
+  those three plus `ai-refusals.test.mjs` and `commitlint-config.test.mjs`. It is not a workspace
+  and Turbo does not see it.
 - `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
   `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
   has its own `tsconfig.json`.
@@ -56,6 +57,7 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 | `pnpm format`                                                           | Prettier over the whole repo, writing changes                                                                                                                                        |
 | `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                    |
 | `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                              |
+| `pnpm check:docs-drift`                                                 | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                  |
 | `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/` gates                                                                                                                                      |
 | `pnpm clean`                                                            | `turbo clean` in both apps, then `rm -rf node_modules` at the root                                                                                                                   |
 | `pnpm prepare`                                                          | `husky`; runs on install and is what creates the git hooks                                                                                                                           |
@@ -142,6 +144,17 @@ is there so that a future buildable package is compiled before the apps typechec
   history, because `main` is never rewritten: 28 of them fail it, and the four since commitlint
   arrived in #3 (54b8b80, d7d058d, a8b4a91, 3e98c14) each fail `body-max-line-length`.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
+- The docs are checked for drift, outside the required checks. `docs/drift-manifest.json` catalogues
+  every machine-verifiable claim in `docs/` (settings read with `gh api`, `path:line` citations,
+  config values, package scripts), and `pnpm check:docs-drift` checks them; its `rules` block says
+  which claims are `live` and which are `historical`, read at the commit that wrote them because
+  ADR 0012 forbids correcting a claim that was true then. A new link, `pnpm` script or `path:line`
+  citation in `docs/` without a manifest entry is itself reported, so add the entry with the doc.
+  `.github/workflows/docs-drift.yml` runs the check weekly and on every push to `main` that touches
+  `docs/adr/`, and when it finds drift has `claude -p` open one correction pull request, following
+  `.github/prompts/docs-drift.md`, assigned to the owner. That job needs the `ANTHROPIC_API_KEY` and
+  `DOCS_DRIFT_TOKEN` secrets and skips with a notice without them. Protection and merge settings
+  need an admin token, so CI reports those claims as skipped; the owner's token checks them locally.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
   React hydration mismatches included, so a stray `console.warn` fails the `e2e` job. Its routes come
