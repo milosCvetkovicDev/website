@@ -27,7 +27,8 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `vercel-ignore-build.mjs` (Vercel's
   ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log check),
   `agent-resume.sh` (the briefing for agent checkpoints, under Working with this repo in Claude
-  Code), and the `node:test` suites that `pnpm test:scripts` runs, one for each of those four plus
+  Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates), and
+  the `node:test` suites that `pnpm test:scripts` runs, one for each of those six plus
   `ai-refusals.test.mjs`, `commitlint-config.test.mjs` and `claude-hooks.test.mjs` (the session
   hooks in `.claude/hooks`). It is a private workspace package, `@repo/scripts`, whose only task is
   `typecheck` (`tsc -p .` against `scripts/tsconfig.json`, which covers the `.mjs` files only), so
@@ -63,6 +64,7 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 | `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                    |
 | `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                              |
 | `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/`                                                                                                                                            |
+| `scripts/flake-hunt.sh [runs]`                                          | Runs the whole e2e suite N times (30 by default) and ranks specs by failure rate in `flake-hunt/flake-report.json`                                                                   |
 | `pnpm clean`                                                            | `turbo clean` in both apps, then `rm -rf node_modules` at the root                                                                                                                   |
 | `pnpm prepare`                                                          | `husky`; runs on install and is what creates the git hooks                                                                                                                           |
 | `pnpm --filter web test:e2e`                                            | Playwright without going through Turborepo                                                                                                                                           |
@@ -114,6 +116,21 @@ measurement behind the choice is in PR 2's entry in `.claude/epics/audit-remedia
   also posted as a review thread, though, and the resolved-threads rule below blocks the merge until
   that thread is resolved: GitHub resolves it once the flagged code changes, and a writer can
   resolve it by hand or dismiss the alert.
+- `.github/workflows/flake-hunt.yml` hunts flaky e2e tests every night at 02:17 UTC and on manual
+  dispatch, never on a pull request, and none of its jobs is a required check. Six shards each run
+  the whole suite five times against the production build with `scripts/flake-hunt.sh`; a report
+  job merges the 30 runs into `flake-report.json` (an artifact, with each failure's trace and
+  screenshot in the shard artifacts), counts a run no shard uploaded as an infrastructure error,
+  and `scripts/flake-hunt-issue.sh` opens one issue labelled `flake-hunt` for the failing tests of
+  every spec that failed in more than 5% of the completed runs it ran in, unless an open
+  `flake-hunt` issue already names them. Only that job may write issues, and it opens one only for
+  the schedule or a dispatch of the default branch. The hunt stops before its first run, failing
+  the shard, when `apps/web/e2e/support/warm-routes.ts` is missing or no spec imports it. Locally,
+  `scripts/flake-hunt.sh [runs]` runs the hunt and writes the report against the dev server,
+  without an issue. 30 runs take hours and hold the Playwright port and that checkout's `.next-e2e`
+  the whole time, so start it in the background from a worktree of its own, with `PLAYWRIGHT_PORT`
+  set when another checkout runs e2e. Ctrl-C stops a hunt in the foreground only; stop a
+  background one with `kill -TERM <pid>`, which exits 143 and still writes the report.
 - `main` has branch protection on, and three checks are required: both CI jobs and
   `Commit messages`. A required check is stored as the job's display name, so the three required
   contexts are the `name:` values in `.github/workflows/ci.yml` and

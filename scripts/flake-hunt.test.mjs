@@ -9,7 +9,7 @@
 // and exits 130 as Playwright does. Like Playwright it has no handler for SIGTERM or SIGHUP, and it
 // writes its report to PLAYWRIGHT_JSON_OUTPUT_FILE when that is set. No browser or real server
 // starts. What is under test is the contract in the script's header: how runs are classified, how
-// specs are ranked, what stops a hunt, and how shards are merged.
+// specs are ranked, what stops a hunt, how shards are merged, and the workflow step that runs it.
 
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -725,6 +725,72 @@ describe('interruptions', () => {
     const run = hunt(['3'], { FLAKE_HUNT_DIR: dir });
     assert.equal(run.status, 130, run.stderr);
     assert.equal(flakeReport(dir).completedRuns, 1);
+  });
+});
+
+describe('the nightly workflow', () => {
+  const WORKFLOW = join(dirname(SCRIPT), '../.github/workflows/flake-hunt.yml');
+
+  /** The indented block of the step named `name` under the key `key`, as the YAML holds it. */
+  function stepBlock(name) {
+    const lines = readFileSync(WORKFLOW, 'utf8').split('\n');
+    const start = lines.findIndex((line) => line.trim() === `- name: ${name}`);
+    assert.ok(start >= 0, `no step named ${name}`);
+    const indent = lines[start].indexOf('-');
+    const end = lines.findIndex(
+      (line, i) => i > start && line.trim() && line.indexOf('-') === indent,
+    );
+    return lines.slice(start, end < 0 ? undefined : end);
+  }
+
+  function runScript(name) {
+    const block = stepBlock(name);
+    const at = block.findIndex((line) => /^\s*run: \|$/.test(line));
+    const indent = block[at + 1].search(/\S/);
+    return block
+      .slice(at + 1)
+      .filter((line) => line.trim() === '' || line.search(/\S/) >= indent)
+      .map((line) => line.slice(indent))
+      .join('\n');
+  }
+
+  // The runner signals the step's shell alone: SIGINT, then SIGTERM 7.5 s later.
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    it(`stops the hunt cleanly when a cancelled shard's shell gets ${signal}`, async () => {
+      writeFileSync(join(root, 'repo/step.sh'), runScript('Run the suite five times'));
+      plan(1, passing());
+      writeFileSync(join(stub, 'run-2.hang'), '');
+      const step = spawn('bash', ['--noprofile', '--norc', '-eo', 'pipefail', 'step.sh'], {
+        cwd: join(root, 'repo'),
+        env: huntEnv({ CI: 'true', FLAKE_HUNT_DIR: huntDir(), FLAKE_HUNT_FIRST_RUN: '1' }),
+        detached: true,
+        stdio: ['ignore', 'ignore', 'pipe'],
+      });
+      groups.push(step.pid);
+      let stderr = '';
+      step.stderr.on('data', (data) => (stderr += data));
+      const exited = new Promise((resolve) => step.on('exit', (code, sig) => resolve(code ?? sig)));
+      const deadline = Date.now() + 20_000;
+      while (!existsSync(join(stub, 'hanging-2'))) {
+        assert.ok(Date.now() < deadline, `run 2 never started; stderr: ${stderr}`);
+        await sleep(50);
+      }
+      process.kill(step.pid, signal);
+      const status = await Promise.race([exited, sleep(5_000).then(() => 'still running')]);
+      assert.equal(status, 143, stderr);
+      const pid = Number(readFileSync(join(stub, 'pid-2'), 'utf8'));
+      assert.ok(!isRunning(pid), 'Playwright was not left running');
+      assert.ok(!isRunning(Number(readFileSync(join(stub, 'webserver-2'), 'utf8'))));
+      assert.deepEqual(flakeReport().interruptedRuns, [{ run: 2, signal: 'SIGTERM' }]);
+    });
+  }
+
+  it("keeps the step's timeout under the job's, and uploads the runs even when cancelled", () => {
+    const text = readFileSync(WORKFLOW, 'utf8');
+    const job = Number(/\n {4}timeout-minutes: (\d+)/.exec(text)[1]);
+    const step = stepBlock('Run the suite five times').join('\n');
+    assert.ok(Number(/timeout-minutes: (\d+)/.exec(step)[1]) < job);
+    assert.match(stepBlock("Upload this shard's runs").join('\n'), /if: \$\{\{ always\(\) \}\}/);
   });
 });
 
