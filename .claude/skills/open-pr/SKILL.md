@@ -36,17 +36,21 @@ Run every node or pnpm command after `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/n
    retry, because the PR may have been created anyway. Retry at most 3 times, waiting 10, 30 and
    60 seconds. If the PR exists but the body did not land, set it over REST:
    `gh api -X PATCH repos/{owner}/{repo}/pulls/<N> -F body=@<file>`.
-7. **Write the handoff now, not at the end.** `.agent-state/open-pr-<slug>.md`: branch, PR number
-   and URL, head SHA, files changed, next step, and the verification commands. Update it at each
-   later milestone.
+7. **Checkpoint now, not at the end.** Write `.agent-state/open-pr-<slug>.json` in the shape
+   `scripts/agent-state.schema.json` defines: the branch in `artifacts.branches` with
+   `pushed: true`, the PR number in `artifacts.prs`, the changed files in `artifacts.files`, the
+   remaining steps as `plan_steps` with `current_step` and `next_action`, and the head SHA, PR URL
+   and verification commands as the `note` of the steps already done. Run
+   `scripts/agent-resume.sh open-pr-<slug>` to check it, and update it after each push and each
+   check result.
 8. **Wait for CI on the head commit.** `gh pr checks <N> --watch`, then confirm the result is for
    this push: `gh pr view <N> --json headRefOid,statusCheckRollup`, where `headRefOid` equals
    `git rev-parse HEAD`, every check run's `conclusion` is `SUCCESS`, `SKIPPED` or `NEUTRAL`, and
    every status context's `state` (Vercel's, which has no conclusion) is `SUCCESS`. `--watch`
    exits 0 on a run a later push superseded, so its exit code alone is not a pass.
    - "failed to be acquired (5 attempts)" is a runner failure: `gh run rerun <run-id> --failed`.
-   - A real failure: fix it in a new commit, push, update the handoff and watch again. After three
-     failed attempts, stop and present the situation.
+   - A real failure: fix it in a new commit, push, update the checkpoint and watch again. After
+     three failed attempts, stop and present the situation.
    - Never `gh pr update-branch --rebase` (it strips the signatures `main` requires); rebase locally
      and `git push --force-with-lease`. Never force-push `main`.
 9. **Report and stop.** Give the PR URL, the head SHA the checks passed on, and the review triage.
