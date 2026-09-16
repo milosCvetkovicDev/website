@@ -1,0 +1,176 @@
+name: Docs drift
+
+# Checks the claims catalogued in docs/drift-manifest.json against the repository and the GitHub API
+# (scripts/check-docs-drift.ts), and when something has drifted, has Claude Code open one pull
+# request that corrects it under ADR 0012, assigned to the owner for review. Nothing here merges.
+#
+# Triggers are deliberately trusted-only: the weekly schedule, a push to `main` that touches an ADR,
+# and a manual run. Never `pull_request` or `pull_request_target`: the second job holds a write
+# token and gives an agent the repository's text to read, so that text must be what the owner
+# merged, not what a pull request proposes.
+#
+# None of these jobs is a required check, and none reports on pull requests, so nothing here can
+# strand a required context (ADR 0021). Their names are free to change.
+#
+# Two secrets, which only the owner can add; without them the second job skips with a notice:
+#   ANTHROPIC_API_KEY  for `claude -p`
+#   DOCS_DRIFT_TOKEN   a fine-grained token with contents and pull requests write on this
+#                      repository. The default GITHUB_TOKEN cannot open the pull request here
+#                      (the "Allow GitHub Actions to create and approve pull requests" setting is
+#                      off), and a pull request it opened would not start CI, so its required
+#                      checks would never report.
+
+on:
+  schedule:
+    - cron: '23 6 * * 1'
+  push:
+    branches: [main]
+    paths: ['docs/adr/**']
+  workflow_dispatch:
+
+# One run at a time, never cancelled: two runs that both found drift must not both open a pull
+# request.
+concurrency:
+  group: docs-drift
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CLAUDE_CODE_VERSION: '2.1.273'
+
+jobs:
+  check:
+    name: Check docs against the manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      drift: ${{ steps.check.outputs.drift }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Historical claims are read at the commit that wrote them, so all history is needed.
+          fetch-depth: 0
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Check the docs
+        id: check
+        # GITHUB_TOKEN cannot read branch protection or the merge settings, so those claims are
+        # listed as skipped, never as holding. The checker needs no install: Node runs the
+        # TypeScript directly.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=0
+          node scripts/check-docs-drift.ts --json --skip-requires admin > drift.json || status=$?
+          node scripts/check-docs-drift.ts --skip-requires admin >> "$GITHUB_STEP_SUMMARY" || true
+          drift=$(jq '.summary.drift + .summary.stale + .summary.uncatalogued' drift.json)
+          echo "drift=$drift" >> "$GITHUB_OUTPUT"
+          # Exit 1 is drift, which the next job acts on and this job reports by failing. Exit 2 is a
+          # check that could not run, and fails too.
+          exit "$status"
+
+      - name: Upload the drift report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-drift-report
+          path: drift.json
+          retention-days: 30
+
+  correct:
+    name: Open a drift correction pull request
+    needs: check
+    if: ${{ !cancelled() && needs.check.outputs.drift != '' && needs.check.outputs.drift != '0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Require the secrets
+        id: secrets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DOCS_DRIFT_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ] || [ -z "$DOCS_DRIFT_TOKEN" ]; then
+            echo "::notice title=Docs drift::Drift was found but no pull request was opened: add the ANTHROPIC_API_KEY and DOCS_DRIFT_TOKEN secrets. The report is the docs-drift-report artifact."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip when a drift pull request is already open
+        id: open
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN }}
+        run: |
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("docs-drift/"))] | length')
+          if [ "$open" -gt 0 ]; then
+            echo "::notice title=Docs drift::A docs-drift pull request is already open; not opening another."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.open.outputs.skip == 'false'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          # Pushing with this token, not GITHUB_TOKEN, is what makes CI run on the pull request.
+          token: ${{ secrets.DOCS_DRIFT_TOKEN }}
+
+      - name: Set up pnpm (version from package.json#packageManager)
+        if: steps.open.outputs.skip == 'false'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Set up Node (version from .nvmrc)
+        if: steps.open.outputs.skip == 'false'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        # Also installs the commit hooks, so the agent's commit is linted like anyone else's.
+        if: steps.open.outputs.skip == 'false'
+        run: pnpm install --frozen-lockfile
+
+      - name: Correct the drift
+        if: steps.open.outputs.skip == 'false'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN }}
+          DOCS_DRIFT_BASE: main
+          DOCS_DRIFT_ASSIGNEE: milosCvetkovicDev
+          DRIFT_REPORT: ${{ runner.temp }}/drift.json
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          node scripts/check-docs-drift.ts --json --skip-requires admin > "$DRIFT_REPORT" || true
+          npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          claude -p "$(cat .github/prompts/docs-drift.md)" \
+            --max-turns 80 \
+            --allowedTools 'Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh api:*),Bash(node scripts/check-docs-drift.ts:*),Bash(pnpm exec prettier:*),Bash(jq:*)'
+
+      - name: Require the pull request
+        if: steps.open.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN }}
+        run: |
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("docs-drift/"))] | length')
+          if [ "$open" -eq 0 ]; then
+            echo "::error title=Docs drift::The agent finished without opening a pull request; read its output above."
+            exit 1
+          fi
