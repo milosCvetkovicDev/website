@@ -51,3 +51,7 @@ playwright-report
 .playwright-mcp/
 # Mimosa hook run reports and session state; they record local absolute paths
 .mimosa
+
+# Agent handoff notes, checkpoints and the Stop hook's snapshots: per machine, full of local
+# paths.
+/.agent-state

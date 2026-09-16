@@ -59,6 +59,7 @@ next-env.d.ts
 /.worktrees
 /.claude/worktrees
 .mimosa
+/.agent-state
 .remember
 *.swp
 *.swo
