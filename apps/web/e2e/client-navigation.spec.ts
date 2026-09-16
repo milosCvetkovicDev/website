@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { caseStudies } from '../src/data/case-studies';
+import { warmRoutes } from './support/warm-routes';
 
 /**
  * A real client-side navigation, by clicking links.
@@ -48,6 +49,17 @@ test.describe('client-side navigation', () => {
   // turn an intermittent hydration mismatch on a soft navigation — the exact class of bug this exists to
   // catch — into a green "flaky" run.
   test.describe.configure({ retries: 0, timeout: 90_000 });
+
+  // Steps 1 and 2 click into routes this server has not served yet, and a client-side navigation
+  // commits its URL only once the destination's RSC payload has arrived. Run alone on the dev server,
+  // that first request compiled `/work` and `/work/[slug]` from a deleted `.next-e2e`, and with the
+  // cache kept it still ran the case study's static-params worker: one of those two `toHaveURL` waits
+  // ran out in 10 of 10 runs with the cache deleted and 5 of 10 with it kept (2026-09-13). Both
+  // destinations are requested before the walk (e2e/support/warm-routes.ts).
+  test.beforeAll(async ({ playwright }, testInfo) => {
+    const [study] = caseStudies;
+    await warmRoutes(playwright, testInfo, ['/work', `/work/${study.slug}`]);
+  });
 
   test('walks / to /work to a case study and back by link clicks', async ({ page }) => {
     const [study] = caseStudies;

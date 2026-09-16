@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { NOT_FOUND_ROUTE } from './routes';
 import { gotoHydrated } from './support/hydration';
+import { warmRoutes } from './support/warm-routes';
 
 /**
  * The 404 page's own content.
@@ -53,13 +54,25 @@ test('the 404 page keeps the site chrome, so a visitor is not stranded', async (
   await expect(page.getByRole('navigation').getByRole('link', { name: 'Work' })).toBeVisible();
 });
 
-test('the recovery links work as client-side navigations', async ({ page }) => {
-  await gotoHydrated(page, NOT_FOUND_ROUTE);
+// `View Work` is a client-side navigation into `/work`, whose URL changes only once that route's RSC
+// payload has arrived. Run alone on the dev server, the click was the first request for `/work`: 1.1
+// to 1.3 s for the payload against 0.04 to 0.7 s for later ones, with `.next-e2e` deleted or kept
+// (2026-09-13). It passed all 20 runs, but the same first request is what failed `case-study.spec.ts`,
+// where it took 4.1 s. The route is requested before the test (e2e/support/warm-routes.ts), from an
+// anonymous group holding only this test.
+test.describe(() => {
+  test.beforeAll(async ({ playwright }, testInfo) => {
+    await warmRoutes(playwright, testInfo, ['/work']);
+  });
 
-  await page.getByRole('link', { name: 'View Work' }).click();
+  test('the recovery links work as client-side navigations', async ({ page }) => {
+    await gotoHydrated(page, NOT_FOUND_ROUTE);
 
-  await expect(page).toHaveURL(/\/work$/);
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  // And the 404 heading is gone, so the navigation replaced the page rather than layering over it.
-  await expect(page.getByRole('heading', { name: 'Page not found' })).toHaveCount(0);
+    await page.getByRole('link', { name: 'View Work' }).click();
+
+    await expect(page).toHaveURL(/\/work$/);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    // And the 404 heading is gone, so the navigation replaced the page rather than layering over it.
+    await expect(page.getByRole('heading', { name: 'Page not found' })).toHaveCount(0);
+  });
 });
