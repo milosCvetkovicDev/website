@@ -23,9 +23,16 @@ describe('formatMetric', () => {
     expect(formatMetric({ value: 12, label: 'services' })).toBe('12');
   });
 
+  // `not.toThrow()` was the whole assertion here, which a `formatMetric` that returned the empty
+  // string for every metric would also pass. The clamp is to 0 and to 20, the range `toFixed`
+  // accepts, so the rendered strings are what the test states.
   it('clamps an out-of-range decimals value instead of throwing', () => {
-    expect(() => formatMetric({ value: 5, decimals: -1, label: 'x' })).not.toThrow();
-    expect(() => formatMetric({ value: 5, decimals: 500, label: 'x' })).not.toThrow();
+    expect(formatMetric({ value: 5, decimals: -1, label: 'x' })).toBe('5');
+    expect(formatMetric({ value: 5, decimals: -1000, label: 'x' })).toBe('5');
+    expect(formatMetric({ value: 5, decimals: 500, label: 'x' })).toBe(`5.${'0'.repeat(20)}`);
+    // A fractional count truncates towards zero before it is clamped.
+    expect(formatMetric({ value: 5, decimals: 2.9, label: 'x' })).toBe('5.00');
+    expect(formatMetric({ value: 5, decimals: Number.NaN, label: 'x' })).toBe('5');
   });
 
   it('does not print NaN or Infinity', () => {

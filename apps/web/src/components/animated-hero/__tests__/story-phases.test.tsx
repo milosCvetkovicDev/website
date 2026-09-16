@@ -6,6 +6,7 @@ import { StrategyPhase } from '../strategy-phase';
 import { ExecutionPhase } from '../execution-phase';
 import { GauntletPhase } from '../gauntlet-phase';
 import { GameComplete } from '../game-complete';
+import { counterTweens, latestCounterTween, onlyCounterTween } from './support/tweens';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
 // it at import time, so the stub must exist before the imports above are evaluated.
@@ -41,6 +42,27 @@ const media = vi.hoisted(() => {
     },
   });
   return state;
+});
+
+// ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom does not
+// implement: every call builds an Error, captures a stack and prints it through the virtual console.
+// A no-op defined for the file's whole lifetime, before the imports register ScrollTrigger, covers
+// every block: any phase that measures on refresh reaches it, and which of them do is not this file's
+// business. Not a spy restored after each test: a refresh GSAP's ticker runs after that restore
+// reaches jsdom's own method again, between tests. vi.restoreAllMocks() does not undo a property
+// definition.
+vi.hoisted(() => {
+  Object.defineProperty(window, 'scrollTo', {
+    configurable: true,
+    writable: true,
+    value: () => {},
+  });
+});
+
+// The describe.each block restores nothing of its own, so the file owns the restoration. Vitest runs
+// the inner hooks first, so a block that also restores its own spies still does.
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 const phases = [
@@ -118,10 +140,6 @@ describe.each(phases)('$name', ({ Phase }) => {
 describe('ExecutionPhase', () => {
   beforeEach(() => {
     media.reduce = false;
-    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom
-    // does not implement: every call builds an Error, captures a stack and prints it through the
-    // virtual console. A no-op is what ScrollTrigger already gets, without the noise.
-    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -138,8 +156,7 @@ describe('ExecutionPhase', () => {
     // A trigger bound to a timeline measures on refresh (GSAP runs one after load in a browser);
     // in jsdom the section is then "in view" and onEnter starts the stats tween on a plain object.
     act(() => ScrollTrigger.refresh());
-    const [statsTarget] = toSpy.mock.calls[0];
-    const statsTween = toSpy.mock.results[0].value;
+    const { target: statsTarget, tween: statsTween } = onlyCounterTween(toSpy);
     return { ...utils, toSpy, statsTarget, statsTween };
   }
 
@@ -166,7 +183,9 @@ describe('ExecutionPhase', () => {
 
     act(() => enterAgain());
 
-    expect(toSpy).toHaveBeenCalledTimes(2);
+    // Two counts, and the first one's target is no longer tweening: a restart, not a second run
+    // stacked on the first.
+    expect(counterTweens(toSpy)).toHaveLength(2);
     expect(gsap.getTweensOf(statsTarget)).toHaveLength(0);
   });
 
@@ -181,7 +200,7 @@ describe('ExecutionPhase', () => {
     // Entering again restarts the count, which writes its own numbers back over the totals.
     act(() => enterAgain());
     act(() => {
-      toSpy.mock.results[1].value.progress(0.5);
+      latestCounterTween(toSpy).tween.progress(0.5);
     });
     expect(screen.queryByText('00:14:32')).not.toBeInTheDocument();
 

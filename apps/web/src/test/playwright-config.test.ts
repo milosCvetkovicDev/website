@@ -1,3 +1,10 @@
+/**
+ * These assertions read a configuration module with no DOM in them, and building a jsdom window is
+ * the most expensive thing in a test file that does not need one -- importing the module alone costs
+ * about two seconds in every worker.
+ *
+ * @vitest-environment node
+ */
 import type { PlaywrightTestConfig } from '@playwright/test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { resolvePort } from '../../playwright.config';
@@ -49,7 +56,7 @@ describe('resolvePort', () => {
 async function loadConfig(ci: string | undefined): Promise<PlaywrightTestConfig> {
   vi.stubEnv('CI', ci);
   // The suite's own port must not leak into the assertions: a developer or CI runner that exported
-  // PLAYWRIGHT_PORT would otherwise change what the config comes out as.
+  // PLAYWRIGHT_PORT would otherwise change what `command` and `port` come out as.
   vi.stubEnv('PLAYWRIGHT_PORT', '');
   vi.resetModules();
   return (await import('../../playwright.config')).default;
@@ -70,5 +77,50 @@ describe('playwright.config.ts flaky tests', () => {
   // Locally there are no retries, so nothing can pass on one.
   it('leaves it off locally', async () => {
     expect((await loadConfig(undefined)).failOnFlakyTests).toBeFalsy();
+  });
+});
+
+/** `webServer` is typed as one object or an array of them; every assertion here wants the object. */
+function webServerOf(config: PlaywrightTestConfig) {
+  const { webServer } = config;
+  expect(Array.isArray(webServer)).toBe(false);
+  expect(webServer).toBeDefined();
+  return webServer as Exclude<typeof webServer, readonly unknown[] | undefined>;
+}
+
+describe('playwright.config.ts webServer (ADR 0014)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  // Reuse was on locally until ADR 0014: a `next start` from another checkout of this same site
+  // answered every request convincingly, so the suite passed against a build that was not the
+  // working tree. False in both modes, so a taken port aborts the run instead.
+  it.each([
+    ['CI', 'true'],
+    ['local', undefined],
+  ])('never attaches to a server it did not start (%s)', async (_label, ci) => {
+    expect(webServerOf(await loadConfig(ci)).reuseExistingServer).toBe(false);
+  });
+
+  it('serves the production build under CI and the dev server locally', async () => {
+    expect(webServerOf(await loadConfig('true')).command).toBe('pnpm start');
+    expect(webServerOf(await loadConfig(undefined)).command).toBe('pnpm dev');
+  });
+
+  // Only the dev server builds anything at run time, and it may run beside a `pnpm dev` from this
+  // same checkout, so it gets its own build directory. Set explicitly in both modes rather than
+  // omitted under CI: Playwright merges this over process.env, so an omitted key would inherit an
+  // ambient NEXT_DIST_DIR and point `pnpm start` at a directory `next build` never wrote.
+  it('pins NEXT_DIST_DIR in both modes', async () => {
+    expect(webServerOf(await loadConfig('true')).env?.NEXT_DIST_DIR).toBe('.next');
+    expect(webServerOf(await loadConfig(undefined)).env?.NEXT_DIST_DIR).toBe('.next-e2e');
+  });
+
+  it('serves the port it tests', async () => {
+    const config = await loadConfig(undefined);
+    expect(webServerOf(config).port).toBe(FALLBACK);
+    expect(config.use?.baseURL).toBe(`http://localhost:${FALLBACK}`);
   });
 });

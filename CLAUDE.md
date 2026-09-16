@@ -50,6 +50,7 @@ pnpm (`pnpm@10.33.0`), not Node. CI reads Node from `.nvmrc` and pnpm from `pack
 | `pnpm --filter web test:e2e`                                     | Playwright without going through Turborepo                                         |
 | `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`                | Playwright on a port other than the default 3210                                   |
 | `pnpm --filter web test:watch`                                   | Vitest in watch mode                                                               |
+| `pnpm --filter web test:coverage`                                | Vitest with a v8 coverage text summary; report-only, no threshold, not in CI       |
 | `pnpm --filter web exec vitest run <path>`                       | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx`            |
 | `pnpm --filter web exec playwright install --with-deps chromium` | Needed once before the first e2e run                                               |
 
@@ -186,6 +187,15 @@ appends extra arguments to the end of a script: `pnpm typecheck --force` would o
 - Browser APIs are stubbed per test file, not globally. `matchMedia` and `IntersectionObserver` are
   defined in a `beforeEach` inside the file that needs them, as in
   `src/components/animated-hero/__tests__/tmux-background.test.tsx`. Keep new stubs local too.
+  `ScrollTrigger.refresh()` calls `window.scrollTo`, which jsdom does not implement, so every call
+  prints a `Not implemented` error into `pnpm test`. A file that loads ScrollTrigger defines a no-op
+  `scrollTo` inside `vi.hoisted`, for the file's whole lifetime, as `gauntlet-phase.test.tsx` does.
+  A spy restored in `afterEach` is not enough: a refresh GSAP's ticker runs after the restore reaches
+  jsdom's own method again, between tests, and prints anyway.
+- Tests find elements by role and name, or by a `data-*` attribute where the tree is `aria-hidden`
+  or decorative, never by a Tailwind class, and pick GSAP tweens by what they are rather than by
+  call order (`src/components/animated-hero/__tests__/support/tweens.ts`). A class is styling: it
+  changes for reasons that have nothing to do with the behaviour under test.
 - Building a jsdom window costs about two seconds in every worker, and it is by far the largest
   single cost in the suite. A test file with no DOM in it declares `@vitest-environment node` in a
   docblock at the top, as the three `src/data/__tests__` files do.
@@ -200,8 +210,11 @@ appends extra arguments to the end of a script: `pnpm typecheck --force` would o
   `src/components/animated-hero/__tests__/story-phases.test.tsx` does. Raising the global default
   hides the next slow test instead.
 - e2e specs must wait for hydration before interacting, because events fired before it are lost.
-  `e2e/hero.spec.ts` waits for the `System Boot` loader to be hidden, and also asserts the page
-  title. That assertion is only a smoke check that the app rendered: it never could catch a second
+  One helper owns the wait: `e2e/support/hydration.ts` exports `gotoHydrated(page, path)`, which
+  navigates and waits, and `expectHydrated(page)`, for after a reload. No spec writes a wait of its
+  own, so when the marker changes (today the `System Boot` loader) only that file does. A spec that
+  only reads server HTML uses the `request` fixture instead of navigating. `e2e/hero.spec.ts` also
+  asserts the page title. That assertion is only a smoke check that the app rendered: it never could catch a second
   checkout of this site, which serves the same title character for character, and the not-found and
   error pages carry it too. Status and path are what catch a wrong page.
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build

@@ -284,7 +284,13 @@ export function GauntletPhase() {
         </div>
 
         {/* Achievement */}
-        <div ref={achievementRef} className={`mt-6 ${achievementVisible ? '' : 'opacity-0'}`}>
+        <div
+          ref={achievementRef}
+          // Named for the tests, which used to reach it through `.closest('.mt-6')` -- a spacing
+          // utility two elements in this phase share.
+          data-gauntlet="achievement"
+          className={`mt-6 ${achievementVisible ? '' : 'opacity-0'}`}
+        >
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
               <span className="text-xl">🏆</span>

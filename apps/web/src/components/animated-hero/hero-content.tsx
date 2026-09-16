@@ -26,10 +26,19 @@ function PlayerCard() {
       <div
         className="flex items-center gap-[7px] border-b border-black/[0.06] bg-[#f5f5f8]/95 px-3 py-1.5 dark:border-[rgba(90,97,144,0.2)] dark:bg-[rgba(30,34,48,0.9)]"
         aria-hidden="true"
+        // Decoration, so there is no role or name to query it by; the tests used to take the first
+        // aria-hidden element in the tree and count `.rounded-full` children inside it.
+        data-decoration="window-controls"
       >
-        <div className="h-[10px] w-[10px] rounded-full bg-[#ff5f56]" />
-        <div className="h-[10px] w-[10px] rounded-full bg-[#ffbd2e]" />
-        <div className="h-[10px] w-[10px] rounded-full bg-[#27c93f]" />
+        <div data-window-control="close" className="h-[10px] w-[10px] rounded-full bg-[#ff5f56]" />
+        <div
+          data-window-control="minimise"
+          className="h-[10px] w-[10px] rounded-full bg-[#ffbd2e]"
+        />
+        <div
+          data-window-control="maximise"
+          className="h-[10px] w-[10px] rounded-full bg-[#27c93f]"
+        />
       </div>
 
       {/* Body with stats - semantic definition list */}

@@ -110,8 +110,10 @@ function resizeViewportTo(height: number) {
   settle();
 }
 
-const mobileBar = () => document.querySelector<HTMLElement>('.will-change-\\[width\\]');
-const progressLine = () => document.querySelector<HTMLElement>('.will-change-\\[height\\]');
+// Both bars are found by what they are, not by the will-change utility they happen to carry: that
+// is a performance hint, and a change to it used to break these tests for no reason.
+const mobileBar = () => document.querySelector<HTMLElement>('[data-progress="scroll"]');
+const progressLine = () => document.querySelector<HTMLElement>('[data-progress="section"]');
 const dotButton = (label: string) => screen.getByRole('button', { name: `Go to ${label} section` });
 const dot = (label: string) => dotButton(label).firstElementChild;
 const currentDots = () =>
@@ -146,8 +148,8 @@ describe('SectionProgress', () => {
     scrollWindowTo(STORY_TOP + STORY_RANGE / 4);
 
     expect(readout).toHaveTextContent('[02/07] DISCOVER');
-    expect(dot('DISCOVER')).toHaveClass('bg-[var(--accent)]');
-    expect(dot('PLAN')).toHaveClass('bg-[var(--border)]');
+    expect(dot('DISCOVER')).toHaveAttribute('data-state', 'reached');
+    expect(dot('PLAN')).toHaveAttribute('data-state', 'pending');
     expect(mobileBar()?.style.width).toBe('25%');
     expect(progressLine()?.style.height).toBe(`${(1 / 6) * 100}%`);
 
@@ -165,9 +167,9 @@ describe('SectionProgress', () => {
     settle();
 
     expect(screen.getByText('[04/07] BUILD')).toBeInTheDocument();
-    expect(dot('BUILD')).toHaveClass('bg-[var(--accent)]');
+    expect(dot('BUILD')).toHaveAttribute('data-state', 'reached');
     // The dot after it stays unlit: reaching a section is not the same as lighting them all.
-    expect(dot('TEST')).toHaveClass('bg-[var(--border)]');
+    expect(dot('TEST')).toHaveAttribute('data-state', 'pending');
     expect(mobileBar()?.style.width).toBe('50%');
     expect(progressLine()?.style.height).toBe('50%');
   });
