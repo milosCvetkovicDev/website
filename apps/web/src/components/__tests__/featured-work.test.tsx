@@ -166,6 +166,33 @@ describe('FeaturedWork', () => {
     expect(linkFor(first.title)).toHaveAttribute('data-active', 'true');
   });
 
+  it('activates cards and lights the diagram on hover and focus with motion allowed', () => {
+    // Every other activation test stubs reduced motion. Activation must not depend on it: most
+    // visitors allow motion, and the e2e hover test is the only other check of this path.
+    stubMatchMedia(false);
+    const intersect = stubIntersectionObserver();
+    const { container, linkFor } = renderFeaturedWork();
+    intersect(true);
+    const [first, second] = featuredProjects;
+    const litPaths = () => container.querySelectorAll('path[data-active="true"]');
+
+    fireEvent.mouseEnter(linkFor(first.title));
+    expect(linkFor(first.title)).toHaveAttribute('data-active', 'true');
+    expect(litPaths()).toHaveLength(litConnections(first));
+
+    fireEvent.mouseLeave(linkFor(first.title));
+    expect(linkFor(first.title)).toHaveAttribute('data-active', 'false');
+    expect(litPaths()).toHaveLength(0);
+
+    fireEvent.focus(linkFor(second.title));
+    expect(linkFor(second.title)).toHaveAttribute('data-active', 'true');
+    expect(litPaths()).toHaveLength(litConnections(second));
+
+    fireEvent.blur(linkFor(second.title));
+    expect(linkFor(second.title)).toHaveAttribute('data-active', 'false');
+    expect(litPaths()).toHaveLength(0);
+  });
+
   it('runs packet animations only while the section is on screen', () => {
     stubMatchMedia(false);
     const intersect = stubIntersectionObserver();
