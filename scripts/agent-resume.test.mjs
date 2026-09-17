@@ -37,10 +37,14 @@ echo 'gh: not logged in' >&2
 exit 1
 `;
 
+/** @type {string} */
 let root;
+/** @type {string} */
 let repo;
+/** @type {string} */
 let stub;
 
+/** @param {...string} args */
 function git(...args) {
   return execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
 }
@@ -75,9 +79,15 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 const utc = (date = new Date()) => date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+/** @param {number} seconds */
 const ago = (seconds) => utc(new Date(Date.now() - seconds * 1000));
 
-/** A valid checkpoint, written now, with the given fields replaced. */
+/**
+ * A valid checkpoint, written now, with the given fields replaced.
+ *
+ * @param {Record<string, unknown>} [overrides]
+ * @returns {Record<string, any>}
+ */
 function checkpoint(overrides = {}) {
   return {
     schema_version: 1,
@@ -96,7 +106,11 @@ function checkpoint(overrides = {}) {
   };
 }
 
-/** A finished checkpoint: every step done, no step in progress. */
+/**
+ * A finished checkpoint: every step done, no step in progress.
+ *
+ * @param {Record<string, unknown>} [overrides]
+ */
 const finished = (overrides = {}) =>
   checkpoint({
     current_step: null,
@@ -105,8 +119,13 @@ const finished = (overrides = {}) =>
     ...overrides,
   });
 
+/** @param {Record<string, unknown>} fields */
 const artifacts = (fields) => ({ branches: [], prs: [], files: [], ...fields });
 
+/**
+ * @param {string} id
+ * @param {string | object} body
+ */
 function save(id, body) {
   writeFileSync(
     join(repo, '.agent-state', `${id}.json`),
@@ -114,11 +133,20 @@ function save(id, body) {
   );
 }
 
-/** gh pr list answers with these pull requests. */
+/**
+ * gh pr list answers with these pull requests.
+ *
+ * @param {...object} list
+ */
 function prs(...list) {
   writeFileSync(join(stub, 'gh.json'), JSON.stringify(list));
 }
 
+/**
+ * @param {number} number
+ * @param {string} headRefName
+ * @param {Record<string, unknown>} [extra]
+ */
 const pr = (number, headRefName, extra = {}) => ({
   number,
   title: `PR ${number}`,
@@ -128,6 +156,10 @@ const pr = (number, headRefName, extra = {}) => ({
   ...extra,
 });
 
+/**
+ * @param {string[]} [args]
+ * @param {Record<string, string>} [env]
+ */
 function resume(args = [], env = {}) {
   const started = Date.now();
   const result = spawnSync('bash', [join(repo, 'scripts/agent-resume.sh'), ...args], {
@@ -147,7 +179,13 @@ function resume(args = [], env = {}) {
   return { ...result, seconds: (Date.now() - started) / 1000 };
 }
 
-/** The marked lines after the heading that starts with `heading`, without their marker. */
+/**
+ * The marked lines after the heading that starts with `heading`, without their marker.
+ *
+ * @param {string} stdout
+ * @param {string} heading
+ * @param {string} marker
+ */
 function listed(stdout, heading, marker) {
   const lines = stdout.split('\n');
   const start = lines.findIndex((l) => l.startsWith(heading));
@@ -160,14 +198,21 @@ function listed(stdout, heading, marker) {
   return out;
 }
 
+/** @param {string} stdout */
 function contradictions(stdout) {
   assert.match(stdout, /^Contradictions/m, `no Contradictions line in:\n${stdout}`);
   return listed(stdout, 'Contradictions', '  ! ');
 }
 
+/** @param {string} stdout */
 const attention = (stdout) => listed(stdout, 'Needs attention:', '  * ');
 
-/** Runs one invalid checkpoint on its own and returns the rules reported for it. */
+/**
+ * Runs one invalid checkpoint on its own and returns the rules reported for it.
+ *
+ * @param {string | object} body
+ * @param {string} [id]
+ */
 function rejected(body, id = 'rule') {
   rmSync(join(repo, '.agent-state'), { recursive: true, force: true });
   mkdirSync(join(repo, '.agent-state'));
@@ -229,7 +274,7 @@ describe('briefing', () => {
     assert.equal(run.status, 0, run.stderr);
     assert.match(run.stdout, /Goal: second/);
     assert.doesNotMatch(run.stdout, /Goal: first/);
-    assert.equal(run.stdout.match(/^## two /gm).length, 1, 'a repeated id is briefed once');
+    assert.equal((run.stdout.match(/^## two /gm) ?? []).length, 1, 'a repeated id is briefed once');
     const missing = resume(['three']);
     assert.equal(missing.status, 2);
     assert.match(missing.stderr, /no checkpoint three/);
@@ -304,12 +349,12 @@ describe('validation', () => {
   });
 
   it('exits 1 for a file that is not exactly one JSON document, each on its own', () => {
-    for (const [name, body, message] of [
+    for (const [name, body, message] of /** @type {Array<[string, string, RegExp]>} */ ([
       ['broken JSON', '{ not json', /!! rule\.json is not valid JSON/],
       ['an empty file', '', /exactly one JSON document, but holds 0/],
       ['whitespace only', '  \n', /exactly one JSON document, but holds 0/],
       ['two documents', JSON.stringify(checkpoint()).repeat(2), /but holds 2/],
-    ]) {
+    ])) {
       rmSync(join(repo, '.agent-state'), { recursive: true, force: true });
       mkdirSync(join(repo, '.agent-state'));
       save('rule', body);
@@ -345,7 +390,8 @@ describe('validation', () => {
   });
 
   it('accepts every property the schema allows, and only those', () => {
-    const props = (schema) => Object.keys(schema.properties).sort();
+    const props = (/** @type {{ properties: object }} */ schema) =>
+      Object.keys(schema.properties).sort();
     const body = checkpoint({
       completed_steps: [
         { step: 1, note: 'n', at: utc() },
@@ -370,7 +416,7 @@ describe('validation', () => {
     save('all', body);
     const run = resume();
     assert.equal(run.status, 0, run.stdout);
-    for (const [where, extra] of [
+    for (const [where, extra] of /** @type {Array<[string, object]>} */ ([
       ['top level', { ...body, notes: 'x' }],
       ['artifacts', { ...body, artifacts: { ...body.artifacts, logs: [] } }],
       ['a completed step', { ...body, completed_steps: [{ step: 1, by: 'x' }, { step: 2 }] }],
@@ -378,7 +424,7 @@ describe('validation', () => {
         'a branch',
         { ...body, artifacts: { ...body.artifacts, branches: [{ name: 'feat/all', sha: 'x' }] } },
       ],
-    ]) {
+    ])) {
       assert.ok(
         rejected(extra).some((rule) => rule.includes('unknown property')),
         where,
@@ -391,7 +437,7 @@ describe('validation', () => {
     assert.equal(SCHEMA.properties.schema_version.const, 1);
     const stamp = new RegExp(SCHEMA.properties.updated_at.pattern);
     const stepStamp = new RegExp(SCHEMA.properties.completed_steps.items.properties.at.pattern);
-    for (const [name, body, rule] of [
+    for (const [name, body, rule] of /** @type {Array<[string, string | object, string]>} */ ([
       ['a second schema version', checkpoint({ schema_version: 2 }), 'schema_version must be 1'],
       [
         'an empty plan',
@@ -476,7 +522,7 @@ describe('validation', () => {
         checkpoint({ next_action: '' }),
         'next_action may be empty only when current_step is null',
       ],
-    ]) {
+    ])) {
       const rules = rejected(body);
       assert.ok(
         rules.some((r) => r.startsWith(rule)),
@@ -534,11 +580,11 @@ describe('validation', () => {
   });
 
   it('rejects branch names git would not accept, and a branch listed twice', () => {
-    for (const [branches, rule] of [
+    for (const [branches, rule] of /** @type {Array<[object[], RegExp]>} */ ([
       [[{ name: 'main\nfeat/ghost', pushed: true }], /name must be a non-empty string without/],
       [[{ name: 'main^{tree}' }], /is not a valid git branch name/],
       [[{ name: 'feat/x' }, { name: 'feat/x' }], /artifacts\.branches lists a branch twice/],
-    ]) {
+    ])) {
       const rules = rejected(checkpoint({ artifacts: artifacts({ branches }) }));
       assert.ok(
         rules.some((r) => rule.test(r)),

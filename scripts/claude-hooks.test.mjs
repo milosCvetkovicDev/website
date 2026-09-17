@@ -266,7 +266,14 @@ describe('session-start.sh with checkpoints', () => {
   const utc = (secondsAgo = 0) =>
     new Date(Date.now() - secondsAgo * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
-  /** A checkpoint with a long plan; finished when `current` is null. */
+  /**
+   * A checkpoint with a long plan; finished when `current` is null.
+   *
+   * @param {string} id
+   * @param {number | null} current
+   * @param {number} secondsAgo
+   * @param {number} [steps]
+   */
   function task(id, current, secondsAgo, steps = 12) {
     const plan = Array.from({ length: steps }, (_, i) => `step ${i + 1}: ${'detail '.repeat(8)}`);
     const done = plan.map((_, i) => i + 1).filter((n) => current === null || n < current);
@@ -299,7 +306,7 @@ describe('session-start.sh with checkpoints', () => {
     note('handoff.md', 'the note\n');
     const out = run(SESSION_START).stdout;
     assert.ok(Buffer.byteLength(out) < 10000, `${Buffer.byteLength(out)} bytes`);
-    const at = (text) => out.indexOf(text);
+    const at = (/** @type {string} */ text) => out.indexOf(text);
     assert.ok(at('--- GIT ---') === 0, out);
     assert.ok(at('--- MY OPEN PRS ---') < at('--- RESUME BRIEFING'));
     assert.ok(at('## z-task (updated') > at('--- RESUME BRIEFING'), 'the live task is in full');
