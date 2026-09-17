@@ -27,10 +27,11 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `vercel-ignore-build.mjs` (Vercel's
   ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log check), and
   the `node:test` suites that `pnpm test:scripts` runs, one for each of those three plus
-  `ai-refusals.test.mjs` and `commitlint-config.test.mjs`. It is a private workspace package,
-  `@repo/scripts`, whose only task is `typecheck` (`tsc -p .` against `scripts/tsconfig.json`), so
-  `turbo typecheck` type-checks it alongside the apps. It ships no source anyone imports: nothing
-  depends on it, and the root scripts still call the `.mjs` files by path.
+  `ai-refusals.test.mjs`, `commitlint-config.test.mjs` and `claude-hooks.test.mjs` (the session
+  hooks in `.claude/hooks`). It is a private workspace package, `@repo/scripts`, whose only task is
+  `typecheck` (`tsc -p .` against `scripts/tsconfig.json`), so `turbo typecheck` type-checks it
+  alongside the apps. It ships no source anyone imports: nothing depends on it, and the root scripts
+  still call the `.mjs` files by path.
 - `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
   `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
   has its own `tsconfig.json`.
@@ -339,6 +340,15 @@ measurement behind the choice is in PR 2's entry in `.claude/epics/audit-remedia
   back. The local dev server also builds into `.next-e2e` (`NEXT_DIST_DIR`, read by
   `apps/web/next.config.ts`), so it never fights a `pnpm dev` from the same checkout over
   `apps/web/.next`. See `docs/adr/0014-playwright-owns-its-server.md`.
+- A flaky e2e test is root-caused before it is patched: reproduce it repeatedly, tell a cold first
+  request apart from a logic fault, and prefer warming the destination route on the dev server
+  before the timed step (a route compiles on its first request) over an arbitrary wait or a retry.
+  Verify a fix with at least five consecutive runs in each mode, the dev server
+  (`pnpm --filter web test:e2e`) and the production build
+  (`pnpm --filter web build && CI=true pnpm --filter web test:e2e --retries=0`), and report the
+  measured timings. Keep `--retries=0` on the production runs: under `CI=true` the config retries
+  a failed test twice, and a run whose only failures passed on a retry is reported as flaky and
+  exits 0.
 
 ## Working with this repo in Claude Code
 
@@ -354,11 +364,37 @@ measurement behind the choice is in PR 2's entry in `.claude/epics/audit-remedia
   those. Other extensions, `.mdx` and `.svg` among them, are left exactly as written. The
   Prettier call ends in `|| true`, so a formatting failure is silent and only surfaces at
   `pnpm format:check`.
+- A SessionStart hook (`.claude/hooks/session-start.sh`) prints the first 20 lines of
+  `git status -sb`, your open pull requests with their checks counted by conclusion (by status
+  while a check is still running), giving `gh` 8 s, and then the `.agent-state` notes changed in
+  the last seven days, newest first: 40 lines and 300 bytes a line of each, with a pointer to the
+  rest, until the output reaches 9,000 bytes. Claude Code caps hook output at 10,000 characters and
+  gives the session only a preview of anything longer. A Stop hook (`.claude/hooks/stop.sh`) runs
+  after every reply, not only at session end, and writes `.agent-state/last-session-<branch>.md`,
+  with `%` and `/` in the branch name percent-encoded (`feat%2Fx`), or `last-session-~detached.md`.
+  Both run git without optional locks, so neither holds `index.lock` against another session, and
+  both exit 0 on any failure; git ignores `.agent-state`. It sits at the repository root rather
+  than under `.claude`, because Claude Code protects `.claude` (except `.claude/worktrees`): allow
+  rules cannot pre-approve a write there, the default and `acceptEdits` modes prompt for it (which
+  a headless session cannot answer), `dontAsk` denies it and auto mode leaves it to the classifier,
+  so only `bypassPermissions` writes there reliably. The snapshot is git state only; the handoff
+  note below is still yours to write.
 - `.mcp.json` is tracked and configures one MCP server for this project, over HTTP. It needs
   authorising once per machine before its tools work, and nothing in the repository depends on it.
 - `.claude/agents/ui-reviewer.md` is a read-only review agent for `apps/web/src/components`: visual
   quality, GSAP cleanup and reduced motion, accessibility, component structure. Run it after
   changing a component.
+- Every change ships as a pull request, because `main`'s protection refuses direct pushes: branch,
+  commit with a Conventional Commit title (Quality gates describes how the squash title is linted),
+  open it with `gh pr create`, and poll CI until every check on the head commit is green before
+  calling the work done. Never squash-merge without the owner's explicit approval.
+  `.claude/skills/open-pr/SKILL.md` walks the whole sequence.
+- Before long-running work, write a handoff note to `.agent-state/<task>.md`: branch, pull request
+  number, files changed, next step and the verification commands. Update it after each milestone,
+  and on resuming read it first instead of reconstructing state from transcripts. `.agent-state`
+  belongs to its checkout: a session sees only the notes of the checkout it runs in, and
+  `git worktree remove` deletes a worktree's notes without asking, because ignored files do not
+  count as untracked. Copy a note that is still needed out of a worktree before removing it.
 - Before opening a pull request, work the checklist in `.github/pull_request_template.md`, which
   lists every gate in CI order; do not keep a second copy of it here. Paste the commands and their
   real output into the Verification section; "seems fine" is not evidence.
@@ -391,6 +427,10 @@ measurement behind the choice is in PR 2's entry in `.claude/epics/audit-remedia
   superseding that record rather than editing it, and deleting the matching assertion in
   `scripts/ai-refusals.test.mjs`.
 - `docs/runbooks` — operational procedures. `docs/runbooks/deploy.md` is the deployment procedure.
+- Before editing a document that describes repository or CI settings, check each claim against the
+  live settings (`gh api repos/milosCvetkovicDev/website`, `.../branches/main/protection`) rather
+  than trusting the existing text, and cite code as a path with line numbers checked against
+  current `main`.
 - `README.md` addresses a reader landing on GitHub; this file addresses an agent about to change
   code. Keep them consistent without duplicating each other.
 
@@ -499,3 +539,8 @@ measurement behind the choice is in PR 2's entry in `.claude/epics/audit-remedia
   deployed site, while an unmodified headless Chromium (Playwright from `apps/web`) reports none
   across schemes, viewports and reduced motion. Judge console cleanliness with Playwright, not the
   pane.
+- `gh` intermittently fails on writes while reads keep working: `gh pr create` and `gh pr edit`
+  return a GraphQL "Something went wrong" or a REST 502. Retry at most three times with a pause,
+  and run `gh pr list --head <branch>` before each retry, because the pull request may have been
+  created anyway. Set a body that did not land over REST:
+  `gh api -X PATCH repos/{owner}/{repo}/pulls/<N> -F body=@<file>`.
