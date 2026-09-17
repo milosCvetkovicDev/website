@@ -87,11 +87,12 @@ is there so that a future buildable package is compiled before the apps typechec
 tasks: `@repo/scripts` runs `tsc -p .`, which checks every `scripts/**/*.mjs` with `checkJs`, and
 `check-docs-drift.ts` as TypeScript, with `strict` against `scripts/tsconfig.json`. That type-check
 gets `typescript` and `@types/node` from the package's own devDependencies, not the root's, and for
-them pnpm adds only the package's importer block to the lockfile. As root devDependencies they would also rewrite other packages'
-lockfile snapshots, because a root dependency is also what pnpm resolves the root's own packages'
-peer dependencies to: a root `@types/node` would become the `@types/node` peer root commitlint
-reaches through `cosmiconfig-typescript-loader`, in place of the version pnpm installed for it. The
-measurement behind the choice is in PR 2's entry in `.claude/epics/audit-remediation-2026-09/50.md`.
+them pnpm adds only the package's importer block to the lockfile. As root devDependencies they would
+also rewrite other packages' lockfile snapshots, because a root dependency is also what pnpm
+resolves the root's own packages' peer dependencies to: a root `@types/node` would become the
+`@types/node` peer root commitlint reaches through `cosmiconfig-typescript-loader`, in place of the
+version pnpm installed for it. The measurement behind the choice is in PR 2's entry in
+`.claude/epics/audit-remediation-2026-09/50.md`.
 
 ## Quality gates
 
