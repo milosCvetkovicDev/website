@@ -10,8 +10,9 @@
 # Vercel's 100 MB per-file upload limit, and the first Path B attempt failed on 1.9 GB of it.
 #
 # Syntax is .gitignore's, so a leading slash anchors a pattern to the repository root. Every
-# directory pattern here is anchored to where that directory is actually produced: an unanchored
-# `build`, `dist` or `out` would also strip a tracked source directory of that name at any depth.
+# directory pattern here but `.mimosa`, `.remember` and `flake-hunt/` is anchored to where that
+# directory is actually produced: an unanchored `build`, `dist` or `out` would also strip a tracked
+# source directory of that name at any depth. No tracked directory has any of those three names.
 # Add a line when an app or a workspace package with a task is added; nothing checks this file
 # against the .gitignore files it mirrors.
 
@@ -36,6 +37,9 @@
 /apps/web/test-results
 /apps/web/playwright-report
 /.playwright-mcp
+# scripts/flake-hunt.sh writes flake-hunt/ into whichever directory it is run from, so this one is
+# not anchored; nothing tracked is a directory named flake-hunt.
+flake-hunt/
 
 # Environment files. apps/web/.gitignore ignores `.env*`; the CLI's built-in list covers only
 # .env.local and .env.*.local, so `apps/web/.env.production` would otherwise be uploaded. The
