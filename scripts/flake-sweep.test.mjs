@@ -48,6 +48,8 @@ if [ -e "$STUB/run-$n.sh" ]; then . "$STUB/run-$n.sh"; fi
 if [ -e "$STUB/run-$n.sleep" ]; then
   # Node, as Playwright is: it restores the default handling of the SIGINT that a background job of
   # a non-interactive shell starts out ignoring. It records the first signal and exits 130 on it.
+  # It writes signal-N.ready once its handlers are in place, and the tests signal only after that:
+  # a signal that lands while Node is still starting ends it with no record.
   exec node -e '
     const [file, seconds] = process.argv.slice(1);
     const stop = (name) => {
@@ -56,6 +58,7 @@ if [ -e "$STUB/run-$n.sleep" ]; then
     };
     process.on("SIGINT", () => stop("SIGINT"));
     process.on("SIGTERM", () => stop("SIGTERM"));
+    require("fs").writeFileSync(file + ".ready", "");
     setTimeout(() => {}, seconds * 1000);
   ' "$STUB/signal-$n" "$(cat "$STUB/run-$n.sleep")"
 fi
@@ -628,11 +631,10 @@ describe('recording runs', () => {
     child.stderr.on('data', (chunk) => (stderr += chunk));
     child.stdout.resume();
     const deadline = Date.now() + 20_000;
-    while (invocations() < 2) {
+    while (!existsSync(join(stub, 'signal-2.ready'))) {
       assert.ok(Date.now() < deadline, 'run 2 never started');
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    await new Promise((resolve) => setTimeout(resolve, 300));
     process.kill(-child.pid, 'SIGINT');
     const code = await new Promise((resolve) => child.on('close', (status) => resolve(status)));
     assert.equal(code, 130, stderr);
@@ -658,11 +660,10 @@ describe('recording runs', () => {
     child.stderr.on('data', (chunk) => (stderr += chunk));
     child.stdout.resume();
     const deadline = Date.now() + 20_000;
-    while (invocations() < 2) {
+    while (!existsSync(join(stub, 'signal-2.ready'))) {
       assert.ok(Date.now() < deadline, 'run 2 never started');
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    await new Promise((resolve) => setTimeout(resolve, 300));
     const sent = Date.now();
     child.kill('SIGTERM');
     const code = await new Promise((resolve) => child.on('close', (status) => resolve(status)));
