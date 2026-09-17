@@ -1,0 +1,428 @@
+name: Docs drift
+
+# Checks the claims catalogued in docs/drift-manifest.json against the repository and the GitHub API
+# (scripts/check-docs-drift.ts). When something has drifted, Claude Code drafts a correction under
+# ADR 0012, and a later job opens one pull request with it, assigned to the owner for review.
+# Nothing here merges: no job runs a merge command, and the job the agent runs in holds no token
+# that could.
+#
+# Triggers are deliberately trusted-only: the weekly schedule, a push to `main` that touches an ADR,
+# and a manual run. Never `pull_request` or `pull_request_target`. Every job after `check` also
+# requires `github.ref` to be `refs/heads/main`, so a manual run from another branch, with that
+# branch's prompt and flags, never reaches the secrets.
+#
+# How the agent is contained (job `propose`):
+#   - No GitHub token: the job's GITHUB_TOKEN can only read contents, the checkout does not persist
+#     it, and no step puts a token in the environment. The agent's only secret is ANTHROPIC_API_KEY.
+#   - `claude -p --restricted` with `--tools Read,Grep,Glob,Edit,Write`: no shell, no web access, no
+#     MCP servers (`--strict-mcp-config`), no project settings or hooks, file tools confined to the
+#     checkout, and in `dontAsk` mode every edit outside `docs/**` and the body file is refused.
+#   - What the agent changed is checked by scripts/docs-drift-patch.mjs (Markdown under docs/ and
+#     the manifest only) and searched for the API key before it leaves the job as an artifact.
+# The agent reads only text the owner merged, plus the checker's report and git output the workflow
+# gathered. It never reads pull requests, issues or forks.
+#
+# Job `publish` holds the write token. It runs no agent: it applies the patch to a fresh checkout,
+# checks it again, formats it with main's configuration, commits, and only then puts the token in
+# the environment of the one step that pushes and opens the pull request.
+#
+# None of these jobs is a required check, and none reports on pull requests, so nothing here can
+# strand a required context (ADR 0021). Their names are free to change.
+#
+# Two secrets, which only the owner can add; without them `gate` stops with a notice:
+#   ANTHROPIC_API_KEY  for `claude -p`
+#   DOCS_DRIFT_TOKEN   a fine-grained token with contents and pull requests write on this
+#                      repository. The default GITHUB_TOKEN cannot open the pull request here
+#                      (the "Allow GitHub Actions to create and approve pull requests" setting is
+#                      off), and a pull request opened or pushed to with it would not start CI, so
+#                      its required checks would never report. Opening the pull request with this
+#                      token starts CI on it.
+# Unverified until the secrets exist: that exactly those two permissions push the branch, open the
+# pull request with an assignee and start CI. The one end-to-end run so far used the owner's own
+# token locally. Do one manual run on main after adding the secrets.
+
+on:
+  schedule:
+    - cron: '23 6 * * 1'
+  push:
+    branches: [main]
+    paths: ['docs/adr/**']
+  workflow_dispatch:
+
+# Runs are serialised, so two runs that both found drift cannot both open a pull request. A run in
+# progress is never cancelled; a newer run that queues replaces one still pending, which loses
+# nothing because every run checks the whole manifest.
+concurrency:
+  group: docs-drift
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CLAUDE_CODE_VERSION: '2.1.273'
+  DOCS_DRIFT_ASSIGNEE: milosCvetkovicDev
+  DOCS_DRIFT_TITLE: 'docs: correct the drift check-docs-drift found'
+
+jobs:
+  check:
+    name: Check docs against the manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      drift: ${{ steps.check.outputs.drift }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Historical claims are read at the commit that wrote them, so all history is needed.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Check the docs
+        id: check
+        # GITHUB_TOKEN cannot read branch protection or the merge settings, so those claims are
+        # listed as skipped, never as holding. The checker needs no install: Node runs the
+        # TypeScript directly.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=0
+          node scripts/check-docs-drift.ts --json --skip-requires admin > drift.json || status=$?
+          node scripts/check-docs-drift.ts --skip-requires admin >> "$GITHUB_STEP_SUMMARY" || true
+          drift=$(jq '.summary.drift + .summary.stale + .summary.uncatalogued' drift.json)
+          echo "drift=$drift" >> "$GITHUB_OUTPUT"
+          # Exit 1 is drift, which the next jobs act on and this job reports by failing. Exit 2 is a
+          # check that could not run, or any other failure of the checker, and fails too.
+          exit "$status"
+
+      - name: Upload the drift report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-drift-report
+          path: drift.json
+          retention-days: 30
+
+  gate:
+    name: Decide whether to draft a correction
+    needs: check
+    if: >-
+      ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.check.outputs.drift != '' &&
+      needs.check.outputs.drift != '0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      go: ${{ steps.gate.outputs.go }}
+      adr-numbers: ${{ steps.gate.outputs.adr-numbers }}
+    steps:
+      - name: Require the secrets and no open drift pull request
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Only whether each secret is set, never its value.
+          HAS_ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+          HAS_DOCS_DRIFT_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN != '' }}
+        run: |
+          if [ "$HAS_ANTHROPIC_API_KEY" != true ] || [ "$HAS_DOCS_DRIFT_TOKEN" != true ]; then
+            echo "::notice title=Docs drift::Drift was found but no pull request was opened:" \
+              "add the ANTHROPIC_API_KEY and DOCS_DRIFT_TOKEN secrets." \
+              "The report is the docs-drift-report artifact."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          prs=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 200 \
+            --json headRefName,isCrossRepository,files)
+          # Only branches in this repository count: anyone can open a pull request from a fork
+          # whose branch is named docs-drift/*.
+          open=$(jq '[.[] | select(.isCrossRepository == false)
+            | select(.headRefName | startswith("docs-drift/"))] | length' <<< "$prs")
+          if [ "$open" -gt 0 ]; then
+            echo "::notice title=Docs drift::A docs-drift pull request is already open;" \
+              "not opening another."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # ADR numbers that open pull requests in this repository already use. Digits only reach
+          # the agent; no pull request text does.
+          numbers=$(jq -r '[.[] | select(.isCrossRepository == false) | .files[]?.path
+            | capture("^docs/adr/(?<n>[0-9]{4})-").n] | unique | join(" ")' <<< "$prs")
+          echo "adr-numbers=$numbers" >> "$GITHUB_OUTPUT"
+          echo "go=true" >> "$GITHUB_OUTPUT"
+
+  propose:
+    name: Draft the correction with Claude Code
+    needs: gate
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && needs.gate.outputs.go == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Read-only, and no step below puts a GitHub token in its environment: the agent runs here.
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.change.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download the drift report
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: docs-drift-report
+          path: .docs-drift
+
+      - name: Gather the evidence
+        # The git output the agent would otherwise run commands for. Paths and ids come from the
+        # validated manifest and are passed as arguments, never evaluated.
+        run: |
+          echo '.docs-drift/' >> .git/info/exclude
+          report=.docs-drift/drift.json
+          mkdir -p .docs-drift/evidence
+          jq -r '.findings[] | select(.status == "drift" or .status == "stale")
+            | [.id, (.line // "" | tostring)] | @tsv' "$report" |
+            while IFS=$'\t' read -r id line; do
+              entry=$(jq -c --arg id "$id" '.assertions[] | select(.id == $id)' \
+                docs/drift-manifest.json)
+              doc=$(jq -r '.doc' <<< "$entry")
+              asof=$(jq -r '.asOf // ""' <<< "$entry")
+              source=$(jq -r '.check.path // .check.file
+                // (if .check.package then .check.package + "/package.json" else "" end)' \
+                <<< "$entry")
+              {
+                echo "## git log -10 --format='%H %ad %s' --date=short -- $doc"
+                git log -10 --format='%H %ad %s' --date=short -- "$doc" || true
+                if [ -n "$line" ]; then
+                  echo "## git blame --porcelain -L $line,$line -- $doc"
+                  git blame --porcelain -L "$line,$line" -- "$doc" || true
+                fi
+                if [ -n "$asof" ] && [ -n "$source" ]; then
+                  echo "## git show $asof:$source"
+                  git show "$asof:$source" || true
+                fi
+              } > ".docs-drift/evidence/$id.txt" 2>&1
+            done
+          jq -r '.uncatalogued[] | [.doc, (.line | tostring)] | @tsv' "$report" |
+            while IFS=$'\t' read -r doc line; do
+              name=$(printf '%s-%s' "$doc" "$line" | tr '/' '_')
+              {
+                echo "## git blame --porcelain -L $line,$line -- $doc"
+                git blame --porcelain -L "$line,$line" -- "$doc" || true
+              } > ".docs-drift/evidence/$name.txt" 2>&1
+            done
+
+      - name: Install Claude Code
+        run: npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+
+      - name: Correct the drift
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ADR_NUMBERS: ${{ needs.gate.outputs.adr-numbers }}
+        run: |
+          case "$ADR_NUMBERS" in *[!0-9\ ]*) echo "unexpected ADR numbers" >&2; exit 1 ;; esac
+          context=$(printf '\n## This run\n\n- Drift report: `%s`\n- Evidence files: `%s`\n' \
+            .docs-drift/drift.json .docs-drift/evidence/)
+          context+=$(printf '\n- Pull request body file: `%s`\n- Date: `%s`\n' \
+            .docs-drift/pr-body.md "$(date -u +%F)")
+          context+=$(printf '\n- ADR numbers used by open pull requests: %s\n' \
+            "${ADR_NUMBERS:-none}")
+          prompt="$(cat .github/prompts/docs-drift.md)
+          ${context}"
+          # --restricted drops every tool that runs commands or code and WebFetch, ignores the
+          # user, project and local settings files (so no project hooks), and confines the file
+          # tools to the checkout. --tools names the only tools that exist. In dontAsk mode a call
+          # no rule allows is refused, so edits land only in docs/** and the body file. The deny
+          # rules repeat the parts that matter most, in case a flag changes meaning.
+          claude -p "$prompt" \
+            --restricted \
+            --strict-mcp-config \
+            --settings '{"disableAllHooks": true}' \
+            --permission-mode dontAsk \
+            --tools 'Read,Grep,Glob,Edit,Write' \
+            --allowedTools 'Edit(/docs/**),Edit(/.docs-drift/pr-body.md)' \
+            --disallowedTools 'Bash,WebFetch,WebSearch' \
+            --disallowedTools 'Read(//proc/**),Read(//sys/**),Read(//dev/**)' \
+            --disable-slash-commands \
+            --no-session-persistence \
+            --max-turns 80 \
+            < /dev/null
+
+      - name: Check what the agent changed
+        id: change
+        run: |
+          out="$RUNNER_TEMP/docs-drift-change"
+          mkdir -p "$out"
+          if [ ! -s .docs-drift/pr-body.md ]; then
+            echo "::error title=Docs drift::The agent wrote no pull request body;" \
+              "read its output above."
+            exit 1
+          fi
+          cp .docs-drift/pr-body.md "$out/pr-body.md"
+          git add --all
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The committed validator, never the working tree's copy, which a change could replace.
+          git show HEAD:scripts/docs-drift-patch.mjs > "$RUNNER_TEMP/docs-drift-patch.mjs"
+          node "$RUNNER_TEMP/docs-drift-patch.mjs"
+          git diff --cached --binary > "$out/changes.patch"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse a change that contains the API key
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if grep -rqF -- "$ANTHROPIC_API_KEY" "$RUNNER_TEMP/docs-drift-change"; then
+            echo "::error title=Docs drift::The change contains the API key; nothing is published."
+            exit 1
+          fi
+
+      - name: Upload the change
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-drift-change
+          path: ${{ runner.temp }}/docs-drift-change
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Require a change
+        if: steps.change.outputs.changed == 'false'
+        run: |
+          echo "::error title=Docs drift::The agent changed no doc;" \
+            "its reasons are in the docs-drift-change artifact."
+          exit 1
+
+  publish:
+    name: Open the drift correction pull request
+    needs: propose
+    if: >-
+      ${{ !cancelled() && github.ref == 'refs/heads/main' &&
+      needs.propose.outputs.changed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm (version from package.json#packageManager)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        # Also installs the commit hooks, so the commit is linted like anyone else's.
+        run: pnpm install --frozen-lockfile
+
+      - name: Download the change
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: docs-drift-change
+          path: ${{ runner.temp }}/docs-drift-change
+
+      - name: Apply, check and format the change
+        # Checked again here, in the job the write token is exposed in, by the validator as
+        # committed on main: `git apply` writes to the working tree, so a patch that replaced
+        # scripts/docs-drift-patch.mjs would otherwise be judged by its own copy. The patch holds
+        # no configuration file, so Prettier and the hooks run with main's configuration only.
+        run: |
+          git show HEAD:scripts/docs-drift-patch.mjs > "$RUNNER_TEMP/docs-drift-patch.mjs"
+          check="$RUNNER_TEMP/docs-drift-patch.mjs"
+          git apply --index "$RUNNER_TEMP/docs-drift-change/changes.patch"
+          node "$check" > "$RUNNER_TEMP/changed.txt"
+          cut -d ' ' -f 2- "$RUNNER_TEMP/changed.txt" > "$RUNNER_TEMP/paths.txt"
+          xargs -d '\n' pnpm exec prettier --write -- < "$RUNNER_TEMP/paths.txt"
+          xargs -d '\n' git add -- < "$RUNNER_TEMP/paths.txt"
+          node "$check"
+
+      - name: Run the checker on the corrected docs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=0
+          node scripts/check-docs-drift.ts --skip-requires admin > "$RUNNER_TEMP/after.txt" \
+            || status=$?
+          {
+            cat "$RUNNER_TEMP/docs-drift-change/pr-body.md"
+            printf '\n## Verification\n\n'
+            printf 'The workflow ran `node scripts/check-docs-drift.ts --skip-requires admin` on '
+            printf 'the corrected docs; it exited %s.\n\n```text\n' "$status"
+            cat "$RUNNER_TEMP/after.txt"
+            printf '```\n'
+          } > "$RUNNER_TEMP/pr-body.md"
+
+      - name: Commit
+        id: commit
+        run: |
+          branch="docs-drift/$(date -u +%F)-${GITHUB_RUN_ID}"
+          git switch --create "$branch"
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit --message "$DOCS_DRIFT_TITLE"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Push and open the pull request
+        id: open
+        # The only step that sees the write token. Hooks are switched off for the push, and the
+        # token is passed to this one git command, never written to the git config.
+        env:
+          GH_TOKEN: ${{ secrets.DOCS_DRIFT_TOKEN }}
+          BRANCH: ${{ steps.commit.outputs.branch }}
+        run: |
+          open=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 200 \
+            --json headRefName,isCrossRepository \
+            --jq '[.[] | select(.isCrossRepository == false)
+              | select(.headRefName | startswith("docs-drift/"))] | length')
+          if [ "$open" -gt 0 ]; then
+            echo "::notice title=Docs drift::A docs-drift pull request opened while this run" \
+              "drafted; not opening another."
+            echo "opened=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          basic=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w 0)
+          echo "::add-mask::$basic"
+          git -c core.hooksPath=/dev/null \
+            -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $basic" \
+            push origin "HEAD:refs/heads/$BRANCH"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+            --assignee "$DOCS_DRIFT_ASSIGNEE" --title "$DOCS_DRIFT_TITLE" \
+            --body-file "$RUNNER_TEMP/pr-body.md"
+          echo "opened=true" >> "$GITHUB_OUTPUT"
+
+      - name: Require the pull request
+        if: steps.open.outputs.opened == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.commit.outputs.branch }}
+        run: |
+          count=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --head "$BRANCH" \
+            --json isCrossRepository --jq '[.[] | select(.isCrossRepository == false)] | length')
+          if [ "$count" -ne 1 ]; then
+            echo "::error title=Docs drift::No pull request is open for $BRANCH."
+            exit 1
+          fi

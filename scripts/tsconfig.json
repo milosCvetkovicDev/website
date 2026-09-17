@@ -3,10 +3,11 @@
     "allowJs": true,
     "checkJs": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "strict": true,
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "types": ["node"]
   },
-  "include": ["**/*.mjs"]
+  "include": ["**/*.mjs", "**/*.ts"]
 }
