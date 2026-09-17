@@ -39,6 +39,9 @@ pnpm-debug.log*
 # Testing
 # scripts/flake-hunt.sh writes its runs and report to flake-hunt in the directory it is run from.
 flake-hunt/
+# scripts/verify-flake.sh writes .verify, and .verify.lock, .verify.lock.taking, .verify.previous
+# or .verify.failed beside it, in the directory it is run from.
+.verify*
 coverage
 test-results
 playwright-report

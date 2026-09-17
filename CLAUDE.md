@@ -30,13 +30,14 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
   `docs-drift-patch.mjs` (the docs drift workflow's check on what its agent changed),
   `agent-resume.sh` (the briefing for agent checkpoints, under Working with this repo in Claude
   Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates),
-  `flake-sweep.sh` (`pnpm test:e2e:sweep`, see Testing), and the `node:test` suites that
-  `pnpm test:scripts` runs, one for each of those nine plus `docs-drift-workflow.test.mjs`,
-  `ai-refusals.test.mjs`, `commitlint-config.test.mjs` and `claude-hooks.test.mjs` (the session
-  hooks in `.claude/hooks`). It is a private workspace package, `@repo/scripts`, whose only task is
-  `typecheck` (`tsc -p .` against `scripts/tsconfig.json`, which covers the `.mjs` and `.ts` files),
-  so `turbo typecheck` type-checks it alongside the apps. It ships no source anyone imports: nothing
-  depends on it, and the root scripts still call the scripts by path.
+  `flake-sweep.sh` (`pnpm test:e2e:sweep`, see Testing), `verify-flake.sh` (runs one e2e spec N
+  times into `.verify`), and the `node:test` suites that `pnpm test:scripts` runs, one for each of
+  those ten plus `docs-drift-workflow.test.mjs`, `ai-refusals.test.mjs`,
+  `commitlint-config.test.mjs` and `claude-hooks.test.mjs` (the session hooks in `.claude/hooks`).
+  It is a private workspace package, `@repo/scripts`, whose only task is `typecheck` (`tsc -p .`
+  against `scripts/tsconfig.json`, which covers the `.mjs` and `.ts` files), so `turbo typecheck`
+  type-checks it alongside the apps. It ships no source anyone imports: nothing depends on it, and
+  the root scripts still call the scripts by path.
 - `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
   `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
   has its own `tsconfig.json`.
@@ -78,6 +79,7 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 | `pnpm --filter web exec vitest run <path>`                              | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx`                                                                                                              |
 | `pnpm --filter web exec playwright install --with-deps chromium webkit` | Needed once before the first e2e run; the phone projects need webkit                                                                                                                 |
 | `scripts/agent-resume.sh [task-id ...]`                                 | Briefs each `.agent-state/<task-id>.json` checkpoint and checks it against git and gh; exits 1 when one is invalid or cannot be briefed                                              |
+| `scripts/verify-flake.sh <runs> e2e/<spec>`                             | Runs one spec N times into `.verify` with pass rate and p50/p95; exits 0 all passed, 1 any failed, 2 usage, tool or lock error or unmeasured run, 130/129/143 on INT/HUP/TERM        |
 
 `pnpm lint:fix` drops `--max-warnings 0`, so it exits 0 on warnings that `pnpm lint` and CI fail on.
 Always finish with `pnpm lint`.
