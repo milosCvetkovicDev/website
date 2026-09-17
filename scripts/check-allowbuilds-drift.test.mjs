@@ -6,7 +6,20 @@
 // false negative before it was a test.
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   collectProblems,
@@ -15,11 +28,29 @@ import {
   readResolvedVersions,
 } from './check-allowbuilds-drift.mjs';
 
+/** @typedef {import('./check-allowbuilds-drift.mjs').AllowBuildsEntry} AllowBuildsEntry */
+/** @typedef {import('./check-allowbuilds-drift.mjs').LifecycleHooks} LifecycleHooks */
+
+const thisScript = join(dirname(fileURLToPath(import.meta.url)), 'check-allowbuilds-drift.mjs');
+
+/** @param {string} block */
 const workspace = (block) => `packages:\n  - 'apps/*'\n\n${block}`;
+/** @param {...string} keys */
 const lock = (...keys) => `packages:\n${keys.map((key) => `  ${key}:\n`).join('')}\nsnapshots:\n`;
 
+/**
+ * @param {string} name
+ * @param {string | null} version null for an entry with no "Reviewed at" note
+ * @returns {AllowBuildsEntry}
+ */
 const denied = (name, version) => ({ name, scalar: 'false', reviewed: version, lineNumber: 1 });
+/** @returns {LifecycleHooks} */
 const hasHook = () => ({ hooks: ['postinstall'] });
+/**
+ * @param {AllowBuildsEntry[]} entries
+ * @param {Map<string, Set<string>>} resolved
+ * @param {(name: string, version: string) => LifecycleHooks} [inspect]
+ */
 const messages = (entries, resolved, inspect = hasHook) =>
   collectProblems(entries, resolved, inspect).problems;
 
@@ -120,13 +151,13 @@ describe('readAllowBuilds', () => {
 describe('readResolvedVersions', () => {
   it('reads plain and scoped keys', () => {
     const resolved = readResolvedVersions(lock('esbuild@0.27.2', "'@esbuild/darwin-arm64@0.27.2'"));
-    assert.deepEqual([...resolved.get('esbuild')], ['0.27.2']);
-    assert.deepEqual([...resolved.get('@esbuild/darwin-arm64')], ['0.27.2']);
+    assert.deepEqual([...(resolved.get('esbuild') ?? [])], ['0.27.2']);
+    assert.deepEqual([...(resolved.get('@esbuild/darwin-arm64') ?? [])], ['0.27.2']);
   });
 
   it('collects every version of a package that resolves more than once', () => {
     const resolved = readResolvedVersions(lock('a@1.0.0', 'a@2.0.0'));
-    assert.deepEqual([...resolved.get('a')].sort(), ['1.0.0', '2.0.0']);
+    assert.deepEqual([...(resolved.get('a') ?? [])].sort(), ['1.0.0', '2.0.0']);
   });
 
   it('does not invent a name from a git specifier', () => {
@@ -180,6 +211,26 @@ describe('collectProblems', () => {
     assert.match(problems[0], /declares no preinstall\/install\/postinstall script/);
   });
 
+  // Shapes the JSDoc type admits but `readLifecycleHooks` never returns: no field set, or a reason
+  // that is empty. None of them read a manifest, so each is a failure that says it could not
+  // confirm, never "declares no script ... Drop it", which is advice to delete a reviewed entry. On
+  // main the first two threw a TypeError on `hooks.length` before any problem was reported.
+  for (const [label, result] of /** @type {[string, LifecycleHooks][]} */ ([
+    ['no field at all', {}],
+    ['an empty unverifiable reason', { unverifiable: '' }],
+    ['an empty skip reason', { skipped: '' }],
+  ])) {
+    it(`reports an inspection result with ${label} as unverifiable, not as scriptless`, () => {
+      const problems = messages([denied('a', '1.2.3')], resolved, () => result);
+      assert.equal(problems.length, 1);
+      assert.match(
+        problems[0] ?? '',
+        /cannot confirm the package still declares a lifecycle script/,
+      );
+      assert.doesNotMatch(problems[0] ?? '', /Drop it/);
+    });
+  }
+
   it('reports, rather than skips, a package it could not inspect', () => {
     const problems = messages([denied('a', '1.2.3')], resolved, () => ({ unverifiable: 'no dir' }));
     assert.match(problems[0], /cannot confirm/);
@@ -195,6 +246,7 @@ describe('collectProblems', () => {
 });
 
 describe('readLifecycleHooks', () => {
+  /** @param {unknown} scripts */
   const manifest = (scripts) => () => ({ scripts });
 
   it('finds a declared hook', () => {
@@ -228,10 +280,14 @@ describe('readLifecycleHooks', () => {
   });
 
   it('skips, and says so, when nothing is installed', () => {
-    assert.match(readLifecycleHooks('a', '1.0.0', null, manifest({})).skipped, /not installed/);
+    assert.match(
+      readLifecycleHooks('a', '1.0.0', null, manifest({})).skipped ?? '',
+      /not installed/,
+    );
   });
 
-  for (const [label, dirs, read] of [
+  /** @type {[string, string[], (dir: string, name: string) => unknown][]} */
+  const unreadable = [
     ['the package is not in the store', [], manifest({})],
     [
       'the manifest cannot be read',
@@ -242,7 +298,8 @@ describe('readLifecycleHooks', () => {
     ],
     ['the manifest is null', ['a@1.0.0'], () => null],
     ['scripts is null', ['a@1.0.0'], () => ({ scripts: null })],
-  ]) {
+  ];
+  for (const [label, dirs, read] of unreadable) {
     it(`does not quietly pass when ${label}`, () => {
       const result = readLifecycleHooks('a', '1.0.0', dirs, read);
       assert.ok(result.unverifiable || result.hooks?.length === 0, 'must not report a live hook');
@@ -251,6 +308,105 @@ describe('readLifecycleHooks', () => {
 
   it('refuses a name that would escape the store directory', () => {
     const result = readLifecycleHooks('../../etc', '1.0.0', ['x'], manifest({}));
-    assert.match(result.unverifiable, /not a usable package name/);
+    assert.match(result.unverifiable ?? '', /not a usable package name/);
+  });
+});
+
+// The entry guard, spawned rather than imported: whether `main()` runs at all is a property of the
+// process, and it was silently false for any path that reached the script through a symlinked
+// directory. A gate that exits 0 because it could not see is the one failure this file's subject
+// forbids (see the rule at the top of check-allowbuilds-drift.mjs), so it is tested end to end.
+describe('the command entry guard', () => {
+  /**
+   * A throwaway checkout holding a copy of the script and a workspace file with no `allowBuilds:`
+   * block, reachable both by its real path and through a symlinked directory.
+   *
+   * macOS resolves /var to /private/var, so the control has to start from the resolved temp
+   * directory: otherwise "the real path" is itself a symlinked one and proves nothing.
+   */
+  function buildFixture() {
+    const root = realpathSync(mkdtempSync(join(realpathSync(tmpdir()), 'allowbuilds-entry-')));
+    const real = join(root, 'real');
+    mkdirSync(join(real, 'scripts'), { recursive: true });
+    copyFileSync(thisScript, join(real, 'scripts', basename(thisScript)));
+    writeFileSync(join(real, 'pnpm-workspace.yaml'), "packages:\n  - 'apps/*'\n");
+    symlinkSync(real, join(root, 'link'), 'dir');
+    return {
+      root,
+      /** @param {string} via */
+      scriptIn: (via) => join(root, via, 'scripts', basename(thisScript)),
+    };
+  }
+
+  /** @param {string} scriptPath */
+  const run = (scriptPath) =>
+    spawnSync(process.execPath, [scriptPath], { encoding: 'utf8', env: { ...process.env } });
+
+  for (const via of ['real', 'link']) {
+    it(`runs the check, and fails, when started by a ${via === 'real' ? 'real' : 'symlinked'} path`, () => {
+      const fixture = buildFixture();
+      try {
+        const result = run(fixture.scriptIn(via));
+        assert.equal(result.status, 1, `expected exit 1 via ${via}, got ${result.status}`);
+        assert.match(result.stderr, /has no `allowBuilds:` block/);
+      } finally {
+        rmSync(fixture.root, { recursive: true, force: true });
+      }
+    });
+  }
+
+  // A module hook moves the checkout away after Node has read the script and before its top level
+  // runs, so neither side of the guard resolves any more. Answering `false` there skipped main() and
+  // exited 0 having checked nothing.
+  it('exits non-zero, rather than 0 in silence, when its own path no longer resolves', () => {
+    const fixture = buildFixture();
+    try {
+      const target = pathToFileURL(fixture.scriptIn('real')).href;
+      const hooks = join(fixture.root, 'hooks.mjs');
+      writeFileSync(
+        hooks,
+        [
+          "import { renameSync } from 'node:fs';",
+          'export async function load(url, context, nextLoad) {',
+          '  const result = await nextLoad(url, context);',
+          `  if (url === ${JSON.stringify(target)}) {`,
+          `    renameSync(${JSON.stringify(join(fixture.root, 'real'))}, ${JSON.stringify(join(fixture.root, 'moved'))});`,
+          '  }',
+          '  return result;',
+          '}',
+        ].join('\n'),
+      );
+      const register = join(fixture.root, 'register.mjs');
+      writeFileSync(
+        register,
+        `import { register } from 'node:module';\nregister(${JSON.stringify(pathToFileURL(hooks).href)});\n`,
+      );
+      const result = spawnSync(
+        process.execPath,
+        ['--import', pathToFileURL(register).href, fixture.scriptIn('real')],
+        { encoding: 'utf8', env: { PATH: process.env.PATH } },
+      );
+      assert.notEqual(result.status, 0, 'a guard that cannot resolve its path must not exit 0');
+      assert.match(result.stderr, /ENOENT/);
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not run the check when the module is imported rather than started', () => {
+    const fixture = buildFixture();
+    try {
+      const importer = join(fixture.root, 'importer.mjs');
+      writeFileSync(
+        importer,
+        `await import(${JSON.stringify(fixture.scriptIn('real'))});\nconsole.log('imported');\n`,
+      );
+      const result = run(importer);
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /imported/);
+      assert.equal(result.stderr, '');
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
   });
 });

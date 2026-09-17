@@ -33,6 +33,12 @@ const SQUASH_CONFIG = 'commitlint.squash.config.mjs';
 // Neither package is a direct dependency, so they are imported from where the CLI imports them:
 // pnpm links a package's dependencies next to it in the store. A file that moves fails its import
 // with the path; an export that changes shape fails the assertions below by name.
+/**
+ * @param {string} from a path inside the package whose sibling is wanted
+ * @param {string} name the sibling package's directory name
+ * @param {string} file the module to import, relative to that directory
+ * @returns {Promise<{ dir: string, module: any }>}
+ */
 const sibling = async (from, name, file) => {
   const dir = join(realpathSync(from), '..', name);
   return { dir, module: await import(pathToFileURL(join(dir, file)).href) };
@@ -52,6 +58,22 @@ const cliVersion = JSON.parse(
 ).version;
 assert.equal(cliVersion.split('.')[0], '21', `@commitlint/cli ${cliVersion}: re-check loadConfig`);
 
+/**
+ * One lint result, as far as these tests read it.
+ *
+ * @typedef {{ valid: boolean, errors: { name: string }[] }} LintOutcome
+ */
+
+/**
+ * A loaded configuration and a linter bound to it.
+ *
+ * @typedef {{ loaded: any, lint: (message: string) => Promise<LintOutcome> }} LoadedConfig
+ */
+
+/**
+ * @param {string} file the configuration file, relative to the repository root
+ * @returns {Promise<LoadedConfig>}
+ */
 const loadConfig = async (file) => {
   const loaded = await loadModule.default({}, { cwd: root, file });
   const parserOpts = loaded.parserPreset?.parserOpts;
@@ -72,9 +94,16 @@ const ignoresRevert = squashModule.ignores.at(-1);
 
 // The title step lints a title as written and with the ` (#NN)` GitHub appends to the subject, so
 // each shape is checked in both forms.
+/** @param {string} message */
 const withSuffix = (message) => message.replace(/^[^\r\n]*/, (header) => `${header} (#81)`);
+/** @param {string[]} messages */
 const bothForms = (messages) => messages.flatMap((message) => [message, withSuffix(message)]);
 
+/**
+ * @param {LoadedConfig} config
+ * @param {string[]} messages
+ * @param {boolean} expected whether every message must lint as valid
+ */
 const expectValid = async (config, messages, expected) => {
   const results = await Promise.all(messages.map(config.lint));
   const wrong = results
@@ -110,7 +139,9 @@ const DEFAULT_IGNORED = [
 
 const SHA = '0123456789abcdef0123456789abcdef01234567';
 
+/** @type {LoadedConfig} */
 let base;
+/** @type {LoadedConfig} */
 let squash;
 before(async () => {
   [base, squash] = await Promise.all([loadConfig(BASE_CONFIG), loadConfig(SQUASH_CONFIG)]);
@@ -120,7 +151,9 @@ describe('the default-ignored shapes', () => {
   it('cover every pattern in the installed @commitlint/is-ignored defaults', () => {
     // A commitlint upgrade that adds a pattern fails here until the table has a message for it. The
     // patterns are bound functions with no readable source, so a miss is reported by its index.
-    const { wildcards } = isIgnoredDefaults;
+    const { wildcards } = /** @type {{ wildcards: ((message: string) => boolean)[] }} */ (
+      isIgnoredDefaults
+    );
     assert.ok(wildcards.length > 0, 'no default ignore patterns found');
     const uncovered = wildcards
       .map((matches, index) => ({ index, covered: DEFAULT_IGNORED.some((m) => matches(m)) }))
@@ -217,6 +250,7 @@ describe('commitlint.squash.config.mjs (the title and the push lint on main)', (
       'feat: 2FA login',
       'feat: _private field',
     ];
+    /** @type {string[]} */
     const disagreements = [];
     for (const header of headers) {
       const rules =
@@ -235,6 +269,7 @@ describe('commitlint.squash.config.mjs (the title and the push lint on main)', (
     assert.ok(types.length > 0, 'no types loaded');
     for (const type of types) assert.equal(ignoresRevert(`Revert "${type}: x"\n`), true, type);
     assert.equal(ignoresRevert('Revert "notatype: x"\n'), false);
+    /** @param {number} length */
     const header = (length) => `feat: ${'a'.repeat(length - 'feat: '.length)}`;
     assert.equal(ignoresRevert(`Revert "${header(max)}"\n`), true);
     assert.equal(ignoresRevert(`Revert "${header(max + 1)}"\n`), false);
@@ -255,6 +290,10 @@ describe('commitlint.squash.config.mjs (the title and the push lint on main)', (
   it('unwraps nesting up to 1000 characters and refuses anything longer at once', () => {
     // `Revert "` and `"` add nine characters a level: 110 levels around a 10-character header come
     // to exactly 1000.
+    /**
+     * @param {number} depth
+     * @param {string} core
+     */
     const nest = (depth, core) => `${'Revert "'.repeat(depth)}${core}${'"'.repeat(depth)}`;
     assert.equal(nest(110, 'feat: abcd').length, 1000);
     assert.equal(ignoresRevert(`${nest(110, 'feat: abcd')}\n`), true);
@@ -298,6 +337,11 @@ describe('commitlint.config.mjs (the local hook and the branch commits)', () => 
 
 describe('the commitlint CLI', () => {
   const bin = join(root, 'node_modules', '.bin', 'commitlint');
+  /**
+   * @param {string[]} args
+   * @param {{ input?: string, cwd?: string, env?: NodeJS.ProcessEnv }} [options]
+   * @returns {Promise<{ code: number | null, signal: NodeJS.Signals | null, output: string }>}
+   */
   const run = (args, { input = '', cwd = root, env = process.env } = {}) =>
     new Promise((resolve, reject) => {
       const child = spawn(bin, args, { cwd, env, timeout: 60_000 });
@@ -312,17 +356,26 @@ describe('the commitlint CLI', () => {
     });
 
   // A missing or broken config exits 1 too, so a failure has to be a rule failure.
+  /** @param {{ code: number | null, output: string }} result */
   const assertRuleFailure = ({ code, output }) => {
     assert.equal(code, 1, output);
     assert.match(output, /found [1-9]\d* problems?/);
   };
   // An empty range exits 0 having read nothing, so a pass has to report each message it linted.
+  /**
+   * @param {{ code: number | null, output: string }} result
+   * @param {number} messages how many messages the run must report as linted
+   */
   const assertLinted = ({ code, output }, messages) => {
     assert.equal(code, 0, output);
     assert.equal(output.match(/found 0 problems/g)?.length ?? 0, messages, output);
   };
 
   it('reads the ignore settings from --config on stdin, as the title step runs it', async () => {
+    /**
+     * @param {string} config
+     * @param {string} title
+     */
     const stdin = (config, title) =>
       run(['--config', config, '--verbose'], { input: `${title}\n` });
     const [strict, lax, revert] = await Promise.all([
@@ -336,7 +389,9 @@ describe('the commitlint CLI', () => {
   });
 
   describe('in a git repository, as the push lint on main runs it', () => {
+    /** @type {string | undefined} */
     let scratch;
+    /** @type {Record<string, string>} */
     const sha = {};
     // Hermetic: no inherited GIT_* variable (git exports GIT_DIR to hooks, and it would point these
     // commits at the real repository), no user or system git config (signing, hooks, templates),
@@ -347,6 +402,7 @@ describe('the commitlint CLI', () => {
       GIT_CONFIG_NOSYSTEM: '1',
       GIT_CEILING_DIRECTORIES: scratch,
     });
+    /** @param {...string} args */
     const git = (...args) =>
       execFileSync(
         'git',
@@ -356,11 +412,17 @@ describe('the commitlint CLI', () => {
         ),
         { cwd: scratch, env: env(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
       );
+    /** @param {string} message */
     const commit = (message) => {
       git('commit', '-q', '--allow-empty', '--cleanup=verbatim', '-m', message);
       return git('rev-parse', 'HEAD').trim();
     };
     // As the workflow runs it: from the repository root, with the config path relative to it.
+    /**
+     * @param {string} config
+     * @param {string[]} args
+     * @param {string} [input]
+     */
     const lintHere = (config, args, input) =>
       run(['--config', config, '--verbose', ...args], { cwd: scratch, env: env(), input });
 
@@ -382,6 +444,11 @@ describe('the commitlint CLI', () => {
     });
 
     it('lints every commit of a --from/--to range', async () => {
+      /**
+       * @param {string} config
+       * @param {string} from
+       * @param {string} to
+       */
       const range = (config, from, to) => lintHere(config, ['--from', from, '--to', to]);
       const [revert, fixup, fixupLax, typedBody, both] = await Promise.all([
         range(SQUASH_CONFIG, sha.base, sha.revert),
@@ -398,6 +465,7 @@ describe('the commitlint CLI', () => {
     });
 
     it('lints the tip read with git log, as it does when the push created the branch', async () => {
+      /** @param {string} ref */
       const tip = (ref) => lintHere(SQUASH_CONFIG, [], git('log', '-1', '--format=%B', ref));
       const [revert, typedBody] = await Promise.all([tip(sha.revert), tip(sha.typedBody)]);
       assertLinted(revert, 1);
@@ -410,6 +478,7 @@ describe('the commitlint CLI', () => {
 // not one and `@commitlint/cli` is), with comment lines dropped before backslash continuations are
 // joined: a comment ends at its newline, whatever it ends with.
 const COMMITLINT = /(?:^|[\s|;&(`/@])commitlint(?=[\s/]|$)/;
+/** @param {string} text */
 const shellLines = (text) =>
   text
     .split('\n')
@@ -417,8 +486,10 @@ const shellLines = (text) =>
     .join('\n')
     .replace(/\\\n\s*/g, ' ')
     .split('\n');
+/** @param {string[]} lines */
 const invocations = (lines) => lines.filter((line) => COMMITLINT.test(line));
 // Every config a line passes, through `--config` or its alias `-g`, with a space or `=`.
+/** @param {string} line */
 const configsOf = (line) =>
   [...line.matchAll(/(?:^|\s)(?:--config|-g)(?:=|\s+)(\S+)/g)].map((match) => match[1]);
 
@@ -435,12 +506,14 @@ describe('.github/workflows/commitlint.yml', () => {
     readFileSync(join(root, '.github', 'workflows', 'commitlint.yml'), 'utf8'),
   );
   // A step starts at a six-space `- `, named or not, and runs to the next one.
+  /** @type {{ name: string | undefined, lines: string[] }[]} */
   const steps = [];
   for (const line of lines) {
     if (/^ {6}- /.test(line))
       steps.push({ name: line.match(/^ {6}- name: (.+)$/)?.[1], lines: [] });
     steps.at(-1)?.lines.push(line);
   }
+  /** @param {string} name */
   const step = (name) => {
     const found = steps.filter((s) => s.name === name);
     assert.equal(found.length, 1, `expected exactly one step named "${name}"`);
@@ -449,6 +522,7 @@ describe('.github/workflows/commitlint.yml', () => {
   const TITLE = 'Lint the pull request title';
   const BRANCH = 'Lint every commit on the branch';
   const PUSH = 'Lint every commit pushed to main';
+  /** @param {string} name */
   const found = (name) => {
     const lines = invocations(step(name).lines);
     assert.ok(lines.length > 0, `no commitlint invocation in "${name}"`);
@@ -469,7 +543,10 @@ describe('.github/workflows/commitlint.yml', () => {
 
   it('runs commitlint in no other step', () => {
     const elsewhere = steps
-      .filter((s) => ![TITLE, BRANCH, PUSH].includes(s.name))
+      // An unnamed step has no name to match; the cast lets `includes` say so.
+      .filter(
+        (s) => !(/** @type {(string | undefined)[]} */ ([TITLE, BRANCH, PUSH]).includes(s.name)),
+      )
       .flatMap((s) =>
         invocations(s.lines).map((line) => `${s.name ?? '(unnamed)'}: ${line.trim()}`),
       );

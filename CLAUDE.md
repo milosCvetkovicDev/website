@@ -5,7 +5,8 @@ Personal portfolio site. A Turborepo 2 + pnpm monorepo whose only shipping app i
 
 ## Architecture
 
-pnpm 10.34 workspace (`apps/*`, `packages/*`, per `pnpm-workspace.yaml`) driven by Turborepo 2.10.
+pnpm 10.34 workspace (`apps/*`, `packages/*`, `scripts`, per `pnpm-workspace.yaml`) driven by
+Turborepo 2.10.
 Node 22 is pinned in `.nvmrc` only; `engines.node` is
 `^22.22.2 || ^24.15.0 || >=26.0.0` and `packageManager` pins pnpm
 (`pnpm@10.34.5`), not Node. CI reads Node from `.nvmrc` and pnpm from `packageManager`. The range is
@@ -24,9 +25,14 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
   `tailwindStylesheet: './src/app/globals.css'` so the class sorter sees the theme.
 - `scripts/` at the repository root holds the scripts that run outside the apps:
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `vercel-ignore-build.mjs` (Vercel's
-  ignored build step, ADR 0016), and the `node:test` suites that `pnpm test:scripts` runs, one for
-  each of those two plus `ai-refusals.test.mjs` and `commitlint-config.test.mjs`. It is not a
-  workspace and Turbo does not see it.
+  ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log check),
+  `agent-resume.sh` (the briefing for agent checkpoints, under Working with this repo in Claude
+  Code), and the `node:test` suites that `pnpm test:scripts` runs, one for each of those four plus
+  `ai-refusals.test.mjs`, `commitlint-config.test.mjs` and `claude-hooks.test.mjs` (the session
+  hooks in `.claude/hooks`). It is a private workspace package, `@repo/scripts`, whose only task is
+  `typecheck` (`tsc -p .` against `scripts/tsconfig.json`, which covers the `.mjs` files only), so
+  `turbo typecheck` type-checks it alongside the apps. It ships no source anyone imports: nothing
+  depends on it, and the root scripts still call the scripts by path.
 - `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
   `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
   has its own `tsconfig.json`.
@@ -50,13 +56,13 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 | `pnpm build`                                                            | `next build` (web) and `tsc -b && vite build` (playground)                                                                                                                           |
 | `pnpm lint`                                                             | ESLint in each app with `--max-warnings 0`                                                                                                                                           |
 | `pnpm lint:fix`                                                         | `eslint --fix` in each app, without `--max-warnings 0`                                                                                                                               |
-| `pnpm typecheck`                                                        | `next typegen && tsc --noEmit` (web), `tsc -b` (playground)                                                                                                                          |
+| `pnpm typecheck`                                                        | `turbo typecheck`: `next typegen && tsc --noEmit` (web), `tsc -b` (playground), `tsc -p .` (scripts)                                                                                 |
 | `pnpm test`                                                             | Vitest unit tests (web only)                                                                                                                                                         |
 | `pnpm test:e2e`                                                         | Playwright specs in `apps/web/e2e`; `turbo.json` gives it `dependsOn: ["build"]`, so the root script builds `web` first. Prefer `pnpm --filter web test:e2e` locally, which does not |
 | `pnpm format`                                                           | Prettier over the whole repo, writing changes                                                                                                                                        |
 | `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                    |
 | `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                              |
-| `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/` gates                                                                                                                                      |
+| `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/`                                                                                                                                            |
 | `pnpm clean`                                                            | `turbo clean` in both apps, then `rm -rf node_modules` at the root                                                                                                                   |
 | `pnpm prepare`                                                          | `husky`; runs on install and is what creates the git hooks                                                                                                                           |
 | `pnpm --filter web test:e2e`                                            | Playwright without going through Turborepo                                                                                                                                           |
@@ -64,16 +70,27 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 | `pnpm --filter web test:watch`                                          | Vitest in watch mode                                                                                                                                                                 |
 | `pnpm --filter web exec vitest run <path>`                              | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx`                                                                                                              |
 | `pnpm --filter web exec playwright install --with-deps chromium webkit` | Needed once before the first e2e run; the phone projects need webkit                                                                                                                 |
+| `scripts/agent-resume.sh [task-id ...]`                                 | Briefs each `.agent-state/<task-id>.json` checkpoint and checks it against git and gh; exits 1 when one is invalid or cannot be briefed                                              |
 
 `pnpm lint:fix` drops `--max-warnings 0`, so it exits 0 on warnings that `pnpm lint` and CI fail on.
 Always finish with `pnpm lint`.
 
-`pnpm clean` only reaches the two apps, because `packages/*` define no `clean` task. Their
-`node_modules` survive it and have to be deleted by hand before a truly cold reinstall.
+`pnpm clean` only reaches the two apps, because `packages/*` and `scripts` define no `clean` task.
+Their `node_modules` survive it and have to be deleted by hand before a truly cold reinstall.
 
 `typecheck` and `test` declare `dependsOn: ["^build"]` in `turbo.json`. Nothing an app depends on
 has a `build` task today (`@repo/prettier-config` is config only), so this is currently a no-op. It
 is there so that a future buildable package is compiled before the apps typecheck against it.
+
+`pnpm typecheck` stays the plain `turbo typecheck`, and `scripts/` is type-checked as one of its
+tasks: `@repo/scripts` runs `tsc -p .`, which checks every `scripts/**/*.mjs` with `checkJs` and
+`strict` against `scripts/tsconfig.json`. That type-check gets `typescript` and `@types/node` from
+the package's own devDependencies, not the root's, and for them pnpm adds only the package's
+importer block to the lockfile. As root devDependencies they would also rewrite other packages'
+lockfile snapshots, because a root dependency is also what pnpm resolves the root's own packages'
+peer dependencies to: a root `@types/node` would become the `@types/node` peer root commitlint
+reaches through `cosmiconfig-typescript-loader`, in place of the version pnpm installed for it. The
+measurement behind the choice is in PR 2's entry in `.claude/epics/audit-remediation-2026-09/50.md`.
 
 ## Quality gates
 
@@ -87,9 +104,11 @@ is there so that a future buildable package is compiled before the apps typechec
   pull request that adds a dependency with a known advisory, dev tooling included, because GitHub's
   dependency graph scopes every `pnpm-lock.yaml` entry `runtime`, the action's default), then
   install, `check:allowbuilds`, `test:scripts`, `format:check`, `lint`, `typecheck`, `test`, `build`.
-  `e2e`: install chromium and webkit, build web, run the Playwright specs on all three projects; the
-  report is uploaded as an artifact on failure or cancellation. Actions are SHA-pinned,
-  `permissions: contents: read`, and concurrency cancels superseded runs on pull requests only.
+  `e2e`: install chromium and webkit, build web, run the Playwright specs on all three projects with
+  their output teed into a log, then check that log with `scripts/check-webserver-log.mjs` whenever
+  the suite ran; the report is uploaded as an artifact on failure or cancellation. Actions are
+  SHA-pinned, `permissions: contents: read`, and concurrency cancels superseded runs on pull
+  requests only.
   CodeQL default setup is on as well (ADR 0018): GitHub manages it, so it has no workflow file here,
   and branch protection does not require its checks. An alert on a line a pull request changes is
   also posted as a review thread, though, and the resolved-threads rule below blocks the merge until
@@ -141,6 +160,21 @@ is there so that a future buildable package is compiled before the apps typechec
   required check on a title nobody linted. Commits on `main` from before the check stay as accepted
   history, because `main` is never rewritten: 28 of them fail it, and the four since commitlint
   arrived in #3 (54b8b80, d7d058d, a8b4a91, 3e98c14) each fail `body-max-line-length`.
+- The web server's output is gated. The `e2e` job tees the Playwright run into a log under
+  `shell: bash`, whose `pipefail` keeps a failing run failing through the pipe, and
+  `scripts/check-webserver-log.mjs` then fails the job on any `[WebServer]` line outside ADR 0015's
+  `Error: Internal: NoFallbackError` block (that message and its `at` frames), the accepted signal
+  that sends an unknown `/work/*` slug to the 404. It does not try to recognise error shapes: only
+  the server's stderr reaches the log, because `webServer.stdout` stays at Playwright's default,
+  `'ignore'`, so every other server line is a finding, warnings included. A missing or empty log
+  fails too, and so does a log with no `[WebServer]` line, which means the capture broke, since
+  every run prints the allowlisted block. The check runs whenever the suite ran, passed or failed,
+  and not after an earlier step failed, when there is no log to read. Its tests run in
+  `pnpm test:scripts`.
+- The root `scripts/` gates are type-checked, not linted. `@repo/scripts` has a `typecheck` task
+  (`tsc -p .`, strict, `checkJs`) that `turbo typecheck` runs, so CI's existing typecheck step
+  covers them without a step of its own. There is no root `eslint.config.*` on purpose: ADR 0003's
+  per-package lint-staged split relies on its absence.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
@@ -236,7 +270,11 @@ is there so that a future buildable package is compiled before the apps typechec
   reachable from a server component's imports lands in that layout's client chunk, so a barrel
   import in `app/layout.tsx` would ship `FeaturedWork` to every route (see ADR 0009). A
   `no-restricted-imports` rule in `apps/web/eslint.config.mjs`, scoped to `src/app/**/layout.tsx`,
-  fails lint on it.
+  fails lint on it. The rule is a pattern rather than one fixed path, and
+  `apps/web/src/test/eslint-config.test.ts` pins the spellings it is known to catch (`@/components`
+  and `../components`, bare, with a trailing slash, or as `/index` with or without a `.ts`, `.tsx`,
+  `.js` or `.jsx` extension, and a nested layout's `../../components`) and the near misses it lets
+  through. It does not see a dynamic `import()`, and it reads layouts only.
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
   keep relative imports for siblings inside one folder.
@@ -279,7 +317,9 @@ is there so that a future buildable package is compiled before the apps typechec
   error pages carry it too. Status and path are what catch a wrong page.
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build
   with `pnpm start` inside `apps/web`, sets `forbidOnly`, retries twice, uses one worker and a 10s
-  expect timeout. Locally it serves the dev server instead.
+  expect timeout, and sets `failOnFlakyTests`: a test that passes only on a retry fails the run, on
+  all three projects, so the report and its `on-first-retry` trace are uploaded instead of discarded
+  with a green job. Locally it serves the dev server instead.
 - It declares three projects. The desktop `chromium` project runs every spec outside `e2e/mobile/`;
   `mobile-chrome` (Pixel 7) and `mobile-safari` (iPhone 13, WebKit) run only `e2e/mobile/`, which is
   where a spec goes when it needs a phone viewport or `isMobile`. `src/test/playwright-config.test.ts`
@@ -302,6 +342,15 @@ is there so that a future buildable package is compiled before the apps typechec
   back. The local dev server also builds into `.next-e2e` (`NEXT_DIST_DIR`, read by
   `apps/web/next.config.ts`), so it never fights a `pnpm dev` from the same checkout over
   `apps/web/.next`. See `docs/adr/0014-playwright-owns-its-server.md`.
+- A flaky e2e test is root-caused before it is patched: reproduce it repeatedly, tell a cold first
+  request apart from a logic fault, and prefer warming the destination route on the dev server
+  before the timed step (a route compiles on its first request) over an arbitrary wait or a retry.
+  Verify a fix with at least five consecutive runs in each mode, the dev server
+  (`pnpm --filter web test:e2e`) and the production build
+  (`pnpm --filter web build && CI=true pnpm --filter web test:e2e --retries=0`), and report the
+  measured timings. Keep `--retries=0` on the production runs: under `CI=true` the config retries
+  a failed test twice, and a run whose only failures passed on a retry is reported as flaky and
+  exits 0.
 
 ## Working with this repo in Claude Code
 
@@ -317,11 +366,51 @@ is there so that a future buildable package is compiled before the apps typechec
   those. Other extensions, `.mdx` and `.svg` among them, are left exactly as written. The
   Prettier call ends in `|| true`, so a formatting failure is silent and only surfaces at
   `pnpm format:check`.
+- A SessionStart hook (`.claude/hooks/session-start.sh`) prints the first 20 lines of
+  `git status -sb`, your open pull requests with their checks counted by conclusion (by status
+  while a check is still running), giving `gh` 8 s, up to 4,000 bytes of the resume briefing from
+  `scripts/agent-resume.sh`, and then the `.agent-state` notes changed in the last seven days,
+  newest first: 40 lines and 300 bytes a line of each, with a pointer to the rest, until the output
+  reaches 9,000 bytes. Claude Code caps hook output at 10,000 characters and gives the session only
+  a preview of anything longer. A Stop hook (`.claude/hooks/stop.sh`) runs after every reply, not
+  only at session end, and writes `.agent-state/last-session-<branch>.md`, with `%` and `/` in the
+  branch name percent-encoded (`feat%2Fx`), or `last-session-~detached.md`. Both run git without
+  optional locks, so neither holds `index.lock` against another session, and both exit 0 on any
+  failure; git ignores `.agent-state`. It sits at the repository root rather than under `.claude`,
+  because Claude Code protects `.claude` (except `.claude/worktrees`): allow rules cannot
+  pre-approve a write there, the default and `acceptEdits` modes prompt for it (which a headless
+  session cannot answer), `dontAsk` denies it and auto mode leaves it to the classifier, so only
+  `bypassPermissions` writes there reliably. The snapshot is git state only; the checkpoint below
+  is still yours to keep.
 - `.mcp.json` is tracked and configures one MCP server for this project, over HTTP. It needs
   authorising once per machine before its tools work, and nothing in the repository depends on it.
 - `.claude/agents/ui-reviewer.md` is a read-only review agent for `apps/web/src/components`: visual
   quality, GSAP cleanup and reduced motion, accessibility, component structure. Run it after
   changing a component.
+- Every change ships as a pull request, because `main`'s protection refuses direct pushes: branch,
+  commit with a Conventional Commit title (Quality gates describes how the squash title is linted),
+  open it with `gh pr create`, and poll CI until every check on the head commit is green before
+  calling the work done. Never squash-merge without the owner's explicit approval.
+  `.claude/skills/open-pr/SKILL.md` walks the whole sequence.
+- Long-running work keeps a checkpoint, `.agent-state/<task-id>.json` (a task id of lowercase
+  letters, digits and hyphens, starting with a letter or digit), in the shape
+  `scripts/agent-state.schema.json` defines: `goal`, numbered `plan_steps`, `current_step` (null
+  once every step is in `completed_steps`), `completed_steps` with their evidence, `artifacts`
+  (`branches` with whether each was pushed, `prs`, and `files` that should exist), `blockers`,
+  `next_action` and `updated_at` in UTC. Write it before the first step. Update it after every
+  meaningful step (a commit, a push, a pull request opened, a check result, a decision), not at the
+  end of the work, and never rely on the final message for the handoff: a session stopped by a usage
+  limit or a crash never writes one. On resuming, run `scripts/agent-resume.sh` (the SessionStart
+  hook runs it at the start of every session) and act on its contradictions before anything else: a
+  contradiction means the checkpoint is stale, so trust git and gh and update the checkpoint first.
+  Failing checks on an open pull request are listed under "Needs attention" instead, since no
+  update to the checkpoint clears them, and a finished task is not checked for branches that its
+  merge deleted. Without task ids the briefing gives each finished task one line;
+  `scripts/agent-resume.sh <task-id>` briefs it in full. `.agent-state` belongs to its checkout: a
+  session sees only the checkpoints and notes of the checkout it runs in, and `git worktree remove`
+  deletes a worktree's without asking, because ignored files do not count as untracked, so copy out
+  what is still needed first. A Markdown note in `.agent-state` is still printed, but it is not
+  validated or checked.
 - Before opening a pull request, work the checklist in `.github/pull_request_template.md`, which
   lists every gate in CI order; do not keep a second copy of it here. Paste the commands and their
   real output into the Verification section; "seems fine" is not evidence.
@@ -354,6 +443,10 @@ is there so that a future buildable package is compiled before the apps typechec
   superseding that record rather than editing it, and deleting the matching assertion in
   `scripts/ai-refusals.test.mjs`.
 - `docs/runbooks` — operational procedures. `docs/runbooks/deploy.md` is the deployment procedure.
+- Before editing a document that describes repository or CI settings, check each claim against the
+  live settings (`gh api repos/milosCvetkovicDev/website`, `.../branches/main/protection`) rather
+  than trusting the existing text, and cite code as a path with line numbers checked against
+  current `main`.
 - `README.md` addresses a reader landing on GitHub; this file addresses an agent about to change
   code. Keep them consistent without duplicating each other.
 
@@ -372,7 +465,13 @@ is there so that a future buildable package is compiled before the apps typechec
   was invoked on, not this file, and `next info` from a subdirectory then resolves outside the
   repository. `apps/web/src/test/next-config.test.ts` pins all of this.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
-  pnpm.
+  pnpm. pnpm's peer-suffix resolution for this dependency graph is not deterministic: now and then
+  a resolution, on `main` as well, flips a few peer suffixes the other way (on 2026-09-16, the
+  `@babel/core` suffix of `next` and `styled-jsx` and the suffixes of the
+  `eslint-plugin-import`/`eslint-import-resolver-typescript` cycle). A lockfile diff that flips only
+  such suffixes is pnpm's own output, not a hand edit. A plain `pnpm install` keeps the flip: the
+  lockfile already matches the manifests, so resolution is skipped. Taking `main`'s whole lockfile
+  with `git checkout` and resolving again (`pnpm install --resolution-only`) usually writes it back.
 - `pnpm install` runs no dependency lifecycle scripts. `allowBuilds` in `pnpm-workspace.yaml` denies
   the two packages pnpm 10 would otherwise warn about (esbuild, unrs-resolver): their scripts only
   check the prebuilt platform binaries the lockfile already installs, and download one only when
@@ -447,10 +546,17 @@ is there so that a future buildable package is compiled before the apps typechec
   every request of an unknown `/work/*` slug, so several times per run, and still passes. It is the
   internal signal that routes such a slug to the site-level 404, and `not-found-shell`, `not-found`,
   `console-clean` and `hydration-marker` all request `/work/does-not-exist`; the response is a
-  correct 404 and no browser console entry results. Do not chase it. The Vercel production log
-  carries no such line, because the platform answers an unknown path from the cached static 404
-  without invoking the route (`docs/adr/0015-static-case-study-params.md`).
+  correct 404 and no browser console entry results. Do not chase it:
+  `scripts/check-webserver-log.mjs` allowlists exactly that message with its stack frames and fails
+  the job on any other `[WebServer]` line. The Vercel production log carries no such line, because
+  the platform answers an unknown path from the cached static 404 without invoking the route
+  (`docs/adr/0015-static-case-study-params.md`).
 - Claude Code's in-app Browser pane logs React error #418 (hydration mismatch) on every page of the
   deployed site, while an unmodified headless Chromium (Playwright from `apps/web`) reports none
   across schemes, viewports and reduced motion. Judge console cleanliness with Playwright, not the
   pane.
+- `gh` intermittently fails on writes while reads keep working: `gh pr create` and `gh pr edit`
+  return a GraphQL "Something went wrong" or a REST 502. Retry at most three times with a pause,
+  and run `gh pr list --head <branch>` before each retry, because the pull request may have been
+  created anyway. Set a body that did not land over REST:
+  `gh api -X PATCH repos/{owner}/{repo}/pulls/<N> -F body=@<file>`.
