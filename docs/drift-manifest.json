@@ -3108,7 +3108,7 @@
       "anchor": "`pnpm format:check",
       "claim": "`pnpm format:check` is a script in ./package.json.",
       "method": "command",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "script",
@@ -3118,7 +3118,8 @@
       "check": {
         "package": ".",
         "script": "format:check"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plan-route-hydration-marker-design-script-lint",
@@ -3126,7 +3127,7 @@
       "anchor": "`pnpm lint",
       "claim": "`pnpm lint` is a script in ./package.json.",
       "method": "command",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "script",
@@ -3136,7 +3137,8 @@
       "check": {
         "package": ".",
         "script": "lint"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plan-route-hydration-marker-design-script-typecheck",
@@ -3144,7 +3146,7 @@
       "anchor": "`pnpm typecheck",
       "claim": "`pnpm typecheck` is a script in ./package.json.",
       "method": "command",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "script",
@@ -3154,7 +3156,8 @@
       "check": {
         "package": ".",
         "script": "typecheck"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plan-route-hydration-marker-design-script-test",
@@ -3162,7 +3165,7 @@
       "anchor": "`pnpm test",
       "claim": "`pnpm test` is a script in ./package.json.",
       "method": "command",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "script",
@@ -3172,7 +3175,8 @@
       "check": {
         "package": ".",
         "script": "test"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plan-route-hydration-marker-plan-link-2026-09-13-route-hydra",
@@ -3180,7 +3184,7 @@
       "anchor": "](2026-09-13-route-hydration-marker-design.md)",
       "claim": "The link to 2026-09-13-route-hydration-marker-design.md resolves to a file in the repository.",
       "method": "file-line",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "link",
@@ -3189,7 +3193,8 @@
       ],
       "check": {
         "path": "docs/plans/2026-09-13-route-hydration-marker-design.md"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plan-route-hydration-marker-plan-script-web-build",
@@ -3197,7 +3202,7 @@
       "anchor": "`pnpm --filter web build",
       "claim": "`pnpm --filter web build` is a script in apps/web/package.json.",
       "method": "command",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "script",
@@ -3207,7 +3212,8 @@
       "check": {
         "package": "apps/web",
         "script": "build"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plan-route-hydration-marker-plan-script-lint",
@@ -3215,7 +3221,7 @@
       "anchor": "`pnpm lint && pnpm typecheck",
       "claim": "`pnpm lint` is a script in ./package.json.",
       "method": "command",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "script",
@@ -3225,7 +3231,8 @@
       "check": {
         "package": ".",
         "script": "lint"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plan-route-hydration-marker-plan-script-format-check",
@@ -3233,7 +3240,7 @@
       "anchor": "`pnpm format:check",
       "claim": "`pnpm format:check` is a script in ./package.json.",
       "method": "command",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "script",
@@ -3243,7 +3250,8 @@
       "check": {
         "package": ".",
         "script": "format:check"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plan-route-hydration-marker-plan-script-check-allowbuilds",
@@ -3251,7 +3259,7 @@
       "anchor": "`pnpm check:allowbuilds && pnpm test:scripts && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
       "claim": "`pnpm check:allowbuilds` is a script in ./package.json.",
       "method": "command",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "script",
@@ -3261,7 +3269,8 @@
       "check": {
         "package": ".",
         "script": "check:allowbuilds"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plan-route-hydration-marker-plan-script-web-test-e2e",
@@ -3269,7 +3278,7 @@
       "anchor": "`pnpm --filter web test:e2e",
       "claim": "`pnpm --filter web test:e2e` is a script in apps/web/package.json.",
       "method": "command",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "script",
@@ -3279,7 +3288,8 @@
       "check": {
         "package": "apps/web",
         "script": "test:e2e"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plan-route-hydration-marker-plan-script-typecheck",
@@ -3287,7 +3297,7 @@
       "anchor": "`pnpm typecheck",
       "claim": "`pnpm typecheck` is a script in ./package.json.",
       "method": "command",
-      "evaluation": "live",
+      "evaluation": "historical",
       "covers": [
         {
           "kind": "script",
@@ -3297,7 +3307,8 @@
       "check": {
         "package": ".",
         "script": "typecheck"
-      }
+      },
+      "asOf": "24d6a843b0f06d9d038d558d233ab10614f656c4"
     },
     {
       "id": "plans-readme-link-adr-readme",
@@ -4149,10 +4160,10 @@
     {
       "id": "adr-0014-cite-playwright-config-64",
       "doc": "docs/adr/0014-playwright-owns-its-server.md",
-      "anchor": "apps/web/playwright.config.ts:64",
-      "claim": "playwright.config.ts:64 pins NEXT_DIST_DIR on both branches, at 4c02b40, the commit that merged the correction.",
+      "anchor": "Playwright pins the variable on both branches. `apps/web/playwright.config.ts:64` is",
+      "claim": "The 2026-09-12 entry cites apps/web/playwright.config.ts:64 for the NEXT_DIST_DIR pin, anchored on that entry's own sentence so a rewrite of it goes stale; at 4c02b40, which merged it, the pin is at :104, and the 2026-09-16 entry records that. It reads this record's own newer entry, so it is checked live.",
       "method": "file-line",
-      "evaluation": "historical",
+      "evaluation": "live",
       "covers": [
         {
           "kind": "citation",
@@ -4160,11 +4171,61 @@
         }
       ],
       "check": {
+        "path": "docs/adr/0014-playwright-owns-its-server.md",
+        "matches": "`trace: 'on-first-retry',`\\s+and\\s+the\\s+pinned\\s+line\\s+is\\s+`apps/web/playwright\\.config\\.ts:104`\\."
+      }
+    },
+    {
+      "id": "adr-0014-cite-playwright-config-64-evidence",
+      "doc": "docs/adr/0014-playwright-owns-its-server.md",
+      "anchor": "`apps/web/playwright.config.ts:64` and the comment above it",
+      "claim": "The 2026-09-12 entry's evidence cites apps/web/playwright.config.ts:64 a second time, anchored on that entry's own text; the 2026-09-16 entry withdraws both citations. It reads this record's own newer entry, so it is checked live.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "docs/adr/0014-playwright-owns-its-server.md",
+        "matches": "This\\s+entry\\s+withdraws\\s+the\\s+citation\\s+`apps/web/playwright\\.config\\.ts:64`\\s+in\\s+both\\s+places\\s+the\\s+2026-09-12\\s+entry\\s+gives\\s+it"
+      }
+    },
+    {
+      "id": "adr-0014-cite-playwright-config-104",
+      "doc": "docs/adr/0014-playwright-owns-its-server.md",
+      "anchor": "the pinned line is `apps/web/playwright.config.ts:104`",
+      "claim": "At 4c02b40, the commit that merged the 2026-09-12 entry, playwright.config.ts:104 pins NEXT_DIST_DIR.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "asOf": "4c02b40906b7d8d6f0d528899338b549e4e42fb3",
+      "covers": [
+        {
+          "kind": "citation",
+          "token": "apps/web/playwright.config.ts:104"
+        }
+      ],
+      "check": {
         "path": "apps/web/playwright.config.ts",
-        "line": 64,
+        "line": 104,
         "contains": "NEXT_DIST_DIR: isCI ? '.next' : '.next-e2e'"
+      }
+    },
+    {
+      "id": "adr-0014-script-check-docs-drift",
+      "doc": "docs/adr/0014-playwright-owns-its-server.md",
+      "anchor": "`pnpm check:docs-drift`",
+      "claim": "`pnpm check:docs-drift` is a script in the root package.json.",
+      "method": "command",
+      "evaluation": "historical",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:docs-drift"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:docs-drift",
+        "runs": "scripts/check-docs-drift.ts"
       },
-      "asOf": "4c02b40906b7d8d6f0d528899338b549e4e42fb3"
+      "asOf": "05555893b3a3d51e2d6f5c39391d18b07ee188ac"
     },
     {
       "id": "adr-0014-cite-next-config-40",
@@ -4878,24 +4939,24 @@
       "anchor": "| 0006 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0006's record carries the status line \"Accepted\".",
+      "claim": "ADR 0006's record carries the status line \"Accepted (corrected 2026-09-16)\".",
       "check": {
         "file": "docs/adr/0006-hydration-safe-client-state.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-09-16)"
       }
     },
     {
       "id": "adr-index-0006-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0006 |",
-      "claim": "The index row for ADR 0006 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0006 gives the record's status line, \"Accepted (corrected 2026-09-16)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0006 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-09-16)"
       }
     },
     {
@@ -5502,24 +5563,24 @@
       "anchor": "| 0014 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0014's record carries the status line \"Accepted (corrected 2026-09-12)\".",
+      "claim": "ADR 0014's record carries the status line \"Accepted (corrected 2026-09-16)\".",
       "check": {
         "file": "docs/adr/0014-playwright-owns-its-server.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted (corrected 2026-09-12)"
+        "equals": "Accepted (corrected 2026-09-16)"
       }
     },
     {
       "id": "adr-index-0014-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0014 |",
-      "claim": "The index row for ADR 0014 gives the record's status line, \"Accepted (corrected 2026-09-12)\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0014 gives the record's status line, \"Accepted (corrected 2026-09-16)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0014 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted (corrected 2026-09-12)"
+        "equals": "Accepted (corrected 2026-09-16)"
       }
     },
     {
@@ -7327,14 +7388,76 @@
     {
       "id": "adr-0006-theme-init-script",
       "doc": "docs/adr/0006-hydration-safe-client-state.md",
-      "anchor": "`themeInitScript` in `apps/web/src/app/layout.tsx` runs in `<head>`",
+      "anchor": "outside React. `themeInitScript` in `apps/web/src/app/layout.tsx` runs in `<head>`",
       "method": "file-line",
       "evaluation": "live",
-      "claim": "layout.tsx carries themeInitScript and suppressHydrationWarning.",
+      "claim": "As corrected on 2026-09-16: layout.tsx renders THEME_INIT_SCRIPT, imported from @/lib/theme, and html and body carry suppressHydrationWarning.",
       "check": {
         "path": "apps/web/src/app/layout.tsx",
-        "matches": "themeInitScript[\\s\\S]*suppressHydrationWarning"
+        "matches": "import \\{ THEME_INIT_SCRIPT \\} from '@/lib/theme';[\\s\\S]*suppressHydrationWarning[\\s\\S]*__html: THEME_INIT_SCRIPT[\\s\\S]*suppressHydrationWarning"
       }
+    },
+    {
+      "id": "adr-0006-theme-init-script-defined",
+      "doc": "docs/adr/0006-hydration-safe-client-state.md",
+      "anchor": "outside React. `themeInitScript` in `apps/web/src/app/layout.tsx` runs in `<head>`",
+      "claim": "As corrected on 2026-09-16: THEME_INIT_SCRIPT is exported from apps/web/src/lib/theme.ts.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/lib/theme.ts",
+        "contains": "export const THEME_INIT_SCRIPT = "
+      }
+    },
+    {
+      "id": "adr-0006-decision-annotated",
+      "doc": "docs/adr/0006-hydration-safe-client-state.md",
+      "anchor": "outside React. `themeInitScript` in `apps/web/src/app/layout.tsx` runs in `<head>`",
+      "claim": "The false themeInitScript sentence in the Decision carries a Corrections entry, since the Decision itself is never rewritten.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "docs/adr/0006-hydration-safe-client-state.md",
+        "matches": "^## Corrections\\n\\n### 2026-09-16\\n[\\s\\S]*\\*\\*The script's name and file\\*\\*, in `## Decision`"
+      }
+    },
+    {
+      "id": "adr-0006-link-0012",
+      "doc": "docs/adr/0006-hydration-safe-client-state.md",
+      "anchor": "](0012-correcting-accepted-records.md)",
+      "claim": "The link to 0012-correcting-accepted-records.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0012-correcting-accepted-records.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0012-correcting-accepted-records.md"
+      },
+      "asOf": "05555893b3a3d51e2d6f5c39391d18b07ee188ac"
+    },
+    {
+      "id": "adr-0006-script-check-docs-drift",
+      "doc": "docs/adr/0006-hydration-safe-client-state.md",
+      "anchor": "`pnpm check:docs-drift`",
+      "claim": "`pnpm check:docs-drift` is a script in the root package.json.",
+      "method": "command",
+      "evaluation": "historical",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:docs-drift"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:docs-drift",
+        "runs": "scripts/check-docs-drift.ts"
+      },
+      "asOf": "05555893b3a3d51e2d6f5c39391d18b07ee188ac"
     },
     {
       "id": "adr-0010-status-tokens-light",
