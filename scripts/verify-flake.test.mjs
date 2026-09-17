@@ -552,12 +552,10 @@ describe('recording runs', () => {
       plan(1, passing());
       const run = sweep(['1', 'e2e/x.spec.ts'], { env: { CI: ci } });
       assert.equal(run.status, 0, run.stderr);
+      const escaped = mode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       assert.match(
         summary(),
-        new RegExp(
-          `^verify-flake: e2e/x\\.spec\\.ts, 1 runs, ${mode.replace(/[()]/g, '\\$&')}$`,
-          'm',
-        ),
+        new RegExp(`^verify-flake: e2e/x\\.spec\\.ts, 1 runs, ${escaped}$`, 'm'),
         `CI='${ci}'`,
       );
     }
