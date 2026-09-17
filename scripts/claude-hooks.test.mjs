@@ -52,14 +52,22 @@ if [ "$1" = status ] && [ -e "$STUB/git.slow" ]; then /bin/sleep 20; fi
 exec "${REAL_GIT}" "$@"
 `;
 
+/** @type {string} */
 let root;
+/** @type {string} */
 let repo;
+/** @type {string} */
 let stub;
 
+/** @param {...string} args */
 function git(...args) {
   return execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
 }
 
+/**
+ * @param {string} path
+ * @param {string} body
+ */
 function executable(path, body) {
   writeFileSync(path, body);
   chmodSync(path, 0o755);
@@ -86,6 +94,7 @@ beforeEach(() => {
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
+/** @param {Record<string, string>} env */
 function hookEnv(env) {
   return {
     ...process.env,
@@ -96,14 +105,24 @@ function hookEnv(env) {
   };
 }
 
+/**
+ * @param {string} hook
+ * @param {Record<string, string>} [env]
+ */
 function run(hook, env = {}) {
   const started = Date.now();
   const result = spawnSync('bash', [hook], { cwd: root, encoding: 'utf8', env: hookEnv(env) });
   return { ...result, seconds: (Date.now() - started) / 1000 };
 }
 
+/** @param {...string} parts */
 const state = (...parts) => join(repo, '.agent-state', ...parts);
 
+/**
+ * @param {string} name
+ * @param {string} body
+ * @param {number} [secondsAgo]
+ */
 function note(name, body, secondsAgo = 0) {
   mkdirSync(dirname(state(name)), { recursive: true });
   writeFileSync(state(name), body);
@@ -111,11 +130,20 @@ function note(name, body, secondsAgo = 0) {
   utimesSync(state(name), when, when);
 }
 
-/** gh pr list answers with these pull requests. */
+/**
+ * gh pr list answers with these pull requests.
+ *
+ * @param {...object} list
+ */
 function prs(...list) {
   writeFileSync(join(stub, 'gh.json'), JSON.stringify(list));
 }
 
+/**
+ * @param {number} number
+ * @param {unknown} statusCheckRollup
+ * @param {Record<string, unknown>} [extra]
+ */
 const pr = (number, statusCheckRollup, extra = {}) => ({
   number,
   title: `PR ${number}`,
