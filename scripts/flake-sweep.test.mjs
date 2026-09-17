@@ -647,23 +647,25 @@ describe('recording runs', () => {
     });
   }
 
-  it('writes every row and the summary when its stdout is closed early', () => {
+  it('writes every row and the summary when its stdout is closed early', async () => {
     const dir = join(root, 'piped');
     plan(1, passing());
     plan(2, passing(), 0, { hook: 'sleep 1\n' });
     plan(3, passing());
     const script = join(root, 'repo/scripts/flake-sweep.sh');
-    const run = spawnSync(
-      'bash',
-      [
-        '-c',
-        'bash "$0" e2e/x.spec.ts 3 "$1" | head -n 1 >/dev/null; echo "${PIPESTATUS[0]}"',
-        script,
-        dir,
-      ],
-      { cwd, encoding: 'utf8', env: env() },
-    );
-    assert.equal(run.stdout.trim(), '0', run.stderr);
+    // No shell in between: the reader closes the sweep's stdout itself after the first chunk, as
+    // `| head -n 1` would, while run 2's hook still has a second to go.
+    const child = spawn('bash', [script, 'e2e/x.spec.ts', '3', dir], {
+      cwd,
+      env: env(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => (stderr += chunk));
+    child.stdout.once('data', () => child.stdout.destroy());
+    /** @type {number | null} */
+    const status = await new Promise((resolve) => child.on('close', (code) => resolve(code)));
+    assert.equal(status, 0, stderr);
     assert.equal(invocations(), 3);
     assert.equal(read(dir, 'runs.tsv').trim().split('\n').length, 4);
     assert.match(
