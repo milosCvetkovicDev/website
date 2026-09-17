@@ -37,6 +37,8 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Testing
+# scripts/flake-hunt.sh writes its runs and report to flake-hunt in the directory it is run from.
+flake-hunt/
 coverage
 test-results
 playwright-report
@@ -49,3 +51,9 @@ playwright-report
 .worktrees
 .claude/worktrees
 .playwright-mcp/
+# Mimosa hook run reports and session state; they record local absolute paths
+.mimosa
+
+# Agent handoff notes, checkpoints and the Stop hook's snapshots: per machine, full of local
+# paths.
+/.agent-state

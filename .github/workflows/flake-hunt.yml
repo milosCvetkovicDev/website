@@ -1,0 +1,166 @@
+name: Flake hunt
+
+# Runs the whole e2e suite 30 times against the production build with scripts/flake-hunt.sh and
+# opens one tracking issue for flaky tests no open `flake-hunt` issue tracks yet
+# (scripts/flake-hunt-issue.sh). The CI e2e job's test step takes about seven minutes on a runner,
+# and a hunt records a trace per failure on top, so the 30 runs are six shards of five in parallel,
+# numbered apart so their results merge into one report.
+#
+# Nothing here is a required check, and it never runs on a pull request. The schedule runs on the
+# default branch; a manual dispatch can run any branch that has this file, and opens an issue only
+# when that branch is the default branch.
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+# One hunt at a time, and a hunt still running when the next night starts is left to finish.
+concurrency:
+  group: flake-hunt
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: '1'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  hunt:
+    name: Hunt, runs ${{ matrix.first }} to ${{ matrix.last }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { first: 1, last: 5 }
+          - { first: 6, last: 10 }
+          - { first: 11, last: 15 }
+          - { first: 16, last: 20 }
+          - { first: 21, last: 25 }
+          - { first: 26, last: 30 }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm (version from package.json#packageManager)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter web exec playwright install --with-deps chromium webkit
+
+      - name: Build web
+        run: pnpm --filter web build
+
+      - name: Run the suite five times
+        # GitHub sets CI=true, so each run serves the production build with the retries CI has
+        # (none for the specs that opt out). Exit 1 means some spec failed, which is what the hunt
+        # is for. Any other exit fails this job after its results are uploaded: 2 when a run could
+        # not test, the hunt could not start or a command in it failed; 129, 130 or 143 when it was
+        # stopped; anything else when it was killed. A `set -u` abort in the script exits 1 too, but
+        # the report job counts every run a shard did not finish, so no run goes missing unseen.
+        #
+        # On a cancellation or a timeout the runner sends SIGINT to this step's shell alone, then
+        # SIGTERM 7.5 s later, and kills the process tree only if the shell outlives that by 2.5 s
+        # (docs.github.com, workflow cancellation). So the hunt runs in the background and the shell
+        # passes either signal on as SIGTERM, which stops the hunt cleanly with its report written.
+        # The step's timeout ends it as failed, not cancelled, so the upload below still runs; the
+        # job's own timeout cancels the job, which is why that upload runs always().
+        timeout-minutes: 65
+        env:
+          PLAYWRIGHT_PORT: '3000'
+          FLAKE_HUNT_DIR: ${{ runner.temp }}/flake-hunt
+          FLAKE_HUNT_FIRST_RUN: ${{ matrix.first }}
+        run: |
+          scripts/flake-hunt.sh 5 &
+          hunt=$!
+          trap 'kill -TERM "$hunt" 2>/dev/null || true' INT TERM
+          while kill -0 "$hunt" 2>/dev/null; do wait "$hunt" || true; done
+          status=0
+          wait "$hunt" || status=$?
+          case $status in
+            0 | 1) ;;
+            *) exit "$status" ;;
+          esac
+
+      - name: Upload this shard's runs
+        # always(), not !cancelled(): a job that hit its timeout counts as cancelled, and its
+        # finished runs are the evidence that night needs.
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flake-hunt-runs-${{ matrix.first }}-${{ matrix.last }}
+          path: ${{ runner.temp }}/flake-hunt/run-*
+          retention-days: 14
+
+  report:
+    name: Report and track new flakes
+    needs: hunt
+    # A shard that failed still uploaded the runs it finished; the report lists its errors and,
+    # told to expect 30 runs, every run no shard uploaded.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download every shard's runs
+        # When no shard uploaded anything, the report below counts all 30 runs as missing.
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: flake-hunt-runs-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/flake-hunt
+
+      - name: Build the report
+        id: report
+        env:
+          FLAKE_HUNT_EXPECTED_RUNS: '30'
+        run: |
+          mkdir -p "$RUNNER_TEMP/flake-hunt"
+          status=0
+          scripts/flake-hunt.sh --report-only "$RUNNER_TEMP/flake-hunt" || status=$?
+          echo "status=$status" >>"$GITHUB_OUTPUT"
+          if [ "$status" -eq 2 ]; then
+            echo "::warning::Some runs could not test or were never uploaded; see the log above"
+          fi
+
+      - name: Upload the report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flake-report
+          path: ${{ runner.temp }}/flake-hunt/flake-report.json
+          retention-days: 30
+
+      - name: Open an issue for new flakes
+        # A manual dispatch of another branch reports in its logs and artifacts only.
+        if: >-
+          github.event_name == 'schedule' ||
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          scripts/flake-hunt-issue.sh "$RUNNER_TEMP/flake-hunt/flake-report.json" "$run_url"
+
+      - name: Fail on runs that could not test
+        if: ${{ steps.report.outputs.status == '2' }}
+        run: |
+          echo "::error::The hunt recorded runs that could not test or were never uploaded"
+          exit 1
