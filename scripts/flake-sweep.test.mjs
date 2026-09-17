@@ -67,12 +67,30 @@ exit "$(cat "$STUB/run-$n.exit" 2>/dev/null || echo 0)"
 `;
 
 /**
+ * @typedef {{
+ *   title: string,
+ *   status: string,
+ *   file?: string,
+ *   line?: number,
+ *   project?: string,
+ *   declared?: string,
+ *   describe?: string,
+ *   ms?: number,
+ * }} Test
+ */
+
+/**
  * A Playwright JSON report for the given tests, with stats derived the way Playwright derives them.
  * Each test is { title, status, file?, line?, project?, declared?, describe?, ms? }; `file` is
  * relative to the test directory, as Playwright reports it, and defaults to the spec under sweep.
+ *
+ * @param {Test[]} tests
+ * @param {{ errors?: { message: string }[], rootDir?: string }} [options]
  */
 function report(tests, { errors = [], rootDir = join(root, 'repo/apps/web/e2e') } = {}) {
+  /** @param {string} status */
   const count = (status) => tests.filter((t) => t.status === status).length;
+  /** @param {Test} t */
   const spec = (t) => ({
     title: t.title,
     file: t.file ?? 'x.spec.ts',
@@ -116,8 +134,11 @@ function report(tests, { errors = [], rootDir = join(root, 'repo/apps/web/e2e') 
 
 const passing = (ms = 100) => report([{ title: 'works', status: 'expected', ms }]);
 
+/** @type {string} */
 let root;
+/** @type {string} */
 let stub;
+/** @type {string} */
 let cwd;
 
 beforeEach(() => {
@@ -141,6 +162,12 @@ beforeEach(() => {
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
+/**
+ * @param {number} n
+ * @param {object | string | null} body
+ * @param {number} [exit]
+ * @param {{ sleep?: number, hook?: string }} [options]
+ */
 function plan(n, body, exit = 0, { sleep, hook } = {}) {
   if (body !== null) {
     writeFileSync(
@@ -165,13 +192,20 @@ const CLEAN_ENV = {
   PLAYWRIGHT_JSON_OUTPUT_DIR: '',
 };
 
+/** @param {Record<string, string>} [extra] */
 function env(extra = {}) {
+  /** @type {Record<string, string | undefined>} */
   const merged = { ...process.env, ...CLEAN_ENV, TMPDIR: join(root, 'tmp'), ...extra, STUB: stub };
   merged.PATH = `${join(stub, 'bin')}:${extra.PATH ?? process.env.PATH}`;
   for (const [key, value] of Object.entries(merged)) if (value === '') delete merged[key];
   return merged;
 }
 
+/**
+ * @param {string[]} args
+ * @param {Record<string, string>} [extra]
+ * @param {{ bash?: string, cwd?: string }} [options]
+ */
 function sweep(args, extra = {}, options = {}) {
   mkdirSync(join(root, 'tmp'), { recursive: true });
   const result = spawnSync(
@@ -188,15 +222,33 @@ function sweep(args, extra = {}, options = {}) {
 
 const invocations = () =>
   existsSync(join(stub, 'count')) ? Number(readFileSync(join(stub, 'count'), 'utf8')) : 0;
-const outDir = (text) => text.match(/flake-sweep: report in (.+)/)?.[1];
+/**
+ * The out-dir the sweep reported. Typed as a string: a test reads it only from a sweep that got as
+ * far as reporting one, and a missing one fails that test where it is used.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+const outDir = (text) => /** @type {string} */ (text.match(/flake-sweep: report in (.+)/)?.[1]);
+/**
+ * @param {string} dir
+ * @param {string} name
+ */
 const read = (dir, name) => readFileSync(join(dir, name), 'utf8');
+/** @param {number} n */
 const stubArgs = (n) =>
   readFileSync(join(stub, `args-${n}`), 'utf8')
     .trim()
     .split('\n');
+/** @param {number} n */
 const stubEnv = (n) => readFileSync(join(stub, `env-${n}`), 'utf8');
 
-/** The summary's lines for one test, found by the text after its counts. */
+/**
+ * The summary's lines for one test, found by the text after its counts.
+ *
+ * @param {string} summary
+ * @param {string} test
+ */
 function block(summary, test) {
   const lines = summary.split('\n');
   const start = lines.findIndex((line) => line.includes(`  ${test}`));
@@ -208,7 +260,11 @@ function block(summary, test) {
 
 describe('arguments and environment', () => {
   it('rejects a bad invocation before any run', () => {
-    for (const [args, extra, message] of [
+    for (const [
+      args,
+      extra,
+      message,
+    ] of /** @type {[string[], Record<string, string>, RegExp][]} */ ([
       [[], {}, /usage: pnpm test:e2e:sweep <spec/],
       [['e2e/x.spec.ts', '1', 'a', 'b'], {}, /usage:/],
       [['e2e/x.spec.ts', '0'], {}, /runs must be a positive integer, got '0'/],
@@ -221,7 +277,7 @@ describe('arguments and environment', () => {
       // The file exists as x.spec.ts: a case-insensitive filesystem would find it anyway.
       [['e2e/X.spec.ts'], {}, /no e2e\/X\.spec\.ts in /],
       [['E2E/x.spec.ts'], {}, /no E2E\/x\.spec\.ts in /],
-    ]) {
+    ])) {
       const run = sweep(args, extra);
       assert.equal(run.status, 1, `${args}: ${run.stderr}`);
       assert.match(run.stderr, message);
@@ -230,11 +286,11 @@ describe('arguments and environment', () => {
   });
 
   it('accepts COLD only as unset, 0 or 1, and never with CI=true', () => {
-    for (const [extra, message] of [
+    for (const [extra, message] of /** @type {[Record<string, string>, RegExp][]} */ ([
       [{ COLD: 'yes' }, /COLD must be unset, 0 or 1, got 'yes'/],
       [{ COLD: 'true' }, /COLD must be unset, 0 or 1, got 'true'/],
       [{ COLD: '1', CI: 'true' }, /COLD=1 deletes the dev server's \.next-e2e/],
-    ]) {
+    ])) {
       const run = sweep(['e2e/x.spec.ts', '1'], extra);
       assert.equal(run.status, 1, JSON.stringify(extra));
       assert.match(run.stderr, message);
@@ -340,7 +396,7 @@ describe('arguments and environment', () => {
     const modes = ['true', '1', 'false'].map((CI) => {
       const run = sweep(['e2e/x.spec.ts', '1'], { CI });
       assert.equal(run.status, 0, run.stderr);
-      return read(run.out, 'sweep.txt').match(/^mode\t(.*)$/m)[1];
+      return /** @type {RegExpMatchArray} */ (read(run.out, 'sweep.txt').match(/^mode\t(.*)$/m))[1];
     });
     assert.deepEqual(modes, ['production build (CI)', 'production build (CI)', 'dev server']);
   });
@@ -431,6 +487,7 @@ describe('the out-dir', () => {
   });
 
   it('records what was swept in sweep.txt', () => {
+    /** @param {string[]} args */
     const git = (...args) =>
       execFileSync('git', ['-C', join(root, 'repo'), ...args], { encoding: 'utf8' });
     git('init', '-q');
@@ -515,7 +572,7 @@ describe('recording runs', () => {
     assert.ok(existsSync(join(run.out, 'run-3-results/x-failed/error-context.md')));
   });
 
-  for (const [name, prepare, message] of [
+  for (const [name, prepare, message] of /** @type {[string, () => void, RegExp][]} */ ([
     ['writes no report', () => plan(2, null, 1), /run 2 wrote no report \(exit 1\)/],
     [
       'writes an unreadable report',
@@ -553,7 +610,7 @@ describe('recording runs', () => {
       () => plan(2, passing(), 0, { hook: 'chmod 444 "$(dirname "$out")/runs.tsv"\n' }),
       /line \d+ exited 1/,
     ],
-  ]) {
+  ])) {
     it(`stops with exit 1 and a partial summary when a run ${name}`, () => {
       plan(1, report([{ title: 'works', status: 'unexpected' }]), 1);
       prepare();
@@ -571,10 +628,10 @@ describe('recording runs', () => {
     });
   }
 
-  for (const [code, word] of [
+  for (const [code, word] of /** @type {[number, string][]} */ ([
     [130, 'interrupted'],
     [143, 'terminated'],
-  ]) {
+  ])) {
     it(`stops with ${code} when Playwright ends a run with ${code}`, () => {
       // As when the sweep was started in the background by a script, which leaves it ignoring
       // SIGINT, while Playwright handles the SIGINT that reached them both.
@@ -635,7 +692,7 @@ describe('recording runs', () => {
       assert.ok(Date.now() < deadline, 'run 2 never started');
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    process.kill(-child.pid, 'SIGINT');
+    process.kill(-(/** @type {number} */ (child.pid)), 'SIGINT');
     const code = await new Promise((resolve) => child.on('close', (status) => resolve(status)));
     assert.equal(code, 130, stderr);
     assert.match(stderr, /interrupted during run 2/);
@@ -679,6 +736,10 @@ describe('recording runs', () => {
 
 describe('summary.txt', () => {
   it('keeps tests apart that share a file, line and title under different describes', () => {
+    /**
+     * @param {string} describe
+     * @param {string} status
+     */
     const axe = (describe, status) => ({ title: 'axe', status, describe, line: 12 });
     plan(1, report([axe('light', 'expected'), axe('dark', 'unexpected')]), 1);
     const run = sweep(['e2e/x.spec.ts', '1']);
