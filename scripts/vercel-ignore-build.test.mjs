@@ -24,7 +24,14 @@ import {
   SKIP_EXIT_CODE,
 } from './vercel-ignore-build.mjs';
 
+/** @typedef {import('./vercel-ignore-build.mjs').Diff} Diff */
+
+/**
+ * @param {Diff} diff
+ * @param {Partial<Parameters<typeof decide>[0]>} [extra]
+ */
 const preview = (diff, extra = {}) => decide({ vercelEnv: 'preview', diff, ...extra });
+/** @param {...string} list */
 const paths = (...list) => ({ paths: list });
 
 describe('isBuildInput', () => {
@@ -131,6 +138,14 @@ describe('decide: building', () => {
     assert.equal(verdict.build, true);
   });
 
+  // A reason is a reason even when it is empty: the check is `!== undefined`, not truthiness, so a
+  // diff that could not be read never falls through to the path list it does not have.
+  it('builds when the diff is unavailable with an empty reason', () => {
+    const verdict = preview({ unavailable: '' });
+    assert.equal(verdict.build, true);
+    assert.match(verdict.reason, /cannot tell what changed/);
+  });
+
   it('builds when the diff is empty', () => {
     // An empty diff from a correct base and an empty diff from a base that happens to equal HEAD
     // are indistinguishable here, and the second one has seen nothing. Build.
@@ -221,8 +236,14 @@ describe('decide: refs that only look like dependabot', () => {
 describe('readDiff', () => {
   // A fake `run` standing in for git. `calls` records the argv so the test can assert which
   // arguments were asked for, not only what came back.
+  /** @param {Record<string, string | null>} replies */
   const fakeGit = (replies) => {
+    /** @type {string[][]} */
     const calls = [];
+    /**
+     * @param {string[]} args
+     * @returns {string | null}
+     */
     const run = (args) => {
       calls.push(args);
       const key = args[0];
@@ -271,23 +292,23 @@ describe('readDiff', () => {
 
   it('reports an unavailable diff when git cannot find the repository root', () => {
     const { run } = fakeGit({ 'rev-parse': null });
-    assert.match(readDiff(env, run).unavailable, /rev-parse/);
+    assert.match(readDiff(env, run).unavailable ?? '', /rev-parse/);
   });
 
   it('reports an unavailable diff when the base is absent from the clone', () => {
     const { run } = fakeGit({ 'rev-parse': '/repo\n', 'cat-file': null });
-    assert.match(readDiff(env, run).unavailable, /not in this clone/);
+    assert.match(readDiff(env, run).unavailable ?? '', /not in this clone/);
   });
 
   it('reports an unavailable diff when the diff command itself fails', () => {
     const { run } = fakeGit({ 'rev-parse': '/repo\n', 'cat-file': '', diff: null });
-    assert.match(readDiff(env, run).unavailable, /failed/);
+    assert.match(readDiff(env, run).unavailable ?? '', /failed/);
   });
 
   it('rejects a base that is not an object name rather than passing it to git', () => {
     const { run, calls } = fakeGit({ 'rev-parse': '/repo\n' });
     const diff = readDiff({ VERCEL_GIT_PREVIOUS_SHA: '--upload-pack=evil' }, run);
-    assert.match(diff.unavailable, /not an object name/);
+    assert.match(diff.unavailable ?? '', /not an object name/);
     assert.equal(
       calls.filter((args) => args[0] !== 'rev-parse').length,
       0,
@@ -299,7 +320,7 @@ describe('readDiff', () => {
     const { run, calls } = fakeGit({ 'rev-parse': '/repo\n', 'cat-file': '', diff: '' });
     readDiff({ VERCEL_GIT_PREVIOUS_SHA: base, VERCEL_GIT_COMMIT_SHA: 'not-a-sha' }, run);
     const diffCall = calls.find((args) => args[0] === 'diff');
-    assert.equal(diffCall.at(-1), 'HEAD');
+    assert.equal(diffCall?.at(-1), 'HEAD');
   });
 });
 
@@ -322,9 +343,10 @@ describe('the command, run as a process the way Vercel runs it', () => {
   // commit on top. The script runs with apps/web as its working directory, where Vercel's Root
   // Directory puts it.
   const script = fileURLToPath(new URL('./vercel-ignore-build.mjs', import.meta.url));
+  /** @type {Record<string, string>} */
   const sha = {};
-  let scratch;
-  let repo;
+  let scratch = '';
+  let repo = '';
 
   // Hermetic: no inherited VERCEL_* variable, no user or system git config (signing, hooks,
   // templates), and git may not walk up out of the scratch directory into a real repository.
@@ -335,6 +357,7 @@ describe('the command, run as a process the way Vercel runs it', () => {
     GIT_CEILING_DIRECTORIES: scratch,
   });
 
+  /** @param {...string} args */
   const git = (...args) =>
     execFileSync(
       'git',
@@ -349,6 +372,10 @@ describe('the command, run as a process the way Vercel runs it', () => {
       { cwd: repo, env: baseEnv(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
     ).trim();
 
+  /**
+   * @param {Record<string, string>} files
+   * @param {string} message
+   */
   const commit = (files, message) => {
     for (const [path, text] of Object.entries(files)) {
       mkdirSync(dirname(join(repo, path)), { recursive: true });
@@ -373,9 +400,17 @@ describe('the command, run as a process the way Vercel runs it', () => {
     if (scratch) rmSync(scratch, { recursive: true, force: true });
   });
 
+  /**
+   * @param {Record<string, string | undefined>} env
+   * @param {{ cwd?: string, entry?: string }} [options]
+   */
   const run = (env, { cwd = join(repo, 'apps', 'web'), entry = script } = {}) =>
     spawnSync(process.execPath, [entry], { cwd, env: { ...baseEnv(), ...env }, encoding: 'utf8' });
 
+  /**
+   * @param {string} from
+   * @param {string} to
+   */
   const push = (from, to) => ({
     VERCEL_GIT_PREVIOUS_SHA: sha[from],
     VERCEL_GIT_COMMIT_SHA: sha[to],

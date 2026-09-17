@@ -1,6 +1,12 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+  # The root gates in scripts/ are a private workspace package, @repo/scripts, so that
+  # `turbo typecheck` runs their `tsc -p .` with the package's own typescript and @types/node. The
+  # package adds only its importer block to the lockfile. As root devDependencies they would also
+  # become the `@types/node` peer of root commitlint, which pnpm resolves from the root's own
+  # dependencies, and rewrite its lockfile snapshots. See CLAUDE.md's Commands section.
+  - 'scripts'
 
 # A package version published less than a day ago is not installed. Most supply-chain compromises of
 # an npm package are found and unpublished within hours, and nothing here needs a release the day it
