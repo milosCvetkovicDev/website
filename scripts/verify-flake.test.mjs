@@ -70,8 +70,11 @@ process.on('SIGINT', () => {
 setTimeout(() => finish(Number(read('exit', '0'))), Number(read('sleep', '0')));
 `;
 
+/** @type {string} */
 let root;
+/** @type {string} */
 let stub;
+/** @type {string} */
 let cwd;
 
 beforeEach(() => {
@@ -98,13 +101,21 @@ beforeEach(() => {
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-/** Prepares run N of the stub: the report it writes (null for none), the exit code and a delay. */
+/**
+ * Prepares run N of the stub: the report it writes (null for none), the exit code and a delay.
+ *
+ * @param {number} n
+ * @param {object | null} body
+ * @param {number} [exit]
+ * @param {{ sleepMs?: number }} [options]
+ */
 function plan(n, body, exit = 0, { sleepMs = 0 } = {}) {
   if (body !== null) writeFileSync(join(stub, `run-${n}.json`), JSON.stringify(body));
   writeFileSync(join(stub, `run-${n}.exit`), String(exit));
   if (sleepMs) writeFileSync(join(stub, `run-${n}.sleep`), String(sleepMs));
 }
 
+/** @param {Record<string, string>} env */
 const environment = (env) => ({
   ...process.env,
   // Unset in the child unless a test sets them: CI=true on the runner would pick CI mode.
@@ -121,6 +132,10 @@ const invocations = () =>
   existsSync(join(stub, 'count')) ? Number(readFileSync(join(stub, 'count'), 'utf8')) : 0;
 
 // Generous: every run starts several node processes, which take seconds each on a loaded machine.
+/**
+ * @param {string[]} args
+ * @param {{ env?: Record<string, string>, timeout?: number }} [options]
+ */
 function sweep(args, { env = {}, timeout = 300_000 } = {}) {
   const result = spawnSync('bash', [join(root, 'repo/scripts/verify-flake.sh'), ...args], {
     cwd,
@@ -131,7 +146,12 @@ function sweep(args, { env = {}, timeout = 300_000 } = {}) {
   return { ...result, invocations: invocations() };
 }
 
-/** Starts a sweep as the leader of its own process group, for the signal tests. */
+/**
+ * Starts a sweep as the leader of its own process group, for the signal tests.
+ *
+ * @param {string[]} args
+ * @param {{ closeOutput?: boolean }} [options]
+ */
 function sweepInBackground(args, { closeOutput = false } = {}) {
   const child = spawn('bash', [join(root, 'repo/scripts/verify-flake.sh'), ...args], {
     cwd,
@@ -154,6 +174,10 @@ function sweepInBackground(args, { closeOutput = false } = {}) {
   return { child, exited };
 }
 
+/**
+ * @param {string} path
+ * @param {number} [ms]
+ */
 async function waitFor(path, ms = 120_000) {
   for (let waited = 0; waited < ms; waited += 50) {
     if (existsSync(path)) return;
@@ -169,6 +193,7 @@ function deadPid() {
   return pid;
 }
 
+/** @param {number} pid */
 function alive(pid) {
   try {
     process.kill(pid, 0);
@@ -179,11 +204,31 @@ function alive(pid) {
 }
 
 /**
+ * @typedef {{
+ *   title: string,
+ *   status: string,
+ *   line?: number,
+ *   project?: string,
+ *   declared?: string,
+ *   durations?: number[],
+ *   describe?: string,
+ * }} Test
+ */
+
+/**
  * A Playwright JSON report. Each test is { title, status, line?, project?, declared?, durations?,
  * describe? }; a test with a describe title sits in a suite of that name inside the file's suite.
+ *
+ * @param {Test[]} tests
+ * @param {{ errors?: { message: string }[], file?: string }} [options]
  */
 function report(tests, { errors = [], file = 'x.spec.ts' } = {}) {
+  /** @param {string} status */
   const count = (status) => tests.filter((t) => t.status === status).length;
+  /**
+   * @param {Test} t
+   * @param {number} i
+   */
   const spec = (t, i) => ({
     title: t.title,
     file,
@@ -207,14 +252,14 @@ function report(tests, { errors = [], file = 'x.spec.ts' } = {}) {
         title: file,
         file,
         specs: tests
-          .map((t, i) => [t, i])
+          .map((t, i) => /** @type {[Test, number]} */ ([t, i]))
           .filter(([t]) => t.describe === undefined)
           .map(([t, i]) => spec(t, i)),
         suites: describes.map((title) => ({
           title,
           file,
           specs: tests
-            .map((t, i) => [t, i])
+            .map((t, i) => /** @type {[Test, number]} */ ([t, i]))
             .filter(([t]) => t.describe === title)
             .map(([t, i]) => spec(t, i)),
           suites: [],
@@ -235,10 +280,15 @@ const passing = (durations = [100]) => report([{ title: 'works', status: 'expect
 const failing = () => report([{ title: 'works', status: 'unexpected', durations: [500] }]);
 
 const verifyDir = () => join(cwd, '.verify');
+/** @param {string} name */
 const readJson = (name) => JSON.parse(readFileSync(join(verifyDir(), name), 'utf8'));
 const summary = () => readFileSync(join(verifyDir(), 'summary.txt'), 'utf8');
 
-/** The summary row whose test column starts with `test`, split into its six columns. */
+/**
+ * The summary row whose test column starts with `test`, split into its six columns.
+ *
+ * @param {string} test
+ */
 function row(test) {
   const line = summary()
     .split('\n')
@@ -247,7 +297,11 @@ function row(test) {
   return line.trim().split(/ {2,}/);
 }
 
-/** Every stderr line of a sweep that met no error: progress lines and the closing pointer. */
+/**
+ * Every stderr line of a sweep that met no error: progress lines and the closing pointer.
+ *
+ * @param {string} stderr
+ */
 function assertQuietStderr(stderr) {
   for (const line of stderr.split('\n').filter(Boolean)) {
     assert.match(
@@ -674,8 +728,8 @@ describe('summary', () => {
     for (let n = 1; n <= 10; n += 1) plan(n, passing(), 0, { sleepMs: n === 10 ? 1500 : 0 });
     const run = sweep(['10', 'e2e/x.spec.ts'], { timeout: 300_000 });
     assert.equal(run.status, 0, run.stderr);
-    const [, p50, p95] = summary().match(
-      /^run duration p50 (\d+\.\d) s, p95 (\d+\.\d) s \(nearest rank\)$/m,
+    const [, p50, p95] = /** @type {RegExpMatchArray} */ (
+      summary().match(/^run duration p50 (\d+\.\d) s, p95 (\d+\.\d) s \(nearest rank\)$/m)
     );
     assert.ok(Number(p95) >= 1.4, `p95 ${p95} is the slow run`);
     assert.ok(Number(p50) < Number(p95), `p50 ${p50} is below p95 ${p95}`);
@@ -683,6 +737,11 @@ describe('summary', () => {
 });
 
 describe('errors stop the sweep with exit 2', () => {
+  /**
+   * @param {string} name
+   * @param {() => void} prepare
+   * @param {RegExp} message
+   */
   const stops = (name, prepare, message) =>
     it(name, () => {
       plan(1, passing());
@@ -788,7 +847,7 @@ describe('signals', () => {
     const { child, exited } = sweepInBackground(['3', 'e2e/x.spec.ts']);
     await waitFor(join(stub, 'pid-2'));
     await sleep(200);
-    process.kill(-child.pid, 'SIGINT');
+    process.kill(-(/** @type {number} */ (child.pid)), 'SIGINT');
     const done = await exited;
     assert.equal(done.code, 130, done.stderr);
     const stubPid = Number(readFileSync(join(stub, 'pid-2'), 'utf8'));
@@ -810,7 +869,7 @@ describe('signals', () => {
     const { child, exited } = sweepInBackground(['2', 'e2e/x.spec.ts']);
     await waitFor(join(stub, 'pid-2'));
     await sleep(200);
-    process.kill(child.pid, 'SIGTERM');
+    process.kill(/** @type {number} */ (child.pid), 'SIGTERM');
     const done = await exited;
     assert.equal(done.code, 143, done.stderr);
     const stubPid = Number(readFileSync(join(stub, 'pid-2'), 'utf8'));
@@ -825,7 +884,7 @@ describe('signals', () => {
     const { child, exited } = sweepInBackground(['2', 'e2e/x.spec.ts']);
     await waitFor(join(stub, 'pid-2'));
     await sleep(200);
-    process.kill(child.pid, 'SIGHUP');
+    process.kill(/** @type {number} */ (child.pid), 'SIGHUP');
     const done = await exited;
     assert.equal(done.code, 129, `${done.signal} ${done.stderr}`);
     const stubPid = Number(readFileSync(join(stub, 'pid-2'), 'utf8'));
@@ -842,7 +901,7 @@ describe('signals', () => {
     const { child, exited } = sweepInBackground(['3', 'e2e/x.spec.ts']);
     await waitFor(join(stub, 'pid-2'));
     await sleep(200);
-    process.kill(child.pid, 'SIGINT');
+    process.kill(/** @type {number} */ (child.pid), 'SIGINT');
     const done = await exited;
     assert.equal(done.code, 130, done.stderr);
     assert.ok(!existsSync(join(stub, 'sigint-2')), 'Playwright got no SIGINT');
@@ -860,7 +919,7 @@ describe('signals', () => {
     const { child, exited } = sweepInBackground(['2', 'e2e/x.spec.ts']);
     await waitFor(join(stub, 'pid-1'));
     await sleep(200);
-    process.kill(-child.pid, 'SIGINT');
+    process.kill(-(/** @type {number} */ (child.pid)), 'SIGINT');
     const done = await exited;
     assert.equal(done.code, 130, done.stderr);
     assert.equal(summary(), 'the earlier sweep');
