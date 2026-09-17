@@ -41,7 +41,9 @@ if (args[0] === 'issue' && args[1] === 'list') {
 }
 `;
 
+/** @type {string} */
 let root;
+/** @type {string} */
 let stub;
 
 beforeEach(() => {
@@ -55,7 +57,28 @@ beforeEach(() => {
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-/** A flake-report.json with one spec per entry: { file, flagged, rate, tests: [...] }. */
+/**
+ * @typedef {{
+ *   title: string,
+ *   failed: number,
+ *   line?: number,
+ *   project?: string,
+ *   error?: string | null,
+ * }} IssueTest
+ * @typedef {{
+ *   file: string,
+ *   flagged: boolean,
+ *   tests: IssueTest[],
+ *   failed?: number,
+ *   rate?: number,
+ * }} IssueSpec
+ */
+
+/**
+ * A flake-report.json with one spec per entry: { file, flagged, rate, tests: [...] }.
+ *
+ * @param {IssueSpec[]} specs
+ */
 function flakeReport(specs) {
   return {
     commit: 'abc1234def',
@@ -90,12 +113,14 @@ function flakeReport(specs) {
   };
 }
 
+/** @param {object} body */
 function file(body) {
   const path = join(root, 'flake-report.json');
   writeFileSync(path, JSON.stringify(body));
   return path;
 }
 
+/** @param {string[]} args */
 function run(...args) {
   const result = spawnSync('bash', [SCRIPT, ...args], {
     encoding: 'utf8',
@@ -103,19 +128,37 @@ function run(...args) {
   });
   const callsFile = join(stub, 'calls');
   const calls = existsSync(callsFile)
-    ? readFileSync(callsFile, 'utf8').trim().split('\n').map(JSON.parse)
+    ? readFileSync(callsFile, 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => /** @type {string[]} */ (JSON.parse(line)))
     : [];
   return { ...result, calls };
 }
 
 /** The hidden marker the issue body carries for a test key. */
+/** @param {string} key */
 const marker = (key) => `<!-- flake-key: ${Buffer.from(key).toString('base64')} -->`;
+/** @param {string[]} bodies */
 const openIssues = (...bodies) =>
   writeFileSync(join(stub, 'open-issues.json'), JSON.stringify(bodies.map((body) => ({ body }))));
 
+/** @param {string[][]} calls */
 const created = (calls) => calls.find((c) => c[0] === 'issue' && c[1] === 'create');
-const option = (call, name) => call[call.indexOf(name) + 1];
+/**
+ * @param {string[] | undefined} call A call the test expects to have been made.
+ * @param {string} name
+ */
+const option = (call, name) => {
+  const args = /** @type {string[]} */ (call);
+  return args[args.indexOf(name) + 1];
+};
 
+/**
+ * @param {IssueTest[]} tests
+ * @param {Partial<IssueSpec>} [extra]
+ * @returns {IssueSpec}
+ */
 const workCards = (tests, extra = {}) => ({
   file: 'work-cards.spec.ts',
   flagged: true,
@@ -227,7 +270,11 @@ describe('which flakes are reported', () => {
     rmSync(join(stub, 'calls'));
     const body = option(created(run(tracked).calls), '--body');
     const markers = body.match(/<!-- flake-key: [^ ]* -->/g);
-    assert.equal(markers.length, 1, 'the title cannot end the marker early');
+    assert.equal(
+      /** @type {RegExpMatchArray} */ (markers).length,
+      1,
+      'the title cannot end the marker early',
+    );
   });
 
   it('finds a tracked test in an older issue, past the 30 gh lists by default', () => {
@@ -259,7 +306,7 @@ describe('which flakes are reported', () => {
     const issue = created(result.calls);
     assert.equal(option(issue, '--title'), 'Flaky e2e tests: 50 new from the flake hunt');
     const body = option(issue, '--body');
-    assert.equal(body.match(/<!-- flake-key: /g).length, 50);
+    assert.equal(/** @type {RegExpMatchArray} */ (body.match(/<!-- flake-key: /g)).length, 50);
     assert.match(body, /\n10 more new flaky tests are not listed/);
     assert.ok(body.includes(marker(`work-cards.spec.ts ${tests[59].title} [chromium]`)));
     const rows = body.split('\n').filter((line) => line.startsWith('| `'));

@@ -82,9 +82,59 @@ if (fs.existsSync(at('run-' + n + '.hang'))) {
 const ESC = String.fromCharCode(27);
 
 /**
+ * @typedef {{
+ *   file: string,
+ *   title: string,
+ *   status: string,
+ *   line?: number,
+ *   project?: string,
+ *   declared?: string,
+ *   describe?: string,
+ *   ms?: number,
+ *   error?: string,
+ *   noError?: boolean,
+ * }} Test
+ */
+
+/**
+ * The parts of flake-report.json the tests read.
+ *
+ * @typedef {{
+ *   commit: string | null,
+ *   mode: string,
+ *   runs: number,
+ *   completedRuns: number,
+ *   load1: { min: number | null, max: number | null },
+ *   infraErrors: { run: number, error: string }[],
+ *   interruptedRuns: { run: number, signal: string }[],
+ *   specs: {
+ *     file: string,
+ *     runs: number,
+ *     failedRuns: number,
+ *     failureRate: number,
+ *     flagged: boolean,
+ *     tests: {
+ *       title: string,
+ *       line: number,
+ *       runs: number,
+ *       failed: number,
+ *       flaky: number,
+ *       failures: { run: number, error: string, attachments: { name: string, path: string }[] }[],
+ *     }[],
+ *   }[],
+ * }} FlakeReport
+ */
+
+/**
  * One test in a report: { file, title, status, line?, project?, declared?, describe?, ms?, error?,
  * noError? }. A failed one gets an error and a trace and a screenshot under __OUT__, unless
  * `noError` is set, which is what Playwright writes for a test.fail() that passed.
+ *
+ * @param {string} file
+ * @param {string} title
+ * @param {string} status
+ * @param {Partial<Test>} [extra]
+ * @returns {Test}
  */
 function test(file, title, status, extra = {}) {
   return { file, title, status, ...extra };
@@ -93,9 +143,14 @@ function test(file, title, status, extra = {}) {
 /**
  * A Playwright JSON report for the given tests, with stats derived the way Playwright derives them.
  * A test with a `describe` title is nested in a suite of that name inside its file's suite.
+ *
+ * @param {Test[]} tests
+ * @param {{ errors?: { message: string }[] }} [options]
  */
 function report(tests, { errors = [] } = {}) {
+  /** @param {string} status */
   const count = (status) => tests.filter((t) => t.status === status).length;
+  /** @param {Test} t */
   const spec = (t) => ({
     title: t.title,
     file: t.file,
@@ -152,14 +207,18 @@ function report(tests, { errors = [] } = {}) {
   };
 }
 
+/** @param {Test} t */
 const slug = (t) =>
   `${t.file}-${t.describe ?? ''}-${t.title}-${t.project ?? 'chromium'}`.replace(
     /[^a-z0-9]+/gi,
     '-',
   );
 
+/** @type {string} */
 let root;
+/** @type {string} */
 let stub;
+/** @type {string} */
 let cwd;
 
 beforeEach(() => {
@@ -187,7 +246,9 @@ beforeEach(() => {
 
 // Process groups a test started, and the processes the stub recorded: a test that fails, or a
 // mutant of the script, must not leave a hunt, a stub or a webServer running to hold the runner.
+/** @type {number[]} */
 const groups = [];
+/** @param {number} pid */
 const kill = (pid) => {
   try {
     process.kill(pid, 'SIGKILL');
@@ -204,6 +265,11 @@ afterEach(() => {
   rmSync(root, { recursive: true, force: true });
 });
 
+/**
+ * @param {number} n
+ * @param {object | null} body
+ * @param {number} [exit]
+ */
 function plan(n, body, exit = 0) {
   if (body !== null) writeFileSync(join(stub, `run-${n}.json`), JSON.stringify(body));
   writeFileSync(join(stub, `run-${n}.exit`), String(exit));
@@ -213,6 +279,7 @@ const passing = (file = 'a.spec.ts') => report([test(file, 'ok', 'expected')]);
 
 // Empty strings stand for "unset" in the script's `${VAR:-default}` expansions. CI in particular is
 // set on every GitHub runner and would otherwise choose the script's mode.
+/** @param {Record<string, string>} env */
 function huntEnv(env) {
   return {
     ...process.env,
@@ -231,6 +298,11 @@ function huntEnv(env) {
 const invocations = () =>
   existsSync(join(stub, 'count')) ? Number(readFileSync(join(stub, 'count'), 'utf8')) : 0;
 
+/**
+ * @param {string[]} [args]
+ * @param {Record<string, string>} [env] `CWD` is where the hunt runs, not a variable it sees.
+ * @param {{ script?: string }} [options]
+ */
 function hunt(args = [], env = {}, { script = join(root, 'repo/scripts/flake-hunt.sh') } = {}) {
   const result = spawnSync('bash', [script, ...args], {
     cwd: env.CWD ?? cwd,
@@ -240,11 +312,16 @@ function hunt(args = [], env = {}, { script = join(root, 'repo/scripts/flake-hun
   return { ...result, invocations: invocations() };
 }
 
+/** @param {number} ms */
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Starts a hunt as its own process group, as a terminal starts a job, and waits until run n hangs,
  * or until the file `until` exists.
+ *
+ * @param {string[]} args
+ * @param {number} n
+ * @param {{ env?: Record<string, string>, until?: string }} [options]
  */
 async function huntUntilHanging(args, n, { env = {}, until = join(stub, `hanging-${n}`) } = {}) {
   const child = spawn('bash', [join(root, 'repo/scripts/flake-hunt.sh'), ...args], {
@@ -253,7 +330,7 @@ async function huntUntilHanging(args, n, { env = {}, until = join(stub, `hanging
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  groups.push(child.pid);
+  groups.push(/** @type {number} */ (child.pid));
   let stderr = '';
   child.stderr.on('data', (data) => (stderr += data));
   child.stdout.resume();
@@ -268,6 +345,7 @@ async function huntUntilHanging(args, n, { env = {}, until = join(stub, `hanging
   return { child, exited, stderr: () => stderr };
 }
 
+/** @param {number} pid */
 function isRunning(pid) {
   try {
     process.kill(pid, 0);
@@ -278,6 +356,10 @@ function isRunning(pid) {
 }
 
 const huntDir = () => join(cwd, 'flake-hunt');
+/**
+ * @param {string} [dir]
+ * @returns {FlakeReport}
+ */
 const flakeReport = (dir = huntDir()) =>
   JSON.parse(readFileSync(join(dir, 'flake-report.json'), 'utf8'));
 
@@ -304,7 +386,11 @@ describe('preconditions stop the hunt before any run', () => {
   });
 
   it('rejects bad run counts, first-run numbers and thresholds', () => {
-    for (const [args, env, message] of [
+    for (const [
+      args,
+      env,
+      message,
+    ] of /** @type {[string[], Record<string, string>, RegExp][]} */ ([
       [['0'], {}, /runs must be a whole number from 1 to 999999, got '0'/],
       [['abc'], {}, /runs must be a whole number from 1 to 999999, got 'abc'/],
       [['007'], {}, /got '007'/],
@@ -315,7 +401,7 @@ describe('preconditions stop the hunt before any run', () => {
       [['1'], { FLAKE_HUNT_FIRST_RUN: '9223372036854775807' }, /got '9223372036854775807'/],
       [['1'], { FLAKE_THRESHOLD: '5%' }, /FLAKE_THRESHOLD must be a number from 0 to 1/],
       [['1'], { FLAKE_THRESHOLD: '1.5' }, /FLAKE_THRESHOLD must be a number from 0 to 1/],
-    ]) {
+    ])) {
       const run = hunt(args, env);
       assert.equal(run.status, 2, `${JSON.stringify(args)} ${JSON.stringify(env)}`);
       assert.match(run.stderr, message);
@@ -393,6 +479,7 @@ describe('a hunt', () => {
   });
 
   it('ranks specs by failure rate and flags those above the threshold', () => {
+    /** @param {string} status */
     const b = (status) => test('b.spec.ts', 'sometimes', status, { line: 9 });
     plan(1, report([test('a.spec.ts', 'ok', 'expected'), b('unexpected')]), 1);
     plan(2, report([test('a.spec.ts', 'ok', 'unexpected'), b('unexpected')]), 1);
@@ -423,6 +510,11 @@ describe('a hunt', () => {
   });
 
   it('lists the tests of a spec by how often they failed, not by line', () => {
+    /**
+     * @param {string} title
+     * @param {number} line
+     * @param {string} status
+     */
     const t = (title, line, status) => test('a.spec.ts', title, status, { line });
     plan(1, report([t('steady', 5, 'expected'), t('shaky', 9, 'unexpected')]), 1);
     plan(2, report([t('steady', 5, 'expected'), t('shaky', 9, 'unexpected')]), 1);
@@ -493,6 +585,10 @@ describe('a hunt', () => {
 
   it('keeps tests apart that share a file, line and title under different describes', () => {
     // As a describe declared in a loop over colour schemes would produce.
+    /**
+     * @param {string} describe
+     * @param {string} status
+     */
     const axe = (describe, status) => test('a.spec.ts', 'axe', status, { describe, line: 12 });
     plan(1, report([axe('light', 'expected'), axe('dark', 'unexpected')]), 1);
     const run = hunt(['1']);
@@ -576,7 +672,7 @@ describe('infrastructure errors', () => {
     assert.ok(existsSync(join(huntDir(), 'run-2/playwright.json')), "Playwright's report stays");
   });
 
-  for (const [name, prepare, message] of [
+  for (const [name, prepare, message] of /** @type {[string, () => void, RegExp][]} */ ([
     ['no report', () => plan(1, null, 1), /wrote no JSON report/],
     ['a run of no tests', () => plan(1, report([]), 0), /ran no tests/],
     ['a killed run', () => plan(1, passing(), 137), /exited 137/],
@@ -590,7 +686,7 @@ describe('infrastructure errors', () => {
       () => plan(1, report([test('a.spec.ts', 'ok', 'unexpected')]), 0),
       /exited 0 but its report counts 1 unexpected/,
     ],
-  ]) {
+  ])) {
     it(`classifies ${name} as one`, () => {
       prepare();
       plan(2, passing());
@@ -640,6 +736,7 @@ describe('interruptions', () => {
     assert.equal(body.completedRuns, 1);
   });
 
+  /** @param {number} n */
   const webServerStopped = (n) => {
     const pid = Number(readFileSync(join(stub, `webserver-${n}`), 'utf8'));
     return !isRunning(pid);
@@ -648,16 +745,16 @@ describe('interruptions', () => {
   // A terminal's Ctrl-C, a `kill -- -<pgid>`, a process manager and a closed terminal all signal
   // the whole process group. Playwright must hear of it once, from the hunt, and stop its
   // webServer.
-  for (const [signal, status] of [
+  for (const [signal, status] of /** @type {[NodeJS.Signals, number][]} */ ([
     ['SIGINT', 130],
     ['SIGTERM', 143],
     ['SIGHUP', 129],
-  ]) {
+  ])) {
     it(`on ${signal} to the group, stops Playwright and its server, exits ${status}`, async () => {
       plan(1, passing());
       writeFileSync(join(stub, 'run-2.hang'), '');
       const { child, exited, stderr } = await huntUntilHanging(['3'], 2);
-      process.kill(-child.pid, signal);
+      process.kill(-(/** @type {number} */ (child.pid)), signal);
       assert.equal(await exited, status, stderr());
       const pid = Number(readFileSync(join(stub, 'pid-2'), 'utf8'));
       assert.ok(!isRunning(pid), 'Playwright has stopped');
@@ -676,7 +773,7 @@ describe('interruptions', () => {
     // Playwright takes a while to stop its webServer; the hunt must not exit before it has.
     writeFileSync(join(stub, 'run-2.hang'), '1500');
     const { child, exited, stderr } = await huntUntilHanging(['3'], 2);
-    process.kill(child.pid, 'SIGTERM');
+    process.kill(/** @type {number} */ (child.pid), 'SIGTERM');
     assert.equal(await exited, 143, stderr());
     const pid = Number(readFileSync(join(stub, 'pid-2'), 'utf8'));
     assert.ok(!isRunning(pid), 'Playwright was not left running');
@@ -709,7 +806,7 @@ describe('interruptions', () => {
       env: { REAL_NODE: process.execPath, SLOW_AFTER: join(huntDir(), 'run-1/report.json') },
       until: join(stub, 'slow-now'),
     });
-    process.kill(-child.pid, 'SIGINT');
+    process.kill(-(/** @type {number} */ (child.pid)), 'SIGINT');
     assert.equal(await exited, 130, stderr());
     assert.doesNotMatch(stderr(), /exited/);
     assert.equal(invocations(), 1, 'run 2 never started');
@@ -732,6 +829,7 @@ describe('the nightly workflow', () => {
   const WORKFLOW = join(dirname(SCRIPT), '../.github/workflows/flake-hunt.yml');
 
   /** The indented block of the step named `name` under the key `key`, as the YAML holds it. */
+  /** @param {string} name */
   function stepBlock(name) {
     const lines = readFileSync(WORKFLOW, 'utf8').split('\n');
     const start = lines.findIndex((line) => line.trim() === `- name: ${name}`);
@@ -743,6 +841,7 @@ describe('the nightly workflow', () => {
     return lines.slice(start, end < 0 ? undefined : end);
   }
 
+  /** @param {string} name */
   function runScript(name) {
     const block = stepBlock(name);
     const at = block.findIndex((line) => /^\s*run: \|$/.test(line));
@@ -755,7 +854,7 @@ describe('the nightly workflow', () => {
   }
 
   // The runner signals the step's shell alone: SIGINT, then SIGTERM 7.5 s later.
-  for (const signal of ['SIGINT', 'SIGTERM']) {
+  for (const signal of /** @type {NodeJS.Signals[]} */ (['SIGINT', 'SIGTERM'])) {
     it(`stops the hunt cleanly when a cancelled shard's shell gets ${signal}`, async () => {
       writeFileSync(join(root, 'repo/step.sh'), runScript('Run the suite five times'));
       plan(1, passing());
@@ -766,7 +865,7 @@ describe('the nightly workflow', () => {
         detached: true,
         stdio: ['ignore', 'ignore', 'pipe'],
       });
-      groups.push(step.pid);
+      groups.push(/** @type {number} */ (step.pid));
       let stderr = '';
       step.stderr.on('data', (data) => (stderr += data));
       const exited = new Promise((resolve) => step.on('exit', (code, sig) => resolve(code ?? sig)));
@@ -775,7 +874,7 @@ describe('the nightly workflow', () => {
         assert.ok(Date.now() < deadline, `run 2 never started; stderr: ${stderr}`);
         await sleep(50);
       }
-      process.kill(step.pid, signal);
+      process.kill(/** @type {number} */ (step.pid), signal);
       const status = await Promise.race([exited, sleep(5_000).then(() => 'still running')]);
       assert.equal(status, 143, stderr);
       const pid = Number(readFileSync(join(stub, 'pid-2'), 'utf8'));
@@ -787,15 +886,20 @@ describe('the nightly workflow', () => {
 
   it("keeps the step's timeout under the job's, and uploads the runs even when cancelled", () => {
     const text = readFileSync(WORKFLOW, 'utf8');
-    const job = Number(/\n {4}timeout-minutes: (\d+)/.exec(text)[1]);
+    const job = Number(
+      /** @type {RegExpExecArray} */ (/\n {4}timeout-minutes: (\d+)/.exec(text))[1],
+    );
     const step = stepBlock('Run the suite five times').join('\n');
-    assert.ok(Number(/timeout-minutes: (\d+)/.exec(step)[1]) < job);
+    assert.ok(
+      Number(/** @type {RegExpExecArray} */ (/timeout-minutes: (\d+)/.exec(step))[1]) < job,
+    );
     assert.match(stepBlock("Upload this shard's runs").join('\n'), /if: \$\{\{ always\(\) \}\}/);
   });
 });
 
 describe('--report-only', () => {
   // Hunts two shards numbered apart, the way the workflow does, into one merged directory.
+  /** @param {[string, string[]][]} shards */
   function mergeShards(shards) {
     const merged = join(root, 'merged');
     mkdirSync(merged);
@@ -867,6 +971,7 @@ describe('--report-only', () => {
 
   it('names the commit the runs tested, not the one that rebuilt the report', () => {
     const repo = join(root, 'repo');
+    /** @param {string[]} args */
     const git = (...args) =>
       spawnSync('git', ['-C', repo, ...args], {
         encoding: 'utf8',
