@@ -27,10 +27,30 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const WORKFLOW = readFileSync(join(ROOT, '.github/workflows/docs-drift.yml'), 'utf8');
 const PROMPT = readFileSync(join(ROOT, '.github/prompts/docs-drift.md'), 'utf8');
 
-/** The workflow's jobs as { name: text }. */
+/**
+ * The value, failing the test that asked for it when it is missing.
+ *
+ * @template T
+ * @param {T | null | undefined} value
+ * @param {string} what
+ * @returns {NonNullable<T>}
+ */
+function found(value, what) {
+  assert.ok(value !== null && value !== undefined, `${what} not found`);
+  return /** @type {NonNullable<T>} */ (value);
+}
+
+/**
+ * The workflow's jobs as { name: text }.
+ *
+ * @param {string} text
+ * @returns {Record<string, string>}
+ */
 function jobs(text) {
   const body = text.slice(text.indexOf('\njobs:\n') + '\njobs:\n'.length);
+  /** @type {Record<string, string>} */
   const result = {};
+  /** @type {string | null} */
   let current = null;
   for (const line of body.split('\n')) {
     const job = /^ {2}([a-z][a-z0-9-]*):$/.exec(line);
@@ -44,22 +64,35 @@ function jobs(text) {
   return result;
 }
 
-/** A job's steps as [{ name, text }]. */
+/**
+ * A job's steps as [{ name, text }].
+ *
+ * @param {string} jobText
+ * @returns {{ name: string, text: string }[]}
+ */
 function steps(jobText) {
   return jobText
     .split(/\n(?= {6}- name: )/)
     .slice(1)
-    .map((text) => ({ name: /- name: (.*)/.exec(text)[1], text }));
+    .map((text) => ({ name: found(/- name: (.*)/.exec(text), 'a step name')[1], text }));
 }
 
-/** The names of the variables a step's `env:` block sets. */
+/**
+ * The names of the variables a step's `env:` block sets.
+ *
+ * @param {string} stepText
+ */
 function envNames(stepText) {
   const block = /\n {8}env:\n((?: {10}.*\n| *#.*\n)*)/.exec(stepText);
   if (!block) return [];
   return [...block[1].matchAll(/^ {10}([A-Z_][A-Z0-9_]*):/gm)].map((m) => m[1]);
 }
 
-/** The arguments of the `claude -p` call, joined across its continuation lines. */
+/**
+ * The arguments of the `claude -p` call, joined across its continuation lines.
+ *
+ * @param {string} stepText
+ */
 function claudeArgs(stepText) {
   const start = stepText.indexOf('claude -p ');
   assert.notEqual(start, -1, 'no claude -p call');
@@ -75,8 +108,14 @@ function claudeArgs(stepText) {
   return args;
 }
 
-/** Every value given to a repeatable flag, split on commas outside parentheses. */
+/**
+ * Every value given to a repeatable flag, split on commas outside parentheses.
+ *
+ * @param {string[]} args
+ * @param {string} flag
+ */
 function flagValues(args, flag) {
+  /** @type {string[]} */
   const values = [];
   args.forEach((arg, index) => {
     if (arg !== flag) return;
@@ -102,8 +141,12 @@ const COMMITTED_VALIDATOR =
   /git show HEAD:scripts\/docs-drift-patch\.mjs > "\$RUNNER_TEMP\/docs-drift-patch\.mjs"/;
 
 const JOBS = jobs(WORKFLOW);
-const AGENT_JOB = Object.keys(JOBS).find((name) => JOBS[name].includes('claude -p '));
-const agentStep = () => steps(JOBS[AGENT_JOB]).find((step) => step.text.includes('claude -p '));
+const AGENT_JOB = Object.keys(JOBS).find((name) => JOBS[name]?.includes('claude -p ')) ?? '';
+const agentStep = () =>
+  found(
+    steps(JOBS[AGENT_JOB] ?? '').find((step) => step.text.includes('claude -p ')),
+    'the claude -p step',
+  );
 
 describe('the docs drift workflow', () => {
   it('has the jobs these tests describe, and runs claude in exactly one step', () => {
@@ -138,7 +181,7 @@ describe('the docs drift workflow', () => {
 
 describe('the job the agent runs in', () => {
   it('can only read, and no step puts a GitHub token in the environment', () => {
-    const job = JOBS[AGENT_JOB];
+    const job = JOBS[AGENT_JOB] ?? '';
     assert.match(job, /\n {4}permissions:\n {6}contents: read\n {4}[a-z]/);
     assert.doesNotMatch(job, /GH_TOKEN|GITHUB_TOKEN|github\.token|DOCS_DRIFT_TOKEN/);
   });
@@ -171,19 +214,23 @@ describe('the job the agent runs in', () => {
   });
 
   it('checks the change and searches it for the key before it leaves the job', () => {
-    const names = steps(JOBS[AGENT_JOB]).map((step) => step.name);
+    const names = steps(JOBS[AGENT_JOB] ?? '').map((step) => step.name);
+    /** @param {string} name */
     const at = (name) => names.indexOf(name);
     assert.ok(at('Correct the drift') < at('Check what the agent changed'));
     assert.ok(at('Check what the agent changed') < at('Refuse a change that contains the API key'));
     assert.ok(at('Refuse a change that contains the API key') < at('Upload the change'));
-    const change = steps(JOBS[AGENT_JOB]).find((s) => s.name === 'Check what the agent changed');
+    const change = found(
+      steps(JOBS[AGENT_JOB] ?? '').find((s) => s.name === 'Check what the agent changed'),
+      'the check step',
+    );
     assert.match(change.text, COMMITTED_VALIDATOR);
     assert.doesNotMatch(change.text, /node scripts\/docs-drift-patch/);
   });
 });
 
 describe('the job that holds the write token', () => {
-  const publish = () => steps(JOBS.publish);
+  const publish = () => steps(JOBS.publish ?? '');
 
   it('exposes the token to one step only, after the change is checked and committed', () => {
     const holders = Object.entries(JOBS).flatMap(([job, text]) =>
@@ -199,7 +246,10 @@ describe('the job that holds the write token', () => {
   });
 
   it('runs no agent, package code or hook while the token is in the environment', () => {
-    const step = publish().find((s) => s.name === 'Push and open the pull request');
+    const step = found(
+      publish().find((s) => s.name === 'Push and open the pull request'),
+      'the push step',
+    );
     const run = step.text.slice(step.text.indexOf('run: |'));
     assert.doesNotMatch(run, /claude|pnpm|npm|npx|node |git commit/);
     assert.match(run, /git -c core\.hooksPath=\/dev\/null \\/);
@@ -207,7 +257,10 @@ describe('the job that holds the write token', () => {
   });
 
   it('checks the patch again in the job that pushes it', () => {
-    const apply = publish().find((s) => s.name === 'Apply, check and format the change');
+    const apply = found(
+      publish().find((s) => s.name === 'Apply, check and format the change'),
+      'the apply step',
+    );
     assert.match(apply.text, COMMITTED_VALIDATOR);
     assert.doesNotMatch(apply.text, /node scripts\/docs-drift-patch/);
     const text = apply.text;
@@ -230,7 +283,10 @@ describe('the open pull request guards', () => {
   });
 
   it('require the pull request for the branch this run pushed, not any drift branch', () => {
-    const require = steps(JOBS.publish).find((s) => s.name === 'Require the pull request');
+    const require = found(
+      steps(JOBS.publish ?? '').find((s) => s.name === 'Require the pull request'),
+      'the require step',
+    );
     assert.match(require.text, /--head "\$BRANCH"/);
   });
 });

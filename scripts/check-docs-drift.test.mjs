@@ -50,8 +50,11 @@ process.stderr.write(reply.stderr ?? '');
 process.exit(reply.status ?? 0);
 `;
 
+/** @type {string} */
 let root;
+/** @type {string} */
 let repo;
+/** @type {string} */
 let stub;
 
 beforeEach(() => {
@@ -70,6 +73,7 @@ beforeEach(() => {
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
+/** @param {...string} args */
 function git(...args) {
   const run = spawnSync(
     'git',
@@ -80,6 +84,10 @@ function git(...args) {
   return run.stdout.trim();
 }
 
+/**
+ * @param {string} path
+ * @param {string} content
+ */
 function write(path, content) {
   mkdirSync(dirname(join(repo, path)), { recursive: true });
   writeFileSync(join(repo, path), content);
@@ -91,6 +99,10 @@ function commit(message = 'change') {
   return git('rev-parse', 'HEAD');
 }
 
+/**
+ * @param {object[]} assertions
+ * @param {{ roots?: string[] }} [options]
+ */
 function manifest(assertions, { roots = ['docs'] } = {}) {
   return {
     schemaVersion: 1,
@@ -100,6 +112,7 @@ function manifest(assertions, { roots = ['docs'] } = {}) {
   };
 }
 
+/** @param {Record<string, unknown>} [overrides] */
 function entry(overrides) {
   return {
     id: 'a',
@@ -113,12 +126,17 @@ function entry(overrides) {
   };
 }
 
+/** @param {...{ status?: number, stdout?: string, stderr?: string }} replies */
 function gh(...replies) {
   replies.forEach((reply, i) =>
     writeFileSync(join(stub, `gh-${i + 1}.json`), JSON.stringify(reply)),
   );
 }
 
+/**
+ * @param {object[]} assertions
+ * @param {{ args?: string[], options?: { roots?: string[] } }} [config]
+ */
 function check(assertions, { args = [], options } = {}) {
   write('docs/drift-manifest.json', JSON.stringify(manifest(assertions, options)));
   const run = spawnSync(process.execPath, [CHECKER, '--root', repo, '--json', ...args], {
@@ -130,6 +148,7 @@ function check(assertions, { args = [], options } = {}) {
       DOCS_DRIFT_GH_BACKOFF_MS: '1',
     },
   });
+  /** @type {any} */
   let report = null;
   try {
     report = JSON.parse(run.stdout);
@@ -139,6 +158,7 @@ function check(assertions, { args = [], options } = {}) {
   return { status: run.status, stderr: run.stderr, report };
 }
 
+/** @param {{ findings: { id: string, status: string }[] }} report */
 const statuses = (report) => Object.fromEntries(report.findings.map((f) => [f.id, f.status]));
 
 describe('file-line', () => {
@@ -219,6 +239,7 @@ describe('file-line', () => {
     // As with a commit of a squash-merged, deleted branch: the remote has it, no ref points at it.
     const origin = join(root, 'origin');
     mkdirSync(join(origin, 'src'), { recursive: true });
+    /** @param {...string} args */
     const inOrigin = (...args) => {
       const run = spawnSync(
         'git',
@@ -264,6 +285,7 @@ describe('file-line', () => {
     );
     chmodSync(join(bin, 'git'), 0o755);
     const missing = 'deadbeef'.repeat(5);
+    /** @param {string} id */
     const historical = (id) =>
       entry({ id, evaluation: 'historical', asOf: missing, check: { path: 'src/app.ts' } });
     write('docs/drift-manifest.json', JSON.stringify(manifest([historical('a'), historical('b')])));
@@ -371,7 +393,10 @@ describe('config-value', () => {
     ]);
     assert.equal(run.status, 1);
     assert.deepEqual(statuses(run.report), { pin: 'drift', gone: 'drift' });
-    assert.equal(run.report.findings.find((f) => f.id === 'pin').actual, 'pnpm@10.34.5');
+    assert.equal(
+      run.report.findings.find((/** @type {{ id: string }} */ f) => f.id === 'pin').actual,
+      'pnpm@10.34.5',
+    );
   });
 
   it('reads a historical value at asOf, and cannot run on a file that is not JSON', () => {
@@ -654,7 +679,9 @@ describe('anchors and coverage', () => {
     const run = check([]);
     assert.equal(run.status, 1);
     assert.deepEqual(
-      run.report.uncatalogued.map((t) => `${t.line} ${t.kind} ${t.token}`),
+      run.report.uncatalogued.map(
+        (/** @type {Record<string, string>} */ t) => `${t.line} ${t.kind} ${t.token}`,
+      ),
       [
         '1 link other.md',
         '2 script check:thing',
@@ -687,7 +714,9 @@ describe('anchors and coverage', () => {
     const run = check([]);
     assert.equal(run.status, 1);
     assert.deepEqual(
-      run.report.uncatalogued.map((t) => `${t.doc}:${t.line} ${t.kind} ${t.token}`),
+      run.report.uncatalogued.map(
+        (/** @type {Record<string, string>} */ t) => `${t.doc}:${t.line} ${t.kind} ${t.token}`,
+      ),
       [
         'docs/adr/sub/doc.md:1 script web one',
         'docs/adr/sub/doc.md:1 script web two',
@@ -812,6 +841,10 @@ describe('the manifest', () => {
 });
 
 describe('exit codes', () => {
+  /**
+   * @param {string[]} args
+   * @param {Record<string, string>} [env]
+   */
   const plain = (args, env = {}) =>
     spawnSync(process.execPath, [CHECKER, ...args], {
       encoding: 'utf8',

@@ -16,14 +16,20 @@ import { parseRaw, problemsIn } from './docs-drift-patch.mjs';
 
 const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), 'docs-drift-patch.mjs');
 
+/** @type {string} */
 let repo;
 
+/** @param {...string} args */
 const git = (...args) => {
   const run = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   return run.stdout;
 };
 
+/**
+ * @param {string} path
+ * @param {string} text
+ */
 const write = (path, text) => {
   mkdirSync(dirname(join(repo, path)), { recursive: true });
   writeFileSync(join(repo, path), text);

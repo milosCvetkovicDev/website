@@ -83,10 +83,10 @@ has a `build` task today (`@repo/prettier-config` is config only), so this is cu
 is there so that a future buildable package is compiled before the apps typecheck against it.
 
 `pnpm typecheck` stays the plain `turbo typecheck`, and `scripts/` is type-checked as one of its
-tasks: `@repo/scripts` runs `tsc -p .`, which checks every `scripts/**/*.mjs` with `checkJs` and
-`strict` against `scripts/tsconfig.json`. That type-check gets `typescript` and `@types/node` from
-the package's own devDependencies, not the root's, and for them pnpm adds only the package's
-importer block to the lockfile. As root devDependencies they would also rewrite other packages'
+tasks: `@repo/scripts` runs `tsc -p .`, which checks every `scripts/**/*.mjs` with `checkJs`, and
+`check-docs-drift.ts` as TypeScript, with `strict` against `scripts/tsconfig.json`. That type-check
+gets `typescript` and `@types/node` from the package's own devDependencies, not the root's, and for
+them pnpm adds only the package's importer block to the lockfile. As root devDependencies they would also rewrite other packages'
 lockfile snapshots, because a root dependency is also what pnpm resolves the root's own packages'
 peer dependencies to: a root `@types/node` would become the `@types/node` peer root commitlint
 reaches through `cosmiconfig-typescript-loader`, in place of the version pnpm installed for it. The

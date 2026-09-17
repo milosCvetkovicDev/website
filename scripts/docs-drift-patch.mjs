@@ -29,6 +29,9 @@ const MANIFEST = 'docs/drift-manifest.json';
 /**
  * Parses `git diff --cached --raw -z --no-renames` output into
  * `{ oldMode, newMode, status, path }` entries.
+ *
+ * @param {string} output
+ * @returns {{ oldMode: string, newMode: string, status: string, path: string }[]}
  */
 export function parseRaw(output) {
   const fields = output.split('\0');
@@ -41,7 +44,12 @@ export function parseRaw(output) {
   return entries;
 }
 
-/** One message per staged entry the drift correction may not contain. */
+/**
+ * One message per staged entry the drift correction may not contain.
+ *
+ * @param {{ newMode: string, status: string, path: string }[]} entries
+ * @returns {string[]}
+ */
 export function problemsIn(entries) {
   if (entries.length === 0) return ['nothing is staged'];
   const problems = [];
@@ -65,14 +73,16 @@ function main() {
       maxBuffer: 64 * 1024 * 1024,
     });
   } catch (error) {
-    console.error(`docs-drift-patch: could not run git: ${error.message}`);
+    console.error(
+      `docs-drift-patch: could not run git: ${error instanceof Error ? error.message : error}`,
+    );
     return 2;
   }
   let entries;
   try {
     entries = parseRaw(output);
   } catch (error) {
-    console.error(`docs-drift-patch: ${error.message}`);
+    console.error(`docs-drift-patch: ${error instanceof Error ? error.message : error}`);
     return 2;
   }
   const problems = problemsIn(entries);
