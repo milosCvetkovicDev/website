@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# SessionStart: print the branch, my open PRs with a check summary, then the recent handoff notes.
-# Stdout becomes session context. Claude Code caps hook output at 10,000 characters and replaces
-# anything longer with a short preview, so the whole output is held to a byte budget, and the git
-# and PR sections come first so that notes cannot push them out. Never fail session start: every
-# command may fail and the hook still exits 0.
+# SessionStart: print the branch, my open PRs with a check summary, the resume briefing for the
+# JSON checkpoints, then the recent handoff notes. Stdout becomes session context. Claude Code caps
+# hook output at 10,000 characters and replaces anything longer with a short preview, so the whole
+# output is held to a byte budget, and git, the PRs and the briefing come first so that notes cannot
+# push them out. Never fail session start: every command may fail and the hook still exits 0.
 
 # `git status` refreshes the index and takes index.lock to write it back, which makes a git add or
 # commit by another session in this checkout fail on the lock. Optional locks are skipped instead.
@@ -13,6 +13,7 @@ PATH="$PATH:/usr/local/bin:/opt/homebrew/bin"
 cd "${CLAUDE_PROJECT_DIR:-$PWD}" || exit 0
 
 BUDGET=9000     # bytes for the whole output, under the 10,000-character cap
+BRIEFING=4000   # bytes of it for the checkpoint briefing
 NOTE_LINES=40   # lines printed from each note
 LINE_BYTES=300  # bytes printed from each line
 gh_timeout=${SESSION_START_GH_TIMEOUT:-8}
@@ -23,6 +24,14 @@ clip() {
   perl -ne 'BEGIN { ($w, $n) = splice @ARGV, 0, 2 } last if $. > $n; chomp;
     $_ = substr($_, 0, $w) . " [...]" if length > $w; print "$_\n"' "$@"
 }
+
+# The checkpoint briefing waits on the network as well, so it starts first and runs alongside gh:
+# the hook takes as long as the slower of the two (8 s at most for gh; agent-resume.sh bounds its
+# own calls), not their sum. It is read through a pipe, so no temporary file can stop the hook.
+briefing_fd=
+if [ -f scripts/agent-resume.sh ] && exec 3< <(bash scripts/agent-resume.sh 2>&1 </dev/null); then
+  briefing_fd=3
+fi
 
 git_out=$(git status -sb 2>/dev/null | clip 200 20)
 
@@ -51,7 +60,18 @@ else
   pr_out='(gh unavailable)'
 fi
 
+briefing=
+if [ -n "$briefing_fd" ]; then
+  # In-progress tasks come first in the briefing and finished ones take a line each, so a cut
+  # loses the least useful part.
+  briefing=$(clip "$LINE_BYTES" 200 <&3 | perl -0777 -ne 'BEGIN { $max = shift }
+    if (length > $max) { $_ = substr($_, 0, $max); s/[^\n]*\z//;
+      $_ .= "[... cut to fit the budget: run scripts/agent-resume.sh]\n" } print' "$BRIEFING")
+  exec 3<&-
+fi
+
 head_out=$(printf -- '--- GIT ---\n%s\n\n--- MY OPEN PRS ---\n%s\n\n' "$git_out" "$pr_out"
+  [ -z "$briefing" ] || printf '%s\n\n' "$briefing"
   echo '--- SAVED STATE (.agent-state, changed in the last 7 days, newest first) ---')
 printf '%s\n' "$head_out"
 used=$(printf '%s\n' "$head_out" | wc -c | tr -d ' ')
