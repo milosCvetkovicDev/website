@@ -20,7 +20,10 @@ import { expect, type PlaywrightWorkerArgs, type TestInfo } from '@playwright/te
  * Call it from a `test.beforeAll` inside a `test.describe` holding only the tests that navigate, so
  * a route that cannot be served fails those tests and no others. A hook's time is not taken from
  * any test's budget. It prepares the server and nothing else: the navigation under test still has
- * to happen by the spec's own means, inside the default expect timeout.
+ * to happen by the spec's own means, inside the default expect timeout or inside a longer one that
+ * the spec justifies with a measurement. `client-navigation.spec.ts` gives its link-click URL waits
+ * 15 s, for the browser's own rendering. A wait that long also absorbs a first request of several
+ * seconds, so that spec no longer catches a route this helper stopped warming.
  */
 
 /** How long one first request may take locally: a cold compile plus the static-params worker. */
