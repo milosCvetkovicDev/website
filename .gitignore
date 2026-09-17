@@ -37,6 +37,8 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Testing
+# scripts/flake-hunt.sh writes its runs and report to flake-hunt in the directory it is run from.
+flake-hunt/
 coverage
 test-results
 playwright-report

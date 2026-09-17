@@ -34,13 +34,13 @@ packages/
   eslint-config/      shared ESLint presets (not yet wired into the apps)
   prettier-config/    shared Prettier config, referenced by prettier.config.mjs files
   typescript-config/  shared tsconfig bases (not yet wired into the apps)
-scripts/          @repo/scripts package: CI gates, Vercel's ignored build step, their tests
+scripts/          @repo/scripts package: CI gates, Vercel build step, flake hunt, tests
 docs/
   adr/            architecture decision records
   plans/          design documents and step-by-step implementation plans with progress
   runbooks/       operational procedures (deployment)
 .claude/          project-level Claude Code configuration (hooks, agents)
-.github/          CI workflow, Dependabot, pull request template
+.github/          CI and commitlint workflows, nightly flake hunt, Dependabot, pull request template
 ```
 
 ## Getting started
@@ -62,21 +62,23 @@ The site runs on `http://localhost:3000`. `pnpm dev:playground` starts the sandb
 
 CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, commitlint runs in a workflow of its own, `.github/workflows/commitlint.yml`, over the pull request title (as written, and with the ` (#NN)` suffix the squash commit gets) and every commit on the branch, or over every commit a push to `main` lands. The title and the push to `main` are linted without commitlint's default ignores, so a title such as `revert everything` or `Merge branch x into y` fails there although the local hook would accept it as a commit. Of the rest, the `quality` job runs the first eight in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last two. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message.
 
-| Command                           | What it checks                                                                                                          | Pre-commit         | CI  |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------ | --- |
-| dependency review                 | Lockfile dependencies a pull request adds with a known advisory                                                         | -                  | yes |
-| `pnpm check:allowbuilds`          | `allowBuilds` entries against the versions the lockfile resolves                                                        | -                  | yes |
-| `pnpm test:scripts`               | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step, commitlint configs, web server log | -                  | yes |
-| `pnpm format:check`               | Prettier, shared config, Tailwind class order                                                                           | yes (staged files) | yes |
-| `pnpm lint`                       | ESLint with `--max-warnings 0` in every app                                                                             | yes (staged files) | yes |
-| commitlint                        | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...); in CI, the PR title and every commit                | yes                | yes |
-| `pnpm typecheck`                  | `next typegen && tsc --noEmit` (web), `tsc -b` (playground), strict `checkJs` over `scripts/`                           | -                  | yes |
-| `pnpm test`                       | Vitest unit tests                                                                                                       | -                  | yes |
-| `pnpm build`                      | Production builds of both apps                                                                                          | -                  | yes |
-| `pnpm --filter web test:e2e`      | Playwright against the production build; a test that passes only on a retry fails the run                               | -                  | yes |
-| `scripts/check-webserver-log.mjs` | Anything the web server wrote to stderr during the e2e run, beyond ADR 0015's `NoFallbackError` block                   | -                  | yes |
+| Command                           | What it checks                                                                                                                      | Pre-commit         | CI  |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --- |
+| dependency review                 | Lockfile dependencies a pull request adds with a known advisory                                                                     | -                  | yes |
+| `pnpm check:allowbuilds`          | `allowBuilds` entries against the versions the lockfile resolves                                                                    | -                  | yes |
+| `pnpm test:scripts`               | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step, commitlint configs, web server log, flake hunt | -                  | yes |
+| `pnpm format:check`               | Prettier, shared config, Tailwind class order                                                                                       | yes (staged files) | yes |
+| `pnpm lint`                       | ESLint with `--max-warnings 0` in every app                                                                                         | yes (staged files) | yes |
+| commitlint                        | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...); in CI, the PR title and every commit                            | yes                | yes |
+| `pnpm typecheck`                  | `next typegen && tsc --noEmit` (web), `tsc -b` (playground), strict `checkJs` over `scripts/`                                       | -                  | yes |
+| `pnpm test`                       | Vitest unit tests                                                                                                                   | -                  | yes |
+| `pnpm build`                      | Production builds of both apps                                                                                                      | -                  | yes |
+| `pnpm --filter web test:e2e`      | Playwright against the production build; a test that passes only on a retry fails the run                                           | -                  | yes |
+| `scripts/check-webserver-log.mjs` | Anything the web server wrote to stderr during the e2e run, beyond ADR 0015's `NoFallbackError` block                               | -                  | yes |
 
 CodeQL default setup is on as well. GitHub manages it outside `.github/workflows`, and it reports on pull requests beside these checks.
+
+`.github/workflows/flake-hunt.yml` is not a check: every night it runs the e2e suite 30 times with `scripts/flake-hunt.sh` and opens an issue for flaky tests no open `flake-hunt` issue tracks yet.
 
 Useful extras: `pnpm lint:fix`, `pnpm format`, `pnpm clean`.
 
