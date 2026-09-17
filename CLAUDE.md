@@ -25,13 +25,14 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
   `tailwindStylesheet: './src/app/globals.css'` so the class sorter sees the theme.
 - `scripts/` at the repository root holds the scripts that run outside the apps:
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `vercel-ignore-build.mjs` (Vercel's
-  ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log check), and
-  the `node:test` suites that `pnpm test:scripts` runs, one for each of those three plus
+  ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log check),
+  `agent-resume.sh` (the briefing for agent checkpoints, under Working with this repo in Claude
+  Code), and the `node:test` suites that `pnpm test:scripts` runs, one for each of those four plus
   `ai-refusals.test.mjs`, `commitlint-config.test.mjs` and `claude-hooks.test.mjs` (the session
   hooks in `.claude/hooks`). It is a private workspace package, `@repo/scripts`, whose only task is
-  `typecheck` (`tsc -p .` against `scripts/tsconfig.json`), so `turbo typecheck` type-checks it
-  alongside the apps. It ships no source anyone imports: nothing depends on it, and the root scripts
-  still call the `.mjs` files by path.
+  `typecheck` (`tsc -p .` against `scripts/tsconfig.json`, which covers the `.mjs` files only), so
+  `turbo typecheck` type-checks it alongside the apps. It ships no source anyone imports: nothing
+  depends on it, and the root scripts still call the scripts by path.
 - `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
   `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
   has its own `tsconfig.json`.
@@ -61,7 +62,7 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 | `pnpm format`                                                           | Prettier over the whole repo, writing changes                                                                                                                                        |
 | `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                    |
 | `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                              |
-| `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/` gates                                                                                                                                      |
+| `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/`                                                                                                                                            |
 | `pnpm clean`                                                            | `turbo clean` in both apps, then `rm -rf node_modules` at the root                                                                                                                   |
 | `pnpm prepare`                                                          | `husky`; runs on install and is what creates the git hooks                                                                                                                           |
 | `pnpm --filter web test:e2e`                                            | Playwright without going through Turborepo                                                                                                                                           |
@@ -69,6 +70,7 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 | `pnpm --filter web test:watch`                                          | Vitest in watch mode                                                                                                                                                                 |
 | `pnpm --filter web exec vitest run <path>`                              | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx`                                                                                                              |
 | `pnpm --filter web exec playwright install --with-deps chromium webkit` | Needed once before the first e2e run; the phone projects need webkit                                                                                                                 |
+| `scripts/agent-resume.sh [task-id ...]`                                 | Briefs each `.agent-state/<task-id>.json` checkpoint and checks it against git and gh; exits 1 when one is invalid or cannot be briefed                                              |
 
 `pnpm lint:fix` drops `--max-warnings 0`, so it exits 0 on warnings that `pnpm lint` and CI fail on.
 Always finish with `pnpm lint`.
@@ -366,19 +368,20 @@ measurement behind the choice is in PR 2's entry in `.claude/epics/audit-remedia
   `pnpm format:check`.
 - A SessionStart hook (`.claude/hooks/session-start.sh`) prints the first 20 lines of
   `git status -sb`, your open pull requests with their checks counted by conclusion (by status
-  while a check is still running), giving `gh` 8 s, and then the `.agent-state` notes changed in
-  the last seven days, newest first: 40 lines and 300 bytes a line of each, with a pointer to the
-  rest, until the output reaches 9,000 bytes. Claude Code caps hook output at 10,000 characters and
-  gives the session only a preview of anything longer. A Stop hook (`.claude/hooks/stop.sh`) runs
-  after every reply, not only at session end, and writes `.agent-state/last-session-<branch>.md`,
-  with `%` and `/` in the branch name percent-encoded (`feat%2Fx`), or `last-session-~detached.md`.
-  Both run git without optional locks, so neither holds `index.lock` against another session, and
-  both exit 0 on any failure; git ignores `.agent-state`. It sits at the repository root rather
-  than under `.claude`, because Claude Code protects `.claude` (except `.claude/worktrees`): allow
-  rules cannot pre-approve a write there, the default and `acceptEdits` modes prompt for it (which
-  a headless session cannot answer), `dontAsk` denies it and auto mode leaves it to the classifier,
-  so only `bypassPermissions` writes there reliably. The snapshot is git state only; the handoff
-  note below is still yours to write.
+  while a check is still running), giving `gh` 8 s, up to 4,000 bytes of the resume briefing from
+  `scripts/agent-resume.sh`, and then the `.agent-state` notes changed in the last seven days,
+  newest first: 40 lines and 300 bytes a line of each, with a pointer to the rest, until the output
+  reaches 9,000 bytes. Claude Code caps hook output at 10,000 characters and gives the session only
+  a preview of anything longer. A Stop hook (`.claude/hooks/stop.sh`) runs after every reply, not
+  only at session end, and writes `.agent-state/last-session-<branch>.md`, with `%` and `/` in the
+  branch name percent-encoded (`feat%2Fx`), or `last-session-~detached.md`. Both run git without
+  optional locks, so neither holds `index.lock` against another session, and both exit 0 on any
+  failure; git ignores `.agent-state`. It sits at the repository root rather than under `.claude`,
+  because Claude Code protects `.claude` (except `.claude/worktrees`): allow rules cannot
+  pre-approve a write there, the default and `acceptEdits` modes prompt for it (which a headless
+  session cannot answer), `dontAsk` denies it and auto mode leaves it to the classifier, so only
+  `bypassPermissions` writes there reliably. The snapshot is git state only; the checkpoint below
+  is still yours to keep.
 - `.mcp.json` is tracked and configures one MCP server for this project, over HTTP. It needs
   authorising once per machine before its tools work, and nothing in the repository depends on it.
 - `.claude/agents/ui-reviewer.md` is a read-only review agent for `apps/web/src/components`: visual
@@ -389,12 +392,25 @@ measurement behind the choice is in PR 2's entry in `.claude/epics/audit-remedia
   open it with `gh pr create`, and poll CI until every check on the head commit is green before
   calling the work done. Never squash-merge without the owner's explicit approval.
   `.claude/skills/open-pr/SKILL.md` walks the whole sequence.
-- Before long-running work, write a handoff note to `.agent-state/<task>.md`: branch, pull request
-  number, files changed, next step and the verification commands. Update it after each milestone,
-  and on resuming read it first instead of reconstructing state from transcripts. `.agent-state`
-  belongs to its checkout: a session sees only the notes of the checkout it runs in, and
-  `git worktree remove` deletes a worktree's notes without asking, because ignored files do not
-  count as untracked. Copy a note that is still needed out of a worktree before removing it.
+- Long-running work keeps a checkpoint, `.agent-state/<task-id>.json` (a task id of lowercase
+  letters, digits and hyphens, starting with a letter or digit), in the shape
+  `scripts/agent-state.schema.json` defines: `goal`, numbered `plan_steps`, `current_step` (null
+  once every step is in `completed_steps`), `completed_steps` with their evidence, `artifacts`
+  (`branches` with whether each was pushed, `prs`, and `files` that should exist), `blockers`,
+  `next_action` and `updated_at` in UTC. Write it before the first step. Update it after every
+  meaningful step (a commit, a push, a pull request opened, a check result, a decision), not at the
+  end of the work, and never rely on the final message for the handoff: a session stopped by a usage
+  limit or a crash never writes one. On resuming, run `scripts/agent-resume.sh` (the SessionStart
+  hook runs it at the start of every session) and act on its contradictions before anything else: a
+  contradiction means the checkpoint is stale, so trust git and gh and update the checkpoint first.
+  Failing checks on an open pull request are listed under "Needs attention" instead, since no
+  update to the checkpoint clears them, and a finished task is not checked for branches that its
+  merge deleted. Without task ids the briefing gives each finished task one line;
+  `scripts/agent-resume.sh <task-id>` briefs it in full. `.agent-state` belongs to its checkout: a
+  session sees only the checkpoints and notes of the checkout it runs in, and `git worktree remove`
+  deletes a worktree's without asking, because ignored files do not count as untracked, so copy out
+  what is still needed first. A Markdown note in `.agent-state` is still printed, but it is not
+  validated or checked.
 - Before opening a pull request, work the checklist in `.github/pull_request_template.md`, which
   lists every gate in CI order; do not keep a second copy of it here. Paste the commands and their
   real output into the Verification section; "seems fine" is not evidence.
