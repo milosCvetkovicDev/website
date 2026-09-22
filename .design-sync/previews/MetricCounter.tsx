@@ -1,8 +1,7 @@
 import { MetricCounter } from 'web';
 
-// The section's animations (the diagram's packets, the metric count-up) run on a clock, and a card
-// is a still frame. The components render their settled state under prefers-reduced-motion, so this
-// page reports that preference; nothing else about the component changes.
+// The count-up runs on a clock, and a card is a still frame. The component renders its settled state
+// under prefers-reduced-motion, so this page reports that preference; nothing else changes.
 const reducedMotionQuery = '(prefers-reduced-motion: reduce)';
 const matchMedia = window.matchMedia.bind(window);
 window.matchMedia = (query: string) =>

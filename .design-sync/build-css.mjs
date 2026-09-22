@@ -27,10 +27,25 @@ const postcss = requireFromPlugin('postcss');
 // base: automatic source detection scans apps/web, as it does when Next builds the site there.
 // optimize without minify: Lightning CSS applies the same syntax lowering as the site's production
 // build, and the output stays readable for the design agent, which reads it as reference.
-const result = await postcss([tailwind({ base: app, optimize: { minify: false } })]).process(
-  readFileSync(from, 'utf8'),
-  { from, to },
-);
+let result;
+try {
+  result = await postcss([tailwind({ base: app, optimize: { minify: false } })]).process(
+    readFileSync(from, 'utf8'),
+    { from, to },
+  );
+} catch (error) {
+  console.error(`${relative(root, from)}: ${error.message}`);
+  process.exit(1);
+}
+
+// Tailwind reports an unresolvable @source glob or a malformed `@source inline(...)` as a warning,
+// not a throw, and the missing utilities would only show up as an unstyled card much later.
+const warnings = result.warnings();
+for (const warning of warnings) console.error(`warning: ${warning.toString()}`);
+if (warnings.length) {
+  console.error(`${relative(root, from)}: ${warnings.length} warning(s) — fix them and re-run`);
+  process.exit(1);
+}
 
 mkdirSync(dirname(to), { recursive: true });
 writeFileSync(to, result.css);

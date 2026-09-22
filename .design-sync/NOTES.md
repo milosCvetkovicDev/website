@@ -12,7 +12,7 @@ expects, and what each workaround depends on.
   synthesized entry. The two `[NO_DIST]` lines every build prints are expected.
 - Run everything from the repository root with the Node from `.nvmrc`
   (`export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use`). The converter's own dependencies go
-  in `.ds-sync/` (`npm i esbuild ts-morph @types/react playwright@<version>`), never the workspace.
+  in `.ds-sync/` (`npm i esbuild ts-morph @types/react playwright@1.63.0`), never the workspace.
 - `buildCmd` first: `node .design-sync/build-css.mjs` compiles `.design-sync/styles.css` with the
   site's own `@tailwindcss/postcss` into `apps/web/dist/design-sync/styles.css` (the `cssEntry`).
   Tailwind emits only classes it finds, so re-run it whenever a component, a preview or
@@ -79,9 +79,10 @@ expects, and what each workaround depends on.
   and it has no access to the repository's data modules.
 - `.design-sync/styles.css` ends with `@source inline(...)` lines that pre-generate layout and colour
   utilities the site itself does not use, so a design's own layout code resolves against the same
-  Tailwind vocabulary. They take the stylesheet from 79 KB to 101 KB. `conventions.md` documents the
+  Tailwind vocabulary. They take the stylesheet from 79 KB to 104 KB. `conventions.md` documents the
   families; keep the two in step, and keep the accent and alpha rules (no `text-[var(--accent)]`, no
-  alpha on a text colour).
+  alpha on a text colour). The focus families are load-bearing: without them a design agent's focus
+  class is never emitted and every interactive element it builds loses its visible focus ring.
 
 ## Re-sync risks
 
@@ -96,6 +97,11 @@ expects, and what each workaround depends on.
 - **The preview `matchMedia` stub depends on components honouring reduced motion.** A component that
   stops checking it will animate under capture again, and its cells will grade on a mid-animation
   frame.
+- **Nothing outside the sync itself checks these files.** `.design-sync/` is covered by no tsconfig
+  and no ESLint config, and the two `.mjs` scripts have no test suite, so a broken preview or a wrong
+  type surfaces when the converter runs, not in CI: `preview-rebuild` prints
+  `! preview build failed: <Name>` and the component drops to a floor card, and `package-validate`
+  fails the render check. Treat a sync run as the gate.
 - **Only the previews and the stylesheet are committed; verification state is not.** Grades live in
   the gitignored `.design-sync/.cache/`, and carry-forward comes from the project's uploaded
   `_ds_sync.json`, so a re-sync from a fresh clone re-verifies nothing as long as that anchor is

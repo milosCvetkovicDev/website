@@ -19,6 +19,9 @@ window.matchMedia = (query: string) =>
       } as MediaQueryList)
     : matchMedia(query);
 
+// The projects are inlined rather than imported from @/data/featured-projects, because this story is
+// also the usage example the design agent copies, and it has no access to the repository's data.
+// They are copies: apps/web/src/data/case-studies.ts stays the source of truth for the site.
 export const AsOnTheSite = () => {
   const projects = [
     {

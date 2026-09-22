@@ -43,6 +43,9 @@ CSS variables, light values in `:root` and dark ones in `.dark`:
   `inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-6 py-3 font-medium text-white hover:bg-[var(--accent-hover)]`.
   Secondary button:
   `inline-flex items-center gap-2 rounded-lg border border-[var(--border)] px-6 py-3 font-medium hover:bg-[var(--card-hover)]`.
+- Every link, button and other focusable element also carries the site's focus ring:
+  `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]`.
+  Leave it on: without it a keyboard user cannot see where they are.
 - Only classes compiled into `_ds_bundle.css` exist. The common layout families are there (flex,
   grid, `md:grid-cols-*`, gap, padding, margin, `max-w-*`, text sizes, rounded, shadow); for
   anything else use an inline style with the tokens, such as `style={{ color: 'var(--muted)' }}`.
