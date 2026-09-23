@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useRef, useCallback } from 'react';
+import { forwardRef, useRef, useCallback, type CSSProperties } from 'react';
 import { gsap } from './use-gsap-scroll';
 
 // Corner bracket decoration for HUD panels
@@ -407,26 +407,88 @@ export function ActivityEntry({
   );
 }
 
-// Data stream effect for background
-// Uses deterministic pattern to avoid hydration mismatch
-export function DataStream({ className = '' }: { className?: string }) {
-  // Generate deterministic binary-like pattern using simple hash
-  const generateLine = (seed: number): string => {
-    let result = '';
-    for (let i = 0; i < 80; i++) {
-      // Simple deterministic pattern based on position
-      result += (seed * (i + 1) * 7) % 13 > 6 ? '1' : '0';
+// Data stream effect for background.
+// The texture is the pattern this component used to render as 50 lines of 80 characters: the digit
+// on line r (1-50) in column c (1-80) is a 1 when r * c * 7 mod 13 is above 6. That depends only
+// on r and c mod 13, so the old block was one 13x13 tile repeated, and a mask cut from that tile
+// reproduces it exactly while filling a container of any size. It is built once, at module load,
+// and is the same string on the server and the client, so hydration never mismatches.
+//
+// Drawn rather than typed, because text is what made it an accessibility defect: ~4,000 digits sat
+// in the accessibility tree, and under the wrapper's opacity axe measured them at 1.12:1 (dark) and
+// 1.17:1 (light): a violation where nothing covers the stream, and undecidable (bgOverlap) where
+// text does, which the gate's zero incomplete budget fails on most routes. The digits are cut out
+// of a solid --accent fill with a CSS mask rather than drawn as an <svg>, a canvas or a
+// background-image, because axe treats any of those as an image behind the text laid over the
+// stream and reports that text as undecidable too. A solid fill under a mask stays measurable.
+// As a decorative graphic it takes --accent, not the text token (ADR 0011). --accent is darker
+// than the old digits against the dark page, so the wrapper doubles its opacity there: 1.14:1
+// against the page, where the digits were 1.12:1 (light keeps 10%: 1.15:1 against 1.17:1). Text
+// laid over the stream still measures 6.82:1 for --muted in dark and 4.97:1 in light, with axe
+// counting the fill as a full layer.
+const STREAM_CELL_W = 4.8; // one Geist Mono advance (0.6em) at the old 8px
+const STREAM_CELL_H = 10; // one 8px line at leading-tight
+const STREAM_PERIOD = 13;
+const STREAM_TILE_W = STREAM_PERIOD * STREAM_CELL_W;
+const STREAM_TILE_H = STREAM_PERIOD * STREAM_CELL_H;
+
+const svgNumber = (n: number) => String(Math.round(n * 100) / 100);
+
+function dataStreamTile(): string {
+  let ones = '';
+  let zeros = '';
+  for (let row = 0; row < STREAM_PERIOD; row++) {
+    for (let col = 0; col < STREAM_PERIOD; col++) {
+      const x = col * STREAM_CELL_W;
+      const y = row * STREAM_CELL_H;
+      if (((row + 1) * (col + 1) * 7) % 13 > 6) {
+        // A 1: flag, stem and foot.
+        ones += `M${svgNumber(x + 1.2)} ${svgNumber(y + 3.2)}l1.2-1v5.6m-1.2 0h2.4`;
+      } else {
+        // A 0, then Geist Mono's centre dot.
+        zeros += `M${svgNumber(x + 0.9)} ${svgNumber(y + 5)}a1.5 2.8 0 1 0 3 0a1.5 2.8 0 1 0-3 0m1.5-.4v.8`;
+      }
     }
-    return result;
-  };
+  }
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${svgNumber(STREAM_TILE_W)}' height='${STREAM_TILE_H}' ` +
+    `fill='none' stroke='#000' stroke-width='.8' stroke-linecap='round' stroke-linejoin='round'>` +
+    `<path id='ones' d='${ones}'/><path id='zeros' d='${zeros}'/></svg>`;
+  // Only what a data URI in a quoted CSS url() cannot carry raw is escaped, as Bootstrap does for
+  // its SVG icons; encodeURIComponent would also turn every space into %20.
+  return `url("data:image/svg+xml,${svg.replace(/[#%<>]/g, encodeURIComponent)}")`;
+}
 
-  const lines = Array.from({ length: 50 }, (_, i) => generateLine(i + 1)).join('\n');
+function dataStreamStyle() {
+  const tileSize = `${svgNumber(STREAM_TILE_W)}px ${STREAM_TILE_H}px`;
+  return {
+    // Carried once in a custom property, so the tile is not serialised twice. It is a data: URI,
+    // so a Content-Security-Policy, which the site does not send today, would need img-src data:.
+    '--data-stream-tile': dataStreamTile(),
+    maskImage: 'var(--data-stream-tile)',
+    WebkitMaskImage: 'var(--data-stream-tile)',
+    maskSize: tileSize,
+    WebkitMaskSize: tileSize,
+    // One tile taller than the container and scrolled up by exactly one tile per loop, so the loop
+    // restarts on a frame identical to the one it ends on.
+    height: `calc(100% + ${STREAM_TILE_H}px)`,
+    '--scroll-up-by': `${STREAM_TILE_H}px`,
+  } satisfies CSSProperties & Record<`--${string}`, string>;
+}
 
+// Pure, so a bundle that imports this module for its other components can drop the tile.
+const DATA_STREAM_STYLE = /* @__PURE__ */ dataStreamStyle();
+
+export function DataStream({ className = '' }: { className?: string }) {
   return (
-    <div className={`pointer-events-none absolute inset-0 overflow-hidden opacity-10 ${className}`}>
-      <div className="animate-scroll-up absolute inset-0 font-mono text-[8px] leading-tight whitespace-pre text-[var(--accent-text)]">
-        {lines}
-      </div>
+    <div
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-0 overflow-hidden opacity-10 dark:opacity-20 ${className}`}
+    >
+      <div
+        className="animate-scroll-up absolute inset-x-0 top-0 bg-[var(--accent)]"
+        style={DATA_STREAM_STYLE}
+      />
     </div>
   );
 }
