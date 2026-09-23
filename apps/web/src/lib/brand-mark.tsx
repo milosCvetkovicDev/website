@@ -9,7 +9,8 @@ import { CARD_COLORS } from './og-image';
  * it from here, so they cannot drift apart.
  *
  * At 32px and under it is a single "m", so it stays legible in a browser tab; above that it is "mc"
- * with the cursor at 60% opacity, as in the header's `Logo`.
+ * with a white "_" cursor at 60% opacity. The header's `Logo` draws its cursor as an `--accent`
+ * bar instead, which would vanish on this accent ground.
  *
  * ImageResponse cannot read the site's woff2 files, so it draws with `geist-mono-600-mark.ttf`, a
  * static Geist Mono 600 cut from the site's own mono font down to the three characters the mark
