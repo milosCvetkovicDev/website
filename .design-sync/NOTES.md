@@ -113,11 +113,16 @@ expects, and what each workaround depends on.
 
 ## Findings in the codebase
 
-- `CodeLine` dims its line numbers with `text-[var(--muted)]/50`, which the repository's colour
-  rules forbid on text. No page renders `CodeLine`, so the accessibility gate never measures it.
+- `CodeLine` dimmed its line numbers with `text-[var(--muted)]/50`, which the repository's colour
+  rules forbid on text: composited on the Terminal's `#0d1117` that is 2.74:1, against 7.50:1 for
+  the token itself. No page renders `CodeLine`, so the accessibility gate never measured it.
+  **Fixed:** the gutter now paints `--muted` at full opacity, and the `group-hover` that brightened
+  it is gone, having become a no-op against the new resting colour. The row's `hover:bg` is still
+  the hover affordance.
   (Every other `text-[var(--accent)]` in the components is on a decorative SVG, which the rules
   allow. The stylesheet also carries a `text-[var(--muted)]/60` that no component uses: automatic
-  source detection finds class names in any file under apps/web, tests included.)
+  source detection finds class names in any file under apps/web, tests included, and this one is
+  prose inside a comment in `apps/web/e2e/section-progress.spec.ts`.)
 - `DataStream` rendered 50 lines of 80 `--accent-text` digits as text inside a wrapper at
   `opacity-10` with no `aria-hidden`: the accessibility tree carried all 4,000 digits as one text
   run, and axe measured them at 1.12:1 (dark) and 1.17:1 (light). That is a violation when nothing

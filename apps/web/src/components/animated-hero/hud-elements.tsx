@@ -323,7 +323,12 @@ export function TypingCursor({ color = 'accent' }: { color?: 'accent' | 'white' 
   );
 }
 
-// Code Line with hover highlight
+// Code Line with hover highlight.
+// The gutter paints `--muted` at full opacity. `--muted/50` composited to 2.74:1 on the
+// Terminal's #0d1117, and ADR 0011 forbids dimming text with an alpha modifier; the token
+// itself is 7.5:1 there. The row's `hover:bg` is the hover affordance, so the gutter needs no
+// colour change of its own: `group-hover:text-[var(--muted)]` was a no-op once the resting
+// colour became the token.
 export function CodeLine({
   lineNumber,
   children,
@@ -342,7 +347,7 @@ export function CodeLine({
       } -mx-4 px-4 ${className}`}
     >
       {lineNumber !== undefined && (
-        <span className="w-8 shrink-0 pr-4 text-right text-[var(--muted)]/50 transition-colors select-none group-hover:text-[var(--muted)]">
+        <span className="w-8 shrink-0 pr-4 text-right text-[var(--muted)] select-none">
           {lineNumber}
         </span>
       )}
