@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectHydrated } from './support/hydration';
 
 /**
  * Two promises the page makes about motion and does not keep.
@@ -52,7 +53,7 @@ test('no endless animation keeps running off-screen or at opacity 0', async ({ p
   // the wrong reason.
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(
     false,
   );
@@ -104,7 +105,7 @@ test('under reduce, hovering an animated heading moves nothing', async ({ page }
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   expect(
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
     'the whole point of this case is the reduce branch',
@@ -155,7 +156,7 @@ test('the scroll animations do respect reduced motion', async ({ page }) => {
   // being blamed for something much larger.
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   await walkToBottom(page);
 
   // Every phase renders its finished state instead of animating to it: the deepest proof is that the

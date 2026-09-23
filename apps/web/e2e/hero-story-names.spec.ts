@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectHydrated } from './support/hydration';
 
 /**
  * The story's accessible names and its heading outline.
@@ -56,7 +57,7 @@ async function openStory(page: Page) {
   // transparent, and no dependence on the ~8 s of pipeline timers the scroll would start.
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   expect(
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
     'these assertions need every phase rendered on mount',

@@ -64,7 +64,7 @@ test.describe('the pre-paint theme script', () => {
   test('a seeded light choice beats a dark OS preference before hydration', async ({ browser }) => {
     const { context, page } = await darkMachine(browser, 'light');
     try {
-      // /about rather than /: no boot loader, so nothing to wait for and no animation in the way.
+      // /about rather than /: no animation in the way.
       await page.goto('/about');
 
       const latched = await themeAtParseTime(page);

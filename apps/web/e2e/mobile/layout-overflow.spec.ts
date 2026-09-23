@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectHydrated } from '../support/hydration';
 
 /**
  * `/` must not scroll sideways on a phone.
@@ -96,7 +97,7 @@ for (const width of PHONE_WIDTHS) {
     const height = page.viewportSize()?.height ?? 812;
     await page.setViewportSize({ width, height });
     await page.goto('/');
-    await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+    await expectHydrated(page);
     await walkTheStory(page);
 
     const { scrollWidth, clientWidth } = await page.evaluate(() => ({

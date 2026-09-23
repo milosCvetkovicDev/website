@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expectHydrated } from './support/hydration';
 
 /**
  * `/` must not scroll sideways at the tablet and desktop widths either.
@@ -39,7 +40,7 @@ for (const width of DESKTOP_WIDTHS) {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/');
-    await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+    await expectHydrated(page);
     // Guard the guard: under `reduce` no from-state is ever rendered and this whole file is green
     // for the wrong reason.
     expect(

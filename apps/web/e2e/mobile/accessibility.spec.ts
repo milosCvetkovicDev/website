@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { audit, describeViolations, passingNodes, ruleIdsThatRan } from '../axe';
+import { expectHydrated } from '../support/hydration';
 
 /**
  * The accessibility gate at a phone viewport.
@@ -38,9 +39,7 @@ async function openPage(page: Page, path: string) {
   const response = await page.goto(path, { waitUntil: 'networkidle', timeout: 30_000 });
   expect(response?.status(), `${path} should answer 200`).toBe(200);
   expect(new URL(page.url()).pathname, `${path} should not redirect`).toBe(path);
-  // `/` shows a boot loader until React has hydrated; other routes have no loader, so the locator
-  // matches nothing and this passes at once.
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 }
 

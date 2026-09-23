@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { caseStudies } from '../src/data/case-studies';
 import { PAGE_ROUTES, expectedStatus } from './routes';
+import { expectHydrated } from './support/hydration';
 
 /**
  * Every route must load without the browser reporting anything: no console errors, no console
@@ -110,9 +111,8 @@ async function expectCleanConsole(
   expect.soft(response?.status(), `${route.path} should answer ${route.status}`).toBe(route.status);
   expect.soft(new URL(documentUrl).pathname, `${route.path} should not redirect`).toBe(route.path);
   await expect.soft(page).toHaveTitle(/Milos Cvetkovic/);
-  // `/` shows a boot loader until React has hydrated, and hydration errors cannot be reported
-  // before that. On every other route the locator matches nothing and this passes at once.
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  // Hydration errors cannot be reported before hydration has finished.
+  await expectHydrated(page);
   // Captured rather than thrown. A scroll-driven console error is the likeliest reason afterLoad
   // failed, so the collected problems have to reach the report before its exception does. This is
   // the same reason the three checks above are soft.
@@ -205,7 +205,7 @@ test.use({ trace: 'retain-on-failure' });
 
 test.describe('Every route', () => {
   // A retry would turn an intermittent console error into a "flaky" pass, which is the one outcome
-  // this spec exists to prevent. The budget covers the navigation and loader waits (30 s each).
+  // this spec exists to prevent. The budget covers the navigation and hydration waits (30 s each).
   test.describe.configure({ retries: 0, timeout: 90_000 });
 
   for (const colorScheme of colorSchemes) {

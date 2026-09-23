@@ -357,9 +357,8 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   React has hydrated. Wait through `e2e/support/hydration.ts` rather than writing a wait of your
   own: `gotoHydrated(page, path)` for a navigation, `expectHydrated(page)` after `page.reload()`. A
   soft navigation needs neither, and a spec with JavaScript off must call neither, because the
-  marker never flips. The helper also waits out the home page's `System Boot` loader until #47
-  deletes it; #74 moves six of the inline loader waits into the helper, and #47 removes the rest
-  with the loader. The marker hydrates with the layout, so content a page wraps in `<Suspense>` or
+  marker never flips. No spec keys a wait on page text: the home page's boot loader, which the
+  inline waits once watched, is gone (ADR 0022). The marker hydrates with the layout, so content a page wraps in `<Suspense>` or
   puts under a `loading.tsx` would hydrate after it flips. No route puts `<main>` inside a
   boundary; the one boundary with content today, the decorative `TmuxBackground` on `/`, may
   hydrate after the marker. `e2e/hero.spec.ts` asserts the page title.

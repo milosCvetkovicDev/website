@@ -74,9 +74,9 @@ test.describe('Featured Work', () => {
     // Under `reduce` the phases above render their finished state in the re-render right after
     // hydration, which gotoHydrated waits through, so no growth moves the card here.
     //
-    // The hydration wait includes the home page's loader. Under a 6x and a 10x CDP CPU throttle
-    // this test ran out of the 30 s default in 1 of 20 and 3 of 5 runs, every time still waiting
-    // for the loader to hide, so it gets the same room past that wait as the hover test.
+    // Under a 6x and a 10x CDP CPU throttle this test ran out of the 30 s default in 1 of 20 and 3
+    // of 5 runs, every time in the hydration wait (then still including the boot loader ADR 0022
+    // removed), so it gets the same room past that wait as the hover test.
     test.setTimeout(60_000);
     await gotoHydrated(page, '/');
     const section = page.getByRole('region', { name: /featured work/i });

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PAGE_ROUTES, expectedStatus } from './routes';
+import { expectHydrated } from './support/hydration';
 // The rule map and the result readers are shared with e2e/mobile/accessibility.spec.ts: only
 // e2e/mobile/ is selected by the two phone projects, and importing one spec file from another would
 // register its tests twice, so they live in their own module.
@@ -80,21 +81,9 @@ import {
  * `PipelineStage`, the `warning` and `error` `NotificationToast` variants, and the `pending` and
  * `error` `ActivityEntry` variants. They are unreachable, not merely uncovered.
  *
- * The boot loader on `/` is outside all of this, and cannot be brought inside it. `openPage` waits
- * for it to be hidden, so no pass measures it, and holding it on screen instead does not help.
- * Measured on 2026-09-10 by aborting the page's `.js` chunks, which stops hydration and leaves the
- * prerendered loader up for good: axe puts every one of its text nodes in `incomplete`, with
- * "background color could not be determined because it is overlapped by another element". axe is
- * right and the overlap is total. The loader is `z-[1]` and the story is `relative z-10` in the
- * same stacking context, so the hero paints over it: `elementFromPoint` at the centre of the
- * loader's own heading, boot line and version tag returns hero content in all three cases, never
- * the loader. Only `violations` fail here, so an assertion on the loader would be green whatever
- * colours it used, and there is nothing on screen for it to be green about. Abort the `.css` chunk
- * with the `.js` and it is worse than useless: the stylesheet goes too and every node passes at
- * 21:1 against an unstyled page. Its progress and boot-message states are not reachable either.
- * `useIsHydrated` flips on the first client commit, so the effect driving them never sees `visible`
- * true and the loader only ever renders its first message. What the loader looks like is held by
- * the token rules in CLAUDE.md and by review, not by this gate.
+ * `/` used to render a boot loader, `fixed` at `z-[1]` under the story's `relative z-10`: axe could
+ * only ever report its text as `incomplete`, overlapped by the hero, and no visitor saw it. It was
+ * removed with ADR 0022, so every pass here now measures everything `/` puts on screen.
  *
  * Every pass in this file runs at the project's desktop viewport. The phone viewports — which is what
  * Lighthouse emulates by default — are covered by `e2e/mobile/accessibility.spec.ts`, which the two
@@ -271,10 +260,7 @@ async function openPage(
   );
   expect(new URL(page.url()).pathname, `${path} should not redirect`).toBe(path);
   await expect(page).toHaveTitle(/Milos Cvetkovic/);
-  // `/` shows a boot loader until React has hydrated and removes it 600 ms later; the audit
-  // is of the page behind it. Other routes have no loader, so the locator matches nothing
-  // and this passes at once.
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   // Playwright ignores unknown emulation options silently: prove the scheme reached the page.
   await expect(page.locator('html')).toContainClass(colorScheme);
   // axe skips what is not on screen, so a page that rendered nothing would be green: require
@@ -291,7 +277,7 @@ test.use({ trace: 'retain-on-failure' });
 test.describe('Accessibility', () => {
   // No retries: a retry would turn an intermittent violation, say text sampled mid-animation, into
   // a "flaky" pass, which is the one outcome a gate must not produce. The budget covers the
-  // navigation, the loader wait (30 s) and an axe run over the whole home page on a slow CI runner.
+  // navigation, the hydration wait (30 s) and an axe run over the whole home page on a slow CI runner.
   test.describe.configure({ retries: 0, timeout: 90_000 });
 
   for (const colorScheme of colorSchemes) {

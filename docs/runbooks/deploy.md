@@ -448,9 +448,9 @@ five runs interleaved with that baseline on the same machine give `/` 96 in ever
 `/work/self-healing-agent` 98 with TBT 53 to 54 ms; the case-study route also stopped loading the
 27.7 KB FeaturedWork chunk. Before comparing a future run
 with these, check `.environment.benchmarkIndex` and `.runWarnings` in its JSON and discard a flagged
-run. A CLS of 0.03 to 0.06 attributed to the boot loader is Lighthouse re-centering it when it
-changes the emulated viewport at about 0.9 s, which it counts by design within 500 ms of that event;
-visitors never see it.
+run. Until ADR 0022 removed the boot loader, a CLS of 0.03 to 0.06 attributed to it was Lighthouse
+re-centering it when it changes the emulated viewport at about 0.9 s, which it counts by design
+within 500 ms of that event; visitors never saw it.
 
 Accessibility on that same 2026-09-09 baseline was 96 on both pages. The points went to colour
 contrast (the accent used as text, labels dimmed with opacity modifiers, and a scroll reveal that

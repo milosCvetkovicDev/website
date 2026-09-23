@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectHydrated } from './support/hydration';
 
 /**
  * The hero's own text colours, measured by computed style rather than by axe.
@@ -190,7 +191,7 @@ async function openHero(page: Page, colorScheme: (typeof colorSchemes)[number]) 
   await installColorProbe(page);
   await page.emulateMedia({ colorScheme });
   await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   // Playwright ignores an unknown emulation option silently: prove the scheme reached the page, or a
   // "dark" run would be measuring the light palette twice.
   await expect(page.locator('html')).toContainClass(colorScheme);
@@ -266,7 +267,7 @@ test('no hero text sits at a resting partial opacity while hovered', async ({ pa
   // no reduced-motion reference at all (`animated-text.tsx`), so it still fires — which is the point.
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   expect(
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
     'this case needs reduced motion, or a reveal mid-tween would be indistinguishable from a ' +
