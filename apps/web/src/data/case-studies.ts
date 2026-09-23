@@ -27,6 +27,8 @@ export function formatMetric(metric: CaseStudyMetric): string {
 export interface CaseStudy {
   slug: string;
   title: string;
+  /** What the project is in a few words, for the page title: `<title> — <tagline>`, 42 chars at most. */
+  tagline: string;
   description: string;
   tags: string[];
   highlight: CaseStudyHighlight;
@@ -49,6 +51,7 @@ export const caseStudies: CaseStudy[] = [
       metric: { value: 73, suffix: '%', label: 'faster resolution' },
     },
     title: 'Self-Healing Agent',
+    tagline: 'autonomous bug fixing',
     description:
       'An AI agent that wakes up before you do. It monitors production, diagnoses errors, and opens PRs with fixes—all autonomously.',
     tags: ['Claude Agent SDK', 'Bun', 'Elysia', 'Azure'],
@@ -88,6 +91,7 @@ export const caseStudies: CaseStudy[] = [
       metric: { value: 40, suffix: '%', label: 'less complexity' },
     },
     title: 'Enterprise B2B Platform',
+    tagline: 'legacy rescue',
     description:
       'Took a legacy codebase everyone was afraid to touch and turned it into a system the team actually enjoys working on.',
     tags: ['React', 'Node.js', 'PostgreSQL', 'Terraform'],
@@ -137,6 +141,7 @@ export const caseStudies: CaseStudy[] = [
       metric: { value: 5, suffix: '×', label: 'faster builds' },
     },
     title: 'Nx Remote Cache Server',
+    tagline: 'faster CI builds',
     description:
       "Why rebuild what hasn't changed? A custom cache server that slashed CI times and gave developers their coffee breaks back.",
     tags: ['Bun', 'Elysia', 'Azure Blob Storage'],

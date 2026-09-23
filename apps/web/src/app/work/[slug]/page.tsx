@@ -32,8 +32,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return buildMetadata({
-    title: caseStudy.title,
-    socialTitle: `${caseStudy.title} | Case Study`,
+    title: `${caseStudy.title} — ${caseStudy.tagline}`,
     description: caseStudy.description,
     path: `/work/${caseStudy.slug}`,
     type: 'article',

@@ -4,8 +4,7 @@ import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
-  title: 'Work',
-  socialTitle: 'Work & Case Studies',
+  title: 'Work — AI agents & legacy modernization',
   description:
     'Real projects, real constraints, real results. Case studies on AI agents, legacy modernization, and high-performance systems.',
   path: '/work',

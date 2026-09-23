@@ -8,7 +8,7 @@ export const metadata = buildMetadata({
   // The root template applies to child segments only, so this is the whole title; `absolute` says so.
   title: { absolute: 'Milos Cvetkovic | Senior Full-Stack Engineer' },
   description:
-    'Senior Full Stack Engineer & Architect building systems that inherit chaos and ship clarity. 13 years of AI-native development, self-healing agents, and cloud-native architecture across TypeScript, React, NestJS, Azure, and Kubernetes.',
+    'Senior Full Stack Engineer building AI-native systems: self-healing agents, legacy rescue and cloud architecture in TypeScript, React and NestJS.',
   path: '/',
 });
 

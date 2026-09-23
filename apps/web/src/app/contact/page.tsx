@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
-  title: 'Connect',
-  socialTitle: 'Connect | Milos Cvetkovic',
+  title: 'Contact',
+  socialTitle: 'Contact Milos Cvetkovic',
   description:
     'Connect with Milos Cvetkovic on LinkedIn, GitHub, and X. Follow along for engineering insights and project updates.',
   path: '/contact',
