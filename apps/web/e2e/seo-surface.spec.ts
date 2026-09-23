@@ -63,6 +63,16 @@ const first = (map: Map<string, string[]>, key: string) => map.get(key)?.[0];
 /** Every route a crawler can reach, with the status it answers. */
 const routes = PAGE_ROUTES.map((path) => ({ path, status: expectedStatus(path) }));
 
+/** A pathname from a head URL, with the trailing slash of anything but the root dropped. */
+const pathOf = (url: string) =>
+  new URL(url, 'https://miloscvetkovic.dev').pathname.replace(/(.)\/$/, '$1');
+
+// A 404 is one prerendered document served for every unknown URL, so nothing in its head can name
+// the URL that was asked for: a canonical or og:url there would name `/_not-found`, or the home page,
+// and every broken link would claim that URL. Making the page render per request would fix that
+// only by making every route dynamic. The owner decision of 2026-09-23: a 404 names no URL at all.
+const NAMES_NO_URL = 'a 404 must name no URL: it is one static document for every unknown path';
+
 test('the head parser reads the tags that are actually there', async ({ request }) => {
   // Green, and the control for all eight rows below. Every one of them asserts that something is
   // *missing*, so a parser that found nothing at all would make them all fail convincingly and the
@@ -79,32 +89,33 @@ test('the head parser reads the tags that are actually there', async ({ request 
   expect(head.raw).toContain('application/ld+json');
 });
 
-test('every route serves one canonical link for its own path', async ({ request }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R22, #48' });
-
+test('every page serves one canonical link for its own path, and a 404 serves none', async ({
+  request,
+}) => {
   const problems: string[] = [];
   for (const { path, status } of routes) {
     const head = await fetchHead(request, path);
     expect(head.status, `${path} should answer ${status}`).toBe(status);
     const canonicals = head.link.get('canonical') ?? [];
+    if (status === 404) {
+      if (canonicals.length > 0) problems.push(`${path}: ${NAMES_NO_URL}, got ${canonicals}`);
+      continue;
+    }
     if (canonicals.length !== 1) {
       problems.push(`${path}: ${canonicals.length} canonical links, expected 1`);
       continue;
     }
     // The path must be its own, not the home page's: one canonical pointing everywhere is worse than
     // none, because it tells a crawler these are all the same document.
-    const pathname = new URL(canonicals[0], 'https://miloscvetkovic.dev').pathname.replace(
-      /(.)\/$/,
-      '$1',
-    );
-    if (pathname !== path) problems.push(`${path}: canonical points at ${canonicals[0]}`);
+    if (pathOf(canonicals[0]) !== path) {
+      problems.push(`${path}: canonical points at ${canonicals[0]}`);
+    }
   }
 
   expect(
     problems,
-    '`canonical` and `alternates` appear nowhere in apps/web/src. Set `alternates.canonical` per ' +
-      'route (metadataBase is already set in layout.tsx, so a relative path resolves).',
+    'every page sets `alternates.canonical` to its own path through buildMetadata() ' +
+      '(src/lib/metadata.ts); nothing in the root layout may, or it would reach the 404s.',
   ).toEqual([]);
 });
 
@@ -154,15 +165,21 @@ test('every route serves an og:image that answers with an image', async ({ reque
 test('every route serves the full Open Graph set and its own twitter:title', async ({
   request,
 }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R24, #48' });
-
   const problems: string[] = [];
   const twitterTitles = new Map<string, string>();
-  for (const { path } of routes) {
+  for (const { path, status } of routes) {
     const head = await fetchHead(request, path);
-    for (const key of ['og:url', 'og:site_name', 'og:locale', 'og:type']) {
+    for (const key of ['og:site_name', 'og:locale', 'og:type']) {
       if (!first(head.meta, key)) problems.push(`${path}: no ${key}`);
+    }
+    const url = first(head.meta, 'og:url');
+    if (status === 404) {
+      if (url) problems.push(`${path}: ${NAMES_NO_URL}, got og:url ${url}`);
+    } else if (!url) {
+      problems.push(`${path}: no og:url`);
+    } else if (pathOf(url) !== path) {
+      // Its own URL, the same one the canonical names, not the home page's.
+      problems.push(`${path}: og:url points at ${url}`);
     }
     const twitterTitle = first(head.meta, 'twitter:title');
     if (!twitterTitle) problems.push(`${path}: no twitter:title`);
@@ -170,8 +187,8 @@ test('every route serves the full Open Graph set and its own twitter:title', asy
   }
 
   // A sub-page that serves the home page's twitter:title is a second bug with the same cause: an
-  // `openGraph: { title, description }` on a route *replaces* the root object from layout.tsx:65-73
-  // rather than merging into it, so the inherited fields vanish and the card falls back to the root.
+  // `openGraph` or `twitter` object on a route *replaces* the root's rather than merging into it, so
+  // the inherited fields vanish and the card falls back to whatever the root still declares.
   const home = twitterTitles.get('/');
   const borrowed = [...twitterTitles]
     .filter(([path, title]) => path !== '/' && title === home)
@@ -182,8 +199,8 @@ test('every route serves the full Open Graph set and its own twitter:title', asy
 
   expect(
     problems,
-    'a per-route `openGraph` object replaces the root one instead of merging: spread the shared ' +
-      'fields, or set them per route.',
+    'a per-route `openGraph` object replaces the root one instead of merging: every page builds ' +
+      'its whole set through buildMetadata() (src/lib/metadata.ts).',
   ).toEqual([]);
 });
 
