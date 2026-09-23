@@ -116,9 +116,12 @@ expects, and what each workaround depends on.
 - `CodeLine` dimmed its line numbers with `text-[var(--muted)]/50`, which the repository's colour
   rules forbid on text: composited on the Terminal's `#0d1117` that is 2.74:1, against 7.50:1 for
   the token itself. No page renders `CodeLine`, so the accessibility gate never measured it.
-  **Fixed:** the gutter now paints `--muted` at full opacity, and the `group-hover` that brightened
-  it is gone, having become a no-op against the new resting colour. The row's `hover:bg` is still
-  the hover affordance.
+  **Fixed:** the gutter now paints `--muted` at full opacity and brightens to `--foreground` on row
+  hover, the idiom `ProgressBar`, `StatDisplay`, `QuestItem` and `PipelineStage` already use. Its
+  old `group-hover:text-[var(--muted)]` had to go either way, since it named the colour the gutter
+  now paints at rest. Keep the hover: a `highlighted` row has no `hover:bg` of its own, because that
+  branch swaps the hover background for a resting one rather than adding to it, so the gutter is the
+  whole of that row's hover response.
   (Every other `text-[var(--accent)]` in the components is on a decorative SVG, which the rules
   allow. The stylesheet also carries a `text-[var(--muted)]/60` that no component uses: automatic
   source detection finds class names in any file under apps/web, tests included, and this one is
@@ -154,5 +157,6 @@ expects, and what each workaround depends on.
   re-entry and reverted on unmount and when the preference changes. It no longer shares its node
   with a `transition-all`, which had smeared its ±2px shake to under 0.15px (sampled every frame
   in Chromium).
-- Both components only reach Claude Design on the next `/design-sync`: until then their cards
-  still show the text texture and the pulsing value.
+- All three fixes (`CodeLine` above, these two) only reach Claude Design on the next
+  `/design-sync`: until then the cards still show the dimmed gutter, the text texture and the
+  pulsing value.
