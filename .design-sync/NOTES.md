@@ -118,3 +118,36 @@ expects, and what each workaround depends on.
   (Every other `text-[var(--accent)]` in the components is on a decorative SVG, which the rules
   allow. The stylesheet also carries a `text-[var(--muted)]/60` that no component uses: automatic
   source detection finds class names in any file under apps/web, tests included.)
+- `DataStream` rendered 50 lines of 80 `--accent-text` digits as text inside a wrapper at
+  `opacity-10` with no `aria-hidden`: the accessibility tree carried all 4,000 digits as one text
+  run, and axe measured them at 1.12:1 (dark) and 1.17:1 (light). That is a violation when nothing
+  covers the stream, which fails the accessibility gate on any route, and `incomplete`
+  (`bgOverlap`) when content sits on it, as in both previews, which fails the eight routes whose
+  budget is zero. **Fixed:** the wrapper is `aria-hidden` and the texture is no longer text. The
+  pattern repeats every 13 lines and 13 columns, so one 13x13 tile of drawn digits, used as a CSS
+  mask over a solid `--accent` fill, reproduces the old block cell for cell
+  (`hud-elements.test.tsx` checks it against the old generator). It is not an `<svg>` pattern, a
+  canvas or a `background-image`, because axe reports any text laid over one of those as
+  `incomplete` (`imgNode`, `bgImage`); over the masked fill it stays measurable, at 4.97:1 for
+  `--muted` on the light page and 6.82:1 on the dark one, since axe counts the fill as a full layer.
+  As a decorative graphic the fill is `--accent`, not `--accent-text` (ADR 0011). That is darker
+  against the dark page than the old digits, so the wrapper goes to `opacity-20` there: 1.14:1
+  against the page, where the digits were 1.12:1 (light keeps `opacity-10`, 1.15:1 against 1.17:1).
+  It now covers its whole container and scrolls one 130px tile per 20 s loop, so the loop restarts
+  without a jump. That is a constant 6.5px/s; the text moved half its container's height per loop.
+- `StatDisplay` put `animate-pulse` on its `--accent-text` value when `highlight` was set.
+  Tailwind's pulse runs opacity 1 → 0.5 → 1, so the value spent about half of every 2 s cycle
+  below 4.5:1, down to 2.60:1 on the Terminal and 2.39:1 on a light `HudPanel`, against 6.95:1 and
+  6.31:1 at rest. That is the "do not dim accent text" rule written as a keyframe, which a grep for
+  `/NN` on a `text-` utility does not find. **Fixed:** the pulse is on an `aria-hidden` glow around
+  the value, a box-shadow with no fill, so a highlighted value keeps the contrast of a plain one on
+  every surface. A tint under the value would stack with the `HudPanel`'s and the row's own hover
+  tints: at the centre of a hovered light `HudPanel` even `/10` takes it to 4.25:1. The glow
+  reaches 16px out and paints over the label, so the row keeps a `gap-4` between them, and forced
+  colours, which drop box-shadows, get an outline instead. The hover glitch also changed. It is one
+  paused timeline in a `gsap.context()`, skipped under reduced motion, restarted from rest on
+  re-entry and reverted on unmount and when the preference changes. It no longer shares its node
+  with a `transition-all`, which had smeared its ±2px shake to under 0.15px (sampled every frame
+  in Chromium).
+- Both components only reach Claude Design on the next `/design-sync`: until then their cards
+  still show the text texture and the pulsing value.

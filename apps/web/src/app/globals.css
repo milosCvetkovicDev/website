@@ -216,13 +216,15 @@ main {
   animation: blink 1s steps(1) infinite;
 }
 
-/* Scrolling data stream */
+/* Scrolling data stream. Moves up by --scroll-up-by, or half the element's height when it is unset.
+   DataStream sets it to one tile of its repeating texture, so each loop restarts on an identical
+   frame. */
 @keyframes scroll-up {
   0% {
     transform: translateY(0);
   }
   100% {
-    transform: translateY(-50%);
+    transform: translateY(calc(-1 * var(--scroll-up-by, 50%)));
   }
 }
 
