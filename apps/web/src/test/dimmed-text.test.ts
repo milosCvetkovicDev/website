@@ -3,11 +3,11 @@
  * Conventions: text is not dimmed with an opacity modifier, "decorative or `aria-hidden` text
  * included, since axe measures it either way". The axe gate (`e2e/accessibility.spec.ts`) enforces
  * it only on what a route renders, at the moment it samples: `CodeLine`'s line numbers,
- * `text-[var(--muted)]/50` at 2.74:1 on the Terminal, went unnoticed because no route renders it
- * (#110). This reads the source instead, so it sees every component whether a page uses it or not.
+ * `text-[var(--muted)]/50` at 2.74:1 on the Terminal, went unnoticed until #110 because no route
+ * renders `CodeLine`. This reads the source instead, so it sees every component a page uses or not.
  *
- * It reads every module under `src/components` outside `__tests__` and flags dimming declared in the
- * markup, on an element whose subtree may render text:
+ * It reads every module under `src/components` outside tests and flags dimming declared in the
+ * markup that reaches text:
  *
  * - an alpha on a text colour, as a modifier (`text-[var(--muted)]/50`, `text-white/60`,
  *   `text-muted/50`) or inside the colour (`text-[rgba(99,102,241,0.7)]`, `text-[#e6edf399]`, a
@@ -15,23 +15,27 @@
  * - an opacity strictly between 0 and 1: `opacity-60`, `[opacity:.5]`, SVG `opacity`;
  * - an animation whose keyframes leave text part-transparent, judged from Tailwind's and globals.css's
  *   own definitions, which is why `animate-pulse` counts and `animate-spin` and the reveals do not;
- * - a `style` colour or opacity whose value the scan can resolve within the module.
+ * - a `style` colour, opacity or animation whose value the scan can resolve within the module;
+ * - a colour or an opacity handed to a component in a prop named for one, which the scan does not
+ *   follow into the component, so it reports it where it is handed over.
  *
- * `opacity-0` and an alpha of 0 hide rather than dim, so the reveal idiom stays legal. "May render
- * text" is structural: text or an expression anywhere under the element, SVG `<text>` included, or
- * content the scan cannot see, such as an imported component's output. An opacity reaches the whole
- * subtree, because it composites everything under the element, which is how `DataStream`'s
- * `opacity-10` wrapper dims digits one element down. A colour stops where a descendant sets its own,
- * and SVG text takes `fill` rather than `color`, so a decorative SVG can keep a dimmed
- * `currentColor`, as the section progress corners do. A dimming class the scan cannot trace to an
- * element is flagged as well.
+ * `opacity-0` and an alpha of 0 hide rather than dim, so the reveal idiom stays legal. "Reaches text"
+ * is structural: text or an expression anywhere under the element, SVG `<text>` included, or content
+ * the scan cannot see, such as an imported component's output. An opacity reaches the whole subtree,
+ * because it composites everything under the element, which is how `DataStream`'s `opacity-10`
+ * wrapper dims digits one element down. A colour stops where a descendant always sets its own, and
+ * SVG text takes `fill` rather than `color`, so a decorative SVG can keep a dimmed `currentColor`,
+ * as the section progress corners do. A class a variant aims elsewhere reaches what it aims at: the
+ * children or descendants `*:`, `**:` and `[&_p]:` select, or the content `before:` generates.
  *
- * Not charged to an element's text: a class aimed at a pseudo-element or a descendant (`after:`,
- * `[&_svg]:`), one under `disabled:`, which WCAG 1.4.3 exempts and axe does not measure, and text
- * that is never painted (`sr-only`, `hidden`, an SVG `<title>`). Out of reach, and so out of scope:
- * colours set from script, GSAP tweens (ADR 0008's separate rule that a reveal starts from 0), a
- * `style` value the scan cannot resolve, gradient text, and a dimming class aimed at `before:` or
- * `after:` content.
+ * Not charged to anything: a class under `disabled:`, which WCAG 1.4.3 exempts and axe does not
+ * measure, and text that is never painted (`sr-only` whatever happens, `hidden`, an SVG `<title>`).
+ * Counted, because the scan cannot tell: an imported component's output, a class string it cannot
+ * trace to an element, and the siblings a variant selects. Out of reach, and so out of scope: colours
+ * set from script, GSAP tweens (ADR 0008's separate rule that a reveal starts from 0), `style` values
+ * held in props or state, gradient text, `stroke` on text, classes in `dangerouslySetInnerHTML`,
+ * class names assembled at run time (which Tailwind tells you never to write), classes imported from
+ * outside `src/components`, and `src/app`, whose pages the axe gate audits.
  *
  * The violations present when the guard landed are expected failures in KNOWN_DEFECTS, and the
  * change that fixes one deletes its entry. globals.css keeps this directory out of Tailwind's source
@@ -40,9 +44,9 @@
  *
  * @vitest-environment node
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   animationDims,
   animationUtilitiesIn,
@@ -74,6 +78,15 @@ const report = (expected: (string | [string, Verdict])[]) =>
   expected.map((entry) => (typeof entry === 'string' ? [entry, 'text'] : entry));
 
 describe('what the scan flags', () => {
+  // A translucent custom property of the fixtures' own, so that no fixture leans on what globals.css
+  // holds: the fix for DIM8 may well make the --log-* colours opaque.
+  beforeAll(() => {
+    vocabulary.properties.set('--fixture-translucent', ['rgba(0, 0, 0, 0.5)']);
+  });
+  afterAll(() => {
+    vocabulary.properties.delete('--fixture-translucent');
+  });
+
   it.each<[string, string, (string | [string, Verdict])[]]>([
     [
       "CodeLine's gutter as it was before #110",
@@ -142,7 +155,8 @@ describe('what the scan flags', () => {
         <p>
           <span className="text-[#e6edf399] text-[#abc8] text-[rgb(230_237_243/0.6)]">a</span>
           <span className="text-[hsl(0_0%_90%/60%)] text-[color-mix(in_oklab,var(--muted)_60%,transparent)]">b</span>
-          <span className="text-[var(--log-dbg)] text-(--log-inf) [color:rgba(0,0,0,.5)]">c</span>
+          <span className="text-[var(--fixture-translucent)] text-(--fixture-translucent) [color:rgba(0,0,0,.5)]">c</span>
+          <span className="text-[rgba(var(--accent-rgb),0.6)] text-[light-dark(#57606a,rgb(139_148_158/.6))]">d</span>
           <input className="placeholder-white/50" placeholder="Search" />
         </p>
       );`,
@@ -152,9 +166,11 @@ describe('what the scan flags', () => {
         'text-[rgb(230_237_243/0.6)]',
         'text-[hsl(0_0%_90%/60%)]',
         'text-[color-mix(in_oklab,var(--muted)_60%,transparent)]',
-        'text-[var(--log-dbg)]',
-        'text-(--log-inf)',
+        'text-[var(--fixture-translucent)]',
+        'text-(--fixture-translucent)',
         '[color:rgba(0,0,0,.5)]',
+        'text-[rgba(var(--accent-rgb),0.6)]',
+        'text-[light-dark(#57606a,rgb(139_148_158/.6))]',
         'placeholder-white/50',
       ],
     ],
@@ -251,16 +267,18 @@ describe('what the scan flags', () => {
       [
         'fill-[var(--muted)]/50',
         'fill-white/40',
-        'fill={fill}',
-        'opacity={dimmed ? 0.3 : 1}',
-        'fillOpacity={0.5}',
-        'opacity={QUIET}',
+        'fill={…}',
+        'opacity={…}',
+        'fillOpacity={…}',
+        'opacity={…}',
       ],
     ],
     [
       'a style colour or opacity the scan can resolve',
       `const LOG_COLORS = { err: 'var(--log-err)', ok: 'var(--log-ok)' } as const;
-      export function Log({ lines }: { lines: { level: 'err' | 'ok'; text: string }[] }) {
+      const DIM = { opacity: 0.5 };
+      const base = { opacity: 0.6 };
+      export function Log({ lines, dimmed, faint }: { lines: { level: 'err' | 'ok'; text: string }[]; dimmed: boolean; faint: boolean }) {
         return (
           <div>
             <span style={{ fontSize: '9px', color: 'rgba(139, 92, 246, 0.7)' }}>Scroll</span>
@@ -270,13 +288,23 @@ describe('what the scan flags', () => {
               </div>
             ))}
             <p style={{ opacity: 0.6 }}>Muted</p>
+            <p style={dimmed ? DIM : undefined}>Chosen</p>
+            <p style={{ ...base, fontSize: 12 }}>Spread</p>
+            <p style={{ opacity: faint && 0.4 }}>Maybe</p>
+            <p style={{ animation: 'pulse 2s infinite' }}>Live</p>
+            <span style={{ color: 'rgba(var(--violet-rgb), 0.7)' }}>Channels</span>
           </div>
         );
       }`,
       [
-        "style.color: 'rgba(139, 92, 246, 0.7)'",
-        'style.color: LOG_COLORS[line.level]',
-        'style.opacity: 0.6',
+        'style.color',
+        'style.color',
+        'style.opacity',
+        'style.opacity',
+        'style.opacity',
+        'style.opacity',
+        'style.animation',
+        'style.color',
       ],
     ],
     [
@@ -414,6 +442,238 @@ describe('what the scan flags', () => {
         </p>
       );`,
       ['opacity-50', 'opacity-40'],
+    ],
+    [
+      'a conditional override, a conditional or undone screen-reader class, an inherited colour',
+      `import { cn } from '@/lib/utils';
+      type Link = { href: string; label: string; active: boolean };
+      export function Nav({ links, collapsed, label }: { links: Link[]; collapsed: boolean; label: string }) {
+        return (
+          <div>
+            <nav className="text-[var(--muted)]/70">
+              {links.map((l) => (
+                <a key={l.href} href={l.href} className={cn(l.active && 'text-[var(--foreground)]')}>
+                  {l.label}
+                </a>
+              ))}
+            </nav>
+            <span className={cn('text-[var(--muted)]/60', collapsed && 'sr-only')}>{label}</span>
+            <span className="sr-only text-[var(--muted)]/50 sm:not-sr-only">Menu</span>
+            <p className="text-[var(--muted)]/40">
+              <a href="/blog" className="text-current">
+                Blog
+              </a>
+            </p>
+            <p className="text-[var(--muted)]/30">
+              <a href="/docs" className="hover:text-white">
+                Docs
+              </a>
+            </p>
+          </div>
+        );
+      }`,
+      [
+        'text-[var(--muted)]/70',
+        'text-[var(--muted)]/60',
+        'text-[var(--muted)]/50',
+        'text-[var(--muted)]/40',
+        'text-[var(--muted)]/30',
+      ],
+    ],
+    [
+      'variants aimed at children and descendants, which dim what they select',
+      `export const Lists = () => (
+        <div>
+          <ul className="*:opacity-60">
+            <li>Next.js</li>
+          </ul>
+          <p className="[&_code]:text-[var(--muted)]/60">
+            Run <code>pnpm test</code> first
+          </p>
+          <ul className="**:text-white/50">
+            <li>
+              <span>x</span>
+            </li>
+          </ul>
+          <ul className="[&>li]:opacity-40">
+            <li>One</li>
+          </ul>
+          <h2 className="[&+p]:opacity-50">Title</h2>
+        </div>
+      );`,
+      [
+        '*:opacity-60',
+        '[&_code]:text-[var(--muted)]/60',
+        '**:text-white/50',
+        '[&>li]:opacity-40',
+        '[&+p]:opacity-50',
+      ],
+    ],
+    [
+      'a dimming aimed at generated content',
+      `export const Prompt = () => (
+        <span aria-hidden="true" className="before:content-['$'] before:text-[var(--muted)]/50" />
+      );`,
+      ['before:text-[var(--muted)]/50'],
+    ],
+    [
+      'a colour or an opacity handed to a component',
+      `function Tag({ color, children }: { color: string; children: React.ReactNode }) {
+        return <span style={{ color }}>{children}</span>;
+      }
+      export const Tags = () => (
+        <p>
+          <Tag color="rgba(99,102,241,0.7)">Next.js</Tag>
+          <Diagram labelOpacity={0.4} />
+        </p>
+      );`,
+      [
+        ['color={…}', 'unattributed'],
+        ['labelOpacity={…}', 'unattributed'],
+      ],
+    ],
+    [
+      'classes spread through a condition or from a helper, and one handed to a helper that renders it',
+      `const rowProps = () => ({ className: 'opacity-40' });
+      const stat = (label: string, cls: string) => <span className={cls}>{label}</span>;
+      export function Rows({ muted, label, items }: { muted: boolean; label: string; items: string[] }) {
+        return (
+          <div>
+            <span {...(muted ? { className: 'opacity-50' } : {})}>{label}</span>
+            <ul>
+              {items.map((item) => (
+                <li key={item} {...rowProps()}>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <p>{stat('Uptime', 'text-[var(--muted)]/60')}</p>
+          </div>
+        );
+      }`,
+      ['opacity-50', 'opacity-40', ['text-[var(--muted)]/60', 'unattributed']],
+    ],
+    [
+      'one entry of a nested map',
+      `const TONE = { label: { dim: 'opacity-60', full: 'font-mono' } };
+      export const Row = ({ text }: { text: string }) => (
+        <p>
+          <span className={TONE.label.dim}>{text}</span>
+          <span className={TONE.label.full}>{text}</span>
+        </p>
+      );`,
+      ['opacity-60'],
+    ],
+    [
+      'a name whose default or first value is empty, which holds text later',
+      `export function Caption({ text = '' }: { text?: string }) {
+        return <p className="opacity-60">{text}</p>;
+      }
+      export function Loading({ loading }: { loading: boolean }) {
+        let label = '';
+        if (loading) label = 'Loading…';
+        return <span className="opacity-50">{label}</span>;
+      }`,
+      ['opacity-60', 'opacity-50'],
+    ],
+    [
+      'a fill that reaches SVG text through an HTML element or a local component',
+      `const LABEL = 'CPU';
+      function Diagram({ className }: { className?: string }) {
+        return (
+          <svg className={className}>
+            <text y="15">API</text>
+          </svg>
+        );
+      }
+      export const Legends = () => (
+        <p>
+          <svg>
+            <g className="fill-white/30">
+              <a href="#cpu">{LABEL}</a>
+              <text>{LABEL}</text>
+            </g>
+          </svg>
+          <span className="fill-white/40">
+            <svg>
+              <text>Queue</text>
+            </svg>
+          </span>
+          <Diagram className="fill-[var(--muted)]/50" />
+        </p>
+      );`,
+      ['fill-white/30', 'fill-white/40', 'fill-[var(--muted)]/50'],
+    ],
+    [
+      'a file input, and a class list written with an escape',
+      `export const Upload = () => (
+        <p>
+          <input type="file" className="opacity-50" />
+          <span className={'font-mono\\nopacity-40'}>x</span>
+        </p>
+      );`,
+      ['opacity-50', 'opacity-40'],
+    ],
+    [
+      'a data-disabled state, which assistive technology and axe do not treat as inactive',
+      `export const Item = () => (
+        <span role="menuitem" data-disabled="" className="data-[disabled]:opacity-50 data-disabled:opacity-40">
+          Delete
+        </span>
+      );`,
+      ['data-[disabled]:opacity-50', 'data-disabled:opacity-40'],
+    ],
+    [
+      "a let's later value, a parameter's default and a spread's condition do not exempt",
+      `function Item({ label, tone = 'text-[var(--foreground)]' }: { label: string; tone?: string }) {
+        return <li className={tone}>{label}</li>;
+      }
+      export function Menu({ open, collapsed, dim }: { open: boolean; collapsed: boolean; dim: boolean }) {
+        let labelClass = 'sr-only';
+        if (open) labelClass = '';
+        let o = 1;
+        if (dim) o = 0.5;
+        return (
+          <div>
+            <span className={\`opacity-60 \${labelClass}\`}>Menu</span>
+            <ul className="text-[var(--muted)]/60">
+              <Item label="A" tone="" />
+            </ul>
+            <svg>
+              <g opacity={o}>
+                <text>x</text>
+              </g>
+            </svg>
+            <span className="opacity-40" {...(collapsed && { className: 'opacity-40 sr-only' })}>
+              Label
+            </span>
+          </div>
+        );
+      }`,
+      ['opacity-60', 'text-[var(--muted)]/60', 'opacity={…}', 'opacity-40', 'opacity-40'],
+    ],
+    [
+      'colours that inherit, however they are spelt, and SVG text a currentColor fill paints',
+      `export const Inherit = ({ active }: { active: boolean }) => (
+        <div>
+          <p className="text-white/40">
+            <span style={active ? { color: 'white' } : undefined}>Tab</span>
+          </p>
+          <p className="text-white/60">
+            <span className="text-[inherit]">x</span>
+            <span className="text-[currentColor]">y</span>
+          </p>
+          <svg className="text-white/50" fill="currentColor">
+            <text>42%</text>
+          </svg>
+          <svg>
+            <a href="#x" opacity={0.5}>
+              <text>Link</text>
+            </a>
+          </svg>
+        </div>
+      );`,
+      ['text-white/40', 'text-white/60', 'text-white/50', 'opacity={…}'],
     ],
   ])('%s', (_name, source, expected) => {
     expect(flagged(scan(source))).toEqual(report(expected));
@@ -603,7 +863,6 @@ describe('what the scan leaves alone', () => {
             <rect className="fill-[var(--accent)]/10" />
           </svg>
           <button className="fill-white/50">
-            <SendIcon />
             Send
             <svg>
               <path d="M0 0" />
@@ -626,6 +885,12 @@ describe('what the scan leaves alone', () => {
           <button disabled={pending} className="disabled:opacity-50 aria-disabled:text-white/50">
             Send
           </button>
+          <span className="[&_svg]:opacity-70">
+            <span>Label</span>
+            <svg>
+              <path d="M0 0" />
+            </svg>
+          </span>
         </p>
       );`,
       [
@@ -634,6 +899,7 @@ describe('what the scan leaves alone', () => {
         '*:opacity-40',
         'disabled:opacity-50',
         'aria-disabled:text-white/50',
+        '[&_svg]:opacity-70',
       ],
     ],
     [
@@ -725,6 +991,59 @@ describe('what the scan leaves alone', () => {
       );`,
       ['font-mono'],
     ],
+    [
+      'a spread onto an element with children of its own, and a symbol reference',
+      `export function Corner(props: React.SVGProps<SVGSVGElement>) {
+        return (
+          <svg viewBox="0 0 40 40" className="text-[var(--accent)]/30" {...props}>
+            <path d="M0 20 L0 0 L20 0" fill="none" stroke="currentColor" />
+          </svg>
+        );
+      }
+      export const Items = () => (
+        <p>
+          <svg className="opacity-50">
+            <use href="/icons.svg#corner" />
+          </svg>
+        </p>
+      );`,
+      ['text-[var(--accent)]/30', 'opacity-50'],
+    ],
+    [
+      'an SVG attribute on an HTML element, a placeholder colour off an input, a full-weight mix',
+      `export const Odd = () => (
+        <p>
+          <span opacity="0.5">Text</span>
+          <span className="placeholder-white/50 font-mono">Text</span>
+          <span className="text-[color-mix(in_oklab,var(--muted)_100%,transparent)]">Text</span>
+        </p>
+      );`,
+      ['placeholder-white/50', 'text-[color-mix(in_oklab,var(--muted)_100%,transparent)]'],
+    ],
+    [
+      'SVG text that takes no colour, a descendant chain, paints that are not for text, a template',
+      `export const Quiet = ({ count }: { count: number }) => (
+        <div className="font-mono">
+          <svg className="text-[var(--accent)]/30">
+            <path stroke="currentColor" d="M0 0" />
+            <text>42%</text>
+          </svg>
+          <div className="[&_p_span]:opacity-50">
+            <p>
+              Body
+              <span>
+                <svg>
+                  <path d="M0 0" />
+                </svg>
+              </span>
+            </p>
+          </div>
+          <Panel borderColor="rgba(99,102,241,0.2)" glowOpacity={0.3} title="Uptime" />
+          <p>{\`\${count} at opacity-50\`}</p>
+        </div>
+      );`,
+      ['font-mono', 'text-[var(--accent)]/30', '[&_p_span]:opacity-50'],
+    ],
   ])('%s', (_name, source, seen) => {
     const result = scan(source);
     expect(result.tokens).toEqual(expect.arrayContaining(seen));
@@ -734,7 +1053,9 @@ describe('what the scan leaves alone', () => {
 
 describe('how an animation is judged', () => {
   const judge = (css: string, utility: string) =>
-    animationDims(animationUtilitiesIn(css).get(utility) ?? '', keyframesIn(css));
+    (animationUtilitiesIn(css).get(utility) ?? []).some((shorthand) =>
+      animationDims(shorthand, keyframesIn(css)),
+    );
 
   it.each<[string, string, string, boolean]>([
     [
@@ -780,6 +1101,36 @@ describe('how an animation is judged', () => {
       true,
     ],
     [
+      'a fade in four steps, which holds partial values between them',
+      '@keyframes fade { from { opacity: 1 } to { opacity: 0 } } .animate-fade { animation: fade 1s steps(4) infinite; }',
+      'fade',
+      true,
+    ],
+    [
+      'a keyframe colour with an alpha',
+      '@keyframes tint { 50% { color: rgb(0 0 0 / 40%) } } .animate-tint { animation: tint 2s infinite; }',
+      'tint',
+      true,
+    ],
+    [
+      'a keyframe filter opacity',
+      '@keyframes haze { 50% { filter: opacity(0.4) } } .animate-haze { animation: haze 2s infinite; }',
+      'haze',
+      true,
+    ],
+    [
+      'a dimming animation that a later reduced-motion rule switches off',
+      '@keyframes soft { 0%, 100% { opacity: 1 } 50% { opacity: .4 } } .animate-soft { animation: soft 2s infinite; } @media (prefers-reduced-motion: reduce) { .animate-soft { animation: none; } }',
+      'soft',
+      true,
+    ],
+    [
+      'an animation declared after a nested block',
+      '@keyframes soft { 50% { opacity: .4 } } .animate-soft { @media (hover: hover) { color: red; } animation: soft 2s infinite; }',
+      'soft',
+      true,
+    ],
+    [
       'an animation that never touches opacity',
       '@keyframes spin { to { transform: rotate(360deg) } } .animate-spin { animation: spin 1s linear infinite; }',
       'spin',
@@ -796,7 +1147,9 @@ describe('how an animation is judged', () => {
       expect.arrayContaining(['spin', 'bounce', 'fade-in', 'blink', 'scale-in']),
     );
     const dimming = names.filter((name) =>
-      animationDims(vocabulary.animations.get(name) ?? '', vocabulary.keyframes),
+      (vocabulary.animations.get(name) ?? []).some((shorthand) =>
+        animationDims(shorthand, vocabulary.keyframes),
+      ),
     );
     expect(dimming.toSorted()).toEqual(['ping', 'pulse']);
   });
@@ -815,9 +1168,9 @@ describe('what the scan cannot pass by not seeing', () => {
     );
   });
 
-  it('reads the values globals.css gives its custom properties, in both themes', () => {
-    expect(vocabulary.properties.get('--log-err')).toHaveLength(2);
-    expect(vocabulary.properties.get('--muted')).toHaveLength(2);
+  it('reads the values globals.css gives its custom properties, in every theme', () => {
+    expect(vocabulary.properties.get('--muted')?.length).toBeGreaterThanOrEqual(2);
+    expect(vocabulary.properties.get('--accent-text')?.length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -843,7 +1196,9 @@ interface KnownDefect {
 /**
  * The violations present when this guard landed. Each is an expected failure until the change that
  * fixes it deletes the entry, which it has to: an expected failure that passes fails the run. Adding
- * an entry ships a known defect on purpose, so it names what fixes it.
+ * an entry ships a known defect on purpose, so it names what fixes it. #47 is the hero task of the
+ * audit remediation epic (.claude/epics/audit-remediation-2026-09/47.md): R12, R13 and R17 are its
+ * expected-failure rows in e2e/hero-contrast.spec.ts, and hero-2 and critic-8 its findings.
  */
 const KNOWN_DEFECTS: KnownDefect[] = [
   {
@@ -886,7 +1241,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     id: 'DIM5',
     file: 'src/components/featured-work/architecture-background.tsx',
     component: 'ArchitectureBackground',
-    tokens: ['opacity-40', 'dark:opacity-60', 'opacity={dimmed ? 0.3 : 1}'],
+    tokens: ['opacity-40', 'dark:opacity-60', 'opacity={…}'],
     sites: 3,
     fixedBy: 'unassigned',
     why: 'the SVG <text> node labels of the diagram behind the featured work sit at 40% (60% dark), and at 0.3 of that under a hovered card',
@@ -904,7 +1259,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     id: 'DIM7',
     file: 'src/components/animated-hero/hero-section.tsx',
     component: 'HeroSection',
-    tokens: ["style.color: 'rgba(139, 92, 246, 0.7)'"],
+    tokens: ['style.color'],
     sites: 1,
     fixedBy: 'R13, #47',
     why: 'the Scroll label under the hero, painted inline at 0.7 alpha (hero-2)',
@@ -913,7 +1268,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     id: 'DIM8',
     file: 'src/components/animated-hero/tmux-background.tsx',
     component: 'StaticPane',
-    tokens: ['style.color: LOG_COLORS[entry.cls]'],
+    tokens: ['style.color'],
     sites: 1,
     fixedBy: 'unassigned',
     why: 'the log lines of the tmux background take the --log-* colours, 0.35 to 0.55 alpha; the animated panes set the same colours from script, which the scan cannot see',
@@ -922,7 +1277,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     id: 'DIM9',
     file: 'src/components/animated-hero/circuit-background.tsx',
     component: 'CircuitBackground',
-    tokens: ['fill={fill}'],
+    tokens: ['fill={…}'],
     sites: 1,
     fixedBy: '#47',
     why: 'SVG <text> labels filled at 0.7, 0.5 and 0.35 alpha; #47 deletes the component',
@@ -974,20 +1329,32 @@ const DECORATIVE = [
 const MODULE_FLOOR = 20;
 const TOKEN_FLOOR = 1500;
 
-/** Every module under src/components, outside test folders and co-located tests, relative to apps/web. */
+/**
+ * Every module under src/components, outside test folders and co-located tests, relative to
+ * apps/web. A symlinked directory is followed once; a dangling link is skipped.
+ */
 function componentModules(): string[] {
   const found: string[] = [];
+  const visited = new Set<string>();
   const descend = (relative: string): void => {
+    const real = realpathSync(path.join(appDir, relative));
+    if (visited.has(real)) return;
+    visited.add(real);
     for (const entry of readdirSync(path.join(appDir, relative), { withFileTypes: true })) {
       const child = `${relative}/${entry.name}`;
-      const directory =
-        entry.isDirectory() ||
-        (entry.isSymbolicLink() && statSync(path.join(appDir, child)).isDirectory());
+      let directory = entry.isDirectory();
+      if (entry.isSymbolicLink()) {
+        try {
+          directory = statSync(path.join(appDir, child)).isDirectory();
+        } catch {
+          continue;
+        }
+      }
       if (directory) {
         if (entry.name !== '__tests__') descend(child);
       } else if (
         /\.[cm]?[jt]sx?$/.test(entry.name) &&
-        !/\.(test|spec|stories)\.[cm]?[jt]sx?$|\.d\.ts$/.test(entry.name)
+        !/\.(test|spec|stories)\.[cm]?[jt]sx?$|\.d\.[cm]?ts$/.test(entry.name)
       ) {
         found.push(child);
       }
@@ -1023,17 +1390,18 @@ const covers = (known: KnownDefect, site: Site) =>
 
 function describeSite(site: Site): string {
   const where = `apps/web/${site.file}:${site.line} ${site.component}`;
-  return site.verdict === 'unattributed'
-    ? `${where} ${site.token}, in a class string the scan cannot trace to an element`
-    : `${where} <${site.element}> ${site.token}, over ${site.evidence}`;
+  if (site.verdict !== 'unattributed') {
+    return `${where} <${site.element}> ${site.token}, over ${site.evidence}`;
+  }
+  return `${where} ${site.token}, ${site.evidence || 'in a class string the scan cannot trace to an element'}`;
 }
 
 describe('the components', () => {
   // Parsing every module twice over, once to prove it parses and once to walk it, is the one costly
-  // step: 0.4 s on its own at a load average of 3.5, while the whole file took 4 s inside a full
-  // `pnpm test` at a load average near 10. So it runs once, here, under a timeout that says what it
-  // is for, and no case pays for it against the 5 s default; eslint-config.test.ts does the same for
-  // loading ESLint.
+  // step: 0.7 s cold and 0.3 s warm on its own, at a load average near 12, and several times that
+  // inside a full `pnpm test` on a loaded machine. So it runs once, here, under a timeout that says
+  // what it is for, and no case pays for it against the 5 s default; eslint-config.test.ts does the
+  // same for loading ESLint.
   beforeAll(() => {
     scanComponents();
   }, 60_000);

@@ -1,16 +1,18 @@
 /**
  * The scanner behind `dimmed-text.test.ts`, which says what it enforces and why. It parses a module
  * with the TypeScript compiler API and reports every dimming declared in its markup, each with
- * whether the element it lands on renders text.
+ * whether the text it reaches is there to be dimmed.
  */
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 export const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const GLOBALS_CSS = 'src/app/globals.css';
-const TAILWIND_THEME = 'node_modules/tailwindcss/theme.css';
+const GLOBALS_CSS = path.join(appDir, 'src/app/globals.css');
+/** Tailwind's own theme, resolved the way the build resolves the package rather than by a path. */
+const TAILWIND_THEME = createRequire(import.meta.url).resolve('tailwindcss/theme.css');
 
 // --- Reading values ------------------------------------------------------------------------------
 
@@ -62,36 +64,114 @@ function tailwindAmount(amount: string): number {
   return arbitrary ? fraction(arbitrary[1].replace(/_/g, ' ')) : NaN;
 }
 
-/**
- * Whether a CSS colour carries an alpha strictly between 0 and 1: `rgba(…, .7)`, `rgb(… / 70%)`,
- * `#rrggbbaa`, `#rgba`, or a `color-mix()` with `transparent`. A `var()` is followed through the
- * stylesheets, in every theme.
- */
-function hasPartialAlpha(colour: string, seen = new Set<string>()): boolean {
-  const value = colour.replace(/_/g, ' ').trim();
-  const variable = /^var\(\s*(--[\w-]+)\s*(?:,([\s\S]*))?\)$/.exec(value);
-  if (variable) {
-    if (seen.has(variable[1])) return false;
-    seen.add(variable[1]);
-    const values = vocabulary.properties.get(variable[1]) ?? (variable[2] ? [variable[2]] : []);
-    return values.some((next) => hasPartialAlpha(next, seen));
-  }
-  if (/^color-mix\(/i.test(value)) return /\btransparent\b/i.test(value);
-  const hex = /^#(?:[\da-f]{3}([\da-f])|[\da-f]{6}([\da-f]{2}))$/i.exec(value);
-  if (hex) return partial(parseInt(hex[1] ? hex[1].repeat(2) : hex[2], 16) / 255);
-  const colourFunction = /^(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(([\s\S]*)\)$/i.exec(
-    value,
-  );
-  if (!colourFunction) return false;
-  const slashed = splitOutside(colourFunction[1], '/');
-  const alpha =
-    slashed.length > 1 ? slashed[slashed.length - 1] : splitOutside(colourFunction[1], ',')[3];
-  return alpha !== undefined && partial(fraction(alpha));
+/** The most translucent of several alphas: a partial one first, then the lowest. */
+function leastOpaque(alphas: number[]): number {
+  return alphas.find(partial) ?? (alphas.length > 0 ? Math.min(...alphas) : 1);
 }
+
+/**
+ * The alpha of a CSS colour: 1 when it is opaque, 0 for `transparent`, NaN when the scan cannot read
+ * it. A `var()` is followed through the stylesheets in every theme and its most translucent value
+ * counts; so does the more translucent side of a `light-dark()`, and a `color-mix()` mixes the
+ * alphas of its colours by their weights.
+ */
+function alphaOf(colour: string, seen: ReadonlySet<string> = new Set()): number {
+  const value = colour.replace(/_/g, ' ').trim();
+  if (/^transparent$/i.test(value)) return 0;
+  const variable = /^(?:var|theme)\(\s*(--[\w-]+)\s*(?:,([\s\S]*))?\)$/.exec(value);
+  if (variable) {
+    if (seen.has(variable[1])) return 1;
+    const next = new Set(seen).add(variable[1]);
+    const values = properties.get(variable[1]) ?? (variable[2] ? [variable[2]] : []);
+    return leastOpaque(values.map((each) => alphaOf(each, next)));
+  }
+  const hex = /^#(?:[\da-f]{3}([\da-f])|[\da-f]{6}([\da-f]{2}))$/i.exec(value);
+  if (hex) return parseInt(hex[1] ? hex[1].repeat(2) : hex[2], 16) / 255;
+  const call = /^([\w-]+)\(([\s\S]*)\)$/.exec(value);
+  if (!call) return 1;
+  const [, name, args] = call;
+  if (/^light-dark$/i.test(name)) {
+    return leastOpaque(splitOutside(args, ',').map((side) => alphaOf(side, seen)));
+  }
+  if (/^color-mix$/i.test(name)) return mixedAlpha(splitOutside(args, ',').slice(1), seen);
+  if (!/^(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)$/i.test(name)) return 1;
+  const slashed = splitOutside(args, '/');
+  if (slashed.length > 1) return fraction(slashed[slashed.length - 1]);
+  const commas = splitOutside(args, ',');
+  // `rgba(r, g, b, a)`, or `rgba(var(--channels), a)` with the channels held in a variable.
+  const channelsInVariable = commas.length > 1 && commas.length < 4 && /^var\(/.test(commas[0]);
+  return commas.length === 4 || channelsInVariable ? fraction(commas[commas.length - 1]) : 1;
+}
+
+/**
+ * The alpha `color-mix()` gives two colours: their alphas weighted by their percentages, an unset
+ * percentage taking what the other leaves, and scaled down when the two add up to less than 100%.
+ */
+function mixedAlpha(parts: string[], seen: ReadonlySet<string>): number {
+  if (parts.length !== 2) return NaN;
+  const [first, second] = parts.map((part) => {
+    const words = splitOutside(part, ' ');
+    const weight = words.length > 1 ? fraction(words[words.length - 1]) : NaN;
+    const colour = Number.isNaN(weight) ? part : words.slice(0, -1).join(' ');
+    return { alpha: alphaOf(colour, seen), weight };
+  });
+  const firstWeight = Number.isNaN(first.weight)
+    ? Number.isNaN(second.weight)
+      ? 0.5
+      : 1 - second.weight
+    : first.weight;
+  const secondWeight = Number.isNaN(second.weight) ? 1 - firstWeight : second.weight;
+  const total = firstWeight + secondWeight;
+  if (total <= 0) return NaN;
+  const mixed = (first.alpha * firstWeight + second.alpha * secondWeight) / total;
+  return mixed * Math.min(total, 1);
+}
+
+/** Whether a CSS colour is translucent, or one whose alpha the scan cannot read. */
+const translucent = (colour: string) => partial(alphaOf(colour));
 
 // --- What the stylesheets define -----------------------------------------------------------------
 
 const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+interface Rule {
+  selector: string;
+  /** The rule's own declarations, without those of the blocks nested in it. */
+  declarations: string;
+}
+
+/** Every block in `css`, nested ones included, with its selector or at-rule and its declarations. */
+function rulesIn(css: string): Rule[] {
+  const rules: Rule[] = [];
+  const open: Rule[] = [];
+  let text = '';
+  for (const char of withoutComments(css)) {
+    if (char === '{') {
+      open.push({ selector: text.trim(), declarations: '' });
+      text = '';
+    } else if (char === '}') {
+      const rule = open.pop();
+      if (rule) {
+        rule.declarations += text;
+        rules.push(rule);
+      }
+      text = '';
+    } else if (char === ';') {
+      if (open.length > 0) open[open.length - 1].declarations += `${text};`;
+      text = '';
+    } else {
+      text += char;
+    }
+  }
+  return rules;
+}
+
+/** Each declaration of a rule, in order. */
+const declarationsOf = (rule: Rule) =>
+  [...rule.declarations.matchAll(/([\w-]+)\s*:\s*([^;]+)/g)].map(([, property, value]) => ({
+    property,
+    value: value.trim(),
+  }));
 
 /** Every custom property `css` declares, with each value it takes: one per theme. */
 function customPropertiesIn(css: string): Map<string, string[]> {
@@ -103,61 +183,75 @@ function customPropertiesIn(css: string): Map<string, string[]> {
 }
 
 /**
+ * The opacity a keyframe's declarations leave, or undefined when they set none: its `opacity`, a
+ * `filter: opacity()`, or the alpha of its `color`, whichever is the most translucent.
+ */
+function keyframeOpacity(declarations: { property: string; value: string }[]): number | undefined {
+  const values = declarations.flatMap(({ property, value }) => {
+    if (property === 'opacity') return [fraction(value)];
+    if (property === 'filter') {
+      const inner = /opacity\(([^)]*)\)/.exec(value);
+      return inner ? [fraction(inner[1])] : [];
+    }
+    return property === 'color' ? [alphaOf(value)] : [];
+  });
+  return values.length > 0 ? leastOpaque(values) : undefined;
+}
+
+/**
  * The opacities each `@keyframes` rule in `css` passes through, by name, counting an unset start or
- * end as the element's own 1. Rules that set no opacity are left out; a name defined twice keeps both.
+ * end as the element's own 1. Rules that leave opacity alone are left out; a name defined twice
+ * keeps both definitions.
  */
 export function keyframesIn(css: string): Map<string, number[][]> {
   const found = new Map<string, number[][]>();
-  const source = withoutComments(css);
-  for (const match of source.matchAll(/@keyframes\s+['"]?([\w-]+)['"]?\s*\{/g)) {
-    let depth = 1;
-    let end = match.index + match[0].length;
-    while (depth > 0 && end < source.length) {
-      if (source[end] === '{') depth++;
-      else if (source[end] === '}') depth--;
-      end++;
+  const rules = rulesIn(css);
+  for (const [index, rule] of rules.entries()) {
+    const name = /^@keyframes\s+['"]?([\w-]+)['"]?$/.exec(rule.selector)?.[1];
+    if (!name) continue;
+    // A keyframes block closes after its steps, so its steps are the rules just before it.
+    const steps: { selectors: string[]; opacity: number | undefined }[] = [];
+    for (let before = index - 1; before >= 0; before--) {
+      const step = rules[before];
+      if (!/^(from|to|[\d.]+%)(\s*,\s*(from|to|[\d.]+%))*$/.test(step.selector)) break;
+      steps.unshift({
+        selectors: step.selector.split(',').map((selector) => selector.trim()),
+        opacity: keyframeOpacity(declarationsOf(step)),
+      });
     }
-    const body = source.slice(match.index + match[0].length, end - 1);
-    const steps = [...body.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selectors, declarations]) => {
-      const opacity = /(?:^|;)\s*opacity\s*:\s*([^;]+)/.exec(declarations.trim());
-      return {
-        selectors: selectors.split(',').map((selector) => selector.trim()),
-        opacity: opacity ? fraction(opacity[1]) : undefined,
-      };
-    });
     const set = steps.flatMap((step) => (step.opacity === undefined ? [] : [step.opacity]));
     if (set.length === 0) continue;
     const at = (edge: RegExp) =>
       steps.find((step) => step.opacity !== undefined && step.selectors.some((s) => edge.test(s)))
         ?.opacity ?? 1;
-    found.set(match[1], [
-      ...(found.get(match[1]) ?? []),
-      [...set, at(/^(from|0%)$/), at(/^(to|100%)$/)],
-    ]);
+    found.set(name, [...(found.get(name) ?? []), [...set, at(/^(from|0%)$/), at(/^(to|100%)$/)]]);
   }
   return found;
 }
 
 /**
- * The animation each `animate-*` utility runs: Tailwind's `--animate-*` theme values, and the
- * `.animate-*` classes and `@utility animate-*` rules of a stylesheet.
+ * Every animation each `animate-*` utility can run: Tailwind's `--animate-*` theme values, and the
+ * `.animate-*` classes and `@utility animate-*` rules of a stylesheet, nested ones included. A
+ * utility keeps them all, so a later override such as a reduced-motion `animation: none` cannot
+ * hide the one that dims.
  */
-export function animationUtilitiesIn(css: string): Map<string, string> {
-  const found = new Map<string, string>();
-  const source = withoutComments(css);
-  for (const [, name, value] of source.matchAll(/--animate-([\w-]+)\s*:\s*([^;]+);/g)) {
-    found.set(name, value.trim());
-  }
-  for (const [, selectors, body] of source.matchAll(/([^{};]+)\{([^{}]*)\}/g)) {
-    const declaration = (property: string) =>
-      new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`).exec(body.trim())?.[1].trim();
+export function animationUtilitiesIn(css: string): Map<string, string[]> {
+  const found = new Map<string, string[]>();
+  const add = (name: string, shorthand: string) =>
+    found.set(name, [...(found.get(name) ?? []), shorthand]);
+  for (const rule of rulesIn(css)) {
+    const declarations = declarationsOf(rule);
+    for (const { property, value } of declarations) {
+      const theme = /^--animate-([\w-]+)$/.exec(property);
+      if (theme) add(theme[1], value);
+    }
+    const value = (property: string) => declarations.find((d) => d.property === property)?.value;
     const longhands = ['name', 'duration', 'timing-function', 'iteration-count', 'fill-mode'];
     const shorthand =
-      declaration('animation') ??
-      longhands.flatMap((part) => declaration(`animation-${part}`) ?? []).join(' ');
+      value('animation') ?? longhands.flatMap((part) => value(`animation-${part}`) ?? []).join(' ');
     if (!shorthand) continue;
-    for (const [, name] of selectors.matchAll(/(?:\.|@utility\s+)animate-([\w-]+)/g)) {
-      found.set(name, shorthand);
+    for (const [, name] of rule.selector.matchAll(/(?:\.|@utility\s+)animate-([\w-]+)/g)) {
+      add(name, shorthand);
     }
   }
   return found;
@@ -165,8 +259,8 @@ export function animationUtilitiesIn(css: string): Map<string, string> {
 
 /**
  * Whether an animation leaves what it animates part-transparent: a keyframe holds an opacity between
- * 0 and 1, or a loop interpolates between two opacities instead of stepping. A single run from or to
- * 0, such as a reveal, passes through partial values only on its way.
+ * 0 and 1, or a loop moves between two opacities other than in a single step. A single run from or
+ * to 0, such as a reveal, passes through partial values only on its way.
  */
 export function animationDims(
   shorthand: string,
@@ -177,11 +271,13 @@ export function animationDims(
     const loops = words.some(
       (word) => word === 'infinite' || (/^(?:\d*\.)?\d+$/.test(word) && Number(word) > 1),
     );
-    const steps = words.some((word) => /^(steps\(.*\)|step-start|step-end)$/.test(word));
+    const binary = words.some((word) =>
+      /^(steps\(\s*1\s*(,[^)]*)?\)|step-start|step-end)$/.test(word),
+    );
     return words
       .flatMap((word) => keyframes.get(word) ?? [])
       .some(
-        (opacities) => opacities.some(partial) || (loops && !steps && new Set(opacities).size > 1),
+        (opacities) => opacities.some(partial) || (loops && !binary && new Set(opacities).size > 1),
       );
   });
 }
@@ -194,8 +290,9 @@ function merged<T>(...maps: Map<string, T[]>[]): Map<string, T[]> {
   return result;
 }
 
-const tailwindTheme = readFileSync(path.join(appDir, TAILWIND_THEME), 'utf8');
-const globalsCss = readFileSync(path.join(appDir, GLOBALS_CSS), 'utf8');
+const tailwindTheme = readFileSync(TAILWIND_THEME, 'utf8');
+const globalsCss = readFileSync(GLOBALS_CSS, 'utf8');
+const properties = merged(customPropertiesIn(tailwindTheme), customPropertiesIn(globalsCss));
 
 /** What classes and styles can name, read from Tailwind's theme and from globals.css. */
 export const vocabulary = {
@@ -204,12 +301,9 @@ export const vocabulary = {
       [...withoutComments(css).matchAll(/--color-([\w-]+)\s*:/g)].map(([, name]) => name),
     ),
   ),
-  properties: merged(customPropertiesIn(tailwindTheme), customPropertiesIn(globalsCss)),
+  properties,
   keyframes: merged(keyframesIn(tailwindTheme), keyframesIn(globalsCss)),
-  animations: new Map([
-    ...animationUtilitiesIn(tailwindTheme),
-    ...animationUtilitiesIn(globalsCss),
-  ]),
+  animations: merged(animationUtilitiesIn(tailwindTheme), animationUtilitiesIn(globalsCss)),
 };
 
 // --- Which class tokens dim ----------------------------------------------------------------------
@@ -218,17 +312,48 @@ export const vocabulary = {
 type Kind = 'color' | 'fill' | 'opacity' | 'animation';
 
 /**
- * Whether a variant points its utility away from the element's own text: at a pseudo-element, or at
- * a descendant or sibling through `*:` or an arbitrary selector (`[&_svg]:`, `[&>li]:`).
+ * Where a utility lands: on the element, on its generated content or its placeholder, or on the
+ * children, descendants or siblings its variant selects, a descendant perhaps by tag.
  */
-function aimsElsewhere(variant: string): boolean {
-  if (/^(before|after|backdrop|\*|\*\*)$/.test(variant)) return true;
-  const selector = /^\[(.*)\]$/.exec(variant)?.[1].replace(/_/g, ' ');
-  return selector !== undefined && /&(\s+|\s*[>+~])/.test(selector);
+type Target =
+  | { on: 'self' | 'placeholder' | 'siblings' | 'before' | 'after' }
+  | { on: 'children' | 'descendants'; tag?: string };
+
+interface Dimming {
+  kind: Kind;
+  target: Target;
 }
 
 /** A variant for an inactive control, whose text WCAG 1.4.3 exempts and axe does not measure. */
 const INACTIVE = /^(group-|peer-)?(aria-)?disabled(\/[\w-]+)?$/;
+
+/** Where a token's variants aim its utility, or null when they aim it at something with no text. */
+function targetOf(variants: string[]): Target | null {
+  let target: Target = { on: 'self' };
+  for (const variant of variants) {
+    if (INACTIVE.test(variant) || variant === 'backdrop') return null;
+    if (variant === 'before' || variant === 'after' || variant === 'placeholder') {
+      target = { on: variant };
+    } else if (variant === '*' || variant === '**') {
+      target = { on: variant === '*' ? 'children' : 'descendants' };
+    } else {
+      // An arbitrary variant aims elsewhere when a combinator follows its `&`: `[&_p_span]` selects
+      // the spans in the element's paragraphs, `[&>li]` its list items, `[&+p]` a sibling.
+      const selector = /^\[(.*)\]$/.exec(variant)?.[1].replace(/_/g, ' ');
+      const after = selector?.split('&')[1];
+      if (after !== undefined && /^\s*[>+~]|^\s+\S/.test(after)) {
+        const combinator = /^\s*([>+~])/.exec(after)?.[1];
+        const steps = after.replace(/^\s*[>+~]?\s*/, '').split(/\s*[>+~]\s*|\s+/);
+        const tag = /^[a-z][a-z0-9-]*/i.exec(steps[steps.length - 1] ?? '')?.[0];
+        target =
+          combinator === '+' || combinator === '~'
+            ? { on: 'siblings' }
+            : { on: combinator === '>' && steps.length === 1 ? 'children' : 'descendants', tag };
+      }
+    }
+  }
+  return target;
+}
 
 /** Arbitrary `text-[…]` values Tailwind v4 reads as a font size: a length, a math function, a keyword. */
 const FONT_SIZE = /^(-?[\d.]+[a-z%]*|(calc|clamp|min|max)\(.*)$/;
@@ -256,41 +381,42 @@ function isTextColour(value: string): boolean {
 /** Whether a colour value carries an alpha of its own: inside it, or in the token it names. */
 function colourHasAlpha(value: string): boolean {
   const arbitrary = /^\[(?:color:)?(.*)\]$/.exec(value);
-  if (arbitrary) return hasPartialAlpha(arbitrary[1]);
+  if (arbitrary) return translucent(arbitrary[1]);
   const variable = /^\((?:color:)?(--[\w-]+)\)$/.exec(value);
-  if (variable) return hasPartialAlpha(`var(${variable[1]})`);
-  return vocabulary.colours.has(value) && hasPartialAlpha(`var(--color-${value})`);
+  if (variable) return translucent(`var(${variable[1]})`);
+  return vocabulary.colours.has(value) && translucent(`var(--color-${value})`);
 }
 
 /**
  * Whether an `animate-*` value dims: a named utility, an arbitrary value, or a variable, which counts
- * when globals.css does not declare it.
+ * when the stylesheets do not declare it.
  */
 function animateDims(value: string): boolean {
   const arbitrary = /^\[(.*)\]$/.exec(value);
   const variable = /^\((--[\w-]+)\)$/.exec(value);
-  const shorthand = arbitrary
-    ? arbitrary[1].replace(/_/g, ' ')
+  const shorthands = arbitrary
+    ? [arbitrary[1].replace(/_/g, ' ')]
     : variable
-      ? vocabulary.properties.get(variable[1])?.join(', ')
+      ? vocabulary.properties.get(variable[1])
       : vocabulary.animations.get(value);
-  if (shorthand === undefined) return variable !== null;
-  return animationDims(shorthand, vocabulary.keyframes);
+  if (shorthands === undefined) return variable !== null;
+  return shorthands.some((shorthand) => animationDims(shorthand, vocabulary.keyframes));
 }
 
-/** What a class token dims, or null when it dims nothing of the element's text. */
-function dimmingKind(token: string): Kind | null {
-  const variants = splitOutside(token, ':');
-  const utility = (variants.pop() ?? '').replace(/^!|!$/g, '');
-  if (variants.some((variant) => aimsElsewhere(variant) || INACTIVE.test(variant))) return null;
-  const property = /^\[(opacity|color|fill|animation):(.+)\]$/.exec(utility);
+/** What a utility dims, whatever its variants aim it at, or null when it dims nothing. */
+function utilityKind(utility: string): Kind | null {
+  const property = /^\[(opacity|color|fill|filter|animation):(.+)\]$/.exec(utility);
   if (property) {
-    const [, name, value] = property;
-    if (name === 'opacity') return partial(fraction(value.replace(/_/g, ' '))) ? 'opacity' : null;
-    if (name === 'animation') {
-      return animationDims(value.replace(/_/g, ' '), vocabulary.keyframes) ? 'animation' : null;
+    const [, name, raw] = property;
+    const value = raw.replace(/_/g, ' ');
+    if (name === 'opacity') return partial(fraction(value)) ? 'opacity' : null;
+    if (name === 'filter') {
+      const inner = /opacity\(([^)]*)\)/.exec(value);
+      return inner && partial(fraction(inner[1])) ? 'opacity' : null;
     }
-    if (!hasPartialAlpha(value)) return null;
+    if (name === 'animation')
+      return animationDims(value, vocabulary.keyframes) ? 'animation' : null;
+    if (!translucent(value)) return null;
     return name === 'fill' ? 'fill' : 'color';
   }
   const [base, ...modifier] = splitOutside(utility, '/');
@@ -308,6 +434,16 @@ function dimmingKind(token: string): Kind | null {
   return animation && animateDims(animation[1]) ? 'animation' : null;
 }
 
+/** How a class token dims, and what, or null when it dims nothing that could hold text. */
+function dimming(token: string): Dimming | null {
+  const variants = splitOutside(token, ':');
+  const utility = (variants.pop() ?? '').replace(/^!|!$/g, '');
+  const target = targetOf(variants);
+  const kind = target && utilityKind(utility);
+  if (!target || !kind) return null;
+  return { kind, target: utility.startsWith('placeholder-') ? { on: 'placeholder' } : target };
+}
+
 // --- Where a class lands -------------------------------------------------------------------------
 
 type JsxTag = ts.JsxElement | ts.JsxSelfClosingElement;
@@ -319,15 +455,21 @@ type StringNode =
   | ts.TemplateMiddle
   | ts.TemplateTail;
 
-/** A piece of source text that may hold class names, and the offset its text starts at. */
+/** A piece of source text that may hold class names. */
 interface Chunk {
   node: ts.Node;
   text: string;
+  /** The offset `text` starts at, and whether each token's offset follows from it. */
   start: number;
+  exact: boolean;
+  /** Whether it applies only some of the time: a branch of a condition, a clsx key, one map entry. */
+  conditional: boolean;
 }
 
 const openingOf = (element: JsxTag) =>
   ts.isJsxElement(element) ? element.openingElement : element;
+
+const isIntrinsic = (tag: string) => /^[a-z]/.test(tag);
 
 function isStringNode(node: ts.Node): node is StringNode {
   return (
@@ -340,25 +482,34 @@ function isStringNode(node: ts.Node): node is StringNode {
 }
 
 /**
- * The source text of a string between its delimiters: a quote, a backtick, or a substitution's `}`
- * and `${`. Raw rather than cooked, so that every offset matches the file.
+ * The text of a string between its delimiters: a quote, a backtick, or a substitution's `}` and `${`.
+ * Where escapes make the page's text differ from the source, the page's text is read, at the
+ * string's own offset.
  */
-function chunkOf(node: StringNode | ts.Identifier): Chunk {
+function chunkOf(node: StringNode | ts.Identifier, conditional: boolean): Chunk {
   const raw = node.getText();
   const start = node.getStart();
-  if (ts.isIdentifier(node)) return { node, text: raw, start };
+  if (ts.isIdentifier(node)) return { node, text: raw, start, exact: true, conditional };
   const closing = ts.isTemplateHead(node) || ts.isTemplateMiddle(node) ? 2 : 1;
-  return { node, text: raw.slice(1, raw.length - closing), start: start + 1 };
+  const source = raw.slice(1, raw.length - closing);
+  const exact = source === node.text;
+  return { node, text: node.text, start: start + 1, exact, conditional };
 }
 
 const tokensIn = (chunk: Chunk) =>
   [...chunk.text.matchAll(/\S+/g)].map((match) => ({
     token: match[0],
-    at: chunk.start + match.index,
+    at: chunk.start + (chunk.exact ? match.index : 0),
   }));
 
 /** Attributes and props that hold classes: `className`, `classNames`, `titleClass`, `labelClassName`. */
 const isClassName = (name: string) => /^class(Name)?(es|s)?$|Class(Name)?(es|s)?$/.test(name);
+
+const LOGICAL = new Set([
+  ts.SyntaxKind.AmpersandAmpersandToken,
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.QuestionQuestionToken,
+]);
 
 function unwrap(node: ts.Expression): ts.Expression {
   let current = node;
@@ -429,36 +580,89 @@ const propertyNamed = (object: ts.ObjectLiteralExpression, key: string) =>
       propertyKey(property) === key,
   );
 
-/** The object literal an expression is, or names within the module. */
-function objectLiteralOf(
+/** The static key of `object.key` or `object['key']`. */
+function staticKey(node: ts.PropertyAccessExpression | ts.ElementAccessExpression) {
+  if (ts.isPropertyAccessExpression(node)) return node.name.text;
+  return ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : undefined;
+}
+
+/** An object literal an expression can be, and whether it applies only some of the time. */
+interface Found {
+  object: ts.ObjectLiteralExpression;
+  sometimes: boolean;
+}
+
+/**
+ * The object literals an expression can be within the module: itself, either side of a condition,
+ * or what a name, an entry of another object or a local function gives.
+ */
+function objectLiteralsOf(
   node: ts.Node | undefined,
   seen = new Set<ts.Node>(),
-): ts.ObjectLiteralExpression | undefined {
-  if (!node || seen.has(node) || !ts.isExpression(node)) return undefined;
+  sometimes = false,
+): Found[] {
+  if (!node || seen.has(node) || !ts.isExpression(node)) return [];
   seen.add(node);
   const expression = unwrap(node);
-  if (ts.isObjectLiteralExpression(expression)) return expression;
-  return ts.isIdentifier(expression) ? objectLiteralOf(declarationOf(expression), seen) : undefined;
+  if (ts.isObjectLiteralExpression(expression)) return [{ object: expression, sometimes }];
+  if (ts.isConditionalExpression(expression)) {
+    return [
+      ...objectLiteralsOf(expression.whenTrue, seen, true),
+      ...objectLiteralsOf(expression.whenFalse, seen, true),
+    ];
+  }
+  if (ts.isBinaryExpression(expression) && LOGICAL.has(expression.operatorToken.kind)) {
+    return [
+      ...objectLiteralsOf(expression.left, seen, true),
+      ...objectLiteralsOf(expression.right, seen, true),
+    ];
+  }
+  if (ts.isIdentifier(expression)) {
+    const held = valuesOf(expression);
+    return held.values.flatMap((value) =>
+      objectLiteralsOf(value, seen, sometimes || held.sometimes),
+    );
+  }
+  if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
+    const key = staticKey(expression);
+    if (key === undefined) return [];
+    return objectLiteralsOf(expression.expression, seen, sometimes).flatMap((found) => {
+      const property = propertyNamed(found.object, key);
+      return property ? objectLiteralsOf(propertyValue(property), seen, found.sometimes) : [];
+    });
+  }
+  if (ts.isCallExpression(expression)) {
+    const callee = callableOf(expression.expression);
+    const returned = callee ? returnedExpressions(callee) : [];
+    return returned.flatMap((value) =>
+      objectLiteralsOf(value, seen, sometimes || returned.length > 1),
+    );
+  }
+  return [];
 }
 
 /** The value `const { key } = object` gives a name, or the whole initializer when that is unclear. */
 function destructured(declaration: ts.VariableDeclaration, binding: Binding): ts.Node | undefined {
-  const object = objectLiteralOf(declaration.initializer);
   const key =
     ts.isBindingElement(binding) && binding.parent.parent === declaration
       ? (binding.propertyName ?? binding.name)
       : undefined;
   const keyText = key && (ts.isIdentifier(key) || ts.isStringLiteral(key)) ? key.text : undefined;
-  const property = object && keyText !== undefined ? propertyNamed(object, keyText) : undefined;
-  return property ? propertyValue(property) : declaration.initializer;
+  if (keyText === undefined) return declaration.initializer;
+  for (const { object } of objectLiteralsOf(declaration.initializer)) {
+    const property = propertyNamed(object, keyText);
+    if (property) return propertyValue(property);
+  }
+  return declaration.initializer;
 }
 
 /**
  * The initializer or function a name refers to, found by walking out through the scopes around it.
  * A parameter without a default, or a loop or `catch` binding, resolves to nothing: its value is not
- * in the source.
+ * in the source. With `constantsOnly`, so does anything but a `const`: a parameter's default or a
+ * `let`'s first value is only one of the values it takes.
  */
-function declarationOf(name: ts.Identifier): ts.Node | undefined {
+function declarationOf(name: ts.Identifier, constantsOnly = false): ts.Node | undefined {
   for (let scope: ts.Node | undefined = name.parent; scope; scope = scope.parent) {
     if (
       ts.isSourceFile(scope) ||
@@ -469,13 +673,17 @@ function declarationOf(name: ts.Identifier): ts.Node | undefined {
     ) {
       for (const statement of scope.statements) {
         if (ts.isFunctionDeclaration(statement) && statement.name?.text === name.text) {
-          return statement;
+          return constantsOnly ? undefined : statement;
         }
         if (!ts.isVariableStatement(statement)) continue;
+        const constant = (statement.declarationList.flags & ts.NodeFlags.Const) !== 0;
         for (const declaration of statement.declarationList.declarations) {
           const binding = bindingNamed(declaration, name.text);
-          if (binding === declaration) return declaration.initializer;
-          if (binding) return destructured(declaration, binding);
+          if (!binding) continue;
+          if (constantsOnly && !constant) return undefined;
+          return binding === declaration
+            ? declaration.initializer
+            : destructured(declaration, binding);
         }
       }
     }
@@ -496,24 +704,133 @@ function declarationOf(name: ts.Identifier): ts.Node | undefined {
     if (ts.isFunctionLike(scope)) {
       for (const parameter of scope.parameters) {
         const binding = bindingNamed(parameter, name.text);
-        if (binding) return binding.initializer;
+        if (binding) return constantsOnly ? undefined : binding.initializer;
       }
     }
   }
   return undefined;
 }
 
-function propertyChunks(property: ts.ObjectLiteralElementLike, seen: Set<ts.Node>): Chunk[] {
-  if (ts.isSpreadAssignment(property)) return classChunks(property.expression, seen);
+/**
+ * Every value a name can hold that the source shows, and whether it holds any of them only some of
+ * the time: a `const` holds its value, a `let` its first value and every later assignment in its
+ * scope, and a parameter its default only when a caller passes nothing.
+ */
+function valuesOf(name: ts.Identifier): { values: ts.Node[]; sometimes: boolean } {
+  const declared = declarationOf(name);
+  const binding = bindingOf(name);
+  if (!binding) return { values: declared ? [declared] : [], sometimes: false };
+  if (ts.isParameter(binding) || (ts.isBindingElement(binding) && !variableOf(binding))) {
+    return { values: declared ? [declared] : [], sometimes: true };
+  }
+  const variable = ts.isVariableDeclaration(binding) ? binding : variableOf(binding);
+  const list = variable?.parent;
+  if (!list || !ts.isVariableDeclarationList(list) || list.flags & ts.NodeFlags.Const) {
+    return { values: declared ? [declared] : [], sometimes: false };
+  }
+  const assigned: ts.Node[] = [];
+  const scope = list.parent.parent;
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isBinaryExpression(node) &&
+      (node.operatorToken.kind === ts.SyntaxKind.EqualsToken ||
+        node.operatorToken.kind === ts.SyntaxKind.PlusEqualsToken) &&
+      ts.isIdentifier(node.left) &&
+      node.left.text === name.text
+    ) {
+      assigned.push(node.right);
+    }
+    ts.forEachChild(node, visit);
+  };
+  if (scope) visit(scope);
+  const values = [...(declared ? [declared] : []), ...assigned];
+  return { values, sometimes: assigned.length > 0 };
+}
+
+/** The declaration a binding element sits in, when it is a variable's rather than a parameter's. */
+function variableOf(binding: ts.BindingElement): ts.VariableDeclaration | undefined {
+  let current: ts.Node = binding;
+  while (
+    ts.isBindingElement(current) ||
+    ts.isObjectBindingPattern(current) ||
+    ts.isArrayBindingPattern(current)
+  ) {
+    current = current.parent;
+  }
+  return ts.isVariableDeclaration(current) ? current : undefined;
+}
+
+/**
+ * The binding a name refers to: a variable, a parameter or one of their destructured names. A loop
+ * or `catch` binding stops the search, as it does for declarationOf.
+ */
+function bindingOf(name: ts.Identifier): Binding | undefined {
+  for (let scope: ts.Node | undefined = name.parent; scope; scope = scope.parent) {
+    const loop =
+      (ts.isForOfStatement(scope) || ts.isForInStatement(scope) || ts.isForStatement(scope)) &&
+      scope.initializer &&
+      ts.isVariableDeclarationList(scope.initializer)
+        ? scope.initializer.declarations
+        : [];
+    if (loop.some((declaration) => bindingNamed(declaration, name.text))) return undefined;
+    if (
+      ts.isCatchClause(scope) &&
+      scope.variableDeclaration &&
+      bindingNamed(scope.variableDeclaration, name.text)
+    ) {
+      return undefined;
+    }
+    if (
+      ts.isSourceFile(scope) ||
+      ts.isBlock(scope) ||
+      ts.isModuleBlock(scope) ||
+      ts.isCaseClause(scope) ||
+      ts.isDefaultClause(scope)
+    ) {
+      for (const statement of scope.statements) {
+        if (!ts.isVariableStatement(statement)) continue;
+        for (const declaration of statement.declarationList.declarations) {
+          const found = bindingNamed(declaration, name.text);
+          if (found) return found;
+        }
+      }
+    }
+    if (ts.isFunctionLike(scope)) {
+      for (const parameter of scope.parameters) {
+        const found = bindingNamed(parameter, name.text);
+        if (found) return found;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** A function literal, or the same-module function a name refers to. */
+function callableOf(node: ts.Node | undefined): ts.FunctionLikeDeclaration | undefined {
+  const target = node && ts.isIdentifier(node) ? declarationOf(node) : node;
+  return target &&
+    (ts.isArrowFunction(target) ||
+      ts.isFunctionExpression(target) ||
+      ts.isFunctionDeclaration(target))
+    ? target
+    : undefined;
+}
+
+function propertyChunks(
+  property: ts.ObjectLiteralElementLike,
+  seen: Set<ts.Node>,
+  conditional: boolean,
+): Chunk[] {
+  if (ts.isSpreadAssignment(property)) return classChunks(property.expression, seen, conditional);
   const name = property.name;
-  // clsx and friends read a key as a class name, so keys are read as well as values.
+  // clsx and friends read a key as a class name, included when its value holds.
   const key =
     name && (ts.isStringLiteral(name) || ts.isIdentifier(name))
-      ? [chunkOf(name)]
+      ? [chunkOf(name, true)]
       : name && ts.isComputedPropertyName(name)
-        ? classChunks(name.expression, seen)
+        ? classChunks(name.expression, seen, true)
         : [];
-  return [...key, ...classChunks(propertyValue(property), seen)];
+  return [...key, ...classChunks(propertyValue(property), seen, conditional)];
 }
 
 /**
@@ -521,21 +838,29 @@ function propertyChunks(property: ts.ObjectLiteralElementLike, seen: Set<ts.Node
  * pieces of a template, clsx arguments and keys, and, through the names they use, the constants,
  * map entries and helper functions of the same module.
  */
-function classChunks(node: ts.Node | undefined, seen = new Set<ts.Node>()): Chunk[] {
+function classChunks(
+  node: ts.Node | undefined,
+  seen = new Set<ts.Node>(),
+  conditional = false,
+): Chunk[] {
   if (!node || seen.has(node)) return [];
   seen.add(node);
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return [chunkOf(node)];
-  if (ts.isJsxExpression(node)) return classChunks(node.expression, seen);
+  const next = (child: ts.Node | undefined, sometimes = conditional) =>
+    classChunks(child, seen, sometimes);
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+    return [chunkOf(node, conditional)];
+  }
+  if (ts.isJsxExpression(node)) return next(node.expression);
   if (ts.isTemplateExpression(node)) {
     return [
-      chunkOf(node.head),
+      chunkOf(node.head, conditional),
       ...node.templateSpans.flatMap((span) => [
-        ...classChunks(span.expression, seen),
-        chunkOf(span.literal),
+        ...next(span.expression),
+        chunkOf(span.literal, conditional),
       ]),
     ];
   }
-  if (ts.isTaggedTemplateExpression(node)) return classChunks(node.template, seen);
+  if (ts.isTaggedTemplateExpression(node)) return next(node.template);
   if (
     ts.isParenthesizedExpression(node) ||
     ts.isAsExpression(node) ||
@@ -544,93 +869,132 @@ function classChunks(node: ts.Node | undefined, seen = new Set<ts.Node>()): Chun
     ts.isTypeAssertionExpression(node) ||
     ts.isSpreadElement(node)
   ) {
-    return classChunks(node.expression, seen);
+    return next(node.expression);
   }
   if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
     // `STYLES.icon` reads that entry alone; `tones[tone]` could be any of them.
-    const key = ts.isPropertyAccessExpression(node)
-      ? node.name.text
-      : ts.isStringLiteralLike(node.argumentExpression)
-        ? node.argumentExpression.text
-        : undefined;
-    const object = key === undefined ? undefined : objectLiteralOf(node.expression);
-    const property = object && key !== undefined ? propertyNamed(object, key) : undefined;
-    return classChunks(property ? propertyValue(property) : node.expression, seen);
+    const key = staticKey(node);
+    const objects = key === undefined ? [] : objectLiteralsOf(node.expression);
+    const found = objects.find(({ object }) => key !== undefined && propertyNamed(object, key));
+    const property = found && key !== undefined ? propertyNamed(found.object, key) : undefined;
+    return property
+      ? next(propertyValue(property), conditional || found!.sometimes || objects.length > 1)
+      : next(node.expression, true);
   }
   if (ts.isConditionalExpression(node)) {
-    return [...classChunks(node.whenTrue, seen), ...classChunks(node.whenFalse, seen)];
+    return [...next(node.whenTrue, true), ...next(node.whenFalse, true)];
   }
   if (ts.isBinaryExpression(node)) {
-    return [...classChunks(node.left, seen), ...classChunks(node.right, seen)];
+    const sometimes = conditional || LOGICAL.has(node.operatorToken.kind);
+    return [...next(node.left, sometimes), ...next(node.right, sometimes)];
   }
-  if (ts.isArrayLiteralExpression(node)) {
-    return node.elements.flatMap((element) => classChunks(element, seen));
-  }
+  if (ts.isArrayLiteralExpression(node)) return node.elements.flatMap((element) => next(element));
   if (ts.isObjectLiteralExpression(node)) {
-    return node.properties.flatMap((property) => propertyChunks(property, seen));
+    return node.properties.flatMap((property) => propertyChunks(property, seen, conditional));
   }
   if (ts.isCallExpression(node)) {
     // The callee too: `[…].join(' ')` reaches the array, a local helper reaches what it returns.
-    return [
-      ...classChunks(node.expression, seen),
-      ...node.arguments.flatMap((argument) => classChunks(argument, seen)),
-    ];
+    return [...next(node.expression), ...node.arguments.flatMap((argument) => next(argument))];
   }
-  if (ts.isIdentifier(node)) return classChunks(declarationOf(node), seen);
+  if (ts.isIdentifier(node)) {
+    const held = valuesOf(node);
+    return held.values.flatMap((value) => next(value, conditional || held.sometimes));
+  }
   if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node)) {
-    return returnedExpressions(node).flatMap((expression) => classChunks(expression, seen));
+    const returned = returnedExpressions(node);
+    return returned.flatMap((expression) => next(expression, conditional || returned.length > 1));
   }
   return [];
 }
 
-/** The values that set an element's classes: its class attributes, and classes in an object it spreads. */
-function classValues(opening: ts.JsxOpeningLikeElement): ts.Node[] {
-  return opening.attributes.properties.flatMap((attribute): ts.Node[] => {
+/**
+ * The values that set an element's classes: its class attributes, and the classes of an object it
+ * spreads, which apply only sometimes when the spread picks between objects.
+ */
+function classValues(opening: ts.JsxOpeningLikeElement) {
+  return opening.attributes.properties.flatMap((attribute) => {
     if (ts.isJsxAttribute(attribute)) {
       return isClassName(attribute.name.getText()) && attribute.initializer
-        ? [attribute.initializer]
+        ? [{ value: attribute.initializer as ts.Node, conditional: false }]
         : [];
     }
-    return (objectLiteralOf(attribute.expression)?.properties ?? []).flatMap((property) => {
-      const key = propertyKey(property);
-      const value = propertyValue(property);
-      return key !== undefined && isClassName(key) && value ? [value] : [];
-    });
+    const objects = objectLiteralsOf(attribute.expression);
+    return objects.flatMap(({ object, sometimes }) =>
+      object.properties.flatMap((property) => {
+        const key = propertyKey(property);
+        const value = propertyValue(property);
+        return key !== undefined && isClassName(key) && value
+          ? [{ value, conditional: sometimes || objects.length > 1 }]
+          : [];
+      }),
+    );
   });
 }
 
-const classTokensOf = (opening: ts.JsxOpeningLikeElement) =>
-  classValues(opening).flatMap((value) =>
-    classChunks(value).flatMap((chunk) => chunk.text.match(/\S+/g) ?? []),
+/**
+ * The class tokens an element's classes can hold. With `always`, only those it holds whatever
+ * happens, not those of a branch of a condition. A token under a variant such as `hover:` or `md:`
+ * applies only sometimes too, and the callers already skip it, because they match bare utilities.
+ */
+function classTokensOf(opening: ts.JsxOpeningLikeElement, always = false): string[] {
+  return classValues(opening).flatMap(({ value, conditional }) =>
+    classChunks(value, new Set(), conditional)
+      .filter((chunk) => !always || !chunk.conditional)
+      .flatMap((chunk) => chunk.text.match(/\S+/g) ?? []),
   );
+}
 
 /**
- * Whether a string can be skipped because it never becomes a class: the value of a DOM attribute
- * such as `d` or `href`, or text rendered as a child. A component's props are read, since any of
- * them might carry a class.
+ * Whether a string can be skipped because it never becomes a class: a type, the value of a DOM
+ * attribute such as `d` or `href`, or text rendered as a child. Anything else, a component's props
+ * and a call's arguments included, is read, since it might become one.
  */
 function neverAClass(node: ts.Node): boolean {
-  for (let current = node.parent; current; current = current.parent) {
+  // Whether only conditions and parentheses stand between the string and where it ends up.
+  let passing = true;
+  let child: ts.Node = node;
+  for (let current = node.parent; current; child = current, current = current.parent) {
     if (ts.isTypeNode(current)) return true;
     if (ts.isJsxAttribute(current)) {
       const tag = current.parent.parent.tagName.getText();
-      return !isClassName(current.name.getText()) && /^[a-z]/.test(tag);
+      return !isClassName(current.name.getText()) && isIntrinsic(tag);
     }
-    if (ts.isJsxElement(current) || ts.isJsxFragment(current)) return true;
-    if (ts.isFunctionLike(current) || ts.isJsxSelfClosingElement(current)) return false;
+    if (
+      ts.isJsxExpression(current) &&
+      (ts.isJsxElement(current.parent) || ts.isJsxFragment(current.parent))
+    ) {
+      return passing;
+    }
+    if (
+      ts.isFunctionLike(current) ||
+      ts.isJsxSpreadAttribute(current) ||
+      ts.isJsxOpeningLikeElement(current)
+    ) {
+      return false;
+    }
+    const through =
+      ts.isParenthesizedExpression(current) ||
+      ts.isJsxExpression(current) ||
+      ts.isTemplateExpression(current) ||
+      ts.isTemplateSpan(current) ||
+      (ts.isConditionalExpression(current) && child !== current.condition) ||
+      (ts.isBinaryExpression(current) &&
+        LOGICAL.has(current.operatorToken.kind) &&
+        child === current.right);
+    if (!through) passing = false;
   }
   return false;
 }
 
 // --- Styles and attributes -----------------------------------------------------------------------
 
-/** SVG elements whose `fill` reaches text: text itself, and the containers that pass it down. */
+/** SVG elements whose paint reaches text: text itself, and the containers that pass it down. */
 const SVG_TEXT = new Set(['text', 'tspan', 'textPath']);
-const FILL_HOSTS = new Set(['svg', 'g', 'symbol', 'switch', ...SVG_TEXT]);
+const PAINT_HOSTS = new Set(['svg', 'g', 'a', 'symbol', 'switch', ...SVG_TEXT]);
 
 /**
- * Every opacity a value can take that the scan can read: literals, both branches of a condition,
- * and names defined in the module. A value it cannot read, such as a prop or state, gives nothing.
+ * Every opacity a value can take that the scan can read: literals, the branches of a condition or a
+ * logical operator, and constants of the module. A value it cannot read, such as a prop, gives none.
  */
 function amountsOf(node: ts.Node | undefined, seen = new Set<ts.Node>()): number[] {
   if (!node || seen.has(node)) return [];
@@ -643,7 +1007,11 @@ function amountsOf(node: ts.Node | undefined, seen = new Set<ts.Node>()): number
   if (ts.isConditionalExpression(expression)) {
     return [...amountsOf(expression.whenTrue, seen), ...amountsOf(expression.whenFalse, seen)];
   }
-  return ts.isIdentifier(expression) ? amountsOf(declarationOf(expression), seen) : [];
+  if (ts.isBinaryExpression(expression) && LOGICAL.has(expression.operatorToken.kind)) {
+    return [...amountsOf(expression.left, seen), ...amountsOf(expression.right, seen)];
+  }
+  if (!ts.isIdentifier(expression)) return [];
+  return valuesOf(expression).values.flatMap((value) => amountsOf(value, seen));
 }
 
 interface Declared {
@@ -652,58 +1020,108 @@ interface Declared {
   node: ts.Node;
 }
 
-/** Dimming set in an element's `style`, or in the SVG `opacity`, `fill` and `fill-opacity` attributes. */
-function declaredDimmings(opening: ts.JsxOpeningLikeElement): Declared[] {
-  const found: Declared[] = [];
-  const judge = (name: string, value: ts.Node, token: string, node: ts.Node) => {
-    if (name === 'opacity' && amountsOf(value).some(partial)) {
-      found.push({ token, kind: 'opacity', node });
-    } else if (
-      (name === 'fillOpacity' || name === 'fill-opacity') &&
-      amountsOf(value).some(partial)
-    ) {
-      found.push({ token, kind: 'fill', node });
-    } else if (
-      (name === 'color' || name === 'fill') &&
-      classChunks(value).some((chunk) => hasPartialAlpha(chunk.text))
-    ) {
-      found.push({ token, kind: name === 'fill' ? 'fill' : 'color', node });
-    }
-  };
-  for (const attribute of opening.attributes.properties) {
-    if (!ts.isJsxAttribute(attribute) || !attribute.initializer) continue;
-    const name = attribute.name.getText();
-    if (name !== 'style') {
-      if (name !== 'color') judge(name, attribute.initializer, attribute.getText(), attribute);
-      continue;
-    }
-    const style = ts.isJsxExpression(attribute.initializer)
-      ? objectLiteralOf(attribute.initializer.expression)
-      : undefined;
-    for (const property of style?.properties ?? []) {
-      const key = propertyKey(property);
-      const value = propertyValue(property);
-      if (key !== undefined && value) {
-        judge(key, value, `style.${key}: ${value.getText()}`, property);
-      }
-    }
+/** What a style property or an SVG attribute dims, if its value dims. */
+function propertyKind(name: string, value: ts.Node): Kind | null {
+  const strings = () => classChunks(value).map((chunk) => chunk.text);
+  if (name === 'opacity') return amountsOf(value).some(partial) ? 'opacity' : null;
+  if (name === 'fillOpacity' || name === 'fill-opacity') {
+    return amountsOf(value).some(partial) ? 'fill' : null;
   }
-  return found;
+  if (name === 'color' || name === 'fill') {
+    if (!strings().some(translucent)) return null;
+    return name === 'fill' ? 'fill' : 'color';
+  }
+  if (name === 'animation') {
+    return strings().some((text) => animationDims(text, vocabulary.keyframes)) ? 'animation' : null;
+  }
+  if (name === 'filter') {
+    const dims = strings().some((text) => {
+      const inner = /opacity\(([^)]*)\)/.exec(text);
+      return inner !== null && partial(fraction(inner[1]));
+    });
+    return dims ? 'opacity' : null;
+  }
+  return null;
+}
+
+/**
+ * The properties a `style` value can set, through names, conditions and spreads, each with whether
+ * it applies only some of the time.
+ */
+function styleProperties(
+  value: ts.Node | undefined,
+): { property: ts.ObjectLiteralElementLike; sometimes: boolean }[] {
+  const seen = new Set<ts.Node>();
+  const expand = ({ object, sometimes }: Found) =>
+    object.properties.flatMap(
+      (property): { property: ts.ObjectLiteralElementLike; sometimes: boolean }[] =>
+        ts.isSpreadAssignment(property)
+          ? objectLiteralsOf(property.expression, seen, sometimes).flatMap(expand)
+          : [{ property, sometimes }],
+    );
+  const expression = value && ts.isJsxExpression(value) ? value.expression : undefined;
+  return objectLiteralsOf(expression, seen).flatMap(expand);
+}
+
+/** Dimming an element's `style` sets, or, on an SVG element, its `opacity`, `fill` and `color`. */
+function declaredDimmings(opening: ts.JsxOpeningLikeElement): Declared[] {
+  const svg = PAINT_HOSTS.has(opening.tagName.getText());
+  return opening.attributes.properties.flatMap((attribute): Declared[] => {
+    if (!ts.isJsxAttribute(attribute) || !attribute.initializer) return [];
+    const name = attribute.name.getText();
+    if (name === 'style') {
+      return styleProperties(attribute.initializer).flatMap(({ property }) => {
+        const key = propertyKey(property);
+        const value = propertyValue(property);
+        const kind = key !== undefined && value ? propertyKind(key, value) : null;
+        return kind ? [{ token: `style.${key}`, kind, node: property }] : [];
+      });
+    }
+    const presentation = ['opacity', 'fillOpacity', 'fill-opacity', 'fill', 'color'];
+    const kind =
+      svg && presentation.includes(name) ? propertyKind(name, attribute.initializer) : null;
+    return kind ? [{ token: `${name}={…}`, kind, node: attribute }] : [];
+  });
+}
+
+/**
+ * A colour or an opacity handed to a component in a prop named for one, which it may use on text.
+ * The scan does not follow a value into the component, so it reports it where it is handed over.
+ */
+function handedDimmings(opening: ts.JsxOpeningLikeElement): Declared[] {
+  if (isIntrinsic(opening.tagName.getText())) return [];
+  return opening.attributes.properties.flatMap((attribute): Declared[] => {
+    if (!ts.isJsxAttribute(attribute) || !attribute.initializer) return [];
+    const name = attribute.name.getText();
+    // `color`, `fill`, `opacity`, or one of them for text: `textColor`, `labelOpacity`. A border's or
+    // a glow's colour is not text's, so `borderColor` and `glowOpacity` are left alone.
+    const paint = /^(?:(?:text|label|title|caption|font|fore)[\w-]*)?(colou?r|fill|opacity)$/i.exec(
+      name,
+    )?.[1];
+    if (!paint) return [];
+    const opacity = /^opacity$/i.test(paint);
+    const dims = opacity
+      ? amountsOf(attribute.initializer).some(partial)
+      : classChunks(attribute.initializer).some((chunk) => translucent(chunk.text));
+    return dims
+      ? [{ token: `${name}={…}`, kind: opacity ? 'opacity' : 'color', node: attribute }]
+      : [];
+  });
 }
 
 // --- Whether an element renders text ------------------------------------------------------------
 
 /** Tags that render a value or a label as text without a text child. */
 const TEXT_CONTROLS = new Set(['textarea', 'select', 'optgroup']);
-/** `<input>` types that render no text. */
-const TEXTLESS_INPUTS = new Set(['checkbox', 'radio', 'range', 'color', 'file', 'hidden', 'image']);
+/** `<input>` types that render no text; a file input names its file, so it is not one of them. */
+const TEXTLESS_INPUTS = new Set(['checkbox', 'radio', 'range', 'color', 'hidden', 'image']);
 /** Content that is never painted. */
 const UNPAINTED = new Set(['title', 'desc', 'metadata']);
-/** Tags that draw content the scan cannot read: another document, a canvas, a referenced symbol. */
-const OPAQUE = new Set(['iframe', 'object', 'embed', 'canvas', 'use']);
-/** SVG shapes, which render no text whatever they are given. */
+/** Tags that draw content the scan cannot read: another document, or a canvas. */
+const OPAQUE = new Set(['iframe', 'object', 'embed', 'canvas']);
+/** SVG shapes and symbol references, which render no text whatever they are given. */
 const SHAPES = new Set([
-  ...['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'image', 'stop'],
+  ...['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'image', 'stop', 'use'],
   ...['animate', 'animateMotion', 'animateTransform', 'set', 'mpath'],
 ]);
 
@@ -714,14 +1132,16 @@ interface Pass {
   scope: Scope;
   /** Whether content the scan cannot see, such as an imported component's output, counts. */
   opaque: boolean;
-  /** Functions already entered, so that a recursive one ends. */
+  /** Functions and constants being walked, so that a recursive one ends. */
   entered: Set<ts.Node>;
 }
 
-/** Whether plain text at this point takes the dimmed paint: a fill paints only SVG text. */
+/** Where the walk stands: at the dimmed element, and whether plain text here takes its paint. */
 interface Place {
   root: boolean;
   painted: boolean;
+  /** Whether the fill here is `currentColor`, so that SVG text takes the colour. */
+  currentFill: boolean;
 }
 
 function clip(text: string): string {
@@ -746,48 +1166,93 @@ function isHidden(opening: ts.JsxOpeningLikeElement): boolean {
   );
 }
 
-/** The `::before` or `::after` text an element's own classes generate, which inherits its dimming. */
-function generatedContent(token: string): string | undefined {
-  const variants = splitOutside(token, ':');
-  const content = /^content-\[(.*)\]$/.exec(variants.pop() ?? '')?.[1];
-  const pseudo = variants.find((variant) => variant === 'before' || variant === 'after');
-  return pseudo && content && !/^(''|""|none)$/.test(content)
-    ? `the ::${pseudo} content ${content}`
-    : undefined;
+/** Whether an element is read only by screen readers: `sr-only` always, and no `not-sr-only`. */
+function isScreenReaderOnly(opening: ts.JsxOpeningLikeElement): boolean {
+  return (
+    classTokensOf(opening, true).includes('sr-only') &&
+    !classTokensOf(opening).some((token) => splitOutside(token, ':').pop() === 'not-sr-only')
+  );
+}
+
+/** The text an element's classes generate as `::before` or `::after` content, which inherits its dimming. */
+function generatedContent(opening: ts.JsxOpeningLikeElement, pseudo?: 'before' | 'after') {
+  for (const token of classTokensOf(opening)) {
+    const variants = splitOutside(token, ':');
+    const content = /^content-\[(.*)\]$/.exec(variants.pop() ?? '')?.[1];
+    const on = variants.find((variant) => variant === 'before' || variant === 'after');
+    if (on && (!pseudo || on === pseudo) && content && !/^(''|""|none)$/.test(content)) {
+      return `the ::${on} content ${content}`;
+    }
+  }
+  return null;
+}
+
+/** Whether a colour value inherits the paint above it rather than setting one. */
+const inherits = (value: string) =>
+  /^(currentcolor|inherit|current)$/i.test(
+    value.replace(/^\[(?:color:|fill:)?(.*)\]$/, '$1').trim(),
+  );
+
+/** The values an element's `style` always gives `key`, not only in one branch; '?' for one unread. */
+function styledAlways(opening: ts.JsxOpeningLikeElement, key: string): string[] {
+  return styleProperties(attributeNamed(opening, 'style')?.initializer)
+    .filter(({ property, sometimes }) => !sometimes && propertyKey(property) === key)
+    .map(({ property }) => {
+      const value = propertyValue(property);
+      const texts = value ? classChunks(value).map((chunk) => chunk.text.trim()) : [];
+      return texts.length === 1 ? texts[0] : '?';
+    });
+}
+
+/** Whether an element always sets a text colour of its own, one that does not inherit. */
+function setsOwnColour(opening: ts.JsxOpeningLikeElement): boolean {
+  const own = classTokensOf(opening, true).some((token) => {
+    const property = /^\[color:(.*)\]$/.exec(token);
+    if (property) return !inherits(property[1]);
+    const text = /^text-(.+)$/.exec(token);
+    const colour = text ? splitOutside(text[1], '/')[0] : undefined;
+    return colour !== undefined && isTextColour(colour) && !inherits(colour);
+  });
+  return own || styledAlways(opening, 'color').some((value) => !inherits(value));
 }
 
 /**
- * Whether an element sets the paint the dimming would pass down to it: its own text colour, or, on
- * an SVG element, a fill of its own (one that is not `currentColor`, for a colour).
+ * The fill an element always sets, taking CSS's order (a `style` over a class over an SVG
+ * attribute): `current` for `currentColor`, `inherit`, `other` for anything else, or undefined.
  */
-function setsOwnPaint(opening: ts.JsxOpeningLikeElement, tokens: string[], scope: Scope): boolean {
-  if (scope === 'all') return false;
-  const own = (pattern: RegExp) =>
-    tokens.some((token) => splitOutside(token, ':').length === 1 && pattern.test(token));
-  const style = (key: string) =>
-    (
-      objectLiteralOf(
-        (attributeNamed(opening, 'style')?.initializer as ts.JsxExpression | undefined)?.expression,
-      )?.properties ?? []
-    ).some((property) => propertyKey(property) === key);
-  const fill = attributeNamed(opening, 'fill')?.initializer;
-  const currentFill =
-    (fill !== undefined && ts.isStringLiteral(fill) && /^currentcolor$/i.test(fill.text)) ||
-    own(/^fill-current$/);
-  const ownFill =
-    FILL_HOSTS.has(opening.tagName.getText()) &&
-    (fill !== undefined || own(/^(fill-|\[fill:)/) || style('fill'));
-  if (scope === 'fill') return ownFill;
-  const ownColour =
-    own(/^\[color:/) ||
-    tokens.some(
-      (token) =>
-        splitOutside(token, ':').length === 1 &&
-        /^text-/.test(token) &&
-        isTextColour(token.replace(/^text-/, '').split('/')[0]),
-    ) ||
-    style('color');
-  return ownColour || (ownFill && !currentFill);
+function fillOf(opening: ts.JsxOpeningLikeElement): 'current' | 'inherit' | 'other' | undefined {
+  const styled = styledAlways(opening, 'fill');
+  const classes = classTokensOf(opening, true).filter(
+    (token) => /^fill-/.test(token) || token.startsWith('[fill:'),
+  );
+  const attribute = attributeNamed(opening, 'fill')?.initializer;
+  const value =
+    styled[styled.length - 1] ??
+    (classes.length > 0
+      ? classes[classes.length - 1] === 'fill-current'
+        ? 'currentColor'
+        : classes[classes.length - 1].replace(/^\[fill:(.*)\]$/, '$1')
+      : attribute && ts.isStringLiteral(attribute)
+        ? attribute.text
+        : attribute
+          ? '?'
+          : undefined);
+  if (value === undefined) return undefined;
+  if (/^currentcolor$/i.test(value)) return 'current';
+  return /^inherit$/i.test(value) ? 'inherit' : 'other';
+}
+
+/**
+ * Whether an element sets, whatever happens, the paint a dimming would pass down to it: for a
+ * colour, a text colour of its own; for a fill, a fill of its own, `currentColor` included.
+ */
+function setsOwnPaint(opening: ts.JsxOpeningLikeElement, scope: Scope): boolean {
+  if (scope === 'color') return setsOwnColour(opening);
+  if (scope === 'fill') {
+    const fill = fillOf(opening);
+    return fill !== undefined && fill !== 'inherit';
+  }
+  return false;
 }
 
 /** The function behind a component declared in the same module, through `memo` and `forwardRef`. */
@@ -805,17 +1270,6 @@ function localComponent(tagName: ts.JsxTagNameExpression): ts.FunctionLikeDeclar
   return node &&
     (ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node))
     ? node
-    : undefined;
-}
-
-/** A function literal, or the same-module function a name refers to. */
-function callableOf(node: ts.Node | undefined): ts.FunctionLikeDeclaration | undefined {
-  const target = node && ts.isIdentifier(node) ? declarationOf(node) : node;
-  return target &&
-    (ts.isArrowFunction(target) ||
-      ts.isFunctionExpression(target) ||
-      ts.isFunctionDeclaration(target))
-    ? target
     : undefined;
 }
 
@@ -842,6 +1296,17 @@ function listBehind(expression: ts.Expression): ts.Expression | undefined {
     : undefined;
 }
 
+/** Walks `node` with `key` marked as entered, so that a recursive function or constant ends. */
+function entering<T>(pass: Pass, key: ts.Node, walk: () => T | null): T | null {
+  if (pass.entered.has(key)) return null;
+  pass.entered.add(key);
+  try {
+    return walk();
+  } finally {
+    pass.entered.delete(key);
+  }
+}
+
 /**
  * What makes `element` count as rendering text under a dimming of `scope`, or null when nothing
  * under it can. The first pass leaves out content the scan cannot see, so that the message names
@@ -850,7 +1315,8 @@ function listBehind(expression: ts.Expression): ts.Expression | undefined {
 function textEvidence(element: JsxTag, scope: Scope): string | null {
   for (const opaque of [false, true]) {
     const pass = { scope, opaque, entered: new Set<ts.Node>() };
-    const evidence = tagEvidence(element, pass, { root: true, painted: scope !== 'fill' });
+    const place = { root: true, painted: scope !== 'fill', currentFill: false };
+    const evidence = tagEvidence(element, pass, place);
     if (evidence) return evidence;
   }
   return null;
@@ -859,15 +1325,26 @@ function textEvidence(element: JsxTag, scope: Scope): string | null {
 function tagEvidence(element: JsxTag, pass: Pass, place: Place): string | null {
   const opening = openingOf(element);
   const tag = opening.tagName.getText();
-  const tokens = classTokensOf(opening);
-  if (UNPAINTED.has(tag) || tokens.includes('sr-only') || isHidden(opening)) return null;
-  if (!place.root && setsOwnPaint(opening, tokens, pass.scope)) return null;
+  if (UNPAINTED.has(tag) || isScreenReaderOnly(opening) || isHidden(opening)) return null;
+  if (!place.root && setsOwnPaint(opening, pass.scope)) return null;
+  const fill = fillOf(opening);
+  const currentFill =
+    fill === undefined || fill === 'inherit' ? place.currentFill : fill === 'current';
+  // SVG text is painted with its fill, which takes the colour only as `currentColor`: its initial
+  // fill is black, and no stylesheet here sets another.
+  if (pass.scope === 'color' && SVG_TEXT.has(tag) && !currentFill) return null;
   const painted = place.painted || SVG_TEXT.has(tag);
-  const generated = tokens.map(generatedContent).find(Boolean);
+  const inside = { root: false, painted, currentFill };
+  const children = ts.isJsxElement(element) ? element.children : [];
+  const generated = generatedContent(opening);
   if (generated && painted) return generated;
+  // Children written out take the place of any a spread would bring, so a spread counts without them.
+  const written = children.some(
+    (child) => !ts.isJsxText(child) || !child.containsOnlyTriviaWhiteSpaces,
+  );
   for (const attribute of opening.attributes.properties) {
     if (ts.isJsxSpreadAttribute(attribute)) {
-      if (pass.opaque && !SHAPES.has(tag)) {
+      if (pass.opaque && !written && !SHAPES.has(tag)) {
         return `{...${clip(attribute.expression.getText())}}, whose content this scan cannot see`;
       }
       continue;
@@ -875,12 +1352,10 @@ function tagEvidence(element: JsxTag, pass: Pass, place: Place): string | null {
     const name = attribute.name.getText();
     if (name === 'dangerouslySetInnerHTML' && painted) return 'dangerouslySetInnerHTML';
     if (name === 'children' && attribute.initializer) {
-      const evidence = nodeEvidence(attribute.initializer, pass, { root: false, painted });
+      const evidence = nodeEvidence(attribute.initializer, pass, inside);
       if (evidence) return evidence;
     }
   }
-  const children = ts.isJsxElement(element) ? element.children : [];
-  const inside = { root: false, painted };
   if (tag === 'input') {
     const type = attributeNamed(opening, 'type')?.initializer;
     const textless =
@@ -891,14 +1366,12 @@ function tagEvidence(element: JsxTag, pass: Pass, place: Place): string | null {
   if (OPAQUE.has(tag) || tag.includes('-')) {
     return pass.opaque ? `<${tag}>, whose content this scan cannot see` : null;
   }
-  if (/^[a-z]/.test(tag) || tag === 'Fragment' || tag === 'React.Fragment') {
+  if (isIntrinsic(tag) || tag === 'Fragment' || tag === 'React.Fragment') {
     return firstEvidence(children, pass, inside);
   }
   const local = localComponent(opening.tagName);
   if (local) {
-    if (pass.entered.has(local)) return null;
-    pass.entered.add(local);
-    return firstEvidence(returnedExpressions(local), pass, inside);
+    return entering(pass, local, () => firstEvidence(returnedExpressions(local), pass, inside));
   }
   if (pass.opaque) return `<${tag}>, whose output this scan cannot see`;
   return firstEvidence(children, pass, inside);
@@ -914,8 +1387,8 @@ function firstEvidence(nodes: readonly ts.Node[], pass: Pass, place: Place): str
 
 /**
  * The first text a JSX child, an attribute value or an expression renders. An expression counts
- * unless it is a literal, JSX the scan can read, a condition over those, a name for them, or a list
- * built from them with `.map` or `Array.from`.
+ * unless it is a literal, JSX the scan can read, a condition over those, a constant for them, or a
+ * list built from them with `.map` or `Array.from`.
  */
 function nodeEvidence(node: ts.Node, pass: Pass, place: Place): string | null {
   if (ts.isJsxText(node)) {
@@ -952,45 +1425,132 @@ function nodeEvidence(node: ts.Node, pass: Pass, place: Place): string | null {
       nodeEvidence(expression.whenFalse, pass, place)
     );
   }
-  if (ts.isBinaryExpression(expression)) {
-    const operator = expression.operatorToken.kind;
-    if (operator === ts.SyntaxKind.AmpersandAmpersandToken) {
+  if (ts.isBinaryExpression(expression) && LOGICAL.has(expression.operatorToken.kind)) {
+    if (expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
       // React renders a falsy number on the left, so `{items.length && …}` can show "0".
       const count = /\.(length|size)$/.test(expression.left.getText());
       return count && place.painted
         ? `{${clip(expression.left.getText())}}, which renders 0 when empty`
         : nodeEvidence(expression.right, pass, place);
     }
-    if (
-      operator === ts.SyntaxKind.BarBarToken ||
-      operator === ts.SyntaxKind.QuestionQuestionToken
-    ) {
-      return (
-        nodeEvidence(expression.left, pass, place) ?? nodeEvidence(expression.right, pass, place)
-      );
-    }
+    return (
+      nodeEvidence(expression.left, pass, place) ?? nodeEvidence(expression.right, pass, place)
+    );
   }
   if (ts.isArrayLiteralExpression(expression)) {
     return firstEvidence(expression.elements, pass, place);
   }
   const callback = mapCallback(expression);
-  const name = ts.isIdentifier(expression) ? expression : undefined;
-  const declared = name && declarationOf(name);
-  const followed = callback ?? declared;
-  if (followed && pass.entered.has(followed)) return null;
   if (callback) {
-    pass.entered.add(callback);
-    return firstEvidence(returnedExpressions(callback), pass, place);
+    return entering(pass, callback, () =>
+      firstEvidence(returnedExpressions(callback), pass, place),
+    );
   }
-  if (name && declared && ts.isExpression(declared) && !ts.isFunctionLike(declared)) {
-    pass.entered.add(declared);
-    // A name for JSX or a literal is judged by what it names; for anything else, the name reads best.
-    const named = nodeEvidence(declared, pass, place);
-    return named?.startsWith('{') ? `{${name.text}}` : named;
+  const name = ts.isIdentifier(expression) ? expression : undefined;
+  const constant = name && declarationOf(name, true);
+  if (name && constant && ts.isExpression(constant) && !ts.isFunctionLike(constant)) {
+    // A constant for JSX or a literal is judged by what it holds; for anything else, the name reads best.
+    const held = entering(pass, constant, () => nodeEvidence(constant, pass, place));
+    return held?.startsWith('{') ? `{${name.text}}` : held;
   }
   const list = listBehind(expression);
   if (list) return nodeEvidence(list, pass, place);
   return place.painted || pass.opaque ? `{${clip(expression.getText())}}` : null;
+}
+
+/**
+ * The elements a JSX element renders as its children, or at any depth: through conditions, lists,
+ * fragments, constants and same-module components. Content the scan cannot see comes back as a
+ * description of it.
+ */
+function elementsUnder(element: JsxTag, deep: boolean): (JsxTag | string)[] {
+  const found: (JsxTag | string)[] = [];
+  const entered = new Set<ts.Node>();
+  const childrenOf = (of: JsxTag) => (ts.isJsxElement(of) ? of.children : []);
+  const enter = (key: ts.Node, nodes: readonly ts.Node[]) => {
+    if (entered.has(key)) return;
+    entered.add(key);
+    nodes.forEach(visit);
+  };
+  function visit(node: ts.Node): void {
+    if (ts.isJsxText(node)) return;
+    if (ts.isJsxExpression(node)) {
+      if (node.expression) visit(node.expression);
+      return;
+    }
+    if (ts.isJsxFragment(node)) return node.children.forEach(visit);
+    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+      const tagName = openingOf(node).tagName;
+      const tag = tagName.getText();
+      if (tag === 'Fragment' || tag === 'React.Fragment') return childrenOf(node).forEach(visit);
+      found.push(node);
+      if (!deep) return;
+      const local = isIntrinsic(tag) ? undefined : localComponent(tagName);
+      if (local) enter(local, returnedExpressions(local));
+      else childrenOf(node).forEach(visit);
+      return;
+    }
+    if (!ts.isExpression(node)) return;
+    const expression = unwrap(node);
+    if (expression !== node) return visit(expression);
+    if (
+      ts.isStringLiteralLike(expression) ||
+      ts.isNumericLiteral(expression) ||
+      ts.isTemplateExpression(expression) ||
+      expression.kind === ts.SyntaxKind.NullKeyword ||
+      expression.kind === ts.SyntaxKind.TrueKeyword ||
+      expression.kind === ts.SyntaxKind.FalseKeyword
+    ) {
+      return;
+    }
+    if (ts.isConditionalExpression(expression)) {
+      visit(expression.whenTrue);
+      return visit(expression.whenFalse);
+    }
+    if (ts.isBinaryExpression(expression) && LOGICAL.has(expression.operatorToken.kind)) {
+      if (expression.operatorToken.kind !== ts.SyntaxKind.AmpersandAmpersandToken) {
+        visit(expression.left);
+      }
+      return visit(expression.right);
+    }
+    if (ts.isArrayLiteralExpression(expression)) return expression.elements.forEach(visit);
+    const callback = mapCallback(expression);
+    if (callback) return enter(callback, returnedExpressions(callback));
+    const constant = ts.isIdentifier(expression) ? declarationOf(expression, true) : undefined;
+    if (constant) return enter(constant, [constant]);
+    const list = listBehind(expression);
+    if (list) return visit(list);
+    found.push(`{${clip(expression.getText())}}, whose content this scan cannot see`);
+  }
+  childrenOf(element).forEach(visit);
+  return found;
+}
+
+/** What makes the text a dimming reaches count, or null when it reaches none. */
+function targetEvidence(element: JsxTag, target: Target, scope: Scope): string | null {
+  const opening = openingOf(element);
+  const tag = opening.tagName.getText();
+  switch (target.on) {
+    case 'self':
+      return textEvidence(element, scope);
+    case 'before':
+    case 'after':
+      return generatedContent(opening, target.on);
+    case 'placeholder':
+      if (tag === 'input' || tag === 'textarea') return `the placeholder of a <${tag}>`;
+      return isIntrinsic(tag) ? null : `<${tag}>, whose output this scan cannot see`;
+    case 'siblings':
+      return 'the siblings it selects, which this scan does not follow';
+    default:
+      for (const found of elementsUnder(element, target.on === 'descendants')) {
+        if (typeof found === 'string') return found;
+        const foundTag = openingOf(found).tagName.getText();
+        if (target.tag && isIntrinsic(foundTag) && foundTag !== target.tag) continue;
+        const evidence = textEvidence(found, scope);
+        if (evidence) return evidence;
+      }
+      return null;
+  }
 }
 
 /** The component a node sits in: the nearest capitalised function or constant around it. */
@@ -1026,14 +1586,14 @@ export interface Site {
   element: string;
   token: string;
   verdict: Verdict;
-  /** What under the element counts as text, for the failure message. */
+  /** What counts as the text it dims, for the failure message. */
   evidence: string;
 }
 
 export interface Scan {
   /** Every class token the scan traced to an element, dimming or not. */
   tokens: string[];
-  /** Every dimming, with whether the element it lands on renders text. */
+  /** Every dimming, with whether it reaches text. */
   sites: Site[];
 }
 
@@ -1074,19 +1634,23 @@ export function scanSource(source: string, file: string): Scan {
   const sites: Site[] = [];
   const traced = new Set<ts.Node>();
   const lineOf = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
-
-  const land = (element: JsxTag, kind: Kind, token: string, position: number) => {
-    const tag = openingOf(element).tagName.getText();
-    // A fill paints SVG text only, so on anything else it dims no text.
-    if (kind === 'fill' && !FILL_HOSTS.has(tag)) return;
-    const scope = kind === 'color' || kind === 'fill' ? kind : 'all';
-    const evidence = textEvidence(element, scope);
+  const report = (node: ts.Node, position: number, token: string, found: Partial<Site>) =>
     sites.push({
       file,
       line: lineOf(position),
-      component: componentOf(element),
-      element: tag,
+      component: componentOf(node),
+      element: '',
       token,
+      verdict: 'unattributed',
+      evidence: '',
+      ...found,
+    });
+
+  const land = (element: JsxTag, found: Dimming, token: string, position: number) => {
+    const scope: Scope = found.kind === 'color' || found.kind === 'fill' ? found.kind : 'all';
+    const evidence = targetEvidence(element, found.target, scope);
+    report(element, position, token, {
+      element: openingOf(element).tagName.getText(),
       verdict: evidence ? 'text' : 'no-text',
       evidence: evidence ?? '',
     });
@@ -1095,18 +1659,23 @@ export function scanSource(source: string, file: string): Scan {
   const visitElements = (node: ts.Node): void => {
     if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
       const opening = openingOf(node);
-      for (const value of classValues(opening)) {
-        for (const chunk of classChunks(value)) {
+      for (const { value, conditional } of classValues(opening)) {
+        for (const chunk of classChunks(value, new Set(), conditional)) {
           traced.add(chunk.node);
           for (const { token, at } of tokensIn(chunk)) {
             tokens.push(token);
-            const kind = dimmingKind(token);
-            if (kind) land(node, kind, token, at);
+            const found = dimming(token);
+            if (found) land(node, found, token, at);
           }
         }
       }
       for (const declared of declaredDimmings(opening)) {
-        land(node, declared.kind, declared.token, declared.node.getStart());
+        const found = { kind: declared.kind, target: { on: 'self' } } as const;
+        land(node, found, declared.token, declared.node.getStart());
+      }
+      for (const handed of handedDimmings(opening)) {
+        const evidence = `handed to <${opening.tagName.getText()}>, which the scan does not follow`;
+        report(handed.node, handed.node.getStart(), handed.token, { evidence });
       }
     }
     ts.forEachChild(node, visitElements);
@@ -1115,19 +1684,10 @@ export function scanSource(source: string, file: string): Scan {
 
   const visitStrings = (node: ts.Node): void => {
     if (isStringNode(node) && !traced.has(node) && !neverAClass(node)) {
-      for (const { token, at } of tokensIn(chunkOf(node))) {
+      for (const { token, at } of tokensIn(chunkOf(node, false))) {
         // Prose ends a class name with punctuation that no class name has.
         const bare = token.replace(/[.,;]+$/, '');
-        if (!dimmingKind(bare)) continue;
-        sites.push({
-          file,
-          line: lineOf(at),
-          component: componentOf(node),
-          element: '',
-          token: bare,
-          verdict: 'unattributed',
-          evidence: '',
-        });
+        if (dimming(bare)) report(node, at, bare, {});
       }
     }
     ts.forEachChild(node, visitStrings);
