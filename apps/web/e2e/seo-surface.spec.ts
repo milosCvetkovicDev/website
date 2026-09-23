@@ -226,16 +226,14 @@ test('/blog is noindex while it is a placeholder', async ({ request }) => {
 });
 
 test('a 404 serves exactly one robots tag, and it says noindex', async ({ request }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R27, #48' });
-
   const head = await fetchHead(request, NOT_FOUND_ROUTE);
   expect(head.status).toBe(404);
   const robots = head.meta.get('robots') ?? [];
 
-  // Two tags that contradict each other are worse than the wrong one: the root `robots` block
-  // (layout.tsx:81-91) applies to the not-found page too, and not-found.tsx exports no metadata of its
-  // own, so `index, follow` is emitted alongside whatever else — plus a googlebot `index, follow`.
+  // Two tags that contradict each other are worse than the wrong one. Next injects `noindex` on every
+  // 404, and anything the root layout's metadata declares reaches the not-found page too, which is how
+  // it used to serve `index, follow` alongside it, plus a googlebot `index, follow`. So robots
+  // directives are set per page (lib/metadata.ts) and never in the root layout.
   expect(
     { robots, googlebot: head.meta.get('googlebot') ?? [] },
     'a 404 must be noindex, and must not also claim index, follow.',

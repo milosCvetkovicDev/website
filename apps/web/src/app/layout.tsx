@@ -74,17 +74,8 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     creator: TWITTER_HANDLE,
   },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
-  },
+  // No `robots` here: each page sets its own through buildMetadata(), and one declared here would
+  // also reach the 404s, beside the `noindex` Next injects there.
 };
 
 export default function RootLayout({
