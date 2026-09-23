@@ -110,6 +110,21 @@ export default async function CaseStudyPage({ params }: PageProps) {
           <p className="text-lg leading-relaxed">{caseStudy.approach}</p>
         </section>
 
+        {caseStudy.howItWorks ? (
+          <section className="mb-12">
+            <h2 className="mb-4 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
+              How It Works
+            </h2>
+            <ol className="list-decimal space-y-3 pl-6 text-lg marker:font-mono marker:text-[var(--accent-text)]">
+              {caseStudy.howItWorks.map((step) => (
+                <li key={step} className="pl-1">
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
+
         {/* Key Contributions */}
         <section className="mb-12">
           <h2 className="mb-4 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
@@ -168,6 +183,21 @@ export default async function CaseStudyPage({ params }: PageProps) {
             ))}
           </ul>
         </section>
+
+        {caseStudy.lessons ? (
+          <section className="mb-12">
+            <h2 className="mb-4 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
+              Lessons
+            </h2>
+            <ul className="space-y-3">
+              {caseStudy.lessons.map((lesson) => (
+                <li key={lesson} className="border-l-2 border-[var(--accent)] pl-4 text-lg">
+                  {lesson}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {/* Tech Stack */}
         <section className="mb-12">
