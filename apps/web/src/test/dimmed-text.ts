@@ -156,7 +156,10 @@ function rulesIn(css: string): Rule[] {
       at = end === -1 ? css.length : end + 1;
     } else if (char === '"' || char === "'") {
       let end = at + 1;
-      while (end < css.length && css[end] !== char) end += css[end] === '\\' ? 2 : 1;
+      // A string left open ends at the end of its line, as CSS ends it.
+      while (end < css.length && css[end] !== char && css[end] !== '\n') {
+        end += css[end] === '\\' ? 2 : 1;
+      }
       text += css.slice(at, end + 1);
       at = end;
     } else if (char === '\\') {
@@ -1080,12 +1083,26 @@ function classValues(opening: ts.JsxOpeningLikeElement) {
  * applies only sometimes too, and the callers already skip it, because they match bare utilities.
  */
 function classTokensOf(opening: ts.JsxOpeningLikeElement, always = false): string[] {
-  return classValues(opening).flatMap(({ value, conditional }) =>
+  const cached = classTokenCache.get(opening)?.get(always);
+  if (cached) return cached;
+  const tokens = classValues(opening).flatMap(({ value, conditional }) =>
     classChunks(value, new Set(), conditional)
       .filter((chunk) => !always || !chunk.conditional)
       .flatMap((chunk) => chunk.text.match(/\S+/g) ?? []),
   );
+  if (handing.length === 0) {
+    classTokenCache.set(opening, (classTokenCache.get(opening) ?? new Map()).set(always, tokens));
+  }
+  return tokens;
 }
+
+/**
+ * Class tokens by element and mode, worked out once: the text walk visits an element once for every
+ * path to it, and resolving a class through the props of a chain of components on each visit grows
+ * with the number of paths. A result worked out while a prop is being resolved is not kept, since
+ * the guard against a component handing a prop to itself may have cut it short.
+ */
+const classTokenCache = new WeakMap<ts.JsxOpeningLikeElement, Map<boolean, string[]>>();
 
 /**
  * Whether a string can be skipped because it never becomes a class: a type, the value of a DOM
@@ -1139,13 +1156,20 @@ const SVG_TEXT = new Set(['text', 'tspan', 'textPath']);
 const PAINT_HOSTS = new Set(['svg', 'g', 'a', 'symbol', 'switch', ...SVG_TEXT]);
 
 /** Whether an element sits in an `<svg>` of the same markup, and not in its `<foreignObject>`. */
-function insideSvg(opening: ts.JsxOpeningLikeElement): boolean {
+function insideSvg(opening: ts.JsxOpeningLikeElement, seen = new Set<ts.Node>()): boolean {
+  if (seen.has(opening)) return false;
+  seen.add(opening);
   const element = ts.isJsxOpeningElement(opening) ? opening.parent : opening;
   for (let node = element.parent; node; node = node.parent) {
-    if (!ts.isJsxElement(node)) continue;
-    const tag = node.openingElement.tagName.getText();
-    if (tag === 'foreignObject') return false;
-    if (tag === 'svg') return true;
+    if (ts.isJsxElement(node)) {
+      const tag = node.openingElement.tagName.getText();
+      if (tag === 'foreignObject') return false;
+      if (tag === 'svg') return true;
+    } else if (isComponentFunction(node)) {
+      // A component of its own is inside an <svg> when the module renders it inside one.
+      const renderers = renderersOf(node);
+      if (renderers.length > 0) return renderers.some((renderer) => insideSvg(renderer, seen));
+    }
   }
   return false;
 }
@@ -1250,12 +1274,14 @@ function declaredDimmings(opening: ts.JsxOpeningLikeElement): Declared[] {
 const NOT_TEXT_PAINT = new Set([
   'backdrop',
   'background',
+  'bar',
   'bg',
   'border',
   'caret',
   'decoration',
   'divider',
   'dot',
+  'edge',
   'from',
   'glow',
   'gradient',
@@ -1275,6 +1301,21 @@ const NOT_TEXT_PAINT = new Set([
   'via',
 ]);
 
+/** Words in a prop's name that make its paint text's. */
+const TEXT_PAINT = new Set([
+  'caption',
+  'font',
+  'fore',
+  'heading',
+  'hint',
+  'label',
+  'link',
+  'placeholder',
+  'text',
+  'title',
+  'value',
+]);
+
 /**
  * A colour or an opacity handed to a component in a prop named for one, which it may use on text.
  * The scan reports it where it is handed over: it cannot follow the value into a component of
@@ -1286,12 +1327,16 @@ function handedDimmings(opening: ts.JsxOpeningLikeElement): Declared[] {
     if (!ts.isJsxAttribute(attribute) || !attribute.initializer) return [];
     const name = attribute.name.getText();
     // `color`, `fill` or `opacity`, alone or after words that say whose: `textColor`, `valueColor`,
-    // `labelOpacity`. A border's, a background's or a glow's paint is not text's, so `borderColor`,
-    // `labelBgColor` and `glowOpacity` are left alone.
-    const [, owner = '', paint] = /^(.*?)(colou?r|fill|opacity)$/i.exec(name) ?? [];
+    // `labelOpacity`. The last word that says whose decides: `labelBgColor` paints a background and
+    // `iconLabelColor` a label, and `borderColor`, `borderTopColor` and `glowOpacity` are left
+    // alone. A name with no such word is read as text's.
+    const [, prefix = '', paint] = /^(.*?)(colou?r|fill|opacity)$/i.exec(name) ?? [];
     if (!paint) return [];
-    const words = owner.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+/g) ?? [];
-    if (words.some((word) => NOT_TEXT_PAINT.has(word.toLowerCase()))) return [];
+    const words = (prefix.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+/g) ?? []).map((word) =>
+      word.toLowerCase(),
+    );
+    const whose = words.findLast((word) => TEXT_PAINT.has(word) || NOT_TEXT_PAINT.has(word));
+    if (whose !== undefined && NOT_TEXT_PAINT.has(whose)) return [];
     const opacity = /^opacity$/i.test(paint);
     const dims = opacity
       ? amountsOf(attribute.initializer).some(partial)

@@ -767,6 +767,37 @@ describe('what the scan flags', () => {
       );`,
       ['opacity-40', 'opacity-40'],
     ],
+    [
+      'an SVG link that is a component of its own, rendered inside an <svg>',
+      `function SvgLink({ children }: { children: React.ReactNode }) {
+        return (
+          <a href="#x" opacity={0.5}>
+            {children}
+          </a>
+        );
+      }
+      export const Map = () => (
+        <svg>
+          <SvgLink>
+            <text>Link</text>
+          </SvgLink>
+        </svg>
+      );`,
+      ['opacity={…}'],
+    ],
+    [
+      'a colour handed for text named after something else first',
+      `export const Rows = () => (
+        <div>
+          <Player trackTitleColor="rgba(255,255,255,0.6)" />
+          <Menu iconLabelColor="rgba(255,255,255,0.6)" />
+        </div>
+      );`,
+      [
+        ['trackTitleColor={…}', 'unattributed'],
+        ['iconLabelColor={…}', 'unattributed'],
+      ],
+    ],
   ])('%s', (_name, source, expected) => {
     expect(flagged(scan(source))).toEqual(report(expected));
   });
@@ -1202,9 +1233,46 @@ describe('what the scan leaves alone', () => {
       }`,
       ['font-mono'],
     ],
+    [
+      "paints for a bar, a graph's edges or a border side, whose last word says whose they are",
+      `export const Charts = () => (
+        <div className="font-mono">
+          <ProgressBar barColor="rgba(99,102,241,0.3)" value={40} />
+          <Graph edgeOpacity={0.4} />
+          <Toggle borderTopColor="rgba(0,0,0,0.5)" ringOffsetColor="rgba(0,0,0,0.5)" />
+        </div>
+      );`,
+      ['font-mono'],
+    ],
   ])('%s', (_name, source, seen) => {
     const result = scan(source);
     expect(result.tokens).toEqual(expect.arrayContaining(seen));
+    expect(flagged(result)).toEqual([]);
+  });
+
+  it('follows a prop down a chain of components without re-resolving it on every path', () => {
+    // Seven levels that each render the next three times: 2,187 paths to the leaf. Resolving the
+    // class through the props again on every path took 4 s at six levels and about six times as
+    // long at seven, past the 5 s timeout; resolving it once per element takes a fraction of that.
+    const depth = 7;
+    const levels = Array.from({ length: depth }, (_, level) => {
+      const next = level + 1 < depth ? '<C' + (level + 1) + ' tone={tone} />' : '';
+      return (
+        'function C' +
+        level +
+        '({ tone }: { tone: string }) {\n' +
+        '  return <span className={tone}>' +
+        next.repeat(3) +
+        '</span>;\n}'
+      );
+    });
+    const source = [
+      "const DIM = 'opacity-50';",
+      ...levels,
+      'export const Root = () => <C0 tone={DIM} />;',
+    ].join('\n');
+    const result = scan(source);
+    expect(result.sites.length).toBeGreaterThan(0);
     expect(flagged(result)).toEqual([]);
   });
 });
@@ -1322,6 +1390,12 @@ describe('how an animation is judged', () => {
       'an escaped quote in a selector',
       `@keyframes a16 { 50% { opacity: .4 } } .animate-a16, .x\\'y { animation: a16 2s infinite; }`,
       'a16',
+      true,
+    ],
+    [
+      'a string left open, which CSS ends at the end of its line',
+      '.x {\n  content: "oops;\n}\n@keyframes u { 50% { opacity: .4 } }\n.animate-u { animation: u 1s infinite; }',
+      'u',
       true,
     ],
   ])('%s', (_name, css, utility, dims) => {
