@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { gsap, ScrollTrigger } from './use-gsap-scroll';
+import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
@@ -55,81 +55,93 @@ export function StrategyPhase() {
     // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
     if (prefersReducedMotion) return;
 
-    gsap.registerPlugin(ScrollTrigger);
-
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top center',
-          end: 'bottom center',
-          toggleActions: 'play none none reverse',
-        },
-      });
-
-      // Tech tree items appear
-      const techItems = techTreeRef.current?.querySelectorAll('.tech-reveal');
-      if (techItems) {
-        tl.fromTo(
-          techItems,
-          { opacity: 0, x: -30, scale: 0.9 },
-          {
-            opacity: 1,
-            x: 0,
-            scale: 1,
-            duration: 0.4,
-            stagger: 0.15,
-            ease: 'power2.out',
+    // GSAP arrives after hydration (load-gsap.ts); until then the section keeps its
+    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // after it reverts. A build that finds the section already in view finishes the entrance at
+    // once rather than hide what the visitor is reading (isAlreadyReached).
+    let ctx: gsap.Context | undefined;
+    const cancelBuild = runWithGsap(({ gsap }) => {
+      const reached = isAlreadyReached(sectionRef.current);
+      ctx = gsap.context(() => {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: 'top center',
+            end: 'bottom center',
+            toggleActions: 'play none none reverse',
           },
-        );
-      }
+        });
 
-      // Synergy bonuses pop in
-      const synergyItems = synergiesRef.current?.querySelectorAll('.synergy-item');
-      if (synergyItems) {
+        // Tech tree items appear
+        const techItems = techTreeRef.current?.querySelectorAll('.tech-reveal');
+        if (techItems) {
+          tl.fromTo(
+            techItems,
+            { opacity: 0, x: -30, scale: 0.9 },
+            {
+              opacity: 1,
+              x: 0,
+              scale: 1,
+              duration: 0.4,
+              stagger: 0.15,
+              ease: 'power2.out',
+            },
+          );
+        }
+
+        // Synergy bonuses pop in
+        const synergyItems = synergiesRef.current?.querySelectorAll('.synergy-item');
+        if (synergyItems) {
+          tl.fromTo(
+            synergyItems,
+            { opacity: 0, scale: 0.8, y: 10 },
+            {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.3,
+              stagger: 0.2,
+              ease: 'back.out(1.7)',
+            },
+            '+=0.2',
+          );
+        }
+
+        // Architecture diagram
         tl.fromTo(
-          synergyItems,
-          { opacity: 0, scale: 0.8, y: 10 },
-          {
-            opacity: 1,
-            scale: 1,
-            y: 0,
-            duration: 0.3,
-            stagger: 0.2,
-            ease: 'back.out(1.7)',
-          },
+          architectureRef.current,
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 0.5 },
           '+=0.2',
         );
-      }
 
-      // Architecture diagram
-      tl.fromTo(
-        architectureRef.current,
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.2',
-      );
+        // SVG lines draw
+        const lines = architectureRef.current?.querySelectorAll('.arch-line');
+        if (lines) {
+          lines.forEach((line) => {
+            const length = (line as SVGPathElement).getTotalLength?.() || 100;
+            gsap.set(line, { strokeDasharray: length, strokeDashoffset: length });
+            tl.to(line, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut' }, '-=0.3');
+          });
+        }
 
-      // SVG lines draw
-      const lines = architectureRef.current?.querySelectorAll('.arch-line');
-      if (lines) {
-        lines.forEach((line) => {
-          const length = (line as SVGPathElement).getTotalLength?.() || 100;
-          gsap.set(line, { strokeDasharray: length, strokeDashoffset: length });
-          tl.to(line, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut' }, '-=0.3');
-        });
-      }
+        // Headline
+        tl.fromTo(
+          headlineRef.current,
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 0.5 },
+          '+=0.2',
+        );
 
-      // Headline
-      tl.fromTo(
-        headlineRef.current,
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.2',
-      );
-    }, sectionRef);
+        // The line draws are the timeline's too, so this also undoes the `set` above.
+        if (reached) tl.progress(1);
+      }, sectionRef);
+    });
 
-    return () => ctx.revert();
+    return () => {
+      cancelBuild();
+      ctx?.revert();
+    };
   }, [prefersReducedMotion]);
 
   return (

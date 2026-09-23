@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 
 /**
@@ -8,8 +9,8 @@ import { expectHydrated } from './support/hydration';
  *
  * - R18 (hero-4) is ADR 0009 rule 4: an endless animation stops while nothing can see it. Seven
  *   `repeat: -1` animations keep running after the story has been scrolled past — `hero-section.tsx:40`
- *   and `:113`, `hero-content.tsx:78`, `hud-elements.tsx:291`, `execution-phase.tsx:284`,
- *   `game-complete.tsx:148`, `loop-phase.tsx:188` — off-screen or at `opacity: 0`, burning a phone
+ *   and `:113`, `hero-content.tsx:78`, `hud-elements.tsx:326`, `execution-phase.tsx:304`,
+ *   `game-complete.tsx:161`, `loop-phase.tsx:209` — off-screen or at `opacity: 0`, burning a phone
  *   battery for something nobody is looking at. Measured with `document.getAnimations()`, which sees
  *   both CSS and Web Animations API timelines, which is why it catches all seven despite their being
  *   written three different ways.
@@ -110,6 +111,11 @@ test('under reduce, hovering an animated heading moves nothing', async ({ page }
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
     'the whole point of this case is the reduce branch',
   ).toBe(true);
+  // The hover handlers run their tweens through GSAP, which arrives when the browser is idle after
+  // hydration (`load-gsap.ts`), under `reduce` as well. A hover that lands earlier and stays still
+  // plays, but only once GSAP is in, which can be after the 200 ms read below: a clean read, and
+  // for an expected failure a lucky pass fails the whole run.
+  await expectGsapLoaded(page);
 
   // Every phase renders its finished state on mount under `reduce`, so all six headings are already
   // in place and no reveal is in flight: any transform seen below was put there by the hover.

@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectGsapLoaded } from '../support/gsap';
 import { expectHydrated } from '../support/hydration';
 
 /**
  * `/` must not scroll sideways on a phone.
  *
  * Row R10 of the RED manifest, fixed by #46. The Execution phase's grid is
- * `grid gap-8 md:grid-cols-2` (`execution-phase.tsx:261`), so below `md` it is a single track — and a
+ * `grid gap-8 md:grid-cols-2` (`execution-phase.tsx:281`), so below `md` it is a single track — and a
  * grid track sizes to its content's min-content width, which for the `<pre>` holding the code sample
  * is 438.6px. In a 327px content box that overflows, and the document measures 463px wide at every
  * phone width: the whole page can be dragged sideways, on the one viewport class where that is most
@@ -21,6 +22,8 @@ import { expectHydrated } from '../support/hydration';
  * section is still at `opacity: 0`, but an invisible element in the flow lays out and overflows all
  * the same, so the row would be RED either way. Walking is what would also catch a phase that only
  * overflows once its reveal has run, and coming back up catches one that overflows on the way out.
+ * The walk starts once GSAP has loaded, which is after hydration (`load-gsap.ts`): walked before
+ * it, a section would be measured in its server-rendered state and no reveal would run.
  */
 
 // No retries. CI sets `retries: 2`, and an expected failure that passes on its first attempt is the
@@ -98,6 +101,7 @@ for (const width of PHONE_WIDTHS) {
     await page.setViewportSize({ width, height });
     await page.goto('/');
     await expectHydrated(page);
+    await expectGsapLoaded(page);
     await walkTheStory(page);
 
     const { scrollWidth, clientWidth } = await page.evaluate(() => ({

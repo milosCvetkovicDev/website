@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gsap, ScrollTrigger } from '../use-gsap-scroll';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { gsap, ScrollTrigger } from '../gsap-runtime';
+import { loadGsap } from '../load-gsap';
 import { DiscoveryPhase } from '../discovery-phase';
 import { StrategyPhase } from '../strategy-phase';
 import { ExecutionPhase } from '../execution-phase';
@@ -9,8 +10,8 @@ import { LoopPhase } from '../loop-phase';
 import { GameComplete } from '../game-complete';
 import { cssTransitions, gsapCssConflicts, tweenedElements } from './gsap-css-conflicts';
 
-// GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
-// it at import time, so the stub must exist before the imports above are evaluated.
+// GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
+// at import time, so the stub must exist before the imports above are evaluated.
 const media = vi.hoisted(() => {
   type Listener = (event: MediaQueryListEvent) => void;
   const listeners = new Set<Listener>();
@@ -43,6 +44,15 @@ const media = vi.hoisted(() => {
     },
   });
   return state;
+});
+
+// The phases do not import GSAP: they ask load-gsap.ts for it, which fetches it once the browser is
+// idle after hydration. Every test here is about what a phase does with GSAP, so the file waits for
+// that load once, with real timers, before any test installs fake ones. From then on each phase
+// builds its timeline synchronously on mount, as it does in the browser once GSAP has arrived. A
+// phase mounted before the load is lazy-gsap.test.tsx's subject.
+beforeAll(async () => {
+  await loadGsap();
 });
 
 // All six story sections, so the shared lifecycle below covers every one of them. LoopPhase was the
@@ -237,6 +247,60 @@ describe.each(tweenedTargets)('$name against CSS', ({ name, Phase, targets, coun
     expect(await gsapCssConflicts(container)).toContainEqual(
       expect.stringMatching(/GSAP tweens \S+, which .*\.transition-all/),
     );
+  });
+});
+
+// A phase built after the visitor has scrolled its section into view, because GSAP arrived late or
+// a soft navigation back restored the scroll position, finishes its entrance at once: nothing the
+// visitor is already reading is hidden behind a from-state (isAlreadyReached in load-gsap.ts). At
+// the top of the page, where every build above happens, the entrances wait for the scroll.
+describe.each(phases)('$name, built with its section already in view', ({ Phase }) => {
+  let scrollY: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    media.reduce = false;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    // jsdom lays nothing out: scrolled two screens down, with every box's top on screen.
+    scrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 2400 });
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ x: 0, y: 120, width: 1024, height: 900 }),
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    if (scrollY) Object.defineProperty(window, 'scrollY', scrollY);
+    else delete (window as { scrollY?: number }).scrollY;
+  });
+
+  it('finishes its entrance instead of hiding the section', () => {
+    const timeline = vi.spyOn(gsap, 'timeline');
+    const fromTo = vi.spyOn(gsap, 'fromTo');
+    render(<Phase />);
+
+    const entrances = [...timeline.mock.results, ...fromTo.mock.results].map(
+      (result) => result.value as gsap.core.Timeline | gsap.core.Tween,
+    );
+    expect(entrances.length).toBeGreaterThan(0);
+    const targets: unknown[] = [];
+    for (const entrance of entrances) {
+      expect(entrance.progress()).toBe(1);
+      const tweens =
+        'getChildren' in entrance
+          ? (entrance.getChildren(true, true, false) as gsap.core.Tween[])
+          : [entrance];
+      for (const tween of tweens) targets.push(...tween.targets());
+    }
+    // Every element an entrance fades is at full opacity, not at its from-state.
+    const faded = targets.filter(
+      (target): target is HTMLElement => target instanceof HTMLElement && !!target.style.opacity,
+    );
+    expect(faded.length).toBeGreaterThan(0);
+    for (const element of faded) expect(element.style.opacity).toBe('1');
   });
 });
 

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 
 /**
@@ -6,15 +7,18 @@ import { expectHydrated } from './support/hydration';
  *
  * Row R11 of the RED manifest, fixed by #46, and a different bug from R10's despite the identical
  * assertion. Here the offender is a GSAP from-state, not a grid track: the Execution phase builds
- * `tl.fromTo(statsRef, { opacity: 0, x: 30 }, …)` (`execution-phase.tsx:184-189`), and a `fromTo`
- * renders its "from" frame the moment the timeline is built — at mount, before any ScrollTrigger has
- * fired. So the stats panel starts 30px to the right of where it belongs and pushes the document out:
- * measured 774px at a 768px viewport and 1082px at 1080px.
+ * `tl.fromTo(statsRef, { opacity: 0, x: 30 }, …)` (`execution-phase.tsx:198-203`), and a `fromTo`
+ * renders its "from" frame the moment the timeline is built — as soon as GSAP has loaded, before
+ * any ScrollTrigger has fired. So the stats panel starts 30px to the right of where it belongs and
+ * pushes the document out: measured 774px at a 768px viewport and 1082px at 1080px.
  *
  * Three widths, at rest, under `no-preference`, and each part of that matters:
  *
  * - At rest, because that is when the from-state is on screen and nothing has scrolled it away. This
- *   is what a visitor sees on first paint.
+ *   is what a visitor sees once the page has settled. GSAP arrives when the browser is idle after
+ *   hydration (`load-gsap.ts`), and until then no timeline exists and no from-state is rendered, so
+ *   the measurement waits for it: taken straight after hydration it would read the server-rendered
+ *   page and this expected failure would pass.
  * - `no-preference`, because under `reduce` every phase effect returns early (ADR 0009), no timeline
  *   is built, no from-state is rendered, and the page is clean. A reduced-motion run of this
  *   assertion passes and proves nothing, so the emulation is asserted rather than assumed —
@@ -41,6 +45,9 @@ for (const width of DESKTOP_WIDTHS) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/');
     await expectHydrated(page);
+    // The from-state only exists once GSAP has loaded and the Execution phase has built its
+    // timeline.
+    await expectGsapLoaded(page);
     // Guard the guard: under `reduce` no from-state is ever rendered and this whole file is green
     // for the wrong reason.
     expect(

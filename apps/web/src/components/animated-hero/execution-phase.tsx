@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { gsap, ScrollTrigger } from './use-gsap-scroll';
+import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, ActivityEntry } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
@@ -98,7 +98,11 @@ export function ExecutionPhase() {
 
   // Single state update at the end of animation for final render
   const [animationComplete, setAnimationComplete] = useState(false);
+  const [gsapUnavailable, setGsapUnavailable] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  // Reduced motion, or no GSAP to count with: the finished build is rendered directly via
+  // `complete` below.
+  const finished = prefersReducedMotion || gsapUnavailable;
 
   // The count is a tween on a plain object whose onUpdate writes straight into the DOM. GSAP
   // re-enters the context for a ScrollTrigger callback, so `ctx.revert()` reverts this tween too,
@@ -110,121 +114,137 @@ export function ExecutionPhase() {
   const tweensRef = useRef<gsap.core.Tween[]>([]);
 
   useEffect(() => {
-    // Reduced motion: the finished build is rendered directly via `complete` below.
-    if (prefersReducedMotion) return;
-
-    gsap.registerPlugin(ScrollTrigger);
+    if (finished) return;
 
     const stopCount = () => {
       tweensRef.current.forEach((tween) => tween.kill());
       tweensRef.current = [];
     };
 
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top center',
-          end: 'bottom center',
-          toggleActions: 'play none none reverse',
-          onEnter: () => {
-            // Entering again (scrolling back up and down) restarts the count instead of running two.
-            stopCount();
-            countingRef.current = true;
-            // The count is starting over, so the finished state React renders has to go back with
-            // it. Leaving it latched would keep `complete` true, and React only rewrites a span
-            // whose rendered value changed, so nothing would ever correct what this count writes.
-            setAnimationComplete(false);
-            // Animate stats using direct DOM manipulation (no React re-renders)
-            const statsTween = gsap.to(
-              {},
-              {
-                duration: 3,
-                onUpdate: function () {
-                  if (!countingRef.current) return;
-                  const progress = this.progress();
-                  const files = Math.round(progress * 34);
-                  const tests = Math.round(progress * 89);
-                  const coverage = Math.round(progress * 100);
-                  const combo = Math.round(progress * 12);
-                  const visibleLineCount = Math.round(progress * codeLines.length);
+    // GSAP arrives after hydration (load-gsap.ts); until then the section keeps its
+    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // after it reverts. A build that finds the section already in view finishes the entrance at
+    // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
+    // the section renders its finished state, as under reduced motion.
+    let ctx: gsap.Context | undefined;
+    const cancelBuild = runWithGsap(
+      ({ gsap }) => {
+        const reached = isAlreadyReached(sectionRef.current);
+        ctx = gsap.context(() => {
+          const tl = gsap.timeline({
+            scrollTrigger: {
+              trigger: sectionRef.current,
+              start: 'top center',
+              end: 'bottom center',
+              toggleActions: 'play none none reverse',
+              onEnter: () => {
+                // Entering again (scrolling back up and down) restarts the count instead of running
+                // two.
+                stopCount();
+                countingRef.current = true;
+                // The count is starting over, so the finished state React renders has to go back
+                // with it. Leaving it latched would keep `complete` true, and React only rewrites a
+                // span whose rendered value changed, so nothing would ever correct what this count
+                // writes.
+                setAnimationComplete(false);
+                // Animate stats using direct DOM manipulation (no React re-renders)
+                const statsTween = gsap.to(
+                  {},
+                  {
+                    duration: 3,
+                    onUpdate: function () {
+                      if (!countingRef.current) return;
+                      const progress = this.progress();
+                      const files = Math.round(progress * 34);
+                      const tests = Math.round(progress * 89);
+                      const coverage = Math.round(progress * 100);
+                      const combo = Math.round(progress * 12);
+                      const visibleLineCount = Math.round(progress * codeLines.length);
 
-                  // Direct DOM updates - bypasses React reconciliation
-                  if (filesProgressRef.current)
-                    filesProgressRef.current.style.width = `${Math.round((files / 34) * 100)}%`;
-                  if (filesTextRef.current)
-                    filesTextRef.current.textContent = `${Math.round((files / 34) * 100)}%`;
-                  if (testsProgressRef.current) testsProgressRef.current.style.width = `${tests}%`;
-                  if (testsTextRef.current) testsTextRef.current.textContent = `${tests}%`;
-                  if (coverageProgressRef.current)
-                    coverageProgressRef.current.style.width = `${coverage}%`;
-                  if (coverageTextRef.current) coverageTextRef.current.textContent = `${coverage}%`;
-                  if (timeRef.current) timeRef.current.textContent = formatTime(progress * 872);
-                  if (comboCountRef.current) comboCountRef.current.textContent = `x${combo}`;
+                      // Direct DOM updates - bypasses React reconciliation
+                      if (filesProgressRef.current)
+                        filesProgressRef.current.style.width = `${Math.round((files / 34) * 100)}%`;
+                      if (filesTextRef.current)
+                        filesTextRef.current.textContent = `${Math.round((files / 34) * 100)}%`;
+                      if (testsProgressRef.current)
+                        testsProgressRef.current.style.width = `${tests}%`;
+                      if (testsTextRef.current) testsTextRef.current.textContent = `${tests}%`;
+                      if (coverageProgressRef.current)
+                        coverageProgressRef.current.style.width = `${coverage}%`;
+                      if (coverageTextRef.current)
+                        coverageTextRef.current.textContent = `${coverage}%`;
+                      if (timeRef.current) timeRef.current.textContent = formatTime(progress * 872);
+                      if (comboCountRef.current) comboCountRef.current.textContent = `x${combo}`;
 
-                  // Show/hide code line spans directly
-                  codeSpansRef.current.forEach((span, i) => {
-                    if (span) {
-                      span.style.opacity = i < visibleLineCount ? '1' : '0';
-                    }
-                  });
-                },
-                onComplete: () => setAnimationComplete(true),
+                      // Show/hide code line spans directly
+                      codeSpansRef.current.forEach((span, i) => {
+                        if (span) {
+                          span.style.opacity = i < visibleLineCount ? '1' : '0';
+                        }
+                      });
+                    },
+                    onComplete: () => setAnimationComplete(true),
+                  },
+                );
+                tweensRef.current.push(statsTween);
               },
-            );
-            tweensRef.current.push(statsTween);
-          },
-        },
-      });
+            },
+          });
 
-      // Code panel slides in
-      tl.fromTo(codeRef.current, { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.5 });
+          // Code panel slides in
+          tl.fromTo(codeRef.current, { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.5 });
 
-      // Stats panel slides in
-      tl.fromTo(
-        statsRef.current,
-        { opacity: 0, x: 30 },
-        { opacity: 1, x: 0, duration: 0.5 },
-        '<0.1',
-      );
+          // Stats panel slides in
+          tl.fromTo(
+            statsRef.current,
+            { opacity: 0, x: 30 },
+            { opacity: 1, x: 0, duration: 0.5 },
+            '<0.1',
+          );
 
-      // Activity feed
-      tl.fromTo(
-        activityRef.current,
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.4 },
-        '+=0.3',
-      );
+          // Activity feed
+          tl.fromTo(
+            activityRef.current,
+            { opacity: 0, y: 20 },
+            { opacity: 1, y: 0, duration: 0.4 },
+            '+=0.3',
+          );
 
-      // Combo counter
-      tl.fromTo(
-        comboRef.current,
-        { opacity: 0, scale: 0.5 },
-        { opacity: 1, scale: 1, duration: 0.3, ease: 'back.out(1.7)' },
-        '+=0.2',
-      );
+          // Combo counter
+          tl.fromTo(
+            comboRef.current,
+            { opacity: 0, scale: 0.5 },
+            { opacity: 1, scale: 1, duration: 0.3, ease: 'back.out(1.7)' },
+            '+=0.2',
+          );
 
-      // Headline
-      tl.fromTo(
-        headlineRef.current,
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.3',
-      );
-    }, sectionRef);
+          // Headline
+          tl.fromTo(
+            headlineRef.current,
+            { opacity: 0, y: 20 },
+            { opacity: 1, y: 0, duration: 0.5 },
+            '+=0.3',
+          );
+
+          if (reached) tl.progress(1);
+        }, sectionRef);
+      },
+      () => setGsapUnavailable(true),
+    );
 
     return () => {
+      cancelBuild();
       countingRef.current = false;
-      ctx.revert();
+      ctx?.revert();
       stopCount();
     };
-  }, [prefersReducedMotion]);
+  }, [finished]);
 
-  // With reduced motion the finished build is shown instead of counting up to it. Each value is
-  // the only child of its span, so React writes it with textContent, overwriting whatever the
-  // count last put there - but only when the value it renders actually changes, which is why a
-  // restarting count resets `animationComplete` above.
-  const complete = prefersReducedMotion || animationComplete;
+  // With reduced motion, or without GSAP, the finished build is shown instead of counting up to it.
+  // Each value is the only child of its span, so React writes it with textContent, overwriting
+  // whatever the count last put there - but only when the value it renders actually changes, which
+  // is why a restarting count resets `animationComplete` above.
+  const complete = finished || animationComplete;
 
   const getTokenColor = (type: string) => {
     switch (type) {

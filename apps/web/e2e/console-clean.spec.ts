@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { caseStudies } from '../src/data/case-studies';
 import { PAGE_ROUTES, expectedStatus } from './routes';
+import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 
 /**
@@ -117,12 +118,15 @@ async function expectCleanConsole(
   // failed, so the collected problems have to reach the report before its exception does. This is
   // the same reason the three checks above are soft.
   let afterLoadError: unknown;
-  if (afterLoad) {
-    try {
-      await afterLoad(page);
-    } catch (error) {
-      afterLoadError = error;
-    }
+  try {
+    // On `/` GSAP arrives after hydration, once the browser is idle (load-gsap.ts), and the story
+    // builds its timelines then. Waiting for it keeps whatever that logs inside the window this
+    // collector listens to, and has the walk below scroll through built timelines rather than past
+    // server-rendered sections that GSAP has not reached yet.
+    if (route.path === '/') await expectGsapLoaded(page);
+    if (afterLoad) await afterLoad(page);
+  } catch (error) {
+    afterLoadError = error;
   }
   // Always the last thing before the assertion, so whatever afterLoad started has a window in which
   // to report.

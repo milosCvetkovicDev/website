@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { gsap } from '../use-gsap-scroll';
+import { gsap } from '../gsap-runtime';
 import { cssTransitions, gsapCssConflicts, tweenedElements } from './gsap-css-conflicts';
 
-// GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers it
+// GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
 // at import time, so the stub must exist before the imports above are evaluated.
 vi.hoisted(() => {
   Object.defineProperty(window, 'matchMedia', {

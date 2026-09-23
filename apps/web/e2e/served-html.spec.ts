@@ -8,11 +8,11 @@ import { expect, test, type Page } from '@playwright/test';
  * The page is prerendered, so a crawler or a reader without JavaScript gets the whole story in the
  * first response — every section, every panel, every line of the code sample. Four of those blocks are
  * nevertheless *invisible* in that response, because their visibility is gated on client state that
- * never arrives: `gauntlet-phase.tsx:302` and `loop-phase.tsx:243` put `opacity-0` on the headline
- * blocks and `:287` / `:228` on the toasts whenever `achievementVisible` / `protocolVisible` is false,
+ * never arrives: `gauntlet-phase.tsx:324` and `loop-phase.tsx:264` put `opacity-0` on the headline
+ * blocks and `:309` / `:249` on the toasts whenever `achievementVisible` / `protocolVisible` is false,
  * and both are false without hydration — `usePrefersReducedMotion`'s server snapshot is `false`
  * (`use-prefers-reduced-motion.ts:17`), so the reduced-motion escape hatch that would have rendered
- * them does not apply either. `execution-phase.tsx:274-277` is the same shape written inline:
+ * them does not apply either. `execution-phase.tsx:294-297` is the same shape written inline:
  * all 22 code spans are `opacity: complete ? 1 : 0`.
  *
  * So the markup is there and the text is transparent, which is the worst of both worlds: it costs the
@@ -189,7 +189,7 @@ test('nothing in the story is painted transparent with JavaScript off', async ({
   if (hiddenSpans > 0) {
     transparent.push(
       `the Execution code sample: ${hiddenSpans} of ${codeSpanOpacities.length} spans at opacity 0 ` +
-        '(execution-phase.tsx:274-277)',
+        '(execution-phase.tsx:294-297)',
     );
   }
 

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { PAGE_ROUTES, expectedStatus } from './routes';
+import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 // The rule map and the result readers are shared with e2e/mobile/accessibility.spec.ts: only
 // e2e/mobile/ is selected by the two phone projects, and importing one spec file from another would
@@ -266,6 +267,10 @@ async function openPage(
   expect(new URL(page.url()).pathname, `${path} should not redirect`).toBe(path);
   await expect(page).toHaveTitle(/Milos Cvetkovic/);
   await expectHydrated(page);
+  // On `/` the story's timelines, and the `opacity: 0` from-states that decide what axe skips at
+  // rest, are built when GSAP arrives, after hydration (load-gsap.ts). The quiet network above
+  // almost always outlasts that, but a gate waits for the state it measures rather than racing it.
+  if (path === '/') await expectGsapLoaded(page);
   // Playwright ignores unknown emulation options silently: prove the scheme reached the page.
   await expect(page.locator('html')).toContainClass(colorScheme);
   // axe skips what is not on screen, so a page that rendered nothing would be green: require

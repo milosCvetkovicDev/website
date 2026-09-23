@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { gsap, ScrollTrigger } from './use-gsap-scroll';
+import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
@@ -17,75 +17,88 @@ export function GameComplete() {
     // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
     if (prefersReducedMotion) return;
 
-    gsap.registerPlugin(ScrollTrigger);
+    // GSAP arrives after hydration (load-gsap.ts); until then the section keeps its
+    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // after it reverts. A build that finds the section already in view finishes the entrance at
+    // once rather than hide what the visitor is reading (isAlreadyReached).
+    let ctx: gsap.Context | undefined;
+    const cancelBuild = runWithGsap(({ gsap }) => {
+      const reached = isAlreadyReached(sectionRef.current);
+      ctx = gsap.context(() => {
+        // The breathing glow is deliberately NOT a child of the timeline below. GSAP gives a child
+        // with `repeat: -1` a total duration of 1e10 seconds, and a timeline takes its duration from
+        // its longest child, so this timeline used to be ~317 years long. The `reverse` toggleAction
+        // only flips the time scale and never seeks, so scrolling back up rewound every second the
+        // glow had been breathing before the entrance itself began to un-play: linger half a minute
+        // and the terminal dissolved half a minute later, while still on screen. Kept out of the
+        // timeline, the entrance is 1.4s and reverses at once, like every other phase.
+        const glow = gsap.to(ctaRef.current, {
+          boxShadow: '0 0 30px rgba(139, 92, 246, 0.4)',
+          duration: 1,
+          delay: 0.2,
+          repeat: -1,
+          yoyo: true,
+          ease: 'power1.inOut',
+          paused: true,
+        });
 
-    const ctx = gsap.context(() => {
-      // The breathing glow is deliberately NOT a child of the timeline below. GSAP gives a child
-      // with `repeat: -1` a total duration of 1e10 seconds, and a timeline takes its duration from
-      // its longest child, so this timeline used to be ~317 years long. The `reverse` toggleAction
-      // only flips the time scale and never seeks, so scrolling back up rewound every second the
-      // glow had been breathing before the entrance itself began to un-play: linger half a minute
-      // and the terminal dissolved half a minute later, while still on screen. Kept out of the
-      // timeline, the entrance is 1.4s and reverses at once, like every other phase.
-      const glow = gsap.to(ctaRef.current, {
-        boxShadow: '0 0 30px rgba(139, 92, 246, 0.4)',
-        duration: 1,
-        delay: 0.2,
-        repeat: -1,
-        yoyo: true,
-        ease: 'power1.inOut',
-        paused: true,
-      });
+        // `resume` on an entrance that has already finished is rendered with events suppressed, so
+        // onComplete does not fire again and the glow has to be picked up by hand. Guarded, because
+        // a visitor who deep-links below the section gets `resume` on an entrance that never played.
+        const resumeGlowIfEntranceDone = () => {
+          if (tl.progress() === 1) glow.play();
+        };
 
-      // `resume` on an entrance that has already finished is rendered with events suppressed, so
-      // onComplete does not fire again and the glow has to be picked up by hand. Guarded, because
-      // a visitor who deep-links below the section gets `resume` on an entrance that never played.
-      const resumeGlowIfEntranceDone = () => {
-        if (tl.progress() === 1) glow.play();
-      };
-
-      const tl = gsap.timeline({
-        onComplete: () => {
-          // restart rather than play, so the 0.2s beat after the CTA lands is the same every time.
-          glow.restart(true);
-        },
-        onReverseComplete: () => {
-          glow.pause(0);
-        },
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top center',
-          // `pause`/`resume` keep the entrance from finishing, and so from starting the glow,
-          // while the section is scrolled past.
-          toggleActions: 'play pause resume reverse',
-          onEnter: resumeGlowIfEntranceDone,
-          onEnterBack: resumeGlowIfEntranceDone,
-          onLeave: () => {
-            glow.pause();
+        const tl = gsap.timeline({
+          onComplete: () => {
+            // restart rather than play, so the 0.2s beat after the CTA lands is the same every time.
+            glow.restart(true);
           },
-          onLeaveBack: () => {
-            glow.pause();
+          onReverseComplete: () => {
+            glow.pause(0);
           },
-        },
-      });
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: 'top center',
+            // `pause`/`resume` keep the entrance from finishing, and so from starting the glow,
+            // while the section is scrolled past.
+            toggleActions: 'play pause resume reverse',
+            onEnter: resumeGlowIfEntranceDone,
+            onEnterBack: resumeGlowIfEntranceDone,
+            onLeave: () => {
+              glow.pause();
+            },
+            onLeaveBack: () => {
+              glow.pause();
+            },
+          },
+        });
 
-      // Terminal draws in
-      tl.fromTo(
-        terminalRef.current,
-        { opacity: 0, scale: 0.95 },
-        { opacity: 1, scale: 1, duration: 0.6, ease: 'power2.out' },
-      );
+        // Terminal draws in
+        tl.fromTo(
+          terminalRef.current,
+          { opacity: 0, scale: 0.95 },
+          { opacity: 1, scale: 1, duration: 0.6, ease: 'power2.out' },
+        );
 
-      // CTA fades and slides up
-      tl.fromTo(
-        ctaRef.current,
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.3',
-      );
-    }, sectionRef);
+        // CTA fades and slides up
+        tl.fromTo(
+          ctaRef.current,
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 0.5 },
+          '+=0.3',
+        );
 
-    return () => ctx.revert();
+        // Events suppressed: the glow starts from the trigger (resumeGlowIfEntranceDone) while the
+        // section is in range, not from onComplete wherever the visitor happens to be.
+        if (reached) tl.progress(1, true);
+      }, sectionRef);
+    });
+
+    return () => {
+      cancelBuild();
+      ctx?.revert();
+    };
   }, [prefersReducedMotion]);
 
   return (

@@ -333,6 +333,15 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   and `../components`, bare, with a trailing slash, or as `/index` with or without a `.ts`, `.tsx`,
   `.js` or `.jsx` extension, and a nested layout's `../../components`) and the near misses it lets
   through. It does not see a dynamic `import()`, and it reads layouts only.
+- GSAP is loaded lazily, never imported by a rendered component.
+  `apps/web/src/components/animated-hero/gsap-runtime.ts` imports `gsap`, and only `load-gsap.ts`
+  reaches it, through `import()`, once the browser is idle after hydration. Effects run GSAP work
+  through `runWithGsap` and event handlers through `useWithGsap`; `import type` is fine. A static
+  import from anything the home page reaches puts about 44 KB gzip back into its initial chunk, so
+  `@typescript-eslint/no-restricted-imports` in `apps/web/eslint.config.mjs` refuses one everywhere
+  in `src` except that module, the tests and `circuit-background.tsx`, which still imports GSAP and
+  two plugins statically and is rendered by no route. `apps/web/src/test/eslint-config.test.ts`
+  pins the rule.
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
   keep relative imports for siblings inside one folder.
@@ -372,6 +381,12 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   That assertion is only a smoke check that the app rendered: it never could catch a second
   checkout of this site, which serves the same title character for character, and the not-found and
   error pages carry it too. Status and path are what catch a wrong page.
+- On `/`, GSAP arrives after hydration: `src/components/animated-hero/load-gsap.ts` fetches it once
+  the browser is idle, and the story builds its timelines then. A spec that measures anything GSAP
+  does on `/`, a from-state at rest, a hover tween or a scroll-driven reveal, waits for it with
+  `expectGsapLoaded(page)` from `e2e/support/gsap.ts` after `expectHydrated`; measured earlier, it
+  reads the server-rendered page instead. The helper fails at once when the load failed.
+  `e2e/gsap-lazy.spec.ts` covers the window before GSAP arrives and a load that fails.
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build
   with `pnpm start` inside `apps/web`, sets `forbidOnly`, retries twice, uses one worker and a 10s
   expect timeout, and sets `failOnFlakyTests`: a test that passes only on a retry fails the run, on

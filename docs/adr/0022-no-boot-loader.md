@@ -57,8 +57,9 @@ What the loader did cost:
 - End-to-end specs wait for hydration only through `apps/web/e2e/support/hydration.ts`
   (`expectHydrated` after a navigation or reload, `gotoHydrated` for a navigation), which reads the
   hydration marker. No spec keys a wait on page text.
-- LCP work on `/` goes after early script, not after the paint. The measured lever is loading GSAP
-  only when the story needs it.
+- LCP work on `/` goes after early script, not after the paint. The measured lever is keeping GSAP
+  out of the page's initial chunk, and #48 does that: `load-gsap.ts` in
+  `apps/web/src/components/animated-hero` fetches it once the browser is idle after hydration.
 
 ## Consequences
 
@@ -83,6 +84,11 @@ What the loader did cost:
 - ADR 0006's use of the loader as an example of derived state, and ADR 0009's note on the CLS it
   caused, describe code that no longer exists. Both were true when written, so under ADR 0012 they
   are not corrected.
+- The same holds for three passages the GSAP change in #48 overtakes. ADR 0009's trade-off that
+  everyone pays for GSAP at load on `/` and its "open follow-up" describe the page before GSAP left
+  the initial chunk, and ADR 0006 names `use-gsap-scroll.ts`, which #48 deleted. ADR 0009 also
+  rejected prefetching GSAP at idle, but against a build that mounted the story on approach; against
+  the static import that replaced that deferral, idle is later than before, not earlier.
 
 ## Alternatives considered
 

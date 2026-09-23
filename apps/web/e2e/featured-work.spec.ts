@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { getActiveConnections } from '../src/data/architecture-graph';
 import { featuredProjects } from '../src/data/featured-projects';
 import { formatMetric } from '../src/data/case-studies';
+import { expectGsapLoaded } from './support/gsap';
 import { gotoHydrated } from './support/hydration';
 
 /** How long the story's scroll-triggered timers may take to finish; see the hover test. */
@@ -28,6 +29,10 @@ test.describe('Featured Work', () => {
     // 20-240, each time a bare "Test timeout" pending on a different line: throughput, not a hang.
     test.setTimeout(60_000);
     await gotoHydrated(page, '/');
+    // The sequences waited on below run on GSAP, which arrives after hydration. Waiting for it also
+    // keeps the jump out of the moment after hydration in which Chromium can undo a scripted scroll
+    // (hero.spec.ts, 'scroll indicator fades on scroll').
+    await expectGsapLoaded(page);
     const section = page.getByRole('region', { name: /featured work/i });
     await section.scrollIntoViewIfNeeded();
     // The last layout change of each phase: the Gauntlet's panel turning to success and the Loop's

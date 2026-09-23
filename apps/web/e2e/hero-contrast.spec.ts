@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 
 /**
@@ -286,8 +287,13 @@ test('no hero text sits at a resting partial opacity while hovered', async ({ pa
     'this case needs reduced motion, or a reveal mid-tween would be indistinguishable from a ' +
       'resting partial opacity',
   ).toBe(true);
+  // The glitch handler runs its timeline through GSAP, which arrives when the browser is idle after
+  // hydration (`load-gsap.ts`). A hover that lands earlier and stays still plays, but only once GSAP
+  // is in, which can be after the 45 frames below have been sampled: a clean read, and for an
+  // expected failure a lucky pass fails the whole run.
+  await expectGsapLoaded(page);
 
-  // `PHASE 3` uses `AnimatedText animation="glitch"` (`execution-phase.tsx:254`). Its duplicates only
+  // `PHASE 3` uses `AnimatedText animation="glitch"` (`execution-phase.tsx:274`). Its duplicates only
   // exist while the glitch timeline runs — five 0.05 s bursts and a 0.1 s settle, about 350 ms — so the
   // opacities are sampled every frame from before the hover rather than read once afterwards. A single
   // read would race the timeline and could report a clean page, and for an expected failure a lucky
@@ -330,7 +336,7 @@ test('no hero text sits at a resting partial opacity while hovered', async ({ pa
   expect(
     offenders,
     'the glitch variant paints aria-hidden duplicates at `opacity-70` ' +
-      '(animated-text.tsx:384, :394). CLAUDE.md forbids dimming text with an opacity modifier even ' +
+      '(animated-text.tsx:428, :438). CLAUDE.md forbids dimming text with an opacity modifier even ' +
       'when it is aria-hidden, because axe measures it anyway.',
   ).toEqual([]);
 });
