@@ -65,6 +65,12 @@ single `alt` cannot; the page points og:image at it through `buildMetadata()`'s 
 prerender at build time.
 `sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
 `NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
+Response headers come from one static `headers()` entry in `apps/web/next.config.ts` whose source,
+`/:path*`, matches every path, `/_next/static` assets and the 404s included:
+`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a Content-Security-Policy, a
+`Permissions-Policy` and a `Cross-Origin-Opener-Policy` (ADR 0023). Next's router sends a few
+answers before it applies `headers()`, and those carry none of them: the 308s that strip a trailing
+slash or collapse repeated slashes, and the plain 500 for a malformed percent-encoding.
 
 ## Commands
 
@@ -563,6 +569,22 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   evaluated as `<projectDir>/next.config.compiled.js`, so the starting directory is whatever Next
   was invoked on, not this file, and `next info` from a subdirectory then resolves outside the
   repository. `apps/web/src/test/next-config.test.ts` pins all of this.
+- `apps/web/next.config.ts` also sends the security headers (ADR 0023), and its CSP allows this
+  origin only: a script, stylesheet, font, image (a `data:` one included) or connection from
+  anywhere else is refused, and the browser logs the refusal as a console error.
+  `e2e/console-clean.spec.ts` fails on it in the desktop `chromium` project, the only one that runs
+  that spec; no WebKit project has a console gate, so a refusal only WebKit makes is not caught in
+  CI. Adding an origin means widening `contentSecurityPolicy()` and its test in
+  `src/test/next-config.test.ts` in the same change. `'unsafe-inline'` is in `script-src`
+  on purpose: the theme script and the RSC payload are inline, and a per-request token instead is
+  refused by ADR 0017 (`scripts/ai-refusals.test.mjs` fails on the word anywhere in the config).
+  `next dev` alone adds `'unsafe-eval'` and `ws:` (NODE_ENV=development), and a Vercel preview
+  build alone adds the Vercel Toolbar's origins and relaxes `Cross-Origin-Opener-Policy` from
+  `same-origin` to `same-origin-allow-popups` (VERCEL_ENV=preview). `turbo.json` declares
+  `VERCEL_ENV` in the `build` task's `env` so that it splits the cache key: Turborepo's strict mode
+  passes `VERCEL_*` through to `next build` anyway, but leaves an undeclared one out of the hash.
+  Never add `upgrade-insecure-requests`: WebKit applies it to `http://localhost`, which breaks the
+  `mobile-safari` project.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm. pnpm's peer-suffix resolution for this dependency graph is not deterministic: now and then
   a resolution, on `main` as well, flips a few peer suffixes the other way (on 2026-09-16, the

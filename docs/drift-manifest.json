@@ -6199,6 +6199,101 @@
       }
     },
     {
+      "id": "adr-readme-link-0023-static-security-headers",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0023-static-security-headers.md)",
+      "claim": "The link to 0023-static-security-headers.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0023-static-security-headers.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0023-static-security-headers.md"
+      }
+    },
+    {
+      "id": "adr-index-0023-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0023 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0023's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0023-static-security-headers.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0023-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0023 |",
+      "claim": "The index row for ADR 0023 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0023 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0023-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0023 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0023's record carries the Date \"2026-09-23\".",
+      "check": {
+        "file": "docs/adr/0023-static-security-headers.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-23"
+      }
+    },
+    {
+      "id": "adr-index-0023-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0023 |",
+      "claim": "The index row for ADR 0023 gives the record's Date, \"2026-09-23\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0023 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-23"
+      }
+    },
+    {
+      "id": "adr-index-0023-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0023 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0023's record carries the H1 title \"Six static security headers on every page and asset\".",
+      "check": {
+        "file": "docs/adr/0023-static-security-headers.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Six static security headers on every page and asset"
+      }
+    },
+    {
+      "id": "adr-index-0023-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0023 |",
+      "claim": "The index row for ADR 0023 gives the record's H1 title, \"Six static security headers on every page and asset\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0023 \\| \\[(.+?)\\]\\(0023-",
+        "equals": "Six static security headers on every page and asset"
+      }
+    },
+    {
       "id": "plans-index-route-hydration-marker-design-pr-87-merged",
       "doc": "docs/plans/README.md",
       "anchor": "| [2026-09-13-route-hydration-marker-design.md](2026-09-13-route-hydration-marker-design.md)",

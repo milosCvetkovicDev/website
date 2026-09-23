@@ -47,6 +47,7 @@ perform an operation.
 | 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)                                   | Superseded by ADR-0021                        | 2026-09-12 |
 | 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)                   | Accepted                                      | 2026-09-13 |
 | 0022 | [The home page renders no boot loader](0022-no-boot-loader.md)                                                                           | Accepted                                      | 2026-09-23 |
+| 0023 | [Six static security headers on every page and asset](0023-static-security-headers.md)                                                   | Accepted                                      | 2026-09-23 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
