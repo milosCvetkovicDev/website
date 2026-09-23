@@ -1,5 +1,11 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
-import { NOT_FOUND_ROUTE, PAGE_ROUTES, STATIC_ROUTES, expectedStatus } from './routes';
+import {
+  CASE_STUDY_ROUTES,
+  NOT_FOUND_ROUTE,
+  PAGE_ROUTES,
+  STATIC_ROUTES,
+  expectedStatus,
+} from './routes';
 
 /**
  * The head every crawler and link-preview bot reads.
@@ -346,23 +352,36 @@ test('the sitemap and robots.txt are served and agree with the routes', async ({
   expect(body, 'robots.txt must point at the sitemap').toContain('Sitemap:');
 });
 
-test('both JSON-LD blocks are served and parse', async ({ request }) => {
-  // Green. `json-ld.tsx` writes its objects straight into the script element without escaping, so a
-  // malformed object would ship as broken JSON with nothing failing. The escape hole in that same
-  // function is R32, unit tested in src/components/__tests__/json-ld.test.tsx.
-  const response = await request.get('/');
-  const html = await response.text();
-  const blocks = [
-    ...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
-  ].map(([, body]) => body);
-  expect(blocks, 'layout.tsx renders PersonJsonLd and WebsiteJsonLd').toHaveLength(2);
+test('the JSON-LD blocks are served and parse, and a case study adds its own two', async ({
+  request,
+}) => {
+  // Green. `json-ld.tsx` writes its objects straight into script elements, so a malformed object would
+  // ship as broken JSON with nothing failing. The escape they all go through is R32, unit tested in
+  // src/components/__tests__/json-ld.test.tsx.
+  const blocksOf = async (path: string) => {
+    const html = await (await request.get(path)).text();
+    return [
+      ...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
+    ].map(([, body]) => JSON.parse(body) as { '@type': string; '@context': string; url?: string });
+  };
 
-  const parsed = blocks.map(
-    (body) => JSON.parse(body) as { '@type': string; '@context': string; url: string },
-  );
-  expect(parsed.map((block) => block['@type'])).toEqual(['Person', 'WebSite']);
-  for (const block of parsed) {
+  const home = await blocksOf('/');
+  expect(
+    home.map((block) => block['@type']),
+    'layout.tsx renders PersonJsonLd and WebsiteJsonLd, and only those, on every route',
+  ).toEqual(['Person', 'WebSite']);
+  for (const block of home) {
     expect(block['@context']).toBe('https://schema.org');
     expect(block.url).toMatch(/^https?:\/\//);
+  }
+
+  for (const path of CASE_STUDY_ROUTES) {
+    const blocks = await blocksOf(path);
+    expect(
+      blocks.map((block) => block['@type']),
+      path,
+    ).toEqual(['Person', 'WebSite', 'TechArticle', 'BreadcrumbList']);
+    const article = blocks[2];
+    expect(new URL(String(article.url)).pathname, `${path}: the article's own URL`).toBe(path);
   }
 });

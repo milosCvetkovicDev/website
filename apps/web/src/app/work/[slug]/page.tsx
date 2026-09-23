@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { BreadcrumbListJsonLd, TechArticleJsonLd } from '@/components/json-ld';
 import { caseStudies, getCaseStudy } from '@/data/case-studies';
 import { buildMetadata } from '@/lib/metadata';
 
@@ -49,6 +50,8 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
   return (
     <div className="py-16 md:py-24">
+      <TechArticleJsonLd caseStudy={caseStudy} />
+      <BreadcrumbListJsonLd caseStudy={caseStudy} />
       <div className="mx-auto max-w-3xl px-6">
         {/* Back link */}
         <Link
