@@ -196,3 +196,23 @@ export const caseStudies: CaseStudy[] = [
 export function getCaseStudy(slug: string): CaseStudy | undefined {
   return caseStudies.find((cs) => cs.slug === slug);
 }
+
+/**
+ * The studies either side of `slug` in data order, wrapping around: what a case study's "More work"
+ * block links to. Never the study itself, and never the same study twice.
+ */
+export function adjacentCaseStudies(
+  slug: string,
+): { direction: 'previous' | 'next'; study: CaseStudy }[] {
+  const index = caseStudies.findIndex((cs) => cs.slug === slug);
+  const count = caseStudies.length;
+  if (index === -1 || count < 2) return [];
+  const previous = caseStudies[(index - 1 + count) % count];
+  const next = caseStudies[(index + 1) % count];
+  return previous === next
+    ? [{ direction: 'next', study: next }]
+    : [
+        { direction: 'previous', study: previous },
+        { direction: 'next', study: next },
+      ];
+}

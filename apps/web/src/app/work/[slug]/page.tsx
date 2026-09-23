@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { BreadcrumbListJsonLd, TechArticleJsonLd } from '@/components/json-ld';
-import { caseStudies, getCaseStudy } from '@/data/case-studies';
+import { adjacentCaseStudies, caseStudies, getCaseStudy } from '@/data/case-studies';
 import { buildMetadata } from '@/lib/metadata';
 
 interface PageProps {
@@ -196,7 +196,41 @@ export default async function CaseStudyPage({ params }: PageProps) {
               </div>
             ))}
           </div>
+          <p className="mt-6 text-sm">
+            <Link href="/skills" className="text-[var(--accent-text)] hover:underline">
+              All my skills, and the experience behind each one
+            </Link>
+          </p>
         </section>
+
+        {/* More work: the studies either side of this one, so each page links on to the others */}
+        <nav aria-labelledby="more-work" className="mb-12">
+          <h2
+            id="more-work"
+            className="mb-6 text-sm font-medium tracking-wider text-[var(--muted)] uppercase"
+          >
+            More work
+          </h2>
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {adjacentCaseStudies(caseStudy.slug).map(({ direction, study }) => (
+              <li
+                key={study.slug}
+                className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4"
+              >
+                <p className="mb-2 font-mono text-xs tracking-wider text-[var(--muted)] uppercase">
+                  {direction === 'previous' ? 'Previous case study' : 'Next case study'}
+                </p>
+                <Link
+                  href={`/work/${study.slug}`}
+                  className="text-lg font-semibold transition-colors hover:text-[var(--accent-text)] hover:underline"
+                >
+                  {study.title}
+                </Link>
+                <p className="mt-2 text-sm text-[var(--muted)]">{study.description}</p>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
         {/* CTA */}
         <section className="border-t border-[var(--border)] pt-8">
