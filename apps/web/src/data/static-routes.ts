@@ -4,10 +4,10 @@
  * learns to ignore the field. Bump a route's date by hand in the commit that changes what it says.
  * A case study's dates live on its entry in `case-studies.ts`.
  *
- * TODO(milos): confirm. From git, the last visible change to each: /about and /contact 2026-02-23
- * (7d31606, "Go live"), /blog 2026-01-27 (696c2ef). `/`, /work, /skills and /contact changed again
- * in the 2026-09-23 SEO pull request (the hero subtitle and the eyebrows), so they carry that day:
- * bump them to the day it merges.
+ * From git, the last commit to change what each route visibly says: `/`, /work, /skills and
+ * /contact 2026-09-23 (d1da60f, #116, which changed the hero subtitle and the eyebrows), /about
+ * 2026-02-23 (7d31606, "Go live (#2)") and /blog 2026-01-27 (696c2ef). The later commits to /about
+ * and /blog changed only formatting, colour tokens, metadata or Open Graph images.
  */
 export const STATIC_ROUTE_UPDATED = {
   '/': '2026-09-23',

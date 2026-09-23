@@ -53,21 +53,35 @@ export interface CaseStudy {
   updatedAt: string;
 }
 
-// TODO(milos): confirm both dates for every study. From git: each was added in acacce0
-// (2026-01-27) and "Go live (#2)", 7d31606, landed on 2026-02-23, which is the publishedAt used
-// below; the apex domain has served the site since 2026-09-09, so that may be the truer answer.
-// updatedAt is 2026-09-23, the SEO pull request that changed every case-study page: bump it to the
-// day it merges.
+// TODO(milos): confirm both dates for every study. From git: acacce0 added every study on
+// 2026-01-27, and PUBLISHED_AT is the date of 7d31606, "Go live: hero redesign, shared configs, and
+// page improvements (#2)", 2026-02-23. But the site was undeployed until 2026-09-09
+// (docs/adr/0002-monorepo-toolchain.md:170; docs/runbooks/deploy.md:14-18 puts the first
+// production deployment, a8b4a91, on that day), so 2026-09-09 may be the truer publish date.
+// UPDATED_AT is 2026-09-23, the day d1da60f (#116) redrafted the studies' visible copy; the
+// rewrite from public sources changes it again, so bump it to the day that rewrite merges.
 const PUBLISHED_AT = '2026-02-23';
 const UPDATED_AT = '2026-09-23';
 
 export const caseStudies: CaseStudy[] = [
-  // TODO(milos): draft copy (SEO pull request, 2026-09-23), written only from this entry's
-  // own claims. Answers to these would add the specifics it leaves out:
+  // TODO(milos): copy rewritten on 2026-09-23 from public sources (the claude-code-monorepo
+  // repository and this repository's docs and history). These questions are still open:
+  // - Is the agent still running, or was it retired? Should the status stay LIVE? The public
+  //   claude-code-monorepo names the self-healing agent helix-agent
+  //   (project/.claude/agents/archived/documentation-writer.md:28), records it as decommissioned
+  //   end to end in PRs #727 and #729 (global/memory/poc5-phase4-gap-tasks.md:2-3, :11, :32; all
+  //   closed 2026-05-13) and lists "#1225 helix-agent removal" as merged on 2026-06-11/12
+  //   (global/memory/platform-dev-stabilization-epic.md:89). The copy keeps the present tense of
+  //   docs/plans/2026-01-27-portfolio-design.md; if it was retired, the status, the description, the approach,
+  //   How It Works and the impact bullets all need to change.
   // - Which log queries, tables or error signals in Azure Log Analytics does the agent watch, and
   //   how does it decide that something has broken?
   // - How does an error reach the agent: does it poll Log Analytics, receive an alert, or
   //   something else, and what does the Elysia service expose (webhook, API, dashboard)?
+  //   claude-code-monorepo global/memory/poc5-phase4-gap-tasks.md:32 records the agent's role
+  //   assignments on the shared Log Analytics workspace, which fits querying it directly, but no
+  //   public source says how errors reach it. The copy says only that it monitors production
+  //   errors through Log Analytics until you confirm.
   // - What does the agent keep in Azure Table Storage: run history, learning metrics, fix
   //   patterns, something else?
   // - What are the actual values of the daily limit, the budget cap and the confidence threshold,
@@ -85,8 +99,8 @@ export const caseStudies: CaseStudy[] = [
   //   codebase, and which Claude model does it use?
   // - Which product or services does it watch in production, and can the company or team context
   //   be named publicly?
-  // - How long has it been running, how many incidents has it diagnosed, and what share of its
-  //   pull requests get merged?
+  // - How long has it been running (or how long did it run), how many incidents has it diagnosed,
+  //   and what share of its pull requests get merged?
   {
     slug: 'self-healing-agent',
     publishedAt: PUBLISHED_AT,
@@ -104,14 +118,14 @@ export const caseStudies: CaseStudy[] = [
     challenge:
       "Production breaks at 3am, and nobody wants that call. Errors don't wait for business hours, every minute of downtime costs money and trust, and the on-call rotation turns into the job developers dread. Before anyone can fix anything, somebody has to wake up, read the production logs, find their way around the codebase and work out what actually broke. That diagnosis is exactly the kind of grunt work a machine could do overnight, if it could be trusted with it. Handing it to an agent brings risks of its own, though: an agent can be confidently wrong, it can run up a bill, and it can keep trying long after a sensible engineer would have stopped. The question: can we fix bugs faster than humans can even wake up?",
     approach:
-      'I built an autonomous agent that never sleeps. It runs on Bun and Elysia, keeps its data in Azure Table Storage, uses Azure Log Analytics for monitoring and watches production logs. When something breaks, an error analysis pipeline built on the Claude Agent SDK and the Anthropic API reads the failure against the codebase, diagnoses the issue and drafts a contextual fix, which it opens as a pull request through the GitHub API. It monitors the CI pipeline, with retry logic capped at three attempts, so a stubborn failure cannot loop forever. Safety constraints keep it on a short leash: daily limits, budget caps and confidence thresholds bound what it may attempt, and it has a kill switch and emergency override controls. Learning metrics are there to improve its calibration, fix patterns get learned and reused automatically, and the system improves itself over time. Humans review and merge; the agent does the grunt work.',
+      'I built an autonomous agent that monitors production errors and proposes fixes through pull requests. It runs on Bun and Elysia as an Azure Container App, keeps its data in Azure Table Storage and uses Azure Log Analytics for monitoring. For each error, an error analysis pipeline built on the Claude Agent SDK reads the failure against the codebase, diagnoses the issue and drafts a fix, which the agent opens as a pull request through the GitHub API. It monitors the CI pipeline and retries on failure, capped at three attempts, so a stubborn failure cannot loop forever. Safety constraints keep it on a short leash: daily limits, budget caps and confidence thresholds bound what it may attempt, and it has a kill switch and emergency override controls. It tracks learning metrics to improve its calibration, and fix pattern learning builds up institutional knowledge. Humans review and merge its pull requests through approval gates; the agent does the grunt work.',
     howItWorks: [
-      'The agent runs around the clock on Bun and Elysia, uses Azure Log Analytics for monitoring and watches production logs.',
-      'When something breaks, an error analysis pipeline built on the Claude Agent SDK and the Anthropic API reads the error against the codebase and diagnoses the issue.',
-      'It drafts a contextual fix and opens a pull request through the GitHub API, while safety constraints (daily limits, budget caps and confidence thresholds) bound what it may attempt.',
-      'It also monitors the CI pipeline, with retry logic capped at three attempts.',
-      'Humans review and merge the fix, with a kill switch and emergency override controls on hand.',
-      'Learning metrics are there to improve its calibration, fix patterns get learned and reused automatically, and the system improves itself over time.',
+      'The agent runs on Bun and Elysia as an Azure Container App and monitors production errors through Azure Log Analytics.',
+      'An error analysis pipeline built on the Claude Agent SDK reads each error against the codebase and diagnoses the issue.',
+      'It drafts a fix and opens a pull request through the GitHub API, while safety constraints (daily limits, budget caps and confidence thresholds) bound what it may attempt.',
+      'It also monitors the CI pipeline and retries on failure, up to three attempts.',
+      'Humans review the pull request through approval gates and merge the fix, with a kill switch and emergency override controls on hand.',
+      'It tracks learning metrics to improve its calibration, and fix pattern learning builds up institutional knowledge.',
     ],
     contributions: [
       'Designed autonomous error analysis pipeline using Claude AI',
@@ -137,10 +151,37 @@ export const caseStudies: CaseStudy[] = [
       { category: 'VCS', items: ['GitHub API'] },
     ],
   },
-  // TODO(milos): draft copy (SEO pull request, 2026-09-23), written only from this entry's
-  // own claims. Answers to these would add the specifics it leaves out:
-  // - What did the platform do and for whom (domain, kind of B2B customer), stated at a level you
-  //   are happy to publish?
+  // TODO(milos): copy rewritten on 2026-09-23 from public sources (the claude-code-monorepo
+  // repository and this repository's docs and history). These questions are still open:
+  // - How much of the public architecture record may this page repeat? claude-code-monorepo
+  //   docs/architecture/00-system-context.md and docs/architecture/legacy/01-legacy-architecture.md
+  //   describe this system's domain, tenancy model, module counts, how tenant scoping is enforced,
+  //   and the document and ERP flow. None of it is in the copy: it would let a reader match this
+  //   page to that document, and some of it describes how the production system is secured. Say
+  //   which parts, if any, belong here.
+  // - How does "I didn't propose a rewrite" (the approach and the first lesson) square with the
+  //   public record? The same document calls the system "the system Acme Platform is replacing"
+  //   (:3), calls testability "the single most cited reason for the rebuild" (:172-175) and ends
+  //   "None of these are reasons to rewrite on their own ... they are" (:666-668), and
+  //   docs/architecture/legacy/02-strangler-migration.md:3-4 and :16-17 describe a strangler-fig
+  //   rebuild under way. Did the rescue come before that rebuild, or run alongside it?
+  // - Did SQL ever sit next to UI components, in a flat file structure? The public source shows the
+  //   API and the single-page app as separate Nx projects (project/CLAUDE.md:12), and no public
+  //   source describes an earlier state.
+  // - The source describes the system as it stands, with no history, and calls its layering a
+  //   convention enforced by review and lint (01-legacy-architecture.md:62-65). Is the layering
+  //   the result of your migration?
+  // - Which hosting does the case study cover? The tech stack lists Azure Container Apps only, but
+  //   the API runs on an Azure Linux App Service with a staging slot, and only its sibling
+  //   domain-api runs on Container Apps (01-legacy-architecture.md:4-5, :593-597;
+  //   docs/architecture/devops/07-environments.md:323-324). Should App Service join the stack?
+  // - Does "Security vulnerabilities caught before they reach production" hold? Only CI and
+  //   Validate Terraform are required for merge; Trivy, Security Scan and Label Critical are
+  //   informational (project/CLAUDE.md:88).
+  // - Does the full Playwright suite run on every push to main or by hand?
+  //   project/apps/legacy-web-e2e/CLAUDE.md:43 says "full suite with 4-way sharding on main", while
+  //   project/.claude/agents/github-actions-expert.md:20 lists e2e-tests.yml as Manual. The copy
+  //   says only that the full suite is sharded four ways.
   // - How big was the legacy codebase when you started (modules, endpoints, lines of code or
   //   number of services)?
   // - How many people were on the team, and what was your role on it (lead, architect, solo)?
@@ -155,8 +196,6 @@ export const caseStudies: CaseStudy[] = [
   //   the first week now?
   // - Did the security scanning (Gitleaks, npm audit, Trivy) catch anything notable that you can
   //   describe without naming the client?
-  // - How many Terraform environments are there, and how is state isolated between them (separate
-  //   backends, workspaces, subscriptions)?
   // - How long did the Playwright suite take before and after the 4-way sharding?
   // - Were infrastructure changes really applied by hand before Terraform, or is 'not YOLO'd'
   //   contrasting with something else?
@@ -177,7 +216,7 @@ export const caseStudies: CaseStudy[] = [
     challenge:
       'The codebase had a reputation, and it had earned it. SQL queries lived next to UI components, in a flat file structure with no layers between them. Validation was manual and happened... sometimes. Tests? What tests? Without them, every change was a guess about what else might break, and nobody wanted to be the one guessing. Deploys were no longer fast, either. None of that bought any patience from the business, which needed new features yesterday. So the real problem was never just messy code: it was how to keep shipping those features on a foundation that made every one of them risky, without stopping everything to fix it first.',
     approach:
-      "I didn't propose a rewrite—that's how projects die. A rewrite stops feature work while the business is still waiting for features, so instead I introduced boundaries gradually. Clean Architecture emerged one module at a time, with controllers, services and repositories each taking one job, so data access got a layer of its own instead of a seat next to the UI. Manual validation gave way to Zod schemas, whose inferred types keep the checks and the code from drifting apart. I built a background job system on pg-boss for async operations; it keeps its queue in PostgreSQL rather than adding another service to run. The delivery path got the same treatment: modular CI/CD from reusable GitHub composite actions, security scanning with Gitleaks, npm audit and Trivy, multi-environment Terraform with isolated state, and Playwright E2E tests written with the Page Object pattern and sharded four ways. Every PR shipped value while improving the foundation underneath.",
+      "I didn't propose a rewrite—that's how projects die. A rewrite stops feature work while the business is still waiting for features, so instead I introduced boundaries gradually. Clean Architecture emerged one module at a time, with controllers, services and repositories each taking one job, so data access got a layer of its own instead of a seat next to the UI. Manual validation gave way to Zod schemas, whose inferred types keep the checks and the code from drifting apart. I built a background job system on pg-boss for async operations; its queue is a table in the same PostgreSQL database as the business data, so enqueueing is transactional and there is no broker to run. The delivery path got the same treatment. CI/CD is built from reusable GitHub composite actions, and Nx's affected commands limit builds, tests and deploys to the projects a change affects. Gitleaks, npm audit and Trivy scan on pushes, pull requests and a weekly schedule. Terraform keeps one remote state file per root directory, with production in a root of its own, and gives each developer a throwaway copy of the stack under a state file of its own; it runs a plan on every pull request that touches the infrastructure and waits for an approval before it applies to production. Playwright E2E tests, written with the Page Object pattern, run as a smoke set on every pull request, and the full suite is sharded four ways. Every PR shipped value while improving the foundation underneath.",
     contributions: [
       'Migrated flat file structure to Clean Architecture (controllers → services → repositories)',
       'Replaced manual validation with Zod schemas and type inference',
@@ -197,10 +236,8 @@ export const caseStudies: CaseStudy[] = [
     lessons: [
       "Don't propose a rewrite: introduce boundaries gradually and let every PR ship value while it improves the foundation underneath.",
       'Replace manual validation with Zod schemas and infer the types from them, so the checks and the code stay in step.',
-      'Tests are part of the rescue rather than a reward for finishing it: the bug rate dropped as coverage climbed.',
+      'Tests are part of the rescue rather than a reward for finishing it.',
       'Infrastructure changes deserve the same review as code, and a multi-environment Terraform architecture with state isolation puts infrastructure in code, where it can get that review.',
-      'Security scanning with Gitleaks, npm audit and Trivy is how vulnerabilities get caught before they reach production.',
-      'A rescued codebase shows it when new developers ship features in their first week and the team actually enjoys working on it.',
     ],
     techStack: [
       {
@@ -220,24 +257,20 @@ export const caseStudies: CaseStudy[] = [
       { category: 'CI/CD', items: ['GitHub Actions', 'Nx'] },
     ],
   },
-  // TODO(milos): draft copy (SEO pull request, 2026-09-23), written only from this entry's
-  // own claims. Answers to these would add the specifics it leaves out:
+  // TODO(milos): copy rewritten on 2026-09-23 from public sources (the claude-code-monorepo
+  // repository and this repository's docs and history). These questions are still open:
   // - How long did a typical CI run take before the cache and after it (as real durations, to
   //   replace 'coffee-break length' and 'near-instant')?
   // - How big is the monorepo (number of projects or apps) and how many developers or pipelines
   //   use the cache?
-  // - What size limit or eviction settings does the in-memory LRU tier use?
-  // - Who holds which token: do CI runners hold the write token and developer machines only the
-  //   read token, and do local builds use the cache at all?
   // - Where are the two tokens stored, and how are they rotated?
   // - Does an artifact fetched from Blob Storage get promoted into the memory tier, and does a
   //   write go to both tiers at once?
-  // - Is there an expiry or clean-up policy for old artifacts in Blob Storage?
   // - What cache hit rate does the server see, in memory and overall?
   // - By how much did cloud compute costs drop (the entry only says 'noticeably')?
-  // - Which Nx version and which remote cache API does the server implement?
-  // - What do the health checks actually check: the process only, or also that Blob Storage is
-  //   reachable?
+  // - Which Nx version was the server built against? CI ran Nx 22.6.4 on 2026-06-29
+  //   (claude-code-monorepo global/memory/platform-ui-test-blindfold-and-icu-casing.md:18), which
+  //   does not settle it. (The API is answered: Nx's self-hosted remote cache protocol.)
   // - What happens to a CI run when it hits the 1000 req/min rate limit: does it fall back to
   //   building locally?
   // - Which company or product was this built for, and how long did building it take?
@@ -258,14 +291,16 @@ export const caseStudies: CaseStudy[] = [
     challenge:
       'Every CI run rebuilt the entire monorepo, however small the change that set it off. No run reused what an earlier run had already built, so code nobody had touched got compiled again, and again, and again. Pipelines ran long enough to fit a coffee break, which meant developers waited, and the full test suite took so long that running all of it felt like a luxury rather than a habit. Meanwhile the cloud bills climbed, because every one of those rebuilds ran on compute we paid for. "Works on my machine" was still something people said with a straight face. The math was simple: we were paying to compile the same unchanged code hundreds of times a day. That left one obvious question worth answering properly: why rebuild what hasn\'t changed?',
     approach:
-      "I built a cache server from scratch, on Bun for raw speed, with Elysia handling the requests. The design is two-tier caching. The hot tier is an LRU cache in memory: frequently accessed artifacts stay there, the least recently used make room when it fills, and a hit comes back nearly instantly. The cold tier is Azure Blob Storage, the persistent cache, so artifacts outlive any one server process. A cache that CI leans on also has to be hard to abuse, so access runs on two tokens, one that can only read and one that can write, each checked with a timing-safe comparison so response times give nothing away about a wrong guess. A rate limit of 1000 requests a minute keeps it stable, and health checks integrate it with the container orchestration on Azure Container Apps. The rule underneath fits on one line: if it hasn't changed, we don't rebuild it. Period.",
+      "I built a cache server from scratch, on Bun for raw speed, with Elysia handling the requests, and made it speak Nx's built-in self-hosted remote cache protocol. The design is two-tier caching. The hot tier is an LRU cache in memory, capped by default at 100 entries, 500MB in total and 10MB per artifact: frequently accessed artifacts up to that size stay there, and the least recently used make room when it fills. The cold tier is Azure Blob Storage, the persistent cache, so artifacts outlive any one server process. A cache that CI leans on also has to be hard to abuse, so access runs on two tokens, each checked with a timing-safe comparison so response times give nothing away about a wrong guess. The read token can only download; the write token can also upload, and only pushes to main hold it, so a pull request cannot poison the cache. A rate limit of 1000 requests a minute per IP keeps it stable, and health checks integrate it with the container orchestration on Azure Container Apps. CI never depends on it: a health probe with a 5-second timeout runs before the Nx steps, and a server that does not answer leaves the run on its local cache. The rule underneath fits on one line: if it hasn't changed, we don't rebuild it. Period.",
     howItWorks: [
-      "When a CI run reaches a part of the monorepo whose code hasn't changed, it asks the cache server for the stored artifacts instead of compiling that code again.",
-      'The server authenticates clients with two tokens, one for reading and one for writing, each checked with a timing-safe comparison, and applies a rate limit of 1000 requests a minute for stability.',
-      'The server looks in its in-memory LRU cache first, where frequently accessed artifacts come back nearly instantly.',
+      'Before its Nx steps, a CI run probes the cache server with a 5-second timeout; if the server does not answer, the run carries on with its local cache.',
+      "When the run reaches a part of the monorepo whose code hasn't changed, Nx asks the server for the stored artifact by its hash (GET /v1/cache/:hash) instead of compiling that code again.",
+      'The server checks the read or write token with a timing-safe comparison and applies a rate limit of 1000 requests a minute per IP.',
+      'The server looks in its in-memory LRU cache first, which by default holds frequently accessed artifacts of up to 10MB each.',
       "If memory doesn't have the artifact, the server falls back to Azure Blob Storage, the persistent cold tier.",
-      'Only when neither tier has it does the run build that code, and a client holding the write token stores the new artifacts for the next run.',
-      "The server itself is built on Bun and Elysia and runs on Azure Container Apps, with health checks for the platform's container orchestration.",
+      'Only when neither tier has it does the run build that code. A push to main, which holds the write token, then uploads the new artifact (PUT /v1/cache/:hash); pull-request runs hold only the read token and never write.',
+      'An entry never changes once written: a second upload for the same hash gets 409 Conflict, and Blob Storage deletes artifacts after 14 days.',
+      'The server itself is built on Bun and Elysia and runs on Azure Container Apps, with a liveness endpoint that answers while the process is up and a readiness endpoint that also checks storage.',
     ],
     contributions: [
       'Built LRU in-memory caching for frequently accessed artifacts',
