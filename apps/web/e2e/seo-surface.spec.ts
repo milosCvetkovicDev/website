@@ -109,9 +109,6 @@ test('every route serves one canonical link for its own path', async ({ request 
 });
 
 test('every route serves an og:image that answers with an image', async ({ request }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R23, #48' });
-
   const problems: string[] = [];
   const reachability = new Map<string, string>();
   for (const { path } of routes) {
