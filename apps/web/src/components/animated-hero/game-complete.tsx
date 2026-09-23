@@ -131,12 +131,14 @@ export function GameComplete() {
           </Terminal>
         </div>
 
+        {/* transition-colors, not transition-all: GSAP tweens this link's opacity, transform and
+            box-shadow, and a transition on any of them re-eases every frame GSAP writes. */}
         <a
           ref={ctaRef}
           href="https://www.linkedin.com/in/milos-cvetkovic-dev"
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-8 inline-flex items-center justify-center rounded-lg bg-[var(--accent)] px-8 py-4 text-lg font-semibold text-white transition-all hover:bg-[var(--accent-hover)]"
+          className="mt-8 inline-flex items-center justify-center rounded-lg bg-[var(--accent)] px-8 py-4 text-lg font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
         >
           Connect on LinkedIn
         </a>

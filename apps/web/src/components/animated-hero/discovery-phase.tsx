@@ -146,13 +146,19 @@ export function DiscoveryPhase() {
             >
               <div ref={tagsRef} className="flex flex-wrap gap-2">
                 {requirements.map((req, index) => (
+                  // The timeline animates this wrapper, and the tag's hover lives on the span inside
+                  // it. On one element the two fight: GSAP writes transform and opacity inline every
+                  // frame, which a transition there re-eases into a lagging, flattened tween, and it
+                  // pins `scale: none` inline, which cancels hover:scale-105.
                   <span
                     key={req.id}
-                    className="requirement-tag cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent-text)] transition-all duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+                    className="requirement-tag"
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
-                    <span className="mr-1 text-[var(--muted)]">#{index + 1}</span>
-                    {req.label}
+                    <span className="block cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent-text)] transition-[scale,background-color,box-shadow] duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]">
+                      <span className="mr-1 text-[var(--muted)]">#{index + 1}</span>
+                      {req.label}
+                    </span>
                   </span>
                 ))}
               </div>

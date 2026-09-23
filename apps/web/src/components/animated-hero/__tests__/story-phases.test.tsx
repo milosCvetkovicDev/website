@@ -7,6 +7,7 @@ import { ExecutionPhase } from '../execution-phase';
 import { GauntletPhase } from '../gauntlet-phase';
 import { LoopPhase } from '../loop-phase';
 import { GameComplete } from '../game-complete';
+import { gsapCssConflicts, tweenedElements } from './gsap-css-conflicts';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
 // it at import time, so the stub must exist before the imports above are evaluated.
@@ -118,6 +119,84 @@ describe.each(phases)('$name', ({ Phase }) => {
     unmount();
     expect(ScrollTrigger.getAll()).toHaveLength(0);
   }, 15_000);
+});
+
+/** Long enough for every timer-driven sequence to create its last reveal: Gauntlet's runs 6.6 s. */
+const WHOLE_SEQUENCE_MS = 10_000;
+
+// What each phase tweens that CSS used to fight, and must now leave alone: the discovery tags and the
+// strategy tech cards (a transition and a hover transform each), the loop alert and the closing CTA
+// (a transition each). Gauntlet's deploy panel never did, because its transition is on a child; it is
+// listed so the check is seen to pass an element that was always fine. Each must be among the elements
+// the check inspects, so it cannot pass by inspecting nothing.
+const tweenedTargets = [
+  {
+    name: 'DiscoveryPhase',
+    Phase: DiscoveryPhase,
+    targets: (root: HTMLElement) => [...root.querySelectorAll('.requirement-tag')],
+    count: 4,
+  },
+  {
+    name: 'StrategyPhase',
+    Phase: StrategyPhase,
+    targets: (root: HTMLElement) => [...root.querySelectorAll('.tech-item')],
+    count: 4,
+  },
+  { name: 'ExecutionPhase', Phase: ExecutionPhase, targets: () => [], count: 0 },
+  {
+    name: 'GauntletPhase',
+    Phase: GauntletPhase,
+    targets: () => [screen.getByText('DEPLOYMENT SUCCESSFUL').closest('.mt-6')],
+    count: 1,
+  },
+  {
+    name: 'LoopPhase',
+    Phase: LoopPhase,
+    targets: () => [screen.getByText(/^(ERROR DETECTED|RESOLVED)$/).closest('.border')],
+    count: 1,
+  },
+  {
+    name: 'GameComplete',
+    Phase: GameComplete,
+    targets: () => [screen.getByRole('link', { name: /connect on linkedin/i })],
+    count: 1,
+  },
+];
+
+describe.each(tweenedTargets)('$name against CSS', ({ Phase, targets, count }) => {
+  beforeEach(() => {
+    media.reduce = false;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    // Nothing plays by itself, so no tween completes and leaves GSAP's timeline before it is read.
+    gsap.ticker.remove(gsap.updateRoot);
+    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom does
+    // not implement.
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    cleanup();
+    gsap.ticker.add(gsap.updateRoot);
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    // Asserted last: a throw here must not skip the global restoration above it.
+    expect(media.listenerCount()).toBe(0);
+  });
+
+  it('leaves every property it tweens to GSAP: no CSS transition on it, no hover transform', async () => {
+    const { container } = render(<Phase />);
+    // Timeline-bound triggers measure on refresh; the timer-driven sequences then create their reveals.
+    act(() => ScrollTrigger.refresh());
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+
+    const tweened = tweenedElements(container);
+    expect(tweened.size).toBeGreaterThan(0);
+    const expected = targets(container);
+    expect(expected).toHaveLength(count);
+    for (const target of expected) expect(target && tweened.has(target)).toBe(true);
+
+    expect(await gsapCssConflicts(container)).toEqual([]);
+  });
 });
 
 describe('ExecutionPhase', () => {

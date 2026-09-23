@@ -172,10 +172,12 @@ export function LoopPhase() {
               </div>
             </div>
 
-            {/* Alert */}
+            {/* Alert. transition-colors, not transition-all: the red-to-green swap is the only
+                change CSS should ease here, and GSAP's pulse writes opacity and transform every
+                frame, which a transition on them re-eases until the pulse vanishes. */}
             <div
               ref={alertRef}
-              className={`rounded-lg border p-4 transition-all duration-500 ${
+              className={`rounded-lg border p-4 transition-colors duration-500 ${
                 shownAlertStatus === 'error'
                   ? 'border-[var(--status-err)]/50 bg-[var(--status-err)]/10'
                   : 'border-[var(--status-ok)]/50 bg-[var(--status-ok)]/10'
