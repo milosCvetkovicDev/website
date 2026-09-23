@@ -1,642 +1,61 @@
 /**
  * Guard for the colour rule ADR 0008 set and ADR 0011 carried over, which CLAUDE.md restates under
  * Conventions: text is not dimmed with an opacity modifier, "decorative or `aria-hidden` text
- * included, since axe measures it either way". The axe gate (`e2e/accessibility.spec.ts`) can only
- * enforce it on what a route renders, at the moment it samples. `CodeLine` painted its line numbers
- * `text-[var(--muted)]/50`, 2.74:1 on the Terminal, and nothing noticed because no route renders it
+ * included, since axe measures it either way". The axe gate (`e2e/accessibility.spec.ts`) enforces
+ * it only on what a route renders, at the moment it samples: `CodeLine`'s line numbers,
+ * `text-[var(--muted)]/50` at 2.74:1 on the Terminal, went unnoticed because no route renders it
  * (#110). This reads the source instead, so it sees every component whether a page uses it or not.
  *
- * It flags a class token in any module under `src/components`, outside `__tests__`, that dims:
+ * It reads every module under `src/components` outside `__tests__` and flags dimming declared in the
+ * markup, on an element whose subtree may render text:
  *
- * - an alpha modifier on a text colour: `text-[var(--muted)]/50`, `text-white/60`,
- *   `text-green-800/70`, a theme colour such as `text-muted/50`, or `text-(--muted)/50`;
- * - an `opacity-*` below 100, where `opacity-0` hides rather than dims and starts the reveal the rule
- *   allows;
- * - an animation whose keyframes hold its element part-transparent, such as `animate-pulse` (see
- *   OPACITY_ANIMATIONS);
+ * - an alpha on a text colour, as a modifier (`text-[var(--muted)]/50`, `text-white/60`,
+ *   `text-muted/50`) or inside the colour (`text-[rgba(99,102,241,0.7)]`, `text-[#e6edf399]`, a
+ *   `var()` whose value in globals.css carries one), and the same on the `fill` that paints SVG text;
+ * - an opacity strictly between 0 and 1: `opacity-60`, `[opacity:.5]`, SVG `opacity`;
+ * - an animation whose keyframes leave text part-transparent, judged from Tailwind's and globals.css's
+ *   own definitions, which is why `animate-pulse` counts and `animate-spin` and the reveals do not;
+ * - a `style` colour or opacity whose value the scan can resolve within the module.
  *
- * in any variant (`dark:`, `hover:`, `group-hover:`), when it lands on an element that may render
- * text: text or an expression anywhere under it, SVG `<text>` included, or a component whose output
- * the scan cannot see. The whole subtree counts because `opacity` composites everything under the
- * element, which is how `DataStream`'s `opacity-10` wrapper dims digits one element down. An element
- * with only shapes under it does not count, so a decorative SVG can keep a dimmed `currentColor`, as
- * the section progress corners do. A dimming token the scan cannot trace to an element is flagged as
- * well, since it cannot tell what that element renders.
+ * `opacity-0` and an alpha of 0 hide rather than dim, so the reveal idiom stays legal. "May render
+ * text" is structural: text or an expression anywhere under the element, SVG `<text>` included, or
+ * content the scan cannot see, such as an imported component's output. An opacity reaches the whole
+ * subtree, because it composites everything under the element, which is how `DataStream`'s
+ * `opacity-10` wrapper dims digits one element down. A colour stops where a descendant sets its own,
+ * and SVG text takes `fill` rather than `color`, so a decorative SVG can keep a dimmed
+ * `currentColor`, as the section progress corners do. A dimming class the scan cannot trace to an
+ * element is flagged as well.
  *
- * A class-string scan cannot see the rest, so it is out of scope: GSAP tweens (ADR 0008's separate
- * rule that a reveal starts from 0), inline `style` colours and opacities, and CSS outside the
- * `animate-*` utilities.
+ * Not charged to an element's text: a class aimed at a pseudo-element or a descendant (`after:`,
+ * `[&_svg]:`), one under `disabled:`, which WCAG 1.4.3 exempts and axe does not measure, and text
+ * that is never painted (`sr-only`, `hidden`, an SVG `<title>`). Out of reach, and so out of scope:
+ * colours set from script, GSAP tweens (ADR 0008's separate rule that a reveal starts from 0), a
+ * `style` value the scan cannot resolve, gradient text, and a dimming class aimed at `before:` or
+ * `after:` content.
  *
- * The violations present when the guard landed are expected failures in KNOWN_DEFECTS, and the change
- * that fixes one deletes its entry. Nothing here needs a DOM, and building a jsdom window costs about
- * two seconds per file.
+ * The violations present when the guard landed are expected failures in KNOWN_DEFECTS, and the
+ * change that fixes one deletes its entry. globals.css keeps this directory out of Tailwind's source
+ * detection, because the fixtures below spell out dozens of the utilities the rule forbids. Nothing
+ * here needs a DOM, and building a jsdom window costs about two seconds per file.
  *
  * @vitest-environment node
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
 import { beforeAll, describe, expect, it } from 'vitest';
+import {
+  animationDims,
+  animationUtilitiesIn,
+  appDir,
+  keyframesIn,
+  scanSource,
+  vocabulary,
+  type Scan,
+  type Site,
+  type Verdict,
+} from './dimmed-text';
 
-const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const COMPONENTS_DIR = 'src/components';
-const GLOBALS_CSS = 'src/app/globals.css';
-
-// --- Which class tokens dim ----------------------------------------------------------------------
-
-interface Vocabulary {
-  /** The colour names the theme adds to Tailwind's, from the `--color-*` declarations. */
-  themeColours: ReadonlySet<string>;
-  /** The `animate-*` utilities that hold what they animate part-transparent. */
-  dimmingAnimations: ReadonlySet<string>;
-}
-
-/**
- * Every animation utility whose keyframes set an opacity, and whether it dims what it animates.
- * Tailwind's own two come first. The rest are the `animate-*` classes in globals.css, and a test
- * below fails when globals.css gains an opacity animation this table does not classify, so a new one
- * gets a decision instead of a pass.
- */
-const OPACITY_ANIMATIONS: Record<
-  string,
-  { dims: boolean; source: 'tailwind' | 'globals.css'; why: string }
-> = {
-  pulse: { dims: true, source: 'tailwind', why: 'holds opacity 0.5 halfway through every cycle' },
-  ping: { dims: true, source: 'tailwind', why: 'fades to 0 as it scales up, on a loop' },
-  blink: { dims: false, source: 'globals.css', why: 'steps between 1 and 0, never in between' },
-  'fade-in': { dims: false, source: 'globals.css', why: 'a reveal from 0, held at 1' },
-  'scale-in': { dims: false, source: 'globals.css', why: 'a reveal from 0, held at 1' },
-  'slide-in-left': { dims: false, source: 'globals.css', why: 'a reveal from 0, held at 1' },
-  'slide-in-right': { dims: false, source: 'globals.css', why: 'a reveal from 0, held at 1' },
-};
-
-function readVocabulary(css: string): Vocabulary {
-  return {
-    themeColours: new Set([...css.matchAll(/--color-([a-z0-9-]+)\s*:/g)].map((match) => match[1])),
-    dimmingAnimations: new Set(
-      Object.entries(OPACITY_ANIMATIONS)
-        .filter(([, animation]) => animation.dims)
-        .map(([name]) => name),
-    ),
-  };
-}
-
-/** The `animate-*` utilities `css` defines whose keyframes set an opacity. */
-function opacityAnimationsIn(css: string): string[] {
-  const keyframes = new Map<string, string>();
-  for (const match of css.matchAll(/@keyframes\s+([\w-]+)\s*\{/g)) {
-    let depth = 1;
-    let end = match.index + match[0].length;
-    while (depth > 0 && end < css.length) {
-      if (css[end] === '{') depth++;
-      else if (css[end] === '}') depth--;
-      end++;
-    }
-    keyframes.set(match[1], css.slice(match.index, end));
-  }
-  const utilities: [string, string | undefined][] = [
-    ...[...css.matchAll(/\.animate-([\w-]+)\s*\{([^}]*)\}/g)].map(
-      (match): [string, string | undefined] => [
-        match[1],
-        /animation(?:-name)?\s*:\s*([\w-]+)/.exec(match[2])?.[1],
-      ],
-    ),
-    ...[...css.matchAll(/--animate-([\w-]+)\s*:\s*([\w-]+)/g)].map((match): [string, string] => [
-      match[1],
-      match[2],
-    ]),
-  ];
-  return utilities
-    .filter(([, name]) => name !== undefined && /\bopacity\s*:/.test(keyframes.get(name) ?? ''))
-    .map(([utility]) => utility);
-}
-
-const globalsCss = readFileSync(path.join(appDir, GLOBALS_CSS), 'utf8');
-const vocabulary = readVocabulary(globalsCss);
-
-/** The utility a token applies once its variants (`dark:`, `group-hover:`, `md:`) and `!` are gone. */
-function utilityOf(token: string): string {
-  let depth = 0;
-  let start = 0;
-  for (let index = 0; index < token.length; index++) {
-    const char = token[index];
-    if (char === '[' || char === '(') depth++;
-    else if (char === ']' || char === ')') depth--;
-    else if (char === ':' && depth === 0) start = index + 1;
-  }
-  return token.slice(start).replace(/^!|!$/g, '');
-}
-
-const SHADES = new Set('50 100 200 300 400 500 600 700 800 900 950'.split(' '));
-
-/** Arbitrary `text-[…]` values Tailwind v4 reads as a font size: a length, a math function, a keyword. */
-const FONT_SIZE = /^(-?[\d.]+[a-z%]*|(calc|clamp|min|max)\(.*)$/;
-const FONT_SIZE_KEYWORD = /^((x{1,3}-)?(small|medium|large)|smaller|larger)$/;
-
-/**
- * Whether `text-<value>` sets a colour rather than a font size, the other thing a slash can follow:
- * `text-sm/6` is a size with a line height. An arbitrary value is read the way Tailwind v4 reads it:
- * a length, a math function, a size keyword or a type hint such as `length:` makes a size, and
- * anything else, a bare `var()` included, is a colour.
- */
-function isTextColour(value: string, themeColours: ReadonlySet<string>): boolean {
-  const arbitrary = /^\[(.*)\]$/.exec(value);
-  if (arbitrary) {
-    const inner = arbitrary[1];
-    if (inner.startsWith('color:')) return true;
-    if (/^[a-z-]+:/.test(inner)) return false;
-    return !FONT_SIZE.test(inner) && !FONT_SIZE_KEYWORD.test(inner);
-  }
-  const variable = /^\((.*)\)$/.exec(value);
-  if (variable) return /^(color:)?--/.test(variable[1]);
-  if (['white', 'black', 'current'].includes(value) || themeColours.has(value)) return true;
-  const palette = /^[a-z]+-(\d+)$/.exec(value);
-  return palette !== null && SHADES.has(palette[1]);
-}
-
-/**
- * Whether an opacity or an alpha is strictly between none and all. Tailwind reads a bare number as a
- * percentage and an arbitrary one as a fraction. An amount this cannot read, such as a variable,
- * counts as partial.
- */
-function isPartial(amount: string): boolean {
-  const percent = /^(\d+(?:\.\d+)?)$/.exec(amount) ?? /^\[(\d*\.?\d+)%\]$/.exec(amount);
-  if (percent) return Number(percent[1]) > 0 && Number(percent[1]) < 100;
-  const fraction = /^\[(\d*\.?\d+)\]$/.exec(amount);
-  if (fraction) return Number(fraction[1]) > 0 && Number(fraction[1]) < 1;
-  return true;
-}
-
-/** Whether a class token dims what it lands on. */
-function dims(token: string): boolean {
-  const utility = utilityOf(token);
-  const alpha = /^text-(.+)\/([^/]+)$/.exec(utility);
-  if (alpha) return isTextColour(alpha[1], vocabulary.themeColours) && isPartial(alpha[2]);
-  const opacity = /^opacity-(.+)$/.exec(utility);
-  if (opacity) return isPartial(opacity[1]);
-  const animation = /^animate-(.+)$/.exec(utility);
-  return animation !== null && vocabulary.dimmingAnimations.has(animation[1]);
-}
-
-// --- Where a class lands -------------------------------------------------------------------------
-
-type JsxTag = ts.JsxElement | ts.JsxSelfClosingElement;
-
-type StringNode =
-  | ts.StringLiteral
-  | ts.NoSubstitutionTemplateLiteral
-  | ts.TemplateHead
-  | ts.TemplateMiddle
-  | ts.TemplateTail;
-
-/** A piece of source text that may hold class names, and the offset its text starts at. */
-interface Chunk {
-  node: ts.Node;
-  text: string;
-  start: number;
-}
-
-function isStringNode(node: ts.Node): node is StringNode {
-  return (
-    ts.isStringLiteral(node) ||
-    ts.isNoSubstitutionTemplateLiteral(node) ||
-    ts.isTemplateHead(node) ||
-    ts.isTemplateMiddle(node) ||
-    ts.isTemplateTail(node)
-  );
-}
-
-/** Every string-like node opens with one delimiter: a quote, a backtick or a substitution's `}`. */
-function chunkOf(node: StringNode | ts.Identifier): Chunk {
-  return { node, text: node.text, start: node.getStart() + (ts.isIdentifier(node) ? 0 : 1) };
-}
-
-function isClassAttribute(attribute: ts.JsxAttribute): boolean {
-  return /^(class|className)$|ClassName$/.test(attribute.name.getText());
-}
-
-function unwrap(node: ts.Expression): ts.Expression {
-  let current = node;
-  while (
-    ts.isParenthesizedExpression(current) ||
-    ts.isAsExpression(current) ||
-    ts.isNonNullExpression(current) ||
-    ts.isSatisfiesExpression(current) ||
-    ts.isTypeAssertionExpression(current)
-  ) {
-    current = current.expression;
-  }
-  return current;
-}
-
-/** What a function returns: its expression body, or every `return` outside nested functions. */
-function returnedExpressions(fn: ts.FunctionLikeDeclaration): ts.Expression[] {
-  const body = fn.body;
-  if (!body) return [];
-  if (!ts.isBlock(body)) return [body];
-  const found: ts.Expression[] = [];
-  const visit = (node: ts.Node): void => {
-    if (ts.isReturnStatement(node)) {
-      if (node.expression) found.push(node.expression);
-    } else if (!ts.isFunctionLike(node)) {
-      ts.forEachChild(node, visit);
-    }
-  };
-  ts.forEachChild(body, visit);
-  return found;
-}
-
-function bindingNamed(
-  node: ts.ParameterDeclaration | ts.BindingElement,
-  text: string,
-): ts.ParameterDeclaration | ts.BindingElement | undefined {
-  if (ts.isIdentifier(node.name)) return node.name.text === text ? node : undefined;
-  for (const element of node.name.elements) {
-    if (ts.isOmittedExpression(element)) continue;
-    const found = bindingNamed(element, text);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-/**
- * The initializer or function a name refers to, found by walking out through the scopes around it.
- * A parameter without a default resolves to nothing, which is what a prop is: a class the scan
- * cannot see from here.
- */
-function declarationOf(name: ts.Identifier): ts.Node | undefined {
-  for (let scope: ts.Node | undefined = name.parent; scope; scope = scope.parent) {
-    if (
-      ts.isSourceFile(scope) ||
-      ts.isBlock(scope) ||
-      ts.isModuleBlock(scope) ||
-      ts.isCaseClause(scope) ||
-      ts.isDefaultClause(scope)
-    ) {
-      for (const statement of scope.statements) {
-        if (ts.isFunctionDeclaration(statement) && statement.name?.text === name.text) {
-          return statement;
-        }
-        if (!ts.isVariableStatement(statement)) continue;
-        for (const declaration of statement.declarationList.declarations) {
-          if (ts.isIdentifier(declaration.name) && declaration.name.text === name.text) {
-            return declaration.initializer;
-          }
-        }
-      }
-    }
-    if (ts.isFunctionLike(scope)) {
-      for (const parameter of scope.parameters) {
-        const binding = bindingNamed(parameter, name.text);
-        if (binding) return binding.initializer;
-      }
-    }
-  }
-  return undefined;
-}
-
-function propertyChunks(property: ts.ObjectLiteralElementLike, seen: Set<ts.Node>): Chunk[] {
-  if (ts.isPropertyAssignment(property)) {
-    // clsx and friends read a key as a class name, so keys are read as well as values.
-    const key =
-      ts.isStringLiteral(property.name) || ts.isIdentifier(property.name)
-        ? [chunkOf(property.name)]
-        : [];
-    return [...key, ...classChunks(property.initializer, seen)];
-  }
-  if (ts.isShorthandPropertyAssignment(property)) {
-    return [chunkOf(property.name), ...classChunks(property.name, seen)];
-  }
-  if (ts.isSpreadAssignment(property)) return classChunks(property.expression, seen);
-  return [];
-}
-
-/**
- * The strings a class attribute's value can be built from: its literals, both branches of every
- * condition, the pieces of a template, clsx arguments and keys, and, through the names they use, the
- * constants, maps and helper functions of the same module.
- */
-function classChunks(node: ts.Node | undefined, seen = new Set<ts.Node>()): Chunk[] {
-  if (!node || seen.has(node)) return [];
-  seen.add(node);
-  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return [chunkOf(node)];
-  if (ts.isJsxExpression(node)) return classChunks(node.expression, seen);
-  if (ts.isTemplateExpression(node)) {
-    return [
-      chunkOf(node.head),
-      ...node.templateSpans.flatMap((span) => [
-        ...classChunks(span.expression, seen),
-        chunkOf(span.literal),
-      ]),
-    ];
-  }
-  if (
-    ts.isParenthesizedExpression(node) ||
-    ts.isAsExpression(node) ||
-    ts.isNonNullExpression(node) ||
-    ts.isSatisfiesExpression(node) ||
-    ts.isTypeAssertionExpression(node) ||
-    ts.isSpreadElement(node) ||
-    ts.isPropertyAccessExpression(node) ||
-    ts.isElementAccessExpression(node)
-  ) {
-    return classChunks(node.expression, seen);
-  }
-  if (ts.isConditionalExpression(node)) {
-    return [...classChunks(node.whenTrue, seen), ...classChunks(node.whenFalse, seen)];
-  }
-  if (ts.isBinaryExpression(node)) {
-    return [...classChunks(node.left, seen), ...classChunks(node.right, seen)];
-  }
-  if (ts.isArrayLiteralExpression(node)) {
-    return node.elements.flatMap((element) => classChunks(element, seen));
-  }
-  if (ts.isObjectLiteralExpression(node)) {
-    return node.properties.flatMap((property) => propertyChunks(property, seen));
-  }
-  if (ts.isCallExpression(node)) {
-    // The callee too: `[…].join(' ')` reaches the array, a local helper reaches what it returns.
-    return [
-      ...classChunks(node.expression, seen),
-      ...node.arguments.flatMap((argument) => classChunks(argument, seen)),
-    ];
-  }
-  if (ts.isIdentifier(node)) return classChunks(declarationOf(node), seen);
-  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node)) {
-    return returnedExpressions(node).flatMap((expression) => classChunks(expression, seen));
-  }
-  return [];
-}
-
-/** Whether a string is the value of an attribute that never becomes a class, such as `d` or `href`. */
-function isOtherAttributeValue(node: ts.Node): boolean {
-  for (let current = node.parent; current; current = current.parent) {
-    if (ts.isJsxAttribute(current)) return !isClassAttribute(current);
-    if (
-      ts.isFunctionLike(current) ||
-      ts.isJsxElement(current) ||
-      ts.isJsxSelfClosingElement(current)
-    ) {
-      return false;
-    }
-  }
-  return false;
-}
-
-// --- Whether an element renders text ------------------------------------------------------------
-
-/** Tags that render a value or a placeholder as text without a text child. */
-const TEXT_CONTROLS = new Set(['input', 'textarea', 'select']);
-
-function clip(text: string): string {
-  const flat = text.replace(/\s+/g, ' ').trim();
-  return flat.length > 40 ? `${flat.slice(0, 39)}…` : flat;
-}
-
-/**
- * What makes `element` count as rendering text, or null when nothing under it can. An expression
- * counts unless it is a literal, JSX this can read, a condition over those or a `.map` whose callback
- * returns them; a component counts because its output is out of sight here. The first pass skips
- * components, so that the message names the text itself when there is any.
- */
-function textEvidence(element: JsxTag): string | null {
-  return tagEvidence(element, false) ?? tagEvidence(element, true);
-}
-
-function tagEvidence(element: JsxTag, components: boolean): string | null {
-  const opening = ts.isJsxElement(element) ? element.openingElement : element;
-  const tag = opening.tagName.getText();
-  if (!/^[a-z][\w-]*$/.test(tag) && components) {
-    return `<${tag}>, whose output this scan cannot see`;
-  }
-  if (TEXT_CONTROLS.has(tag)) return `a <${tag}>, which renders its value as text`;
-  const innerHtml = opening.attributes.properties.some(
-    (attribute) =>
-      ts.isJsxAttribute(attribute) && attribute.name.getText() === 'dangerouslySetInnerHTML',
-  );
-  if (innerHtml) return 'dangerouslySetInnerHTML';
-  return ts.isJsxElement(element) ? childrenEvidence(element.children, components) : null;
-}
-
-function childrenEvidence(children: readonly ts.JsxChild[], components: boolean): string | null {
-  for (const child of children) {
-    const evidence = childEvidence(child, components);
-    if (evidence) return evidence;
-  }
-  return null;
-}
-
-function childEvidence(child: ts.JsxChild, components: boolean): string | null {
-  if (ts.isJsxText(child)) {
-    return child.containsOnlyTriviaWhiteSpaces ? null : `the text "${clip(child.text)}"`;
-  }
-  if (ts.isJsxExpression(child)) {
-    return child.expression ? expressionEvidence(child.expression, components) : null;
-  }
-  if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)) {
-    return tagEvidence(child, components);
-  }
-  if (ts.isJsxFragment(child)) return childrenEvidence(child.children, components);
-  return null;
-}
-
-/** What a `list.map(…)` or `list.flatMap(…)` callback returns, or undefined for anything else. */
-function mappedResults(expression: ts.Expression): ts.Expression[] | undefined {
-  if (!ts.isCallExpression(expression) || !ts.isPropertyAccessExpression(expression.expression)) {
-    return undefined;
-  }
-  if (!['map', 'flatMap'].includes(expression.expression.name.text)) return undefined;
-  const callback = expression.arguments.find(
-    (argument) => ts.isArrowFunction(argument) || ts.isFunctionExpression(argument),
-  );
-  return callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))
-    ? returnedExpressions(callback)
-    : undefined;
-}
-
-function expressionEvidence(node: ts.Expression, components: boolean): string | null {
-  const expression = unwrap(node);
-  if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) {
-    return expression.text.trim() ? `the string "${clip(expression.text)}"` : null;
-  }
-  if (
-    expression.kind === ts.SyntaxKind.NullKeyword ||
-    expression.kind === ts.SyntaxKind.TrueKeyword ||
-    expression.kind === ts.SyntaxKind.FalseKeyword ||
-    (ts.isIdentifier(expression) && expression.text === 'undefined')
-  ) {
-    return null;
-  }
-  if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) {
-    return tagEvidence(expression, components);
-  }
-  if (ts.isJsxFragment(expression)) return childrenEvidence(expression.children, components);
-  if (ts.isConditionalExpression(expression)) {
-    return (
-      expressionEvidence(expression.whenTrue, components) ??
-      expressionEvidence(expression.whenFalse, components)
-    );
-  }
-  if (ts.isBinaryExpression(expression)) {
-    const operator = expression.operatorToken.kind;
-    // `a && <X />` renders <X /> or nothing: the left side is the condition.
-    if (operator === ts.SyntaxKind.AmpersandAmpersandToken) {
-      return expressionEvidence(expression.right, components);
-    }
-    if (
-      operator === ts.SyntaxKind.BarBarToken ||
-      operator === ts.SyntaxKind.QuestionQuestionToken
-    ) {
-      return (
-        expressionEvidence(expression.left, components) ??
-        expressionEvidence(expression.right, components)
-      );
-    }
-  }
-  const mapped = mappedResults(expression);
-  if (mapped) {
-    for (const result of mapped) {
-      const evidence = expressionEvidence(result, components);
-      if (evidence) return evidence;
-    }
-    return null;
-  }
-  return `{${clip(expression.getText())}}`;
-}
-
-/** The component a node sits in: the nearest capitalised function or constant around it. */
-function componentOf(node: ts.Node): string {
-  let fallback: string | undefined;
-  for (let current: ts.Node | undefined = node; current; current = current.parent) {
-    let name: string | undefined;
-    if (
-      (ts.isFunctionDeclaration(current) ||
-        ts.isFunctionExpression(current) ||
-        ts.isClassDeclaration(current)) &&
-      current.name
-    ) {
-      name = current.name.text;
-    } else if (ts.isVariableDeclaration(current) && ts.isIdentifier(current.name)) {
-      name = current.name.text;
-    }
-    if (name && /^[A-Z]/.test(name)) return name;
-    fallback ??= name;
-  }
-  return fallback ?? '(module)';
-}
-
-// --- The scan ------------------------------------------------------------------------------------
-
-type Verdict = 'text' | 'no-text' | 'unattributed';
-
-interface Site {
-  file: string;
-  line: number;
-  component: string;
-  /** The tag the class lands on, or '' when the scan could not trace it to one. */
-  element: string;
-  token: string;
-  verdict: Verdict;
-  /** What under the element counts as text, for the failure message. */
-  evidence: string;
-}
-
-interface Scan {
-  /** Every class token the scan traced to an element, dimming or not. */
-  tokens: string[];
-  /** Every dimming token, with whether the element it lands on renders text. */
-  sites: Site[];
-}
-
-/**
- * A parse error leaves a truncated tree behind rather than an exception, and a truncated tree has
- * fewer classes in it, so a module that does not parse must fail loudly rather than scan clean.
- */
-function assertParses(source: string, file: string): void {
-  const { diagnostics = [] } = ts.transpileModule(source, {
-    fileName: file,
-    reportDiagnostics: true,
-    compilerOptions: { jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext },
-  });
-  if (diagnostics.length > 0) {
-    const reasons = diagnostics
-      .map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, ' '))
-      .join('; ');
-    throw new Error(`${file} did not parse, so this scan cannot see it: ${reasons}`);
-  }
-}
-
-function scanSource(source: string, file: string): Scan {
-  assertParses(source, file);
-  const sourceFile = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
-  const tokens: string[] = [];
-  const sites: Site[] = [];
-  const traced = new Set<ts.Node>();
-  const evidenceOf = new Map<JsxTag, string | null>();
-  const lineOf = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
-  const tokensIn = (chunk: Chunk) =>
-    [...chunk.text.matchAll(/\S+/g)].map((match) => ({
-      token: match[0],
-      at: chunk.start + match.index,
-    }));
-
-  const visitElements = (node: ts.Node): void => {
-    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
-      const opening = ts.isJsxElement(node) ? node.openingElement : node;
-      for (const attribute of opening.attributes.properties) {
-        if (!ts.isJsxAttribute(attribute) || !isClassAttribute(attribute)) continue;
-        for (const chunk of classChunks(attribute.initializer)) {
-          traced.add(chunk.node);
-          for (const { token, at } of tokensIn(chunk)) {
-            tokens.push(token);
-            if (!dims(token)) continue;
-            if (!evidenceOf.has(node)) evidenceOf.set(node, textEvidence(node));
-            const evidence = evidenceOf.get(node) ?? null;
-            sites.push({
-              file,
-              line: lineOf(at),
-              component: componentOf(node),
-              element: opening.tagName.getText(),
-              token,
-              verdict: evidence ? 'text' : 'no-text',
-              evidence: evidence ?? '',
-            });
-          }
-        }
-      }
-    }
-    ts.forEachChild(node, visitElements);
-  };
-  visitElements(sourceFile);
-
-  const visitStrings = (node: ts.Node): void => {
-    if (isStringNode(node) && !traced.has(node) && !isOtherAttributeValue(node)) {
-      for (const { token, at } of tokensIn(chunkOf(node))) {
-        if (!dims(token)) continue;
-        sites.push({
-          file,
-          line: lineOf(at),
-          component: componentOf(node),
-          element: '',
-          token,
-          verdict: 'unattributed',
-          evidence: '',
-        });
-      }
-    }
-    ts.forEachChild(node, visitStrings);
-  };
-  visitStrings(sourceFile);
-
-  return { tokens, sites };
-}
 
 // --- The fixtures --------------------------------------------------------------------------------
 
@@ -644,14 +63,18 @@ function scan(source: string, file = 'src/components/fixture.tsx'): Scan {
   return scanSource(source, file);
 }
 
-/** The dimming tokens the scan reports, with why: over text, or not traced to an element. */
+/** The dimmings the scan reports, with why: over text, or not traced to an element. */
 const flagged = (result: Scan) =>
   result.sites
     .filter((site) => site.verdict !== 'no-text')
     .map((site) => [site.token, site.verdict]);
 
+/** A fixture's expected report: a bare token is a dimming over text. */
+const report = (expected: (string | [string, Verdict])[]) =>
+  expected.map((entry) => (typeof entry === 'string' ? [entry, 'text'] : entry));
+
 describe('what the scan flags', () => {
-  it.each<[string, string, string[]]>([
+  it.each<[string, string, (string | [string, Verdict])[]]>([
     [
       "CodeLine's gutter as it was before #110",
       `export function CodeLine({ lineNumber }: { lineNumber?: number }) {
@@ -696,6 +119,46 @@ describe('what the scan flags', () => {
       ],
     ],
     [
+      'an alpha inside the colour, as the hero skill tags have',
+      `export function SkillTags({ tags }: { tags: string[] }) {
+        return (
+          <ul>
+            {tags.map((tag) => (
+              <li
+                key={tag}
+                className="text-[rgba(99,102,241,0.7)] hover:text-[#a78bfa] dark:text-[rgba(167,139,250,0.6)]"
+              >
+                {tag}
+              </li>
+            ))}
+          </ul>
+        );
+      }`,
+      ['text-[rgba(99,102,241,0.7)]', 'dark:text-[rgba(167,139,250,0.6)]'],
+    ],
+    [
+      'an alpha in every colour notation, and in the token a colour names',
+      `export const Labels = () => (
+        <p>
+          <span className="text-[#e6edf399] text-[#abc8] text-[rgb(230_237_243/0.6)]">a</span>
+          <span className="text-[hsl(0_0%_90%/60%)] text-[color-mix(in_oklab,var(--muted)_60%,transparent)]">b</span>
+          <span className="text-[var(--log-dbg)] text-(--log-inf) [color:rgba(0,0,0,.5)]">c</span>
+          <input className="placeholder-white/50" placeholder="Search" />
+        </p>
+      );`,
+      [
+        'text-[#e6edf399]',
+        'text-[#abc8]',
+        'text-[rgb(230_237_243/0.6)]',
+        'text-[hsl(0_0%_90%/60%)]',
+        'text-[color-mix(in_oklab,var(--muted)_60%,transparent)]',
+        'text-[var(--log-dbg)]',
+        'text-(--log-inf)',
+        '[color:rgba(0,0,0,.5)]',
+        'placeholder-white/50',
+      ],
+    ],
+    [
       'variants and the important marker',
       `export const Label = () => (
         <span className="dark:text-white/50 hover:text-[var(--muted)]/60 md:opacity-60 group-hover:opacity-50 !opacity-40 opacity-30!">
@@ -714,9 +177,16 @@ describe('what the scan flags', () => {
     [
       'an opacity below 100 in every spelling Tailwind v4 reads',
       `export const Label = () => (
-        <span className="opacity-60 opacity-2.5 opacity-[.5] opacity-[50%] opacity-(--dim)">x</span>
+        <span className="opacity-60 opacity-2.5 opacity-[.5] opacity-[50%] opacity-(--dim) [opacity:.5]">x</span>
       );`,
-      ['opacity-60', 'opacity-2.5', 'opacity-[.5]', 'opacity-[50%]', 'opacity-(--dim)'],
+      [
+        'opacity-60',
+        'opacity-2.5',
+        'opacity-[.5]',
+        'opacity-[50%]',
+        'opacity-(--dim)',
+        '[opacity:.5]',
+      ],
     ],
     [
       'a reveal that stops short of full opacity',
@@ -758,6 +228,58 @@ describe('what the scan flags', () => {
       ['opacity-40', 'dark:opacity-60'],
     ],
     [
+      'SVG text painted with a translucent fill, or under an SVG opacity',
+      `const LABEL_FILL = { ic: 'rgba(139, 92, 246, 0.35)' } as const;
+      const QUIET = 0.6;
+      export function Labels({ tier, dimmed }: { tier: 'ic'; dimmed: boolean }) {
+        const fill = LABEL_FILL[tier];
+        return (
+          <svg viewBox="0 0 10 10">
+            <text className="fill-[var(--muted)]/50">Queue</text>
+            <g className="fill-white/40">
+              <text>API</text>
+            </g>
+            <text fill={fill}>DB</text>
+            <g opacity={dimmed ? 0.3 : 1}>
+              <text>Cache</text>
+            </g>
+            <text fillOpacity={0.5}>Log</text>
+            <text opacity={QUIET}>Queue</text>
+          </svg>
+        );
+      }`,
+      [
+        'fill-[var(--muted)]/50',
+        'fill-white/40',
+        'fill={fill}',
+        'opacity={dimmed ? 0.3 : 1}',
+        'fillOpacity={0.5}',
+        'opacity={QUIET}',
+      ],
+    ],
+    [
+      'a style colour or opacity the scan can resolve',
+      `const LOG_COLORS = { err: 'var(--log-err)', ok: 'var(--log-ok)' } as const;
+      export function Log({ lines }: { lines: { level: 'err' | 'ok'; text: string }[] }) {
+        return (
+          <div>
+            <span style={{ fontSize: '9px', color: 'rgba(139, 92, 246, 0.7)' }}>Scroll</span>
+            {lines.map((line) => (
+              <div key={line.text} style={{ color: LOG_COLORS[line.level] }}>
+                {line.text}
+              </div>
+            ))}
+            <p style={{ opacity: 0.6 }}>Muted</p>
+          </div>
+        );
+      }`,
+      [
+        "style.color: 'rgba(139, 92, 246, 0.7)'",
+        'style.color: LOG_COLORS[line.level]',
+        'style.opacity: 0.6',
+      ],
+    ],
+    [
       'a pulse on text, as StatDisplay has when highlighted',
       `export function Stat({ value, highlight }: { value: string; highlight?: boolean }) {
         return (
@@ -773,14 +295,30 @@ describe('what the scan flags', () => {
       ['animate-pulse'],
     ],
     [
-      'a ping on text',
-      `export const Badge = () => <span className="animate-ping">New</span>;`,
-      ['animate-ping'],
+      "a ping, and animations written as a value, whatever the shorthand's order",
+      `export const Badges = () => (
+        <p>
+          <span className="animate-ping">New</span>
+          <span className="animate-[pulse_3s_ease-in-out_infinite]">a</span>
+          <span className="animate-[3s_infinite_pulse]">b</span>
+          <span className="[animation:pulse_2s_infinite]">c</span>
+          <span className="animate-(--undeclared)">d</span>
+        </p>
+      );`,
+      [
+        'animate-ping',
+        'animate-[pulse_3s_ease-in-out_infinite]',
+        'animate-[3s_infinite_pulse]',
+        '[animation:pulse_2s_infinite]',
+        'animate-(--undeclared)',
+      ],
     ],
     [
-      'a class that reaches the element through a map, a helper or clsx',
+      'a class that reaches the element through a map, a helper, clsx or a destructured name',
       `import { cn } from '@/lib/utils';
       const tones = { dim: 'text-white/50', loud: 'text-white' };
+      const PARTS = { label: 'opacity-40' };
+      const { label: labelClass } = PARTS;
       function mutedIf(muted: boolean) {
         return muted ? 'opacity-60' : '';
       }
@@ -789,11 +327,13 @@ describe('what the scan flags', () => {
           <p>
             <span className={tones[tone]}>{label}</span>
             <span className={mutedIf(muted)}>{label}</span>
-            <span className={cn('font-mono', { 'opacity-70': muted })}>{label}</span>
+            <span className={cn('font-mono', { 'opacity-70': muted, ['opacity-20']: !muted })}>{label}</span>
+            <span className={labelClass}>{label}</span>
+            <span className={tw\`opacity-80 font-mono\`}>{label}</span>
           </p>
         );
       }`,
-      ['text-white/50', 'opacity-60', 'opacity-70'],
+      ['text-white/50', 'opacity-60', 'opacity-70', 'opacity-20', 'opacity-40', 'opacity-80'],
     ],
     [
       'an element whose content the scan cannot see, and a text input',
@@ -806,17 +346,83 @@ describe('what the scan flags', () => {
             </div>
             <Badge className="opacity-70" />
             <input className="placeholder:text-white/40" placeholder="Search" />
+            <my-badge className="opacity-30" />
           </div>
         );
       }`,
-      ['opacity-50', 'opacity-60', 'opacity-70', 'placeholder:text-white/40'],
+      ['opacity-50', 'opacity-60', 'opacity-70', 'placeholder:text-white/40', 'opacity-30'],
     ],
-  ])('%s', (_name, source, tokens) => {
-    expect(flagged(scan(source))).toEqual(tokens.map((token) => [token, 'text']));
+    [
+      'children that arrive through a spread or a children prop',
+      `import { cn } from '@/lib/utils';
+      export function Caption({ className, ...props }: React.ComponentProps<'p'>) {
+        return <p className={cn('text-sm text-[var(--muted)]/70', className)} {...props} />;
+      }
+      export const Note = ({ label }: { label: string }) => <span className="opacity-60" children={label} />;`,
+      ['text-[var(--muted)]/70', 'opacity-60'],
+    ],
+    [
+      'class props under other names, classes spread from an object, and a class in any prop',
+      `const itemProps = { className: 'opacity-40' };
+      export function Legend({ items }: { items: string[] }) {
+        return (
+          <div>
+            <Panel title="Uptime" titleClass="text-[var(--muted)]/60" />
+            <Tabs classNames={{ label: 'opacity-60' }} />
+            <Tag tone="opacity-30" label="beta" />
+            <ul>
+              {items.map((item) => (
+                <li key={item} {...itemProps}>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      }`,
+      ['text-[var(--muted)]/60', 'opacity-60', 'opacity-40', ['opacity-30', 'unattributed']],
+    ],
+    [
+      'text without a JSX child: generated content and an option group',
+      `export const Prompt = () => (
+        <p>
+          <span aria-hidden="true" className="text-[var(--muted)]/50 before:content-['$']" />
+          <select>
+            <optgroup label="Recent" className="opacity-60" />
+          </select>
+        </p>
+      );`,
+      ['text-[var(--muted)]/50', 'opacity-60'],
+    ],
+    [
+      'a local component that renders text, and a count that renders 0',
+      `function Label({ text }: { text: string }) {
+        return <span>{text}</span>;
+      }
+      export const Row = ({ items }: { items: string[] }) => (
+        <p>
+          <span className="opacity-50">
+            <Label text="Uptime" />
+          </span>
+          <span className="opacity-40">
+            {items.length && (
+              <svg>
+                <path d="M0 0" />
+              </svg>
+            )}
+          </span>
+        </p>
+      );`,
+      ['opacity-50', 'opacity-40'],
+    ],
+  ])('%s', (_name, source, expected) => {
+    expect(flagged(scan(source))).toEqual(report(expected));
   });
 
-  it('a dimming class in a string it cannot trace to an element', () => {
-    const source = `export const dimmedLabel = 'font-mono text-white/50';`;
+  it('a dimming class in a string it cannot trace to an element, and not in a type or prose', () => {
+    const source = `type Dim = 'opacity-40' | 'opacity-100';
+      export const dimmedLabel = 'font-mono text-white/50';
+      export const NOTE = 'Fades from opacity-0 to opacity-100.';`;
     expect(flagged(scan(source, 'src/components/styles.ts'))).toEqual([
       ['text-white/50', 'unattributed'],
     ]);
@@ -867,42 +473,94 @@ describe('what the scan leaves alone', () => {
       ['opacity-50', 'opacity-10', 'absolute', 'text-lg'],
     ],
     [
-      'shapes an SVG draws from a list',
-      `const PATHS = ['M0 0 L1 1', 'M1 1 L2 2'];
-      export const Circuit = () => (
-        <svg className="text-[var(--accent)]/40 opacity-60" viewBox="0 0 2 2">
-          {PATHS.map((d) => (
-            <path key={d} d={d} stroke="currentColor" />
-          ))}
+      'shapes drawn by a list, a local component, a named callback, Array.from, a Fragment or a constant',
+      `import { Fragment } from 'react';
+      const PATHS = ['M0 0 L1 1', 'M1 1 L2 2'];
+      const icon = (
+        <svg>
+          <path d="M0 0" />
         </svg>
+      );
+      function Edge({ d }: { d: string }) {
+        return <path d={d} stroke="currentColor" />;
+      }
+      const renderDot = (i: number) => <circle key={i} r={2} />;
+      export const Graph = ({ edge }: { edge: React.SVGProps<SVGPathElement> }) => (
+        <p>
+          <svg className="text-[var(--accent)]/40 opacity-60" viewBox="0 0 2 2">
+            <path {...edge} />
+            {PATHS.map((d) => (
+              <path key={d} d={d} stroke="currentColor" />
+            ))}
+            {PATHS.map((d) => (
+              <Edge key={d} d={d} />
+            ))}
+            {[1, 2].map(renderDot)}
+            {Array.from({ length: 3 }, (_, i) => (
+              <line key={i} />
+            ))}
+            {PATHS.map((d) => (
+              <Fragment key={d}>
+                <path d={d} />
+              </Fragment>
+            ))}
+          </svg>
+          <span className="opacity-30">{icon}</span>
+        </p>
       );`,
-      ['text-[var(--accent)]/40', 'opacity-60'],
+      ['text-[var(--accent)]/40', 'opacity-60', 'opacity-30'],
     ],
     [
       'hidden and full opacity, which do not dim',
       `export const Reveal = ({ shown }: { shown: boolean }) => (
         <span
-          className={\`transition-opacity \${shown ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 opacity-[1] text-white/100\`}
+          className={\`transition-opacity \${shown ? 'opacity-100' : 'opacity-0'} group-hover:opacity-100 opacity-[1] opacity-[1e0] [opacity:0] text-white/100 text-white/0\`}
         >
           x
         </span>
       );`,
-      ['opacity-100', 'opacity-0', 'group-hover:opacity-100', 'opacity-[1]', 'text-white/100'],
+      [
+        'opacity-100',
+        'opacity-0',
+        'group-hover:opacity-100',
+        'opacity-[1]',
+        'opacity-[1e0]',
+        '[opacity:0]',
+        'text-white/100',
+        'text-white/0',
+      ],
     ],
     [
       'tints, borders, decoration and shadows with an alpha, none of which is the text colour',
       `export const Pill = () => (
-        <span className="border border-[var(--status-ok)]/50 bg-[var(--accent)]/10 decoration-[var(--status-ok)]/50 hover:bg-[var(--accent)]/5 shadow-black/20 text-shadow-lg/50">
+        <span className="border border-[var(--status-ok)]/50 border-[rgba(99,102,241,0.2)] bg-[var(--accent)]/10 decoration-[var(--status-ok)]/50 hover:bg-[var(--accent)]/5 shadow-black/20 shadow-[0_0_30px_rgba(139,92,246,0.1)] text-shadow-lg/50">
           ok
         </span>
       );`,
       [
         'border-[var(--status-ok)]/50',
+        'border-[rgba(99,102,241,0.2)]',
         'bg-[var(--accent)]/10',
         'decoration-[var(--status-ok)]/50',
         'hover:bg-[var(--accent)]/5',
         'shadow-black/20',
+        'shadow-[0_0_30px_rgba(139,92,246,0.1)]',
         'text-shadow-lg/50',
+      ],
+    ],
+    [
+      'solid colours in any notation',
+      `export const Tag = () => (
+        <span className="text-[#6b7280] hover:text-[#a78bfa] text-[rgb(99_102_241)] text-[rgba(99,102,241,1)] text-[#abcf] text-[var(--accent-text)] text-[var(--status-ok)]">
+          tag
+        </span>
+      );`,
+      [
+        'text-[#6b7280]',
+        'text-[rgb(99_102_241)]',
+        'text-[rgba(99,102,241,1)]',
+        'text-[#abcf]',
+        'text-[var(--accent-text)]',
       ],
     ],
     [
@@ -922,22 +580,122 @@ describe('what the scan leaves alone', () => {
       ],
     ],
     [
+      'a colour or a fill that stops where a descendant paints its own',
+      `export const Gauge = () => (
+        <p className="text-white/60">
+          <span className="text-[var(--foreground)]">Bold</span>
+          <svg className="text-[var(--accent)]/30" viewBox="0 0 10 10">
+            <path d="M0 0" stroke="currentColor" />
+            <text fill="var(--foreground)">42%</text>
+          </svg>
+          <svg className="fill-white/40">
+            <text className="fill-[var(--foreground)]">Solid</text>
+          </svg>
+        </p>
+      );`,
+      ['text-white/60', 'text-[var(--accent)]/30', 'fill-white/40'],
+    ],
+    [
+      'a fill on shapes, and on an HTML element whose text does not take it',
+      `export const Icons = () => (
+        <p>
+          <svg>
+            <rect className="fill-[var(--accent)]/10" />
+          </svg>
+          <button className="fill-white/50">
+            <SendIcon />
+            Send
+            <svg>
+              <path d="M0 0" />
+            </svg>
+          </button>
+        </p>
+      );`,
+      ['fill-[var(--accent)]/10', 'fill-white/50'],
+    ],
+    [
+      'classes aimed at a pseudo-element or a descendant, and a disabled control',
+      `export const Link = ({ pending }: { pending: boolean }) => (
+        <p>
+          <a className="inline-flex [&_svg]:opacity-60 after:opacity-50 *:opacity-40" href="/work">
+            Case study
+            <svg>
+              <path d="M0 0" />
+            </svg>
+          </a>
+          <button disabled={pending} className="disabled:opacity-50 aria-disabled:text-white/50">
+            Send
+          </button>
+        </p>
+      );`,
+      [
+        '[&_svg]:opacity-60',
+        'after:opacity-50',
+        '*:opacity-40',
+        'disabled:opacity-50',
+        'aria-disabled:text-white/50',
+      ],
+    ],
+    [
+      'text that is never painted: an SVG title, screen-reader text, a hidden element, a checkbox',
+      `export const Quiet = () => (
+        <p>
+          <svg className="text-[var(--accent)]/30" role="img">
+            <title>Section 2 of 5</title>
+            <path d="M0 0" />
+          </svg>
+          <span className="opacity-50">
+            <span className="sr-only">Loading</span>
+            <span hidden>later</span>
+          </span>
+          <input type="checkbox" className="opacity-60" />
+        </p>
+      );`,
+      ['text-[var(--accent)]/30', 'opacity-50', 'opacity-60'],
+    ],
+    [
+      'one entry of a map of classes, and a destructured one',
+      `const PARTS = { icon: 'opacity-60', label: 'font-mono text-sm' };
+      const { icon, label: labelClass } = PARTS;
+      export const Row = ({ label }: { label: string }) => (
+        <span className="flex gap-2">
+          <svg className={PARTS.icon} viewBox="0 0 4 4">
+            <circle cx="2" cy="2" r="2" />
+          </svg>
+          <span className={PARTS.label}>{label}</span>
+          <svg className={icon} viewBox="0 0 4 4">
+            <circle cx="2" cy="2" r="2" />
+          </svg>
+          <span className={labelClass}>{label}</span>
+        </span>
+      );`,
+      ['opacity-60', 'font-mono', 'text-sm'],
+    ],
+    [
       'animations that do not hold text part-transparent, and a pulse on a dot',
       `export const Status = () => (
         <p className="animate-bounce">
           <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
-          <span className="animate-spin">↻</span>
+          <span className="animate-spin animate-[spin_1s_linear_infinite]">↻</span>
           <span className="animate-blink ml-0.5 inline-block h-5 w-2 bg-[var(--accent)]" />
-          Live
+          <span className="animate-fade-in">Live</span>
         </p>
       );`,
-      ['animate-bounce', 'animate-pulse', 'animate-spin', 'animate-blink'],
+      [
+        'animate-bounce',
+        'animate-pulse',
+        'animate-spin',
+        'animate-[spin_1s_linear_infinite]',
+        'animate-blink',
+        'animate-fade-in',
+      ],
     ],
     [
-      'whitespace, comments, null and a condition that renders a shape',
+      'whitespace, comments, null, a non-breaking space and a condition that renders a shape',
       `export const Spacer = ({ show }: { show: boolean }) => (
         <span className="opacity-50">
           {' '}
+          &nbsp;
           {/* a comment */}
           {show && (
             <svg>
@@ -950,10 +708,19 @@ describe('what the scan leaves alone', () => {
       ['opacity-50'],
     ],
     [
-      'class-like words in attributes that are not classes',
+      'style values it cannot resolve, and binary ones',
+      `export const Pane = ({ progress, shown }: { progress: number; shown: boolean }) => (
+        <p className="font-mono" style={{ opacity: progress }}>
+          <span style={{ opacity: shown ? 1 : 0, color: 'var(--accent-text)' }}>ok</span>
+        </p>
+      );`,
+      ['font-mono'],
+    ],
+    [
+      'class-like words in attributes and in rendered text, which are not classes',
       `export const Go = () => (
         <a className="font-mono" href="/opacity-50" aria-label="text-white/50 as prose" data-state="opacity-40">
-          Go
+          Go <code>{'text-white/50'}</code>
         </a>
       );`,
       ['font-mono'],
@@ -965,6 +732,76 @@ describe('what the scan leaves alone', () => {
   });
 });
 
+describe('how an animation is judged', () => {
+  const judge = (css: string, utility: string) =>
+    animationDims(animationUtilitiesIn(css).get(utility) ?? '', keyframesIn(css));
+
+  it.each<[string, string, string, boolean]>([
+    [
+      'a loop through a partial opacity',
+      '@keyframes breathe { 0%, 100% { opacity: 1 } 50% { opacity: .4 } } .animate-breathe { animation: breathe 2s ease-in-out infinite; }',
+      'breathe',
+      true,
+    ],
+    [
+      'a loop between 1 and 0 that interpolates, declared with @utility and the name last',
+      '@keyframes fade { from { opacity: 1 } to { opacity: 0 } } @utility animate-fade { animation: 1s ease infinite fade; }',
+      'fade',
+      true,
+    ],
+    [
+      'a loop between 1 and 0 that steps',
+      '@keyframes blink { 0%, 50% { opacity: 1 } 51%, 100% { opacity: 0 } } .animate-blink { animation: blink 1s steps(1) infinite; }',
+      'blink',
+      false,
+    ],
+    [
+      'a reveal from 0 held at 1, for either of two grouped classes',
+      '@keyframes rise { from { opacity: 0 } to { opacity: 1 } } .animate-rise, .animate-lift { animation: rise .3s ease-out forwards; }',
+      'lift',
+      false,
+    ],
+    [
+      'a reveal that stops at .8',
+      '@keyframes rise { from { opacity: 0 } to { opacity: .8 } } .animate-rise { animation: rise .3s forwards; }',
+      'rise',
+      true,
+    ],
+    [
+      'the second of two animations',
+      '@keyframes rise { from { opacity: 0 } } @keyframes pulse { 50% { opacity: .5 } } .animate-both { animation: rise .3s, pulse 2s infinite; }',
+      'both',
+      true,
+    ],
+    [
+      'longhands instead of the shorthand',
+      '@keyframes fade { to { opacity: 0 } } .animate-fade { animation-name: fade; animation-iteration-count: infinite; }',
+      'fade',
+      true,
+    ],
+    [
+      'an animation that never touches opacity',
+      '@keyframes spin { to { transform: rotate(360deg) } } .animate-spin { animation: spin 1s linear infinite; }',
+      'spin',
+      false,
+    ],
+  ])('%s', (_name, css, utility, dims) => {
+    expect(judge(css, utility)).toBe(dims);
+  });
+
+  // A new dimming animation fails this: check where it is used, then add it here.
+  it("finds that only pulse and ping dim, among Tailwind's animations and globals.css's", () => {
+    const names = [...vocabulary.animations.keys()];
+    expect(names).toEqual(
+      expect.arrayContaining(['spin', 'bounce', 'fade-in', 'blink', 'scale-in']),
+    );
+    const dimming = names.filter((name) =>
+      animationDims(vocabulary.animations.get(name) ?? '', vocabulary.keyframes),
+    );
+    expect(dimming.toSorted()).toEqual(['ping', 'pulse']);
+  });
+});
+
 describe('what the scan cannot pass by not seeing', () => {
   it('refuses a module it cannot parse', () => {
     expect(() => scan('export const A = () => <div className="opacity-50">x</span>;')).toThrow(
@@ -972,18 +809,15 @@ describe('what the scan cannot pass by not seeing', () => {
     );
   });
 
-  it('reads the theme colours from globals.css', () => {
-    expect([...vocabulary.themeColours]).toEqual(
-      expect.arrayContaining(['muted', 'accent', 'accent-text', 'status-ok', 'foreground']),
+  it("reads the colours of Tailwind's theme and of globals.css", () => {
+    expect([...vocabulary.colours]).toEqual(
+      expect.arrayContaining(['white', 'green-800', 'muted', 'accent-text', 'status-ok']),
     );
   });
 
-  it('classifies every opacity animation globals.css defines, and no animation it does not', () => {
-    const defined = opacityAnimationsIn(globalsCss);
-    const classified = Object.entries(OPACITY_ANIMATIONS)
-      .filter(([, animation]) => animation.source === 'globals.css')
-      .map(([name]) => name);
-    expect(defined.toSorted()).toEqual(classified.toSorted());
+  it('reads the values globals.css gives its custom properties, in both themes', () => {
+    expect(vocabulary.properties.get('--log-err')).toHaveLength(2);
+    expect(vocabulary.properties.get('--muted')).toHaveLength(2);
   });
 });
 
@@ -999,6 +833,8 @@ interface KnownDefect {
   file: string;
   component: string;
   tokens: string[];
+  /** How many dimmings of those tokens the component has: a new one, or one fewer, needs a look. */
+  sites: number;
   /** The change that removes it, or `unassigned`. */
   fixedBy: string;
   why: string;
@@ -1015,6 +851,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     file: 'src/components/animated-hero/hud-elements.tsx',
     component: 'CodeLine',
     tokens: ['text-[var(--muted)]/50'],
+    sites: 1,
     fixedBy: '#110',
     why: 'the line-number gutter, which #110 paints with --muted at full opacity',
   },
@@ -1023,39 +860,80 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     file: 'src/components/animated-hero/hud-elements.tsx',
     component: 'DataStream',
     tokens: ['opacity-10'],
-    fixedBy: 'unassigned',
-    why: 'fifty lines of --accent-text digits under an opacity-10 wrapper, a texture made of text',
+    sites: 1,
+    fixedBy: '#47',
+    why: 'fifty lines of --accent-text digits under an opacity-10 wrapper; #47 deletes the component',
   },
   {
     id: 'DIM3',
     file: 'src/components/animated-hero/hud-elements.tsx',
     component: 'StatDisplay',
     tokens: ['animate-pulse'],
-    fixedBy: 'unassigned',
-    why: 'a highlighted value pulses its glyphs down to opacity 0.5 and back',
+    sites: 1,
+    fixedBy: '#47',
+    why: 'a highlighted value pulses its glyphs down to opacity 0.5; #47 deletes the component',
   },
   {
     id: 'DIM4',
     file: 'src/components/animated-hero/animated-text.tsx',
     component: 'GlitchText',
     tokens: ['opacity-70'],
-    fixedBy: 'unassigned',
-    why: 'the two aria-hidden copies of its text drawn while it glitches on hover',
+    sites: 2,
+    fixedBy: 'R17, #47',
+    why: 'the two aria-hidden copies of its text drawn while it glitches on hover (critic-8)',
   },
   {
     id: 'DIM5',
     file: 'src/components/featured-work/architecture-background.tsx',
     component: 'ArchitectureBackground',
-    tokens: ['opacity-40', 'dark:opacity-60'],
+    tokens: ['opacity-40', 'dark:opacity-60', 'opacity={dimmed ? 0.3 : 1}'],
+    sites: 3,
     fixedBy: 'unassigned',
-    why: 'the diagram behind the featured work draws its node labels as SVG <text> under this wrapper',
+    why: 'the SVG <text> node labels of the diagram behind the featured work sit at 40% (60% dark), and at 0.3 of that under a hovered card',
+  },
+  {
+    id: 'DIM6',
+    file: 'src/components/animated-hero/hero-content.tsx',
+    component: 'SkillTags',
+    tokens: ['text-[rgba(99,102,241,0.7)]', 'dark:text-[rgba(167,139,250,0.6)]'],
+    sites: 2,
+    fixedBy: 'R12, R13, #47',
+    why: 'the hero skill tags paint an accent at 0.7 alpha, 0.6 in the dark theme (hero-2)',
+  },
+  {
+    id: 'DIM7',
+    file: 'src/components/animated-hero/hero-section.tsx',
+    component: 'HeroSection',
+    tokens: ["style.color: 'rgba(139, 92, 246, 0.7)'"],
+    sites: 1,
+    fixedBy: 'R13, #47',
+    why: 'the Scroll label under the hero, painted inline at 0.7 alpha (hero-2)',
+  },
+  {
+    id: 'DIM8',
+    file: 'src/components/animated-hero/tmux-background.tsx',
+    component: 'StaticPane',
+    tokens: ['style.color: LOG_COLORS[entry.cls]'],
+    sites: 1,
+    fixedBy: 'unassigned',
+    why: 'the log lines of the tmux background take the --log-* colours, 0.35 to 0.55 alpha; the animated panes set the same colours from script, which the scan cannot see',
+  },
+  {
+    id: 'DIM9',
+    file: 'src/components/animated-hero/circuit-background.tsx',
+    component: 'CircuitBackground',
+    tokens: ['fill={fill}'],
+    sites: 1,
+    fixedBy: '#47',
+    why: 'SVG <text> labels filled at 0.7, 0.5 and 0.35 alpha; #47 deletes the component',
   },
 ];
 
 /**
- * Dimmed classes the rule allows because nothing under them renders text, the three this guard was
- * written to leave alone. Pinned with their counts to show the scan reaching and judging them rather
- * than missing them. A <text> added under one turns it into a finding.
+ * Dimmed classes the text rule allows because nothing under them renders text: the three sites this
+ * guard was written to leave alone. Pinned with their counts to show the scan reaching and judging
+ * them rather than missing them. A <text> added under one turns it into a finding, and the change
+ * that deletes one of these components (#47 deletes HexBadge) deletes its row.
  */
 const DECORATIVE = [
   {
@@ -1089,22 +967,28 @@ const DECORATIVE = [
 ];
 
 /**
- * Floors on what the scan reads, well under today's 28 modules and 2,081 class tokens so that
- * deleting a component does not trip them, and far over what a walk that lost a directory or an
- * attribute visitor that stopped firing would read.
+ * Floors on what the scan reads, well under today's counts so that deleting a component does not
+ * trip them, and far over what a walk that lost a directory or a visitor that stopped firing would
+ * read. The pinned sites above catch a narrower loss.
  */
 const MODULE_FLOOR = 20;
 const TOKEN_FLOOR = 1500;
 
-/** Every module under src/components outside the test folders, relative to apps/web. */
+/** Every module under src/components, outside test folders and co-located tests, relative to apps/web. */
 function componentModules(): string[] {
   const found: string[] = [];
   const descend = (relative: string): void => {
     for (const entry of readdirSync(path.join(appDir, relative), { withFileTypes: true })) {
       const child = `${relative}/${entry.name}`;
-      if (entry.isDirectory()) {
+      const directory =
+        entry.isDirectory() ||
+        (entry.isSymbolicLink() && statSync(path.join(appDir, child)).isDirectory());
+      if (directory) {
         if (entry.name !== '__tests__') descend(child);
-      } else if (/\.tsx?$/.test(entry.name)) {
+      } else if (
+        /\.[cm]?[jt]sx?$/.test(entry.name) &&
+        !/\.(test|spec|stories)\.[cm]?[jt]sx?$|\.d\.ts$/.test(entry.name)
+      ) {
         found.push(child);
       }
     }
@@ -1161,10 +1045,19 @@ describe('the components', () => {
   });
 
   it('dims no text, apart from the known defects', () => {
-    const unexpected = findings().filter(
-      (site) => !KNOWN_DEFECTS.some((known) => covers(known, site)),
-    );
-    expect(unexpected.map(describeSite), RULE).toEqual([]);
+    const sites = findings();
+    const unknown = sites
+      .filter((site) => !KNOWN_DEFECTS.some((known) => covers(known, site)))
+      .map(describeSite);
+    const recounted = KNOWN_DEFECTS.flatMap((known) => {
+      const count = sites.filter((site) => covers(known, site)).length;
+      return count === 0 || count === known.sites
+        ? []
+        : [
+            `${known.id} ${known.component}: ${count} dimmings where the entry records ${known.sites}`,
+          ];
+    });
+    expect([...unknown, ...recounted], RULE).toEqual([]);
   });
 
   it.each(DECORATIVE)('finds no text under $component <$element> $token', (decorative) => {
@@ -1180,9 +1073,11 @@ describe('the components', () => {
     expect(verdicts).toEqual(Array.from({ length: decorative.count }, () => 'no-text'));
   });
 
-  // When one of these fails with "Expect test to fail", its defect is gone: delete the entry.
+  // A known defect's test fails with "Expect test to fail" once none of its tokens dims text in its
+  // component. Check that the text is legible before deleting the entry: the scan cannot see colours
+  // set from script or GSAP, so a dimming moved there reads as a fix.
   for (const known of KNOWN_DEFECTS) {
-    it.fails(`${known.id} (${known.fixedBy}): ${known.component} dims no text`, () => {
+    it.fails(`${known.id} (${known.fixedBy}): ${known.component} stops dimming text`, () => {
       expect(
         findings()
           .filter((site) => covers(known, site))
