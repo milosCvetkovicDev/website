@@ -68,7 +68,7 @@ export function StrategyPhase() {
       });
 
       // Tech tree items appear
-      const techItems = techTreeRef.current?.querySelectorAll('.tech-item');
+      const techItems = techTreeRef.current?.querySelectorAll('.tech-reveal');
       if (techItems) {
         tl.fromTo(
           techItems,
@@ -152,11 +152,11 @@ export function StrategyPhase() {
               TECH TREE
             </h3>
             {techChoices.map((tech) => (
-              // The timeline animates this wrapper, and hover-lift lives on the card inside it. On
-              // one element the two fight: hover-lift's transition on transform re-eases every frame
-              // of GSAP's entrance, and GSAP's inline transform cancels the lift.
-              <div key={tech.category} className="tech-item">
-                <div className="group hover-lift relative flex cursor-default items-center gap-4 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
+              // The timeline animates this wrapper and the card inside it keeps hover-lift: on one
+              // element its transform transition re-eases GSAP's entrance, and GSAP's inline
+              // transform cancels the lift.
+              <div key={tech.category} className="tech-reveal">
+                <div className="tech-item group hover-lift relative flex cursor-default items-center gap-4 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
                   {/* Selection indicator */}
                   <div className="absolute top-0 bottom-0 left-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
 

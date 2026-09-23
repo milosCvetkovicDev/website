@@ -42,7 +42,7 @@ export function DiscoveryPhase() {
       tl.fromTo(chatRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5 });
 
       // Tags extract and float
-      const tagElements = tagsRef.current?.querySelectorAll('.requirement-tag');
+      const tagElements = tagsRef.current?.querySelectorAll('.requirement-reveal');
       if (tagElements) {
         tl.fromTo(
           tagElements,
@@ -146,16 +146,14 @@ export function DiscoveryPhase() {
             >
               <div ref={tagsRef} className="flex flex-wrap gap-2">
                 {requirements.map((req, index) => (
-                  // The timeline animates this wrapper, and the tag's hover lives on the span inside
-                  // it. On one element the two fight: GSAP writes transform and opacity inline every
-                  // frame, which a transition there re-eases into a lagging, flattened tween, and it
-                  // pins `scale: none` inline, which cancels hover:scale-105.
-                  <span
-                    key={req.id}
-                    className="requirement-tag"
-                    style={{ animationDelay: `${index * 0.1}s` }}
-                  >
-                    <span className="block cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent-text)] transition-[scale,background-color,box-shadow] duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]">
+                  // The timeline animates this wrapper and the tag inside it keeps the hover: on one
+                  // element a transition re-eases every frame GSAP writes, and GSAP's inline
+                  // `scale: none` cancels hover:scale-105.
+                  <span key={req.id} className="requirement-reveal inline-block">
+                    <span
+                      className="requirement-tag block cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent-text)] transition-[scale,color,background-color,border-color,box-shadow] duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
                       <span className="mr-1 text-[var(--muted)]">#{index + 1}</span>
                       {req.label}
                     </span>

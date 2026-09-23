@@ -131,8 +131,7 @@ export function GameComplete() {
           </Terminal>
         </div>
 
-        {/* transition-colors, not transition-all: GSAP tweens this link's opacity, transform and
-            box-shadow, and a transition on any of them re-eases every frame GSAP writes. */}
+        {/* transition-colors only: GSAP tweens this link's opacity, transform and box-shadow. */}
         <a
           ref={ctaRef}
           href="https://www.linkedin.com/in/milos-cvetkovic-dev"
