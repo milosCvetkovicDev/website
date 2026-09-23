@@ -135,3 +135,19 @@ expects, and what each workaround depends on.
   against the page, where the digits were 1.12:1 (light keeps `opacity-10`, 1.15:1 against 1.17:1).
   It now covers its whole container and scrolls one 130px tile per 20 s loop, so the loop restarts
   without a jump. That is a constant 6.5px/s; the text moved half its container's height per loop.
+- `StatDisplay` put `animate-pulse` on its `--accent-text` value when `highlight` was set.
+  Tailwind's pulse runs opacity 1 → 0.5 → 1, so the value spent about half of every 2 s cycle
+  below 4.5:1, down to 2.60:1 on the Terminal and 2.39:1 on a light `HudPanel`, against 6.95:1 and
+  6.31:1 at rest. That is the "do not dim accent text" rule written as a keyframe, which a grep for
+  `/NN` on a `text-` utility does not find. **Fixed:** the pulse is on an `aria-hidden` glow around
+  the value, a box-shadow with no fill, so a highlighted value keeps the contrast of a plain one on
+  every surface. A tint under the value would stack with the `HudPanel`'s and the row's own hover
+  tints: at the centre of a hovered light `HudPanel` even `/10` takes it to 4.25:1. The glow
+  reaches 16px out and paints over the label, so the row keeps a `gap-4` between them, and forced
+  colours, which drop box-shadows, get an outline instead. The hover glitch also changed. It is one
+  paused timeline in a `gsap.context()`, skipped under reduced motion, restarted from rest on
+  re-entry and reverted on unmount and when the preference changes. It no longer shares its node
+  with a `transition-all`, which had smeared its ±2px shake to under 0.15px (sampled every frame
+  in Chromium).
+- Both components only reach Claude Design on the next `/design-sync`: until then their cards
+  still show the text texture and the pulsing value.

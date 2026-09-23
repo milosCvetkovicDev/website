@@ -1,6 +1,7 @@
 'use client';
 
-import { forwardRef, useRef, useCallback, type CSSProperties } from 'react';
+import { forwardRef, useEffect, useRef, type CSSProperties } from 'react';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { gsap } from './use-gsap-scroll';
 
 // Corner bracket decoration for HUD panels
@@ -162,7 +163,17 @@ export function ProgressBar({
   );
 }
 
-// Stat Display with glitch hover effect on value
+// Stat Display with glitch hover effect on value.
+// `highlight` marks a live value with a glow that pulses around it. The value itself never pulses:
+// Tailwind's pulse takes opacity down to 0.5, which left --accent-text at 2.60:1 on the Terminal
+// for half of every cycle, and ADR 0011 never dims accent text. Nothing is painted under the value
+// either. A tint there would stack with the HudPanel's and this row's own hover tints: at the
+// centre of a hovered light HudPanel, where its GlowBorder peaks, even /10 takes the value from
+// 4.81:1 to 4.25:1. A box-shadow is painted only outside the box it belongs to, so a highlighted
+// value keeps the contrast of a plain one on every surface. The glow does reach 16px out (a 6px
+// inset and a 10px blur) and paints over the label, which is not positioned, so the row keeps a
+// gap-4 between them: a long label in a narrow row would otherwise sit under the glow. Forced
+// colours drop box-shadows, so there the glow is an outline, which they keep.
 export function StatDisplay({
   label,
   value,
@@ -174,43 +185,61 @@ export function StatDisplay({
   className?: string;
   highlight?: boolean;
 }) {
+  const rowRef = useRef<HTMLDivElement>(null);
   const valueRef = useRef<HTMLSpanElement>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
-  const handleMouseEnter = useCallback(() => {
-    if (!valueRef.current) return;
+  // Quick glitch on hover. Reduced motion skips it; the row still answers the hover with its tint
+  // and the label's colour. One paused timeline is restarted on every hover, so re-entering
+  // mid-shake starts it again from rest rather than stacking a second timeline on the value, and
+  // the context reverts it, inline transform included, on unmount or when reduced motion turns on.
+  useEffect(() => {
+    const row = rowRef.current;
+    const valueEl = valueRef.current;
+    if (prefersReducedMotion || !row || !valueEl) return;
 
-    // Quick glitch effect
-    gsap
-      .timeline()
-      .to(valueRef.current, { x: -2, duration: 0.05 })
-      .to(valueRef.current, { x: 2, duration: 0.05 })
-      .to(valueRef.current, { x: -1, duration: 0.05 })
-      .to(valueRef.current, { x: 0, duration: 0.05 })
-      .to(valueRef.current, { scale: 1.1, duration: 0.1 })
-      .to(valueRef.current, {
-        scale: 1,
-        duration: 0.2,
-        ease: 'elastic.out(1, 0.3)',
-      });
-  }, []);
+    let glitch: gsap.core.Timeline | undefined;
+    const ctx = gsap.context(() => {
+      glitch = gsap
+        .timeline({ paused: true })
+        .to(valueEl, { x: -2, duration: 0.05 })
+        .to(valueEl, { x: 2, duration: 0.05 })
+        .to(valueEl, { x: -1, duration: 0.05 })
+        .to(valueEl, { x: 0, duration: 0.05 })
+        .to(valueEl, { scale: 1.1, duration: 0.1 })
+        .to(valueEl, { scale: 1, duration: 0.2, ease: 'elastic.out(1, 0.3)' });
+    });
+    const onMouseEnter = () => glitch?.restart();
+    row.addEventListener('mouseenter', onMouseEnter);
+    return () => {
+      row.removeEventListener('mouseenter', onMouseEnter);
+      ctx.revert();
+    };
+  }, [prefersReducedMotion]);
 
   return (
     <div
-      className={`group -mx-2 flex cursor-pointer items-center justify-between rounded p-2 transition-colors hover:bg-[var(--accent)]/5 ${className}`}
-      onMouseEnter={handleMouseEnter}
+      ref={rowRef}
+      className={`group -mx-2 flex cursor-pointer items-center justify-between gap-4 rounded p-2 transition-colors hover:bg-[var(--accent)]/5 ${className}`}
     >
       <span className="font-mono text-xs tracking-wider text-[var(--muted)] uppercase transition-colors group-hover:text-[var(--foreground)]">
         {label}
       </span>
+      {/* No CSS transition on this span: GSAP writes its transform on every frame of the glitch,
+          and a transition would ease each write and smear the shake. */}
       <span
         ref={valueRef}
-        className={`inline-block font-mono transition-all ${
-          highlight
-            ? 'animate-pulse font-bold text-[var(--accent-text)]'
-            : 'text-[var(--accent-text)]'
-        }`}
+        className={`relative inline-block font-mono text-[var(--accent-text)] ${highlight ? 'font-bold' : ''}`}
       >
-        {value}
+        {/* A highlighted empty value gets no glow: it would pulse around nothing. */}
+        {highlight && String(value).trim() !== '' && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-x-1.5 -inset-y-0.5 animate-pulse rounded shadow-[0_0_10px_color-mix(in_oklab,var(--accent)_60%,transparent)] forced-colors:outline"
+          />
+        )}
+        {/* Positioned, and after the glow, so that it paints above it. */}
+        <span className="relative">{value}</span>
       </span>
     </div>
   );

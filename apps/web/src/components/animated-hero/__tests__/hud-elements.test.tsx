@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DataStream } from '../hud-elements';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { gsap } from '../use-gsap-scroll';
+import { DataStream, StatDisplay } from '../hud-elements';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
 // it at import time, so the stub must exist before the imports above are evaluated.
@@ -167,7 +168,14 @@ describe('server rendering', () => {
     media.reduce = false;
   });
 
-  it.each([['DataStream', (c: Components) => <c.DataStream />]])(
+  it.each([
+    ['DataStream', (c: Components) => <c.DataStream />],
+    ['a StatDisplay', (c: Components) => <c.StatDisplay label="Uptime" value="99.9%" />],
+    [
+      'a highlighted StatDisplay',
+      (c: Components) => <c.StatDisplay label="Fixes" value={3} highlight />,
+    ],
+  ])(
     'hydrates %s without a mismatch, from a server and a client that each load the module',
     async (_, element) => {
       // Two instances of the module, as the server and the browser each evaluate it: a module-level
@@ -198,4 +206,184 @@ describe('server rendering', () => {
       }
     },
   );
+});
+
+describe('StatDisplay', () => {
+  /** Renders every GSAP tween as if `seconds` had elapsed; the ticker is detached in beforeEach. */
+  const elapse = (seconds: number) => gsap.updateRoot(gsap.globalTimeline.time() + seconds);
+
+  /** The element the hover glitch has moved, walking up from the value's text to its row. */
+  const movedElement = (text: HTMLElement): HTMLElement | null => {
+    const row = text.closest<HTMLElement>('.group');
+    for (let el: HTMLElement | null = text; el && el !== row; el = el.parentElement) {
+      if (el.style.transform) return el;
+    }
+    return null;
+  };
+
+  beforeEach(() => {
+    media.reduce = false;
+    // Drive GSAP by hand instead of from requestAnimationFrame, so the glitch is deterministic.
+    gsap.ticker.remove(gsap.updateRoot);
+  });
+
+  afterEach(() => {
+    cleanup();
+    gsap.ticker.add(gsap.updateRoot);
+    vi.restoreAllMocks();
+  });
+
+  it('pulses a decorative glow around a highlighted value, never the value itself', () => {
+    const { container } = render(<StatDisplay label="Auto-fixes today" value={3} highlight />);
+    const value = screen.getByText('3');
+    const row = value.closest<HTMLElement>('.group');
+
+    // Nothing between the glyphs and their row may animate opacity: that dims the text itself.
+    for (let el: HTMLElement | null = value; el && el !== row; el = el.parentElement) {
+      expect(el).not.toHaveClass('animate-pulse');
+    }
+    const pulse = container.querySelector('.animate-pulse');
+    expect(pulse).not.toBeNull();
+    expect(pulse).toHaveAttribute('aria-hidden', 'true');
+    expect(pulse?.textContent).toBe('');
+    expect(pulse?.contains(value)).toBe(false);
+    // And it paints nothing under the glyphs: a fill there would stack with the tints of the
+    // surfaces the row sits on and lower the value's contrast.
+    expect(pulse?.className).not.toMatch(/(^|[\s:])bg-|inset_|inset-(shadow|ring)/);
+    // Its box encloses the value's, so the shadow, painted only outside that box, misses the glyphs.
+    expect(pulse?.className).toMatch(/(^|\s)-inset-x-\S/);
+    expect(pulse?.className).toMatch(/(^|\s)-inset-y-\S/);
+  });
+
+  it('draws no glow around a highlighted value that is empty', () => {
+    const { container } = render(<StatDisplay label="Pending" value="" highlight />);
+
+    expect(container.querySelector('.animate-pulse')).toBeNull();
+  });
+
+  it('does not pulse anything when the value is not highlighted', () => {
+    const { container } = render(<StatDisplay label="Uptime" value="99.9%" />);
+
+    expect(container.querySelector('.animate-pulse')).toBeNull();
+  });
+
+  it('glitches the value when the row is hovered', () => {
+    render(<StatDisplay label="Uptime" value="99.9%" />);
+    const value = screen.getByText('99.9%');
+
+    fireEvent.mouseEnter(value.closest('.group')!);
+    elapse(0.06);
+
+    expect(movedElement(value)).not.toBeNull();
+  });
+
+  it('does not glitch when the visitor prefers reduced motion', () => {
+    media.reduce = true;
+    render(<StatDisplay label="Uptime" value="99.9%" />);
+    const value = screen.getByText('99.9%');
+
+    fireEvent.mouseEnter(value.closest('.group')!);
+    elapse(0.06);
+
+    expect(movedElement(value)).toBeNull();
+  });
+
+  it('restarts a glitch that is still running instead of stacking a second one on the value', () => {
+    render(<StatDisplay label="Uptime" value="99.9%" />);
+    const value = screen.getByText('99.9%');
+    const row = value.closest<HTMLElement>('.group')!;
+    fireEvent.mouseEnter(row);
+    elapse(0.06);
+    const moved = movedElement(value)!;
+    const frameAfterOneStep = moved.style.transform;
+    const tweensOfOneGlitch = gsap.getTweensOf(moved).length;
+
+    fireEvent.mouseEnter(row);
+    elapse(0.06);
+
+    // Replayed from rest, so the same time in lands on the same frame, on one timeline.
+    expect(moved.style.transform).toBe(frameAfterOneStep);
+    expect(tweensOfOneGlitch).toBeGreaterThan(0);
+    expect(gsap.getTweensOf(moved)).toHaveLength(tweensOfOneGlitch);
+  });
+
+  it('reverts a running glitch when it unmounts', () => {
+    const { unmount } = render(<StatDisplay label="Uptime" value="99.9%" />);
+    const value = screen.getByText('99.9%');
+    fireEvent.mouseEnter(value.closest('.group')!);
+    elapse(0.06);
+    const moved = movedElement(value)!;
+
+    unmount();
+
+    expect(gsap.getTweensOf(moved)).toEqual([]);
+  });
+
+  it('reverts a running glitch, back to where the value started, when reduced motion turns on', () => {
+    render(<StatDisplay label="Uptime" value="99.9%" />);
+    const value = screen.getByText('99.9%');
+    fireEvent.mouseEnter(value.closest('.group')!);
+    elapse(0.06);
+    const moved = movedElement(value)!;
+
+    act(() => media.set(true));
+
+    expect(gsap.getTweensOf(moved)).toEqual([]);
+    expect(movedElement(value)).toBeNull();
+
+    fireEvent.mouseEnter(value.closest('.group')!);
+    elapse(0.06);
+
+    expect(movedElement(value)).toBeNull();
+  });
+
+  it('leaves no hover listener behind when reduced motion turns on, or when it unmounts', () => {
+    // A leaked listener would do nothing visible, because the context kills its timeline, so the
+    // registrations themselves are what is checked.
+    const added = vi.spyOn(EventTarget.prototype, 'addEventListener');
+    const removed = vi.spyOn(EventTarget.prototype, 'removeEventListener');
+    const hoverListeners = (spy: typeof added) =>
+      spy.mock.calls.filter(([type]) => type === 'mouseenter').length;
+    const { unmount } = render(<StatDisplay label="Uptime" value="99.9%" />);
+    expect(hoverListeners(added)).toBe(1);
+
+    act(() => media.set(true));
+    expect(hoverListeners(removed)).toBe(hoverListeners(added));
+
+    act(() => media.set(false));
+    unmount();
+    expect(hoverListeners(added)).toBe(2);
+    expect(hoverListeners(removed)).toBe(2);
+  });
+
+  it('glitches again once reduced motion is switched back off', () => {
+    render(<StatDisplay label="Uptime" value="99.9%" />);
+    const value = screen.getByText('99.9%');
+    act(() => media.set(true));
+    act(() => media.set(false));
+
+    fireEvent.mouseEnter(value.closest('.group')!);
+    elapse(0.06);
+
+    expect(movedElement(value)).not.toBeNull();
+  });
+
+  it('leaves the transform GSAP animates free of any CSS transition, which would smear the glitch', () => {
+    render(<StatDisplay label="Uptime" value="99.9%" />);
+    const value = screen.getByText('99.9%');
+    fireEvent.mouseEnter(value.closest('.group')!);
+    elapse(0.06);
+    const moved = movedElement(value)!;
+
+    // `transition`, `transition-all`, `transition-transform` and an arbitrary list naming
+    // transform all cover it; `transition-colors` does not.
+    const smearing = moved.className
+      .split(/\s+/)
+      .filter((utility) =>
+        /^([\w-]+:)*transition(-all|-transform|-\[[^\]]*(all|transform|translate|scale)[^\]]*\])?$/.test(
+          utility,
+        ),
+      );
+    expect(smearing).toEqual([]);
+  });
 });
