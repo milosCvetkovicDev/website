@@ -11,13 +11,17 @@
  *
  * - an alpha on a text colour, as a modifier (`text-[var(--muted)]/50`, `text-white/60`,
  *   `text-muted/50`) or inside the colour (`text-[rgba(99,102,241,0.7)]`, `text-[#e6edf399]`, a
- *   `var()` whose value in globals.css carries one), and the same on the `fill` that paints SVG text;
+ *   `var()` whose value in globals.css carries one), and the same on the `fill` that paints SVG
+ *   text;
  * - an opacity strictly between 0 and 1: `opacity-60`, `[opacity:.5]`, SVG `opacity`;
- * - an animation whose keyframes leave text part-transparent, judged from Tailwind's and globals.css's
- *   own definitions, which is why `animate-pulse` counts and `animate-spin` and the reveals do not;
+ * - an animation whose keyframes leave text part-transparent, judged from Tailwind's and
+ *   globals.css's own definitions, which is why `animate-pulse` counts and `animate-spin` and the
+ *   reveals do not;
  * - a `style` colour, opacity or animation whose value the scan can resolve within the module;
- * - a colour or an opacity handed to a component in a prop named for one, which the scan does not
- *   follow into the component, so it reports it where it is handed over.
+ * - a colour or an opacity handed to a component in a prop named for one (`textColor`,
+ *   `valueColor`, `labelOpacity`), reported where it is handed over, since the scan cannot follow
+ *   it into a component of another module. A name that says the paint is another's, such as
+ *   `borderColor`, `labelBgColor` or `glowOpacity`, is left alone.
  *
  * `opacity-0` and an alpha of 0 hide rather than dim, so the reveal idiom stays legal. "Reaches
  * text" is structural: text or an expression anywhere under the element, SVG `<text>` included, or
@@ -27,21 +31,24 @@
  * always sets its own, and SVG text takes `fill` rather than `color`, so a decorative SVG can keep
  * a dimmed `currentColor`, as the section progress corners do. A class a variant aims elsewhere
  * reaches what it aims at: the children or descendants `*:`, `**:` and `[&_p]:` select, or the
- * content `before:` generates.
+ * content `before:` generates. A component of the same module is followed through its props:
+ * `<Label tone={DIM} />` dims whatever `Label` puts `tone` on. Class and style props are the
+ * exception, because they land on the `<Label>` element itself and are judged there.
  *
  * Not charged to anything: a class under `disabled:`, which WCAG 1.4.3 exempts and axe does not
  * measure, and text that is never painted (`sr-only` whatever happens, `hidden`, an SVG `<title>`).
  * Counted, because the scan cannot tell: an imported component's output, a class string it cannot
- * trace to an element, and the siblings a variant selects. Out of reach, and so out of scope: colours
- * set from script, GSAP tweens (ADR 0008's separate rule that a reveal starts from 0), `style` values
- * held in props or state, gradient text, `stroke` on text, classes in `dangerouslySetInnerHTML`,
- * class names assembled at run time (which Tailwind tells you never to write), classes imported from
- * outside `src/components`, and `src/app`, whose pages the axe gate audits.
+ * trace to an element, and the siblings a variant selects. Out of reach, and so out of scope:
+ * colours set from script, GSAP tweens (ADR 0008's separate rule that a reveal starts from 0),
+ * `style` values held in state or in props the module does not set, gradient text, `stroke` on
+ * text, classes in `dangerouslySetInnerHTML`, class names assembled at run time (which Tailwind
+ * tells you never to write), classes imported from outside `src/components`, and `src/app`, whose
+ * pages the axe gate audits.
  *
  * The violations present when the guard landed are expected failures in KNOWN_DEFECTS, and the
- * change that fixes one deletes its entry. globals.css keeps this directory out of Tailwind's source
- * detection, because the fixtures below spell out dozens of the utilities the rule forbids. Nothing
- * here needs a DOM, and building a jsdom window costs about two seconds per file.
+ * change that fixes one deletes its entry. globals.css keeps this directory out of Tailwind's
+ * source detection, because the fixtures below spell out dozens of the utilities the rule forbids.
+ * Nothing here needs a DOM, and building a jsdom window costs about two seconds per file.
  *
  * @vitest-environment node
  */
@@ -518,7 +525,7 @@ describe('what the scan flags', () => {
       ['before:text-[var(--muted)]/50'],
     ],
     [
-      'a colour or an opacity handed to a component',
+      'a colour or an opacity handed to a component, and followed into one of the same module',
       `function Tag({ color, children }: { color: string; children: React.ReactNode }) {
         return <span style={{ color }}>{children}</span>;
       }
@@ -528,10 +535,7 @@ describe('what the scan flags', () => {
           <Diagram labelOpacity={0.4} />
         </p>
       );`,
-      [
-        ['color={…}', 'unattributed'],
-        ['labelOpacity={…}', 'unattributed'],
-      ],
+      ['style.color', ['color={…}', 'unattributed'], ['labelOpacity={…}', 'unattributed']],
     ],
     [
       'classes spread through a condition or from a helper, and one handed to a helper that renders it',
@@ -675,6 +679,124 @@ describe('what the scan flags', () => {
         </div>
       );`,
       ['text-white/40', 'text-white/60', 'text-white/50', 'opacity={…}'],
+    ],
+    [
+      'a class or opacity a same-module component takes in a named prop, beside a decorative use',
+      `const DIM = 'opacity-50';
+      const labelProps = { tone: 'opacity-20' };
+      function Label({ tone }: { tone: string }) {
+        return <span className={tone}>Text</span>;
+      }
+      function Badge(props: { tone: string; label: string }) {
+        return <b className={props.tone}>{props.label}</b>;
+      }
+      function Meter({ o }: { o: number }) {
+        return (
+          <svg>
+            <g opacity={o}>
+              <text>CPU</text>
+            </g>
+          </svg>
+        );
+      }
+      export const Panel = () => (
+        <p>
+          <svg className={DIM}>
+            <path d="M0 0" />
+          </svg>
+          <Label tone={DIM} />
+          <Label {...labelProps} />
+          <Badge tone="opacity-40" label="beta" />
+          <Meter o={0.5} />
+        </p>
+      );`,
+      ['opacity-50', 'opacity-20', 'opacity-40', 'opacity={…}'],
+    ],
+    [
+      'a colour handed under a name that says whose text it paints',
+      `export const Stats = () => (
+        <div>
+          <Stat valueColor="rgba(99,102,241,0.6)" value="42" />
+        </div>
+      );`,
+      [['valueColor={…}', 'unattributed']],
+    ],
+    [
+      'props a same-module component reads as props.x, for an opacity or a spread, and its style',
+      `function Meter(props: { o: number }) {
+        return (
+          <svg>
+            <g opacity={props.o}>
+              <text>MEM</text>
+            </g>
+          </svg>
+        );
+      }
+      function Chip(props: { extra: { className: string }; label: string }) {
+        return <span {...props.extra}>{props.label}</span>;
+      }
+      function Frame({ style, children }: { style: React.CSSProperties; children: React.ReactNode }) {
+        return <div style={style}>{children}</div>;
+      }
+      export const Board = () => (
+        <p>
+          <Meter o={0.4} />
+          <Chip extra={{ className: 'opacity-30' }} label="beta" />
+          <Frame style={{ opacity: 0.5 }}>Note</Frame>
+        </p>
+      );`,
+      ['opacity={…}', 'opacity-30', 'style.opacity'],
+    ],
+    [
+      "classes spread from what an object's method returns, called directly or through a name",
+      `const S = {
+        rowProps() {
+          return { className: 'opacity-40' };
+        },
+      };
+      const rowProps = S.rowProps;
+      export const Rows = ({ items }: { items: string[] }) => (
+        <ul>
+          {items.map((item) => (
+            <li key={item} {...S.rowProps()}>
+              {item}
+            </li>
+          ))}
+          <li {...rowProps()}>last</li>
+        </ul>
+      );`,
+      ['opacity-40', 'opacity-40'],
+    ],
+    [
+      'an SVG link that is a component of its own, rendered inside an <svg>',
+      `function SvgLink({ children }: { children: React.ReactNode }) {
+        return (
+          <a href="#x" opacity={0.5}>
+            {children}
+          </a>
+        );
+      }
+      export const Map = () => (
+        <svg>
+          <SvgLink>
+            <text>Link</text>
+          </SvgLink>
+        </svg>
+      );`,
+      ['opacity={…}'],
+    ],
+    [
+      'a colour handed for text named after something else first',
+      `export const Rows = () => (
+        <div>
+          <Player trackTitleColor="rgba(255,255,255,0.6)" />
+          <Menu iconLabelColor="rgba(255,255,255,0.6)" />
+        </div>
+      );`,
+      [
+        ['trackTitleColor={…}', 'unattributed'],
+        ['iconLabelColor={…}', 'unattributed'],
+      ],
     ],
   ])('%s', (_name, source, expected) => {
     expect(flagged(scan(source))).toEqual(report(expected));
@@ -1045,9 +1167,112 @@ describe('what the scan leaves alone', () => {
       );`,
       ['font-mono', 'text-[var(--accent)]/30', '[&_p_span]:opacity-50'],
     ],
+    [
+      'paints named for a background, a gradient stop or an icon, however the name is built',
+      `export const Cards = () => (
+        <div className="font-mono">
+          <Card labelBgColor="rgba(0,0,0,0.5)" title="x" />
+          <Chart fromColor="rgba(0,0,0,0.5)" iconOpacity={0.4} label="CPU" />
+        </div>
+      );`,
+      ['font-mono'],
+    ],
+    [
+      'an opacity attribute on an HTML link, which HTML ignores, in or out of an SVG',
+      `export const Links = () => (
+        <nav className="font-mono">
+          <a href="/work" opacity="0.5">
+            Work
+          </a>
+          <svg>
+            <foreignObject width="100" height="20">
+              <a href="/docs" opacity="0.5">
+                Docs
+              </a>
+            </foreignObject>
+          </svg>
+        </nav>
+      );`,
+      ['font-mono'],
+    ],
+    [
+      'classes an object literal returns from a method or a getter, each entry read alone',
+      `const S = {
+        cls(on: boolean) {
+          return on ? 'opacity-40' : 'opacity-20';
+        },
+        get frame() {
+          return 'opacity-30';
+        },
+        get label() {
+          return 'tracking-wide';
+        },
+      };
+      export const Marks = ({ on }: { on: boolean }) => (
+        <p className="font-mono">
+          <svg className={S.cls(on)}>
+            <path d="M0 0" />
+          </svg>
+          <svg className={S.frame}>
+            <path d="M0 0" />
+          </svg>
+          <span className={S.label}>Text</span>
+        </p>
+      );`,
+      ['opacity-40', 'opacity-20', 'opacity-30', 'tracking-wide'],
+    ],
+    [
+      'a component that spreads a prop back into itself',
+      `export function Tree({ more }: { more: { tone: string } }) {
+        return (
+          <li className="font-mono">
+            <span className={more.tone}>node</span>
+            <Tree {...more} />
+          </li>
+        );
+      }`,
+      ['font-mono'],
+    ],
+    [
+      "paints for a bar, a graph's edges or a border side, whose last word says whose they are",
+      `export const Charts = () => (
+        <div className="font-mono">
+          <ProgressBar barColor="rgba(99,102,241,0.3)" value={40} />
+          <Graph edgeOpacity={0.4} />
+          <Toggle borderTopColor="rgba(0,0,0,0.5)" ringOffsetColor="rgba(0,0,0,0.5)" />
+        </div>
+      );`,
+      ['font-mono'],
+    ],
   ])('%s', (_name, source, seen) => {
     const result = scan(source);
     expect(result.tokens).toEqual(expect.arrayContaining(seen));
+    expect(flagged(result)).toEqual([]);
+  });
+
+  it('follows a prop down a chain of components without re-resolving it on every path', () => {
+    // Seven levels that each render the next three times: 2,187 paths to the leaf. Resolving the
+    // class through the props again on every path took 4 s at six levels and about six times as
+    // long at seven, past the 5 s timeout; resolving it once per element takes a fraction of that.
+    const depth = 7;
+    const levels = Array.from({ length: depth }, (_, level) => {
+      const next = level + 1 < depth ? '<C' + (level + 1) + ' tone={tone} />' : '';
+      return (
+        'function C' +
+        level +
+        '({ tone }: { tone: string }) {\n' +
+        '  return <span className={tone}>' +
+        next.repeat(3) +
+        '</span>;\n}'
+      );
+    });
+    const source = [
+      "const DIM = 'opacity-50';",
+      ...levels,
+      'export const Root = () => <C0 tone={DIM} />;',
+    ].join('\n');
+    const result = scan(source);
+    expect(result.sites.length).toBeGreaterThan(0);
     expect(flagged(result)).toEqual([]);
   });
 });
@@ -1136,6 +1361,42 @@ describe('how an animation is judged', () => {
       '@keyframes spin { to { transform: rotate(360deg) } } .animate-spin { animation: spin 1s linear infinite; }',
       'spin',
       false,
+    ],
+    [
+      'a brace inside a quoted string in a keyframe',
+      '@keyframes a12 { 0% { content: "}"; } 50% { opacity: .4 } } .animate-a12 { animation: a12 2s infinite; }',
+      'a12',
+      true,
+    ],
+    [
+      'a comment opener inside a quoted string, and a comment later on',
+      '@keyframes a13 { 0% { content: "/*"; } 50% { opacity: .4 } } .animate-a13 { animation: a13 2s infinite; } /* the end */',
+      'a13',
+      true,
+    ],
+    [
+      'a brace after an escaped quote inside a quoted string',
+      `@keyframes a14 { 0% { content: '\\'}'; } 50% { opacity: .4 } } .animate-a14 { animation: a14 2s infinite; }`,
+      'a14',
+      true,
+    ],
+    [
+      'a brace inside a comment',
+      '@keyframes a15 { /* } */ 50% { opacity: .4 } } .animate-a15 { animation: a15 2s infinite; }',
+      'a15',
+      true,
+    ],
+    [
+      'an escaped quote in a selector',
+      `@keyframes a16 { 50% { opacity: .4 } } .animate-a16, .x\\'y { animation: a16 2s infinite; }`,
+      'a16',
+      true,
+    ],
+    [
+      'a string left open, which CSS ends at the end of its line',
+      '.x {\n  content: "oops;\n}\n@keyframes u { 50% { opacity: .4 } }\n.animate-u { animation: u 1s infinite; }',
+      'u',
+      true,
     ],
   ])('%s', (_name, css, utility, dims) => {
     expect(judge(css, utility)).toBe(dims);
