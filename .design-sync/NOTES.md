@@ -43,7 +43,10 @@ expects, and what each workaround depends on.
   `node .design-sync/props-from-source.mjs` from the TypeScript source; run it with `--check` on
   every re-sync and paste its output back into `dtsPropsFor` when it reports drift.
 - `componentSrcMap` excludes `ThemeProvider` (it is the preview `provider`, still on the global),
-  `HydrationMarker` and the two JSON-LD components (they render nothing visible).
+  `HydrationMarker` and the four JSON-LD components (they render nothing visible). #116 added
+  `TechArticleJsonLd` and `BreadcrumbListJsonLd` to `json-ld.tsx`; the 2026-09-23 re-sync found them
+  through `props-from-source.mjs --check` and excluded them. A new export in `json-ld.tsx` needs the
+  same null entry.
 - `CTA` is on `window.Portfolio` but gets no card: the converter's `isComponentName` treats
   all-caps names as constants and drops it after discovery. The owner chose to leave it
   bundle-only (2026-09-22) over renaming it in the app or forking `lib/dts.mjs`;
@@ -58,6 +61,12 @@ expects, and what each workaround depends on.
   on 2026-09-22. The final render check was 32/32 clean: no `bad`, `thin` or `variantsIdentical`
   flags and no floor cards, so there is no "known render warns" list to carry forward. A warn on a
   later run is new.
+- The 2026-09-23 re-sync carried every grade forward (grades key on the previews, which had not
+  changed), but #110 to #116 had changed 13 of the 32 carded components (the phases, the hero
+  pieces, `AnimatedText`, and four of the HUD elements) and `globals.css`, so it re-captured all 32
+  with `--spot-check-components` and regraded the 81 cells from the sheets: all
+  `good`, render check 32/32 clean, still no warns. Do the same after any run of component changes
+  that large: carried-forward grades vouch for the previews, not for the components behind them.
 - **Animated components are previewed in their settled state.** A card is a still frame, and the
   phases, the hero pieces, `ArchitectureBackground` and `MetricCounter` animate on scroll or on a
   timer. Their preview files stub `window.matchMedia` for `(prefers-reduced-motion: reduce)` at
@@ -94,6 +103,14 @@ expects, and what each workaround depends on.
 - **The `next/` stand-ins cover only `next/link` and `next/navigation`.** A component that starts
   importing another `next/*` module silently pulls Next's internals back into the bundle (watch the
   bundle size, ~600 KB today) or fails on `process`/`__dirname`.
+- **GSAP is loaded with a dynamic `import()` since #116** (`animated-hero/load-gsap.ts`). esbuild
+  folds it into the IIFE, so `_ds_bundle.js` holds GSAP and no runtime `import(` (checked
+  2026-09-23: `grep -c 'import(' ds-bundle/_ds_bundle.js` is 0). A bundle that keeps one would try to
+  fetch a chunk that was never uploaded, and the phases would never animate in a design. The phase
+  cards would not show it, since they render the reduced-motion state and skip the request, but the
+  `AnimatedHero` card would: `preloadGsap()` in `animated-hero/index.tsx` runs under reduced motion
+  too (the hover effects in `animated-text.tsx` still use GSAP), so the render check would record
+  the failed fetch there.
 - **The preview `matchMedia` stub depends on components honouring reduced motion.** A component that
   stops checking it will animate under capture again, and its cells will grade on a mid-animation
   frame.
@@ -108,8 +125,22 @@ expects, and what each workaround depends on.
   intact.
 - **The build assumed:** Node 22.22.0 via nvm, pnpm 10.34.5, Tailwind 4.3.3 through the repo's own
   `@tailwindcss/postcss`, chromium 1243 via `playwright@1.63.0` in `.ds-sync/`, and the skill files
-  from Claude Code 2.1.275. Nothing is fetched from the network at build time; the fonts are the
+  from Claude Code 2.1.275 (the 2026-09-23 re-sync ran 2.1.280 with no config change beyond the two
+  exclusions above). Nothing is fetched from the network at build time; the fonts are the
   repository's own woff2 files.
+
+## Claude Design's report
+
+- The design-system report in Claude Design lists Tailwind internals as token problems: the
+  `--tw-translate-*`, `--tw-scale-*` and other `--tw-*` properties, `--ease-out`, and the
+  `.space-y-*` selectors (raised by the design agent on 2026-09-23). They are Tailwind v4's
+  `@property` registrations and per-utility variables, plus the one easing variable the site's
+  `ease-out` class emits, not the site's own tokens. They stay. The converter has no option to keep
+  custom properties out of the token list: `lib/css.mjs` says the app's scope filter is a permissive
+  heuristic and accepts the noise as the price of shipping component CSS to designs. Removing them
+  from `_ds_bundle.css` would break every transform, shadow and easing utility in a design. Treat
+  the report entry as known, not new. The design agent also suggested tagging them
+  `/* @kind other */`; nothing in the skill or the converter reads such a tag, so it was not tried.
 
 ## Findings in the codebase
 
@@ -124,8 +155,9 @@ expects, and what each workaround depends on.
   whole of that row's hover response.
   (Every other `text-[var(--accent)]` in the components is on a decorative SVG, which the rules
   allow. The stylesheet also carries a `text-[var(--muted)]/60` that no component uses: automatic
-  source detection finds class names in any file under apps/web, tests included, and this one is
-  prose inside a comment in `apps/web/e2e/section-progress.spec.ts`.)
+  source detection finds class names in any file under apps/web except `src/test` (which
+  `globals.css` excludes with `@source not '../test'` since #113), e2e specs included, and this one
+  is prose inside a comment in `apps/web/e2e/section-progress.spec.ts`.)
 - `DataStream` rendered 50 lines of 80 `--accent-text` digits as text inside a wrapper at
   `opacity-10` with no `aria-hidden`: the accessibility tree carried all 4,000 digits as one text
   run, and axe measured them at 1.12:1 (dark) and 1.17:1 (light). That is a violation when nothing
@@ -157,6 +189,5 @@ expects, and what each workaround depends on.
   re-entry and reverted on unmount and when the preference changes. It no longer shares its node
   with a `transition-all`, which had smeared its ±2px shake to under 0.15px (sampled every frame
   in Chromium).
-- All three fixes (`CodeLine` above, these two) only reach Claude Design on the next
-  `/design-sync`: until then the cards still show the dimmed gutter, the text texture and the
-  pulsing value.
+- All three fixes (`CodeLine` above, these two) reached Claude Design with the 2026-09-23 re-sync:
+  the regraded cards show the full-opacity gutter, the masked texture and the glow.
