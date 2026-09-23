@@ -19,14 +19,15 @@
  * - a colour or an opacity handed to a component in a prop named for one, which the scan does not
  *   follow into the component, so it reports it where it is handed over.
  *
- * `opacity-0` and an alpha of 0 hide rather than dim, so the reveal idiom stays legal. "Reaches text"
- * is structural: text or an expression anywhere under the element, SVG `<text>` included, or content
- * the scan cannot see, such as an imported component's output. An opacity reaches the whole subtree,
- * because it composites everything under the element, which is how `DataStream`'s `opacity-10`
- * wrapper dims digits one element down. A colour stops where a descendant always sets its own, and
- * SVG text takes `fill` rather than `color`, so a decorative SVG can keep a dimmed `currentColor`,
- * as the section progress corners do. A class a variant aims elsewhere reaches what it aims at: the
- * children or descendants `*:`, `**:` and `[&_p]:` select, or the content `before:` generates.
+ * `opacity-0` and an alpha of 0 hide rather than dim, so the reveal idiom stays legal. "Reaches
+ * text" is structural: text or an expression anywhere under the element, SVG `<text>` included, or
+ * content the scan cannot see, such as an imported component's output. An opacity reaches the whole
+ * subtree, because it composites everything under the element, which is how `DataStream`'s
+ * `opacity-10` wrapper dimmed digits one element down until #111. A colour stops where a descendant
+ * always sets its own, and SVG text takes `fill` rather than `color`, so a decorative SVG can keep
+ * a dimmed `currentColor`, as the section progress corners do. A class a variant aims elsewhere
+ * reaches what it aims at: the children or descendants `*:`, `**:` and `[&_p]:` select, or the
+ * content `before:` generates.
  *
  * Not charged to anything: a class under `disabled:`, which WCAG 1.4.3 exempts and axe does not
  * measure, and text that is never painted (`sr-only` whatever happens, `hidden`, an SVG `<title>`).
@@ -79,7 +80,7 @@ const report = (expected: (string | [string, Verdict])[]) =>
 
 describe('what the scan flags', () => {
   // A translucent custom property of the fixtures' own, so that no fixture leans on what globals.css
-  // holds: the fix for DIM8 may well make the --log-* colours opaque.
+  // holds: the fix for StaticPane's log lines may well make the --log-* colours opaque.
   beforeAll(() => {
     vocabulary.properties.set('--fixture-translucent', ['rgba(0, 0, 0, 0.5)']);
   });
@@ -212,7 +213,7 @@ describe('what the scan flags', () => {
       ['group-hover:opacity-50'],
     ],
     [
-      "an opacity on an ancestor of the text, as DataStream's wrapper has",
+      "an opacity on an ancestor of the text, as DataStream's wrapper had until #111",
       `export function DataStream({ className = '' }: { className?: string }) {
         const lines = '0101';
         return (
@@ -308,7 +309,7 @@ describe('what the scan flags', () => {
       ],
     ],
     [
-      'a pulse on text, as StatDisplay has when highlighted',
+      'a pulse on text, as StatDisplay had when highlighted until #111',
       `export function Stat({ value, highlight }: { value: string; highlight?: boolean }) {
         return (
           <span
@@ -1212,24 +1213,6 @@ const KNOWN_DEFECTS: KnownDefect[] = [
   },
   {
     id: 'DIM2',
-    file: 'src/components/animated-hero/hud-elements.tsx',
-    component: 'DataStream',
-    tokens: ['opacity-10'],
-    sites: 1,
-    fixedBy: '#47',
-    why: 'fifty lines of --accent-text digits under an opacity-10 wrapper; #47 deletes the component',
-  },
-  {
-    id: 'DIM3',
-    file: 'src/components/animated-hero/hud-elements.tsx',
-    component: 'StatDisplay',
-    tokens: ['animate-pulse'],
-    sites: 1,
-    fixedBy: '#47',
-    why: 'a highlighted value pulses its glyphs down to opacity 0.5; #47 deletes the component',
-  },
-  {
-    id: 'DIM4',
     file: 'src/components/animated-hero/animated-text.tsx',
     component: 'GlitchText',
     tokens: ['opacity-70'],
@@ -1238,7 +1221,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the two aria-hidden copies of its text drawn while it glitches on hover (critic-8)',
   },
   {
-    id: 'DIM5',
+    id: 'DIM3',
     file: 'src/components/featured-work/architecture-background.tsx',
     component: 'ArchitectureBackground',
     tokens: ['opacity-40', 'dark:opacity-60', 'opacity={…}'],
@@ -1247,7 +1230,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the SVG <text> node labels of the diagram behind the featured work sit at 40% (60% dark), and at 0.3 of that under a hovered card',
   },
   {
-    id: 'DIM6',
+    id: 'DIM4',
     file: 'src/components/animated-hero/hero-content.tsx',
     component: 'SkillTags',
     tokens: ['text-[rgba(99,102,241,0.7)]', 'dark:text-[rgba(167,139,250,0.6)]'],
@@ -1256,7 +1239,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the hero skill tags paint an accent at 0.7 alpha, 0.6 in the dark theme (hero-2)',
   },
   {
-    id: 'DIM7',
+    id: 'DIM5',
     file: 'src/components/animated-hero/hero-section.tsx',
     component: 'HeroSection',
     tokens: ['style.color'],
@@ -1265,7 +1248,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the Scroll label under the hero, painted inline at 0.7 alpha (hero-2)',
   },
   {
-    id: 'DIM8',
+    id: 'DIM6',
     file: 'src/components/animated-hero/tmux-background.tsx',
     component: 'StaticPane',
     tokens: ['style.color'],
@@ -1274,7 +1257,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the log lines of the tmux background take the --log-* colours, 0.35 to 0.55 alpha; the animated panes set the same colours from script, which the scan cannot see',
   },
   {
-    id: 'DIM9',
+    id: 'DIM7',
     file: 'src/components/animated-hero/circuit-background.tsx',
     component: 'CircuitBackground',
     tokens: ['fill={…}'],
