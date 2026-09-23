@@ -323,7 +323,13 @@ export function TypingCursor({ color = 'accent' }: { color?: 'accent' | 'white' 
   );
 }
 
-// Code Line with hover highlight
+// Code Line with hover highlight.
+// The gutter paints `--muted` at full opacity: `--muted/50` composited to 2.74:1 on the
+// Terminal's #0d1117, and ADR 0011 forbids dimming text with an alpha modifier, where the
+// token itself is 7.50:1. On row hover it brightens to `--foreground`, the same idiom as the
+// labels in ProgressBar, StatDisplay, QuestItem and PipelineStage. That hover is also the only
+// one a `highlighted` row has, because the branch below swaps `hover:bg` for a resting `bg`
+// rather than adding to it.
 export function CodeLine({
   lineNumber,
   children,
@@ -342,7 +348,7 @@ export function CodeLine({
       } -mx-4 px-4 ${className}`}
     >
       {lineNumber !== undefined && (
-        <span className="w-8 shrink-0 pr-4 text-right text-[var(--muted)]/50 transition-colors select-none group-hover:text-[var(--muted)]">
+        <span className="w-8 shrink-0 pr-4 text-right text-[var(--muted)] transition-colors select-none group-hover:text-[var(--foreground)]">
           {lineNumber}
         </span>
       )}
