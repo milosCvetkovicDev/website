@@ -225,6 +225,19 @@ main {
   animation: blink 1s steps(1) infinite;
 }
 
+/* The wordmark's cursor (components/logo.tsx), a filled bar rather than text. The animation runs a
+   fixed number of times and has no fill mode, so the bar ends at full opacity. */
+@keyframes mc-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.15;
+  }
+}
+
 /* Scrolling data stream. Moves up by --scroll-up-by, or half the element's height when it is unset.
    DataStream sets it to one tile of its repeating texture, so each loop restarts on an identical
    frame. */

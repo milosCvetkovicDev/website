@@ -320,8 +320,9 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   their dark values in both themes.
 - Components live in `apps/web/src/components`. `index.ts` is a barrel for the page-level ones
   (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `Highlights`, `FeaturedWork`, `TechStack`,
-  `CTA`, `PersonJsonLd`, `WebsiteJsonLd`). The hero and its phases live in
-  `components/animated-hero` and are imported from there directly, not through the barrel.
+  `CTA`, `PersonJsonLd`, `WebsiteJsonLd`), plus the `Logo` wordmark the header and footer draw.
+  The hero and its phases live in `components/animated-hero` and are imported from there
+  directly, not through the barrel.
   Layouts import from the component modules directly, never through the barrel: every client module
   reachable from a server component's imports lands in that layout's client chunk, so a barrel
   import in `app/layout.tsx` would ship `FeaturedWork` to every route (see ADR 0009). A

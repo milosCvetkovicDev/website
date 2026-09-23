@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Logo } from './logo';
 
 const socialLinks = [
   {
@@ -68,9 +69,12 @@ export function Footer() {
     <footer className="mt-auto border-t border-[var(--border)]">
       <div className="mx-auto max-w-5xl px-6 py-8">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-          <p className="text-sm text-[var(--muted)]">
-            {new Date().getFullYear()} Milos Cvetkovic. Built with Next.js.
-          </p>
+          <div className="flex items-center gap-2">
+            <Logo size={14} />
+            <p className="text-sm text-[var(--muted)]">
+              {new Date().getFullYear()} Milos Cvetkovic. Built with Next.js.
+            </p>
+          </div>
           <div className="flex items-center gap-4">
             {socialLinks.map((link) => (
               <Link
