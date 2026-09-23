@@ -1,0 +1,62 @@
+/*
+ * Source of the stylesheet the Claude Design sync ships. build-css.mjs compiles it with the site's own
+ * Tailwind v4 PostCSS plugin into apps/web/dist/design-sync/styles.css, the cssEntry in config.json.
+ * It is the site's globals.css, the utilities the site and the previews use, and the two font
+ * variables that the root layout would otherwise set through next/font.
+ */
+@import '../apps/web/src/app/globals.css';
+
+/* Class names that only the previews use. The site's own sources are found by automatic detection,
+   which build-css.mjs bases in apps/web exactly as the site build does. */
+@source './previews';
+
+/* next/font/local sets these two on <body> through a generated class (apps/web/src/app/layout.tsx).
+   A design built from the bundle has no root layout, so they are declared here, naming the faces in
+   fonts.css ahead of the fallback faces globals.css declares. */
+:root {
+  --font-geist-sans: 'Geist', 'Geist Fallback';
+  --font-geist-mono: 'Geist Mono', 'Geist Mono Fallback';
+}
+
+/* Layout and colour utilities the site does not happen to use, compiled in so that a design's own
+   layout code resolves: the design agent writes its glue in the same Tailwind vocabulary as the
+   components, and Tailwind only emits a class it has seen. md: is the site's one breakpoint. The
+   colour families follow CLAUDE.md's rules: --accent-text is the only accent text class, and no
+   text colour carries an alpha modifier. */
+@source inline('{md:,}{block,inline-block,flex,inline-flex,grid,hidden}');
+@source inline('{md:,}{flex-row,flex-col,items-start,items-center,items-end,justify-between}');
+@source inline('{flex-wrap,flex-1,shrink-0,grow,items-baseline,items-stretch}');
+@source inline('{justify-start,justify-center,justify-end,justify-around}');
+@source inline('{md:,}grid-cols-{1,2,3,4,6,12}');
+@source inline('{md:,}col-span-{1,2,3,4,6,12}');
+@source inline('{md:,}{gap,p,px,py}-{0,1,2,3,4,6,8,12,16}');
+@source inline('{gap-x,gap-y,space-x,space-y,pt,pb,pl,pr}-{0,1,2,3,4,6,8,12,16}');
+@source inline('{m,mx,my,mt,mb,ml,mr}-{0,1,2,4,6,8,12,16}');
+@source inline('{mx-auto,ml-auto,mr-auto}');
+@source inline('{w,h}-{full,screen,fit,auto}');
+@source inline('min-h-{full,screen}');
+@source inline('max-w-{sm,md,lg,xl,2xl,3xl,4xl,5xl,6xl}');
+@source inline('{md:,}text-{xs,sm,base,lg,xl,2xl,3xl,4xl,5xl}');
+@source inline('font-{sans,mono,normal,medium,semibold,bold}');
+@source inline('{uppercase,tracking-tight,tracking-wide,tracking-wider,tracking-widest}');
+@source inline('{leading-none,leading-tight,leading-snug,leading-normal,leading-relaxed}');
+@source inline('{text-left,text-center,text-right,truncate,tabular-nums,whitespace-nowrap}');
+@source inline('{rounded,rounded-md,rounded-lg,rounded-xl,rounded-2xl,rounded-full}');
+@source inline('{border,border-2,border-t,border-b,border-l,border-r}');
+@source inline('{shadow-sm,shadow,shadow-md,shadow-lg}');
+@source inline('{relative,absolute,inset-0,overflow-hidden,overflow-auto,sticky,top-0,z-10}');
+@source inline('{hover:,}bg-[var(--{background,card,card-hover,border,accent,accent-hover})]');
+@source inline('{hover:,}bg-[var(--{accent,status-ok,status-warn,status-err})]/{5,10,20}');
+@source inline('{hover:,}border-[var(--{border,accent,status-ok,status-warn,status-err})]');
+@source inline('border-[var(--{accent,status-ok,status-warn,status-err})]/{30,50}');
+@source inline(
+  '{hover:,}text-[var(--{foreground,muted,accent-text,status-ok,status-warn,status-err})]'
+);
+/* Focus, as the site draws it (the FOCUS_RING constant in featured-work.tsx). Without these a
+   design agent writes a focus class Tailwind never emitted, and every interactive element it builds
+   has no visible keyboard focus: a silent WCAG 2.4.7 failure. */
+@source inline('focus-visible:outline-{none,1,2}');
+@source inline('focus-visible:outline-offset-{1,2,4}');
+@source inline('focus-visible:outline-[var(--{accent,accent-text,foreground})]');
+/* White on an accent fill is the site's primary-button pairing. */
+@source inline('{text,bg}-{white,black}');
