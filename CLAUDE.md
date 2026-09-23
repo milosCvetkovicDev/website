@@ -46,10 +46,24 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 
 `/`, `/about`, `/blog`, `/contact`, `/skills`, `/work`, `/work/[slug]`.
 
-`apps/web/src/app` also holds the metadata files `sitemap.ts` and `robots.ts`, plus `error.tsx` and
-`not-found.tsx`. `sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
-`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There are no route handlers
-(`route.ts`) and no middleware.
+Every route's head comes from `buildMetadata()` in `apps/web/src/lib/metadata.ts`: its canonical,
+complete Open Graph and Twitter blocks, and its robots directive. Next replaces `openGraph`,
+`twitter` and `robots` wholesale per segment rather than merging them, so the root layout keeps only
+what is true of every response, the 404s included (`metadataBase`, the title template and the
+default Next requires beside it, the author, card type, site name, locale), and never a URL, a
+description, a link-preview title or a robots directive.
+
+`apps/web/src/app` also holds `error.tsx`, `not-found.tsx` and the metadata files: `sitemap.ts`,
+`robots.ts`, `manifest.ts`, `icon.tsx` and `apple-icon.tsx` (the navigation's "MC" mark, drawn by
+`src/lib/brand-mark.tsx`), and an `opengraph-image.tsx` in the root and in each static route's
+folder, all over one card design in `src/lib/og-image.tsx`. Each folder needs its own: a root image
+never reaches a page that declares its own `openGraph`. There are two route handlers:
+`favicon.ico/route.ts` packs the same mark into an ICO, and `work/[slug]/og-image.png/route.ts`
+draws the case-study card, whose alt text has to name the study, which an `opengraph-image` file's
+single `alt` cannot; the page points og:image at it through `buildMetadata()`'s `image`. All of them
+prerender at build time.
+`sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
+`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
 
 ## Commands
 
@@ -275,7 +289,11 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 - Formatting comes only from `packages/prettier-config`: semicolons, single quotes, trailing commas,
   two-space indent, 100 columns, LF, plus `prettier-plugin-tailwindcss`. Do not add local overrides.
 - Data lives in `apps/web/src/data`. `case-studies.ts` is the single source of truth for project
-  copy, metrics and tech stacks; pages read from it rather than restating any of it.
+  copy, metrics and tech stacks; pages read from it rather than restating any of it. Content dates
+  live there too: each study's `publishedAt` and `updatedAt`, and `STATIC_ROUTE_UPDATED` in
+  `static-routes.ts` for the static routes. They are the sitemap's `lastmod` and the case studies'
+  TechArticle dates, so the commit that changes what a page visibly says bumps its date, and no
+  other commit does.
 - Server components by default. Add `'use client'` only where browser APIs, React state or GSAP are
   actually needed.
 - Tailwind v4 is CSS-first: the theme is declared in `apps/web/src/app/globals.css` and compiled by
@@ -315,6 +333,15 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   and `../components`, bare, with a trailing slash, or as `/index` with or without a `.ts`, `.tsx`,
   `.js` or `.jsx` extension, and a nested layout's `../../components`) and the near misses it lets
   through. It does not see a dynamic `import()`, and it reads layouts only.
+- GSAP is loaded lazily, never imported by a rendered component.
+  `apps/web/src/components/animated-hero/gsap-runtime.ts` imports `gsap`, and only `load-gsap.ts`
+  reaches it, through `import()`, once the browser is idle after hydration. Effects run GSAP work
+  through `runWithGsap` and event handlers through `useWithGsap`; `import type` is fine. A static
+  import from anything the home page reaches puts about 44 KB gzip back into its initial chunk, so
+  `@typescript-eslint/no-restricted-imports` in `apps/web/eslint.config.mjs` refuses one everywhere
+  in `src` except that module, the tests and `circuit-background.tsx`, which still imports GSAP and
+  two plugins statically and is rendered by no route. `apps/web/src/test/eslint-config.test.ts`
+  pins the rule.
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
   keep relative imports for siblings inside one folder.
@@ -346,15 +373,20 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   React has hydrated. Wait through `e2e/support/hydration.ts` rather than writing a wait of your
   own: `gotoHydrated(page, path)` for a navigation, `expectHydrated(page)` after `page.reload()`. A
   soft navigation needs neither, and a spec with JavaScript off must call neither, because the
-  marker never flips. The helper also waits out the home page's `System Boot` loader until #47
-  deletes it; #74 moves six of the inline loader waits into the helper, and #47 removes the rest
-  with the loader. The marker hydrates with the layout, so content a page wraps in `<Suspense>` or
+  marker never flips. No spec keys a wait on page text: the home page's boot loader, which the
+  inline waits once watched, is gone (ADR 0022). The marker hydrates with the layout, so content a page wraps in `<Suspense>` or
   puts under a `loading.tsx` would hydrate after it flips. No route puts `<main>` inside a
   boundary; the one boundary with content today, the decorative `TmuxBackground` on `/`, may
   hydrate after the marker. `e2e/hero.spec.ts` asserts the page title.
   That assertion is only a smoke check that the app rendered: it never could catch a second
   checkout of this site, which serves the same title character for character, and the not-found and
   error pages carry it too. Status and path are what catch a wrong page.
+- On `/`, GSAP arrives after hydration: `src/components/animated-hero/load-gsap.ts` fetches it once
+  the browser is idle, and the story builds its timelines then. A spec that measures anything GSAP
+  does on `/`, a from-state at rest, a hover tween or a scroll-driven reveal, waits for it with
+  `expectGsapLoaded(page)` from `e2e/support/gsap.ts` after `expectHydrated`; measured earlier, it
+  reads the server-rendered page instead. The helper fails at once when the load failed.
+  `e2e/gsap-lazy.spec.ts` covers the window before GSAP arrives and a load that fails.
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build
   with `pnpm start` inside `apps/web`, sets `forbidOnly`, retries twice, uses one worker and a 10s
   expect timeout, and sets `failOnFlakyTests`: a test that passes only on a retry fails the run, on

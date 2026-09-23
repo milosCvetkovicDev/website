@@ -1,10 +1,11 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gsap, ScrollTrigger } from '../use-gsap-scroll';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { gsap, ScrollTrigger } from '../gsap-runtime';
+import { loadGsap } from '../load-gsap';
 import { GauntletPhase } from '../gauntlet-phase';
 
-// GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
-// it at import time, so the stub must exist before the imports above are evaluated.
+// GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
+// at import time, so the stub must exist before the imports above are evaluated.
 const media = vi.hoisted(() => {
   type Listener = (event: MediaQueryListEvent) => void;
   const listeners = new Set<Listener>();
@@ -66,6 +67,13 @@ function elapse(seconds: number) {
 }
 
 describe('GauntletPhase', () => {
+  // The phase asks load-gsap.ts for GSAP, which arrives when the browser is idle. Waited for once,
+  // with real timers, before beforeEach fakes setTimeout: from then on the phase builds its trigger
+  // synchronously on mount, as it does in the browser once GSAP has arrived.
+  beforeAll(async () => {
+    await loadGsap();
+  });
+
   beforeEach(() => {
     media.reduce = false;
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });

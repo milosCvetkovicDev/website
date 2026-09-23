@@ -5,12 +5,13 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import type { ComponentProps } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gsap } from '../use-gsap-scroll';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { gsap } from '../gsap-runtime';
+import { loadGsap } from '../load-gsap';
 import { DataStream, PipelineStage, StatDisplay } from '../hud-elements';
 import { cssTransitions } from './gsap-css-conflicts';
 
-// GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
+// GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers
 // it at import time, so the stub must exist before the imports above are evaluated.
 const media = vi.hoisted(() => {
   type Listener = (event: MediaQueryListEvent) => void;
@@ -43,6 +44,13 @@ const media = vi.hoisted(() => {
     },
   });
   return state;
+});
+
+// StatDisplay asks load-gsap.ts for GSAP, which arrives once the browser is idle after hydration.
+// Its glitch tests are about what it does with GSAP, so the file waits for that load once, with real
+// timers; from then on the timeline is built synchronously on mount, as it is in the browser.
+beforeAll(async () => {
+  await loadGsap();
 });
 
 /** The generator DataStream used when it rendered its texture as 50 lines of 80 characters. */

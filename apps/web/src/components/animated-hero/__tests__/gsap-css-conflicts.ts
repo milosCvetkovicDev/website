@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compile } from 'tailwindcss';
-import { gsap } from '../use-gsap-scroll';
+import { gsap } from '../gsap-runtime';
 
 /**
  * Finds the elements where CSS fights a GSAP tween for a property. Two of the ways were measured per

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { gsap, ScrollTrigger } from './use-gsap-scroll';
+import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
@@ -35,7 +35,11 @@ export function LoopPhase() {
   const [visibleEvents, setVisibleEvents] = useState(0);
   const [alertStatus, setAlertStatus] = useState<'error' | 'resolved'>('error');
   const [showProtocol, setShowProtocol] = useState(false);
+  const [gsapUnavailable, setGsapUnavailable] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  // Reduced motion, or no GSAP to run the sequence with: the final state is rendered directly via
+  // the derived values below.
+  const finished = prefersReducedMotion || gsapUnavailable;
 
   // Every timer is tracked so unmounting (or a reduced-motion switch) cancels the sequence.
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -43,92 +47,109 @@ export function LoopPhase() {
     timersRef.current.push(setTimeout(callback, delayMs));
   }, []);
 
-  const animateHealing = useCallback(() => {
-    // Alert pulses
-    later(() => {
-      gsap.fromTo(
-        alertRef.current,
-        { opacity: 0, scale: 0.9 },
-        { opacity: 1, scale: 1, duration: 0.3 },
-      );
-    }, 500);
+  // Only ever called from the ScrollTrigger below, which exists once GSAP has loaded; it passes
+  // GSAP in rather than this callback reaching for a module-level import.
+  const animateHealing = useCallback(
+    (gsap: Gsap) => {
+      // Alert pulses
+      later(() => {
+        gsap.fromTo(
+          alertRef.current,
+          { opacity: 0, scale: 0.9 },
+          { opacity: 1, scale: 1, duration: 0.3 },
+        );
+      }, 500);
 
-    // Timeline events appear one by one
-    healingTimeline.forEach((_, index) => {
-      later(
-        () => {
-          setVisibleEvents(index + 1);
+      // Timeline events appear one by one
+      healingTimeline.forEach((_, index) => {
+        later(
+          () => {
+            setVisibleEvents(index + 1);
 
-          // Resolve alert when we hit the success events
-          if (index === healingTimeline.length - 1) {
-            later(() => {
-              setAlertStatus('resolved');
-
-              // Show protocol notification
+            // Resolve alert when we hit the success events
+            if (index === healingTimeline.length - 1) {
               later(() => {
-                setShowProtocol(true);
-                gsap.fromTo(
-                  protocolRef.current,
-                  { opacity: 0, y: 20 },
-                  { opacity: 1, y: 0, duration: 0.5, ease: 'back.out(1.7)' },
-                );
+                setAlertStatus('resolved');
 
-                // Headline
-                gsap.fromTo(
-                  headlineRef.current,
-                  { opacity: 0, y: 20 },
-                  { opacity: 1, y: 0, duration: 0.5 },
-                );
+                // Show protocol notification
+                later(() => {
+                  setShowProtocol(true);
+                  gsap.fromTo(
+                    protocolRef.current,
+                    { opacity: 0, y: 20 },
+                    { opacity: 1, y: 0, duration: 0.5, ease: 'back.out(1.7)' },
+                  );
+
+                  // Headline
+                  gsap.fromTo(
+                    headlineRef.current,
+                    { opacity: 0, y: 20 },
+                    { opacity: 1, y: 0, duration: 0.5 },
+                  );
+                }, 500);
               }, 500);
-            }, 500);
-          }
-        },
-        800 + index * 400,
-      );
-    });
-  }, [later]);
+            }
+          },
+          800 + index * 400,
+        );
+      });
+    },
+    [later],
+  );
 
   useEffect(() => {
-    // Reduced motion: the final state is rendered directly via the derived values below.
-    if (prefersReducedMotion) return;
+    if (finished) return;
 
-    gsap.registerPlugin(ScrollTrigger);
-
-    const ctx = gsap.context(() => {
-      ScrollTrigger.create({
-        trigger: sectionRef.current,
-        start: 'top center',
-        once: true,
-        onEnter: animateHealing,
-      });
-
-      // Dashboard fades in
-      gsap.fromTo(
-        dashboardRef.current,
-        { opacity: 0, y: 30 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.5,
-          scrollTrigger: {
+    // GSAP arrives after hydration (load-gsap.ts); until then the section keeps its
+    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // after it reverts. A build that finds the section already in view finishes the entrance at
+    // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
+    // the section renders its finished state, as under reduced motion.
+    let ctx: gsap.Context | undefined;
+    const cancelBuild = runWithGsap(
+      ({ gsap, ScrollTrigger }) => {
+        const reached = isAlreadyReached(sectionRef.current);
+        ctx = gsap.context(() => {
+          ScrollTrigger.create({
             trigger: sectionRef.current,
             start: 'top center',
-          },
-        },
-      );
-    }, sectionRef);
+            once: true,
+            onEnter: () => animateHealing(gsap),
+          });
+
+          // Dashboard fades in
+          const fadeIn = gsap.fromTo(
+            dashboardRef.current,
+            { opacity: 0, y: 30 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.5,
+              scrollTrigger: {
+                trigger: sectionRef.current,
+                start: 'top center',
+              },
+            },
+          );
+
+          if (reached) fadeIn.progress(1);
+        }, sectionRef);
+      },
+      () => setGsapUnavailable(true),
+    );
 
     return () => {
-      ctx.revert();
+      cancelBuild();
+      ctx?.revert();
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [animateHealing, prefersReducedMotion]);
+  }, [animateHealing, finished]);
 
-  // With reduced motion the timeline is shown complete instead of animating in.
-  const shownEvents = prefersReducedMotion ? healingTimeline.length : visibleEvents;
-  const shownAlertStatus = prefersReducedMotion ? 'resolved' : alertStatus;
-  const protocolVisible = prefersReducedMotion || showProtocol;
+  // With reduced motion, or without GSAP, the timeline is shown complete instead of animating in.
+  const shownEvents = finished ? healingTimeline.length : visibleEvents;
+  const shownAlertStatus = finished ? 'resolved' : alertStatus;
+  const protocolVisible = finished || showProtocol;
 
   const getEventColor = (type: string) => {
     switch (type) {

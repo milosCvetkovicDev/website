@@ -1,14 +1,14 @@
-import type { Metadata } from 'next';
+import { buildMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Writing',
   description:
     'Hard-won lessons on AI agents, legacy rescue, and building systems that scale. No fluff, no hype—just what actually works.',
-  openGraph: {
-    title: 'Writing',
-    description: 'Hard-won lessons from the trenches.',
-  },
-};
+  path: '/blog',
+  // Out of search while this is a Coming Soon placeholder, as it is out of `sitemap.ts`; the nav
+  // link stays. When the first post ships, delete this line and put /blog back in the sitemap.
+  index: false,
+});
 
 export default function BlogPage() {
   return (

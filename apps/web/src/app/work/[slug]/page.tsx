@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { caseStudies, getCaseStudy } from '@/data/case-studies';
+import { BreadcrumbListJsonLd, TechArticleJsonLd } from '@/components/json-ld';
+import { adjacentCaseStudies, caseStudies, getCaseStudy } from '@/data/case-studies';
+import { buildMetadata } from '@/lib/metadata';
+import { cardAlt } from '@/lib/og-image';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -30,20 +33,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: 'Not Found' };
   }
 
-  return {
-    title: caseStudy.title,
+  return buildMetadata({
+    title: `${caseStudy.title} — ${caseStudy.tagline}`,
     description: caseStudy.description,
-    openGraph: {
-      title: `${caseStudy.title} | Case Study`,
-      description: caseStudy.description,
-      type: 'article',
+    path: `/work/${caseStudy.slug}`,
+    type: 'article',
+    image: {
+      url: `/work/${caseStudy.slug}/og-image.png`,
+      alt: cardAlt(`Case study: ${caseStudy.title}`),
     },
-    twitter: {
-      card: 'summary_large_image',
-      title: caseStudy.title,
-      description: caseStudy.description,
-    },
-  };
+  });
 }
 
 export default async function CaseStudyPage({ params }: PageProps) {
@@ -56,6 +55,8 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
   return (
     <div className="py-16 md:py-24">
+      <TechArticleJsonLd caseStudy={caseStudy} />
+      <BreadcrumbListJsonLd caseStudy={caseStudy} />
       <div className="mx-auto max-w-3xl px-6">
         {/* Back link */}
         <Link
@@ -113,6 +114,21 @@ export default async function CaseStudyPage({ params }: PageProps) {
           </h2>
           <p className="text-lg leading-relaxed">{caseStudy.approach}</p>
         </section>
+
+        {caseStudy.howItWorks ? (
+          <section className="mb-12">
+            <h2 className="mb-4 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
+              How It Works
+            </h2>
+            <ol className="list-decimal space-y-3 pl-6 text-lg marker:font-mono marker:text-[var(--accent-text)]">
+              {caseStudy.howItWorks.map((step) => (
+                <li key={step} className="pl-1">
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
 
         {/* Key Contributions */}
         <section className="mb-12">
@@ -173,6 +189,21 @@ export default async function CaseStudyPage({ params }: PageProps) {
           </ul>
         </section>
 
+        {caseStudy.lessons ? (
+          <section className="mb-12">
+            <h2 className="mb-4 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
+              Lessons
+            </h2>
+            <ul className="space-y-3">
+              {caseStudy.lessons.map((lesson) => (
+                <li key={lesson} className="border-l-2 border-[var(--accent)] pl-4 text-lg">
+                  {lesson}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         {/* Tech Stack */}
         <section className="mb-12">
           <h2 className="mb-6 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
@@ -200,7 +231,41 @@ export default async function CaseStudyPage({ params }: PageProps) {
               </div>
             ))}
           </div>
+          <p className="mt-6 text-sm">
+            <Link href="/skills" className="text-[var(--accent-text)] hover:underline">
+              All my skills, and the experience behind each one
+            </Link>
+          </p>
         </section>
+
+        {/* More work: the studies either side of this one, so each page links on to the others */}
+        <nav aria-labelledby="more-work" className="mb-12">
+          <h2
+            id="more-work"
+            className="mb-6 text-sm font-medium tracking-wider text-[var(--muted)] uppercase"
+          >
+            More work
+          </h2>
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {adjacentCaseStudies(caseStudy.slug).map(({ direction, study }) => (
+              <li
+                key={study.slug}
+                className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4"
+              >
+                <p className="mb-2 font-mono text-xs tracking-wider text-[var(--muted)] uppercase">
+                  {direction === 'previous' ? 'Previous case study' : 'Next case study'}
+                </p>
+                <Link
+                  href={`/work/${study.slug}`}
+                  className="text-lg font-semibold transition-colors hover:text-[var(--accent-text)] hover:underline"
+                >
+                  {study.title}
+                </Link>
+                <p className="mt-2 text-sm text-[var(--muted)]">{study.description}</p>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
         {/* CTA */}
         <section className="border-t border-[var(--border)] pt-8">

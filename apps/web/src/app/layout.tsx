@@ -1,9 +1,10 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 // Self-hosted through next/font/local rather than fetched from Google Fonts at build time: outside
 // dev, Next turns a failed Google Fonts fetch into a build error, so an outage or a network block on a
 // runner blocked every production deploy. The files are subsets of Geist; see fonts/README.md.
 import localFont from 'next/font/local';
 import './globals.css';
+import { SITE_NAME, TWITTER_HANDLE } from '@/lib/metadata';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 // Imported from their own modules, not the `@/components` barrel: every client module reachable
 // from a server component's imports is bundled into that layout's client chunk whether it renders
@@ -35,61 +36,39 @@ const geistMono = localFont({
   fallback: ['Geist Mono Fallback'],
 });
 
+// Only what is true of every response, the 404 included. What names a route (the canonical, og:url,
+// the titles and descriptions) comes from each page's buildMetadata(): Next replaces `openGraph` and
+// `twitter` wholesale per segment, so a URL or title set here would reach every page that forgot one.
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: 'Milos Cvetkovic | Senior Full-Stack Engineer',
     template: '%s | Milos Cvetkovic',
   },
-  description:
-    'Senior Full Stack Engineer & Architect building systems that inherit chaos and ship clarity. 13 years of AI-native development, self-healing agents, and cloud-native architecture across TypeScript, React, NestJS, Azure, and Kubernetes.',
-  keywords: [
-    'Senior Full-Stack Engineer',
-    'AI-Native Development',
-    'TypeScript',
-    'React',
-    'NestJS',
-    'Azure',
-    'Terraform',
-    'Claude Code',
-    'DDD',
-    'Kubernetes',
-    'Self-Healing Agents',
-    'Cloud Architecture',
-    'Node.js Developer',
-    'Legacy Modernization',
-    'Clean Architecture',
-    'DevOps',
-  ],
   authors: [{ name: 'Milos Cvetkovic' }],
   creator: 'Milos Cvetkovic',
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: siteUrl,
-    siteName: 'Milos Cvetkovic',
-    title: 'Milos Cvetkovic | Senior Full-Stack Engineer',
-    description:
-      'Senior Full Stack Engineer & Architect building systems that inherit chaos and ship clarity. 13 years of AI-native development, self-healing agents, and cloud-native architecture.',
+    siteName: SITE_NAME,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Milos Cvetkovic | Senior Full-Stack Engineer',
-    description:
-      'Senior Full Stack Engineer & Architect building systems that inherit chaos and ship clarity. AI-native development, self-healing agents, cloud architecture.',
-    creator: '@milos_dev',
+    creator: TWITTER_HANDLE,
   },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
-  },
+  // No `robots` here: each page sets its own through buildMetadata(), and one declared here would
+  // also reach the 404s, beside the `noindex` Next injects there.
+};
+
+// Browser chrome in each scheme's `--background` (globals.css). The media queries follow the
+// operating system, not the site's toggle, which Next cannot see; `color-scheme` in globals.css is
+// what follows the toggle, and the meta tag tells the browser both schemes exist before CSS loads.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
+  colorScheme: 'light dark',
 };
 
 export default function RootLayout({

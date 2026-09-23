@@ -44,13 +44,6 @@ export async function expectHydrated(page: Page): Promise<void> {
     `#${HYDRATION_MARKER_ID} is on the page but never read data-hydrated="true": ` +
       'hydration did not complete',
   ).toHaveAttribute('data-hydrated', 'true', { timeout: HYDRATION_TIMEOUT_MS });
-  // `/` also keeps its boot loader in the DOM for 600 ms after hydration, and the gates audit the page
-  // behind it. That timer runs late on a busy machine, so this waits as long as the inline waits it
-  // replaced. #47 (hero-9) deletes the loader and this wait with it; on other routes the locator
-  // matches nothing and this passes at once.
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({
-    timeout: HYDRATION_TIMEOUT_MS,
-  });
 }
 
 /**

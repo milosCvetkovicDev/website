@@ -392,8 +392,9 @@ already `light` when navigation committed, so there was no flash. Claude Code's 
 pane logs React error #418 on these pages while an unmodified Chromium does not, so use a real
 browser or Playwright for the console check.
 
-Then walk the site by hand. The App Router serves nine pages; `sitemap.ts` lists all nine, six
-static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
+Then walk the site by hand. The App Router serves nine pages; `sitemap.ts` lists eight of them,
+five static plus one per entry in `apps/web/src/data/case-studies.ts` (three today). `/blog` is left
+out, and served `noindex`, while it is a Coming Soon placeholder.
 
 - [ ] `/` loads, the hero animation runs, and scrolling does not stall
 - [ ] `/about`
@@ -404,8 +405,10 @@ static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
 - [ ] `/skills`
 - [ ] `/blog`
 - [ ] `/contact`
-- [ ] `/sitemap.xml` lists exactly those nine URLs, all on the apex origin
-- [ ] `/robots.txt` allows `/`, disallows `/api/` and `/_next/`, and points at the apex sitemap
+- [ ] `/sitemap.xml` lists exactly those URLs except `/blog`, eight, all on the apex origin
+- [ ] `/blog` serves `<meta name="robots" content="noindex, follow">`
+- [ ] `/robots.txt` allows `/`, disallows nothing (`/_next/` holds the CSS, scripts and fonts a
+      crawler renders with), and points at the apex sitemap
 - [ ] `/work/does-not-exist` answers `404` and renders the site not-found page
       (`apps/web/src/app/not-found.tsx`), identically to `/no-such-page`. There is one not-found page,
       not two: the case-study segment has no `not-found.tsx` of its own, because
@@ -445,9 +448,9 @@ five runs interleaved with that baseline on the same machine give `/` 96 in ever
 `/work/self-healing-agent` 98 with TBT 53 to 54 ms; the case-study route also stopped loading the
 27.7 KB FeaturedWork chunk. Before comparing a future run
 with these, check `.environment.benchmarkIndex` and `.runWarnings` in its JSON and discard a flagged
-run. A CLS of 0.03 to 0.06 attributed to the boot loader is Lighthouse re-centering it when it
-changes the emulated viewport at about 0.9 s, which it counts by design within 500 ms of that event;
-visitors never see it.
+run. Until ADR 0022 removed the boot loader, a CLS of 0.03 to 0.06 attributed to it was Lighthouse
+re-centering it when it changes the emulated viewport at about 0.9 s, which it counts by design
+within 500 ms of that event; visitors never saw it.
 
 Accessibility on that same 2026-09-09 baseline was 96 on both pages. The points went to colour
 contrast (the accent used as text, labels dimmed with opacity modifiers, and a scroll reveal that

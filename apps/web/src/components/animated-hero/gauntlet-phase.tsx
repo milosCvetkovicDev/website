@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { gsap, ScrollTrigger } from './use-gsap-scroll';
+import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, PipelineStage, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
@@ -33,7 +33,11 @@ export function GauntletPhase() {
     'idle',
   );
   const [showAchievement, setShowAchievement] = useState(false);
+  const [gsapUnavailable, setGsapUnavailable] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  // Reduced motion, or no GSAP to run the sequence with: the finished pipeline is rendered directly
+  // via the derived values below.
+  const finished = prefersReducedMotion || gsapUnavailable;
 
   // The sequence is driven by timers the ScrollTrigger callback schedules, and anything created
   // inside those timers runs after GSAP has left the context, so `ctx.revert()` never sees it.
@@ -57,138 +61,156 @@ export function GauntletPhase() {
     revealTweensRef.current = [];
   }, []);
 
-  const animatePipeline = useCallback(() => {
-    // Entering again (scrolling back up and down, or motion being allowed again) restarts the
-    // run from pending instead of stacking on it or resuming a half-finished one.
-    cancelSequence();
-    setStageStates(pendingStages);
-    setDeploymentStatus('idle');
-    setShowAchievement(false);
-    let delay = 0;
+  // Only ever called from the ScrollTrigger below, which exists once GSAP has loaded; it passes
+  // GSAP in rather than this callback reaching for a module-level import.
+  const animatePipeline = useCallback(
+    (gsap: Gsap) => {
+      // Entering again (scrolling back up and down, or motion being allowed again) restarts the
+      // run from pending instead of stacking on it or resuming a half-finished one.
+      cancelSequence();
+      setStageStates(pendingStages);
+      setDeploymentStatus('idle');
+      setShowAchievement(false);
+      let delay = 0;
 
-    pipelineStages.forEach((stage, index) => {
-      // Start running
-      later(() => {
-        setStageStates((prev) => {
-          const newStates = [...prev];
-          newStates[index] = { status: 'running', progress: 0 };
-          return newStates;
-        });
-
-        // Animate progress
-        progressTweensRef.current.push(
-          gsap.to(
-            {},
-            {
-              duration: stage.duration,
-              onUpdate: function () {
-                setStageStates((prev) => {
-                  const newStates = [...prev];
-                  newStates[index] = {
-                    status: 'running',
-                    progress: Math.round(this.progress() * 100),
-                  };
-                  return newStates;
-                });
-              },
-              onComplete: () => {
-                setStageStates((prev) => {
-                  const newStates = [...prev];
-                  newStates[index] = { status: 'passed', progress: 100 };
-                  return newStates;
-                });
-              },
-            },
-          ),
-        );
-      }, delay * 1000);
-
-      delay += stage.duration + 0.2;
-    });
-
-    // Deployment animation
-    later(() => {
-      setDeploymentStatus('deploying');
-      revealTweensRef.current.push(
-        gsap.fromTo(
-          deployRef.current,
-          { opacity: 0, scale: 0.9 },
-          { opacity: 1, scale: 1, duration: 0.4 },
-        ),
-      );
-
-      later(() => {
-        setDeploymentStatus('success');
-
-        // Achievement pops in
+      pipelineStages.forEach((stage, index) => {
+        // Start running
         later(() => {
-          setShowAchievement(true);
-          revealTweensRef.current.push(
-            gsap.fromTo(
-              achievementRef.current,
-              { opacity: 0, y: 20, scale: 0.8 },
+          setStageStates((prev) => {
+            const newStates = [...prev];
+            newStates[index] = { status: 'running', progress: 0 };
+            return newStates;
+          });
+
+          // Animate progress
+          progressTweensRef.current.push(
+            gsap.to(
+              {},
               {
-                opacity: 1,
-                y: 0,
-                scale: 1,
-                duration: 0.5,
-                ease: 'back.out(1.7)',
+                duration: stage.duration,
+                onUpdate: function () {
+                  setStageStates((prev) => {
+                    const newStates = [...prev];
+                    newStates[index] = {
+                      status: 'running',
+                      progress: Math.round(this.progress() * 100),
+                    };
+                    return newStates;
+                  });
+                },
+                onComplete: () => {
+                  setStageStates((prev) => {
+                    const newStates = [...prev];
+                    newStates[index] = { status: 'passed', progress: 100 };
+                    return newStates;
+                  });
+                },
               },
             ),
           );
+        }, delay * 1000);
 
-          // Headline
-          revealTweensRef.current.push(
-            gsap.fromTo(
-              headlineRef.current,
-              { opacity: 0, y: 20 },
-              { opacity: 1, y: 0, duration: 0.5 },
-            ),
-          );
-        }, 300);
-      }, 1000);
-    }, delay * 1000);
-  }, [cancelSequence, later]);
-
-  useEffect(() => {
-    // Reduced motion: the finished pipeline is rendered directly via the derived values below.
-    if (prefersReducedMotion) return;
-
-    gsap.registerPlugin(ScrollTrigger);
-
-    const ctx = gsap.context(() => {
-      ScrollTrigger.create({
-        trigger: sectionRef.current,
-        start: 'top center',
-        onEnter: () => animatePipeline(),
+        delay += stage.duration + 0.2;
       });
 
-      // Initial fade in
-      gsap.fromTo(
-        pipelineRef.current,
-        { opacity: 0, y: 30 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.5,
-          scrollTrigger: {
+      // Deployment animation
+      later(() => {
+        setDeploymentStatus('deploying');
+        revealTweensRef.current.push(
+          gsap.fromTo(
+            deployRef.current,
+            { opacity: 0, scale: 0.9 },
+            { opacity: 1, scale: 1, duration: 0.4 },
+          ),
+        );
+
+        later(() => {
+          setDeploymentStatus('success');
+
+          // Achievement pops in
+          later(() => {
+            setShowAchievement(true);
+            revealTweensRef.current.push(
+              gsap.fromTo(
+                achievementRef.current,
+                { opacity: 0, y: 20, scale: 0.8 },
+                {
+                  opacity: 1,
+                  y: 0,
+                  scale: 1,
+                  duration: 0.5,
+                  ease: 'back.out(1.7)',
+                },
+              ),
+            );
+
+            // Headline
+            revealTweensRef.current.push(
+              gsap.fromTo(
+                headlineRef.current,
+                { opacity: 0, y: 20 },
+                { opacity: 1, y: 0, duration: 0.5 },
+              ),
+            );
+          }, 300);
+        }, 1000);
+      }, delay * 1000);
+    },
+    [cancelSequence, later],
+  );
+
+  useEffect(() => {
+    if (finished) return;
+
+    // GSAP arrives after hydration (load-gsap.ts); until then the section keeps its
+    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // after it reverts. A build that finds the section already in view finishes the entrance at
+    // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
+    // the section renders its finished state, as under reduced motion.
+    let ctx: gsap.Context | undefined;
+    const cancelBuild = runWithGsap(
+      ({ gsap, ScrollTrigger }) => {
+        const reached = isAlreadyReached(sectionRef.current);
+        ctx = gsap.context(() => {
+          ScrollTrigger.create({
             trigger: sectionRef.current,
             start: 'top center',
-          },
-        },
-      );
-    }, sectionRef);
+            onEnter: () => animatePipeline(gsap),
+          });
+
+          // Initial fade in
+          const fadeIn = gsap.fromTo(
+            pipelineRef.current,
+            { opacity: 0, y: 30 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.5,
+              scrollTrigger: {
+                trigger: sectionRef.current,
+                start: 'top center',
+              },
+            },
+          );
+
+          if (reached) fadeIn.progress(1);
+        }, sectionRef);
+      },
+      () => setGsapUnavailable(true),
+    );
 
     return () => {
-      ctx.revert();
+      cancelBuild();
+      ctx?.revert();
       cancelSequence();
     };
-  }, [animatePipeline, cancelSequence, prefersReducedMotion]);
+  }, [animatePipeline, cancelSequence, finished]);
 
-  // With reduced motion the pipeline is shown finished instead of running stage by stage.
-  const shownStageStates = prefersReducedMotion ? passedStages : stageStates;
-  const shownDeploymentStatus = prefersReducedMotion ? 'success' : deploymentStatus;
-  const achievementVisible = prefersReducedMotion || showAchievement;
+  // With reduced motion, or without GSAP, the pipeline is shown finished instead of running stage
+  // by stage.
+  const shownStageStates = finished ? passedStages : stageStates;
+  const shownDeploymentStatus = finished ? 'success' : deploymentStatus;
+  const achievementVisible = finished || showAchievement;
 
   return (
     <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">

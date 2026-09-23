@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { gsap, ScrollTrigger } from './use-gsap-scroll';
+import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, QuestItem, TypingCursor } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
@@ -26,67 +26,78 @@ export function DiscoveryPhase() {
     // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
     if (prefersReducedMotion) return;
 
-    gsap.registerPlugin(ScrollTrigger);
-
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top center',
-          end: 'bottom center',
-          toggleActions: 'play none none reverse',
-        },
-      });
-
-      // Chat message types in
-      tl.fromTo(chatRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5 });
-
-      // Tags extract and float
-      const tagElements = tagsRef.current?.querySelectorAll('.requirement-reveal');
-      if (tagElements) {
-        tl.fromTo(
-          tagElements,
-          { opacity: 0, scale: 0, x: -50 },
-          {
-            opacity: 1,
-            scale: 1,
-            x: 0,
-            duration: 0.4,
-            stagger: 0.15,
-            ease: 'back.out(1.7)',
+    // GSAP arrives after hydration (load-gsap.ts); until then the section keeps its
+    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // after it reverts. A build that finds the section already in view finishes the entrance at
+    // once rather than hide what the visitor is reading (isAlreadyReached).
+    let ctx: gsap.Context | undefined;
+    const cancelBuild = runWithGsap(({ gsap }) => {
+      const reached = isAlreadyReached(sectionRef.current);
+      ctx = gsap.context(() => {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: sectionRef.current,
+            start: 'top center',
+            end: 'bottom center',
+            toggleActions: 'play none none reverse',
           },
-          '+=0.3',
-        );
-      }
+        });
 
-      // Quest log updates. fromTo() renders its "from" state immediately, before the trigger
-      // fires, so the entries must start fully hidden rather than dimmed: dimmed text sits on the
-      // page at 2.7:1 until the user scrolls here, which fails WCAG AA (and the Lighthouse audit).
-      const questItems = questRef.current?.querySelectorAll('.quest-item');
-      if (questItems?.length) {
+        // Chat message types in
+        tl.fromTo(chatRef.current, { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5 });
+
+        // Tags extract and float
+        const tagElements = tagsRef.current?.querySelectorAll('.requirement-reveal');
+        if (tagElements) {
+          tl.fromTo(
+            tagElements,
+            { opacity: 0, scale: 0, x: -50 },
+            {
+              opacity: 1,
+              scale: 1,
+              x: 0,
+              duration: 0.4,
+              stagger: 0.15,
+              ease: 'back.out(1.7)',
+            },
+            '+=0.3',
+          );
+        }
+
+        // Quest log updates. fromTo() renders its "from" state immediately, before the trigger
+        // fires, so the entries must start fully hidden rather than dimmed: dimmed text sits on the
+        // page at 2.7:1 until the user scrolls here, which fails WCAG AA (and the Lighthouse audit).
+        const questItems = questRef.current?.querySelectorAll('.quest-item');
+        if (questItems?.length) {
+          tl.fromTo(
+            questItems,
+            { opacity: 0, x: -8 },
+            {
+              opacity: 1,
+              x: 0,
+              duration: 0.3,
+              stagger: 0.2,
+            },
+            '+=0.2',
+          );
+        }
+
+        // Headline
         tl.fromTo(
-          questItems,
-          { opacity: 0, x: -8 },
-          {
-            opacity: 1,
-            x: 0,
-            duration: 0.3,
-            stagger: 0.2,
-          },
+          headlineRef.current,
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 0.5 },
           '+=0.2',
         );
-      }
 
-      // Headline
-      tl.fromTo(
-        headlineRef.current,
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.2',
-      );
-    }, sectionRef);
+        if (reached) tl.progress(1);
+      }, sectionRef);
+    });
 
-    return () => ctx.revert();
+    return () => {
+      cancelBuild();
+      ctx?.revert();
+    };
   }, [prefersReducedMotion]);
 
   return (

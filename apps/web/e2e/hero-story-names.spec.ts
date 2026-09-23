@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectHydrated } from './support/hydration';
 
 /**
  * The story's accessible names and its heading outline.
@@ -7,7 +8,7 @@ import { expect, test, type Page } from '@playwright/test';
  * axe rule can catch, which is why they are a role-and-name spec rather than another audit pass:
  *
  * - R14. `AnimatedText` splits its text into one `inline-block` span per character
- *   (`animated-text.tsx:159-185`, `:302-328`, `:1004-1030`). Accessible-name computation joins the
+ *   (`animated-text.tsx:176-206`, `:338-368`, `:1089-1119`). Accessible-name computation joins the
  *   spans without separators in the DOM sense but the rendered result reads as spaced letters to a
  *   screen reader, so the Discovery, Execution and Loop `h2`s announce as `M o s t b u g s …`. No axe
  *   rule looks at this: `empty-heading` only asks whether there is text at all.
@@ -40,7 +41,7 @@ const PHASES = [
 
 /**
  * The three phase-closing `h2`s whose text `AnimatedText` splits into one span per character: the
- * `wave`, `scatter` and `morse` variants (`animated-text.tsx:159-185`, `:302-328`, `:1004-1030`).
+ * `wave`, `scatter` and `morse` variants (`animated-text.tsx:176-206`, `:338-368`, `:1089-1119`).
  */
 const SPLIT_HEADINGS = [
   {
@@ -56,7 +57,7 @@ async function openStory(page: Page) {
   // transparent, and no dependence on the ~8 s of pipeline timers the scroll would start.
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   expect(
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
     'these assertions need every phase rendered on mount',
@@ -129,8 +130,8 @@ test('each of the six story sections is a named region whose first heading is it
 
   expect(
     problems,
-    'the six phase sections (discovery-phase.tsx:93, strategy-phase.tsx:136, ' +
-      'execution-phase.tsx:249, gauntlet-phase.tsx:194, loop-phase.tsx:145, game-complete.tsx:92) ' +
+    'the six phase sections (discovery-phase.tsx:104, strategy-phase.tsx:148, ' +
+      'execution-phase.tsx:269, gauntlet-phase.tsx:216, loop-phase.tsx:166, game-complete.tsx:105) ' +
       "have no accessible name, and each phase's own h2 is its closing statement at the bottom.",
   ).toEqual([]);
 });

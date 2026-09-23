@@ -2,7 +2,7 @@
 
 import { forwardRef, useEffect, useRef, type CSSProperties } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
-import { gsap } from './use-gsap-scroll';
+import { runWithGsap } from './load-gsap';
 
 // Corner bracket decoration for HUD panels
 function CornerBrackets({ className = '' }: { className?: string }) {
@@ -193,27 +193,33 @@ export function StatDisplay({
   // and the label's colour. One paused timeline is restarted on every hover, so re-entering
   // mid-shake starts it again from rest rather than stacking a second timeline on the value, and
   // the context reverts it, inline transform included, on unmount or when reduced motion turns on.
+  // GSAP arrives after hydration (load-gsap.ts): a hover before then finds no timeline and does
+  // nothing rather than playing late, and the cleanup cancels a build that has not run yet.
   useEffect(() => {
     const row = rowRef.current;
     const valueEl = valueRef.current;
     if (prefersReducedMotion || !row || !valueEl) return;
 
     let glitch: gsap.core.Timeline | undefined;
-    const ctx = gsap.context(() => {
-      glitch = gsap
-        .timeline({ paused: true })
-        .to(valueEl, { x: -2, duration: 0.05 })
-        .to(valueEl, { x: 2, duration: 0.05 })
-        .to(valueEl, { x: -1, duration: 0.05 })
-        .to(valueEl, { x: 0, duration: 0.05 })
-        .to(valueEl, { scale: 1.1, duration: 0.1 })
-        .to(valueEl, { scale: 1, duration: 0.2, ease: 'elastic.out(1, 0.3)' });
+    let ctx: gsap.Context | undefined;
+    const cancelBuild = runWithGsap(({ gsap }) => {
+      ctx = gsap.context(() => {
+        glitch = gsap
+          .timeline({ paused: true })
+          .to(valueEl, { x: -2, duration: 0.05 })
+          .to(valueEl, { x: 2, duration: 0.05 })
+          .to(valueEl, { x: -1, duration: 0.05 })
+          .to(valueEl, { x: 0, duration: 0.05 })
+          .to(valueEl, { scale: 1.1, duration: 0.1 })
+          .to(valueEl, { scale: 1, duration: 0.2, ease: 'elastic.out(1, 0.3)' });
+      });
     });
     const onMouseEnter = () => glitch?.restart();
     row.addEventListener('mouseenter', onMouseEnter);
     return () => {
       row.removeEventListener('mouseenter', onMouseEnter);
-      ctx.revert();
+      cancelBuild();
+      ctx?.revert();
     };
   }, [prefersReducedMotion]);
 
