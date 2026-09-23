@@ -394,8 +394,10 @@ export function PipelineStage({
         {name}
       </span>
       <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
+        {/* Colours only: GauntletPhase writes the width on every frame of a stage, and a width
+            transition would restart on each write and trail the progress. */}
         <div
-          className={`h-full rounded-full transition-all duration-500 ${progressColors[status]}`}
+          className={`h-full rounded-full transition-colors duration-500 ${progressColors[status]}`}
           style={{ width: `${progress}%` }}
         >
           {status === 'running' && (
