@@ -3,20 +3,20 @@
  *
  * `sitemap()`'s output, against the data file it should be derived from.
  *
- * Row R31 of the RED manifest, fixed by #48, plus the green assertions around it. No DOM here, so
- * `node` rather than jsdom: building a jsdom window costs about two seconds in every worker and is the
+ * Row R31 of the RED manifest, fixed by #48, plus the assertions around it. No DOM here, so `node`
+ * rather than jsdom: building a jsdom window costs about two seconds in every worker and is the
  * largest single cost in this suite (CLAUDE.md, Testing).
  *
- * The sitemap restates the six static routes by hand (`sitemap.ts:7-44`) while `e2e/routes.ts` and
- * `console-clean.spec.ts` keep their own copies. Consolidating the *source* side is #48's — a module
- * under `src/app` importing from `e2e/` would ship the spec directory into the build — so this file
- * asserts the two agree rather than editing either.
+ * The sitemap lists the static routes by hand, with their dates from `src/data/static-routes.ts`,
+ * while `e2e/routes.ts` keeps the spec side's own list; a module under `src/app` importing from
+ * `e2e/` would ship the spec directory into the build. So this file asserts the two agree.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '../sitemap';
 import { caseStudies } from '@/data/case-studies';
+import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
-// The same expression the module uses (`sitemap.ts:5`), so a developer who has NEXT_PUBLIC_SITE_URL set
+// The same expression as `baseUrl` in sitemap.ts, so a developer who has NEXT_PUBLIC_SITE_URL set
 // in their shell gets the assertions they should rather than a failure about an origin nobody is testing.
 const BASE = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
 
@@ -66,28 +66,50 @@ describe('sitemap()', () => {
     expect(urls).toHaveLength(new Set(urls).size);
   });
 
-  it.fails(
-    'R31 (#48): lists exactly the indexable routes, excludes /blog, and does not stamp every entry with one build clock',
-    () => {
-      const entries = sitemap();
+  it('R31 (#48): lists exactly the indexable routes, excludes /blog, and dates each by its content', () => {
+    const entries = sitemap();
 
-      // Two defects in one row, because they are one edit: the URL set and the timestamps.
-      //
-      // /blog is a Coming Soon placeholder. The owner decision of 2026-09-11 keeps its nav link, makes
-      // it noindex (R26) and takes it out of the sitemap — offering an empty page to search and
-      // telling the same crawler not to index it is a contradiction, and it is currently listed
-      // weekly at priority 0.6.
-      expect(entries.map(({ url }) => url).sort()).toEqual([...EXPECTED_URLS].sort());
+    // Two defects in one row, because they were one edit: the URL set and the timestamps.
+    //
+    // /blog is a Coming Soon placeholder. The owner decision of 2026-09-11 keeps its nav link, makes
+    // it noindex (R26) and takes it out of the sitemap: offering an empty page to search and telling
+    // the same crawler not to index it is a contradiction.
+    expect(entries.map(({ url }) => url).sort()).toEqual([...EXPECTED_URLS].sort());
 
-      // Every entry is `lastModified: new Date()` (`sitemap.ts:10-48`), so all nine stamps are the
-      // same instant — the moment the sitemap was generated. That tells a crawler the whole site
-      // changed on every deploy, which is the same as telling it nothing, and it will stop trusting
-      // the field. Distinct stamps per route are what make it worth sending.
-      const stamps = entries.map(({ lastModified }) => String(lastModified));
-      expect(
-        new Set(stamps).size,
-        'every entry shares one timestamp: lastModified is a build clock, not a content date',
-      ).toBeGreaterThan(1);
-    },
-  );
+    // Every entry used to be `lastModified: new Date()`, so all of them carried the one instant the
+    // sitemap was generated. That tells a crawler the whole site changed on every deploy, which is
+    // the same as telling it nothing, and it stops trusting the field.
+    const stamps = entries.map(({ lastModified }) => String(lastModified));
+    expect(
+      new Set(stamps).size,
+      'every entry shares one timestamp: lastModified is a build clock, not a content date',
+    ).toBeGreaterThan(1);
+  });
+
+  describe('lastModified', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('does not depend on when the sitemap is generated', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const before = sitemap();
+      vi.setSystemTime(new Date('2031-06-15T12:34:56Z'));
+      expect(sitemap()).toEqual(before);
+    });
+
+    it('is a real calendar date, from the data files', () => {
+      const byUrl = new Map(sitemap().map(({ url, lastModified }) => [url, lastModified]));
+      expect(byUrl.get(BASE)).toBe(STATIC_ROUTE_UPDATED['/']);
+      for (const { slug, updatedAt } of caseStudies) {
+        expect(byUrl.get(`${BASE}/work/${slug}`)).toBe(updatedAt);
+      }
+      for (const date of byUrl.values()) {
+        expect(String(date)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        // Round-trips through Date, so 2026-02-30 cannot slip in.
+        expect(new Date(`${String(date)}T00:00:00Z`).toISOString().slice(0, 10)).toBe(date);
+      }
+    });
+  });
 });

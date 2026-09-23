@@ -327,7 +327,7 @@ test('the sitemap and robots.txt are served and agree with the routes', async ({
   expect(sitemap.headers()['content-type']).toContain('xml');
   const xml = await sitemap.text();
   // Compared by pathname, not by full URL: the origin comes from NEXT_PUBLIC_SITE_URL with a fallback
-  // (`sitemap.ts:5`), so pinning `https://miloscvetkovic.dev` would fail for anyone who sets that
+  // (`baseUrl` in sitemap.ts), so pinning `https://miloscvetkovic.dev` would fail for anyone who sets that
   // variable — and the origin is not what this test is about. R31 pins the URL *set* against the data.
   const listed = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(([, url]) =>
     new URL(url).pathname.replace(/(.)\/$/, '$1'),

@@ -39,6 +39,16 @@ describe('caseStudies', () => {
     expect(new Set(caseStudies.map((study) => study.slug)).size).toBe(caseStudies.length);
   });
 
+  it('dates every study with real calendar dates, updated no earlier than published', () => {
+    for (const { slug, publishedAt, updatedAt } of caseStudies) {
+      for (const date of [publishedAt, updatedAt]) {
+        expect(date, slug).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10), slug).toBe(date);
+      }
+      expect(updatedAt >= publishedAt, `${slug}: updatedAt before publishedAt`).toBe(true);
+    }
+  });
+
   it('states every headline metric as a finite number', () => {
     for (const study of caseStudies) {
       expect(Number.isFinite(study.highlight.metric.value)).toBe(true);

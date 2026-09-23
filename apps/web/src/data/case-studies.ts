@@ -40,11 +40,28 @@ export interface CaseStudy {
     category: string;
     items: string[];
   }[];
+  /**
+   * When the case study first went public and when its visible content last changed, as ISO dates
+   * (`YYYY-MM-DD`). The sitemap's `lastmod` and the TechArticle's dates read them, so bump
+   * `updatedAt` in the commit that changes what the page says, and only then.
+   */
+  publishedAt: string;
+  updatedAt: string;
 }
+
+// TODO(milos): confirm both dates for every study. From git: each was added in acacce0
+// (2026-01-27) and "Go live (#2)", 7d31606, landed on 2026-02-23, which is the publishedAt used
+// below; the apex domain has served the site since 2026-09-09, so that may be the truer answer.
+// updatedAt is 2026-09-23, the SEO pull request that changed every case-study page: bump it to the
+// day it merges.
+const PUBLISHED_AT = '2026-02-23';
+const UPDATED_AT = '2026-09-23';
 
 export const caseStudies: CaseStudy[] = [
   {
     slug: 'self-healing-agent',
+    publishedAt: PUBLISHED_AT,
+    updatedAt: UPDATED_AT,
     highlight: {
       category: 'AI AGENT',
       status: 'LIVE',
@@ -85,6 +102,8 @@ export const caseStudies: CaseStudy[] = [
   },
   {
     slug: 'enterprise-b2b-platform',
+    publishedAt: PUBLISHED_AT,
+    updatedAt: UPDATED_AT,
     highlight: {
       category: 'PLATFORM',
       status: 'PRODUCTION',
@@ -135,6 +154,8 @@ export const caseStudies: CaseStudy[] = [
   },
   {
     slug: 'nx-remote-cache',
+    publishedAt: PUBLISHED_AT,
+    updatedAt: UPDATED_AT,
     highlight: {
       category: 'DEVOPS',
       status: 'PRODUCTION',
