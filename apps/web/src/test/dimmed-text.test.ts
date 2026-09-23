@@ -1204,15 +1204,6 @@ interface KnownDefect {
 const KNOWN_DEFECTS: KnownDefect[] = [
   {
     id: 'DIM1',
-    file: 'src/components/animated-hero/hud-elements.tsx',
-    component: 'CodeLine',
-    tokens: ['text-[var(--muted)]/50'],
-    sites: 1,
-    fixedBy: '#110',
-    why: 'the line-number gutter, which #110 paints with --muted at full opacity',
-  },
-  {
-    id: 'DIM2',
     file: 'src/components/animated-hero/animated-text.tsx',
     component: 'GlitchText',
     tokens: ['opacity-70'],
@@ -1221,7 +1212,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the two aria-hidden copies of its text drawn while it glitches on hover (critic-8)',
   },
   {
-    id: 'DIM3',
+    id: 'DIM2',
     file: 'src/components/featured-work/architecture-background.tsx',
     component: 'ArchitectureBackground',
     tokens: ['opacity-40', 'dark:opacity-60', 'opacity={…}'],
@@ -1230,7 +1221,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the SVG <text> node labels of the diagram behind the featured work sit at 40% (60% dark), and at 0.3 of that under a hovered card',
   },
   {
-    id: 'DIM4',
+    id: 'DIM3',
     file: 'src/components/animated-hero/hero-content.tsx',
     component: 'SkillTags',
     tokens: ['text-[rgba(99,102,241,0.7)]', 'dark:text-[rgba(167,139,250,0.6)]'],
@@ -1239,7 +1230,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the hero skill tags paint an accent at 0.7 alpha, 0.6 in the dark theme (hero-2)',
   },
   {
-    id: 'DIM5',
+    id: 'DIM4',
     file: 'src/components/animated-hero/hero-section.tsx',
     component: 'HeroSection',
     tokens: ['style.color'],
@@ -1248,7 +1239,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the Scroll label under the hero, painted inline at 0.7 alpha (hero-2)',
   },
   {
-    id: 'DIM6',
+    id: 'DIM5',
     file: 'src/components/animated-hero/tmux-background.tsx',
     component: 'StaticPane',
     tokens: ['style.color'],
@@ -1257,7 +1248,7 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the log lines of the tmux background take the --log-* colours, 0.35 to 0.55 alpha; the animated panes set the same colours from script, which the scan cannot see',
   },
   {
-    id: 'DIM7',
+    id: 'DIM6',
     file: 'src/components/animated-hero/circuit-background.tsx',
     component: 'CircuitBackground',
     tokens: ['fill={…}'],
