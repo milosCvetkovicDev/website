@@ -405,7 +405,8 @@ static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
 - [ ] `/blog`
 - [ ] `/contact`
 - [ ] `/sitemap.xml` lists exactly those nine URLs, all on the apex origin
-- [ ] `/robots.txt` allows `/`, disallows `/api/` and `/_next/`, and points at the apex sitemap
+- [ ] `/robots.txt` allows `/`, disallows nothing (`/_next/` holds the CSS, scripts and fonts a
+      crawler renders with), and points at the apex sitemap
 - [ ] `/work/does-not-exist` answers `404` and renders the site not-found page
       (`apps/web/src/app/not-found.tsx`), identically to `/no-such-page`. There is one not-found page,
       not two: the case-study segment has no `not-found.tsx` of its own, because

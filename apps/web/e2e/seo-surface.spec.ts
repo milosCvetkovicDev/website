@@ -190,9 +190,6 @@ test('every route serves the full Open Graph set and its own twitter:title', asy
 test('robots.txt allows what the site serves and names nothing it does not', async ({
   request,
 }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R25, #48' });
-
   const response = await request.get('/robots.txt');
   expect(response.status()).toBe(200);
   const body = await response.text();
