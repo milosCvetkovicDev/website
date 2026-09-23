@@ -7,6 +7,7 @@ import { ExecutionPhase } from '../execution-phase';
 import { GauntletPhase } from '../gauntlet-phase';
 import { LoopPhase } from '../loop-phase';
 import { GameComplete } from '../game-complete';
+import { cssTransitions, gsapCssConflicts, tweenedElements } from './gsap-css-conflicts';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
 // it at import time, so the stub must exist before the imports above are evaluated.
@@ -118,6 +119,125 @@ describe.each(phases)('$name', ({ Phase }) => {
     unmount();
     expect(ScrollTrigger.getAll()).toHaveLength(0);
   }, 15_000);
+});
+
+/** Long enough for every timer-driven sequence to create its last reveal: Gauntlet's runs 6.6 s. */
+const WHOLE_SEQUENCE_MS = 10_000;
+/** Just past the loop alert's pulse at 500 ms, while it still reads ERROR DETECTED. */
+const EARLY_MS = 600;
+
+// What each phase tweens that CSS used to fight, and must now leave alone: the discovery tags and the
+// strategy tech cards (a transition and a hover transform each), the loop alert and the closing CTA
+// (a transition each). Execution's commit-streak counter and Gauntlet's deploy panel never were;
+// they are listed so the check is seen to pass elements that were always fine, and Gauntlet's also
+// shows a transition on a child is fine. Each must be among the elements the check inspects, with
+// exactly the properties listed, so the check cannot pass by inspecting nothing.
+const tweenedTargets = [
+  {
+    name: 'DiscoveryPhase',
+    Phase: DiscoveryPhase,
+    targets: (root: HTMLElement) => [...root.querySelectorAll('.requirement-reveal')],
+    count: 4,
+    tweens: ['opacity', 'transform'],
+  },
+  {
+    name: 'StrategyPhase',
+    Phase: StrategyPhase,
+    targets: (root: HTMLElement) => [...root.querySelectorAll('.tech-reveal')],
+    count: 4,
+    tweens: ['opacity', 'transform'],
+  },
+  {
+    name: 'ExecutionPhase',
+    Phase: ExecutionPhase,
+    targets: () => [screen.getByText('COMMIT STREAK').parentElement],
+    count: 1,
+    tweens: ['opacity', 'transform'],
+  },
+  {
+    name: 'GauntletPhase',
+    Phase: GauntletPhase,
+    targets: () => [screen.getByText('DEPLOYMENT SUCCESSFUL').closest('.mt-6')],
+    count: 1,
+    tweens: ['opacity', 'transform'],
+  },
+  {
+    name: 'LoopPhase',
+    Phase: LoopPhase,
+    targets: () => [screen.getByText(/^(ERROR DETECTED|RESOLVED)$/).closest('.border')],
+    count: 1,
+    tweens: ['opacity', 'transform'],
+  },
+  {
+    name: 'GameComplete',
+    Phase: GameComplete,
+    targets: () => [screen.getByRole('link', { name: /connect on linkedin/i })],
+    count: 1,
+    tweens: ['opacity', 'transform', 'box-shadow'],
+  },
+];
+
+describe.each(tweenedTargets)('$name against CSS', ({ name, Phase, targets, count, tweens }) => {
+  beforeEach(() => {
+    media.reduce = false;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    // Nothing plays by itself, so no tween completes and leaves GSAP's timeline before it is read.
+    gsap.ticker.remove(gsap.updateRoot);
+    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom does
+    // not implement.
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    try {
+      cleanup();
+    } finally {
+      // Restored even when an unmount throws, so the next test does not start with GSAP stopped.
+      gsap.ticker.add(gsap.updateRoot);
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
+    // Asserted last: a throw here must not skip the global restoration above it.
+    expect(media.listenerCount()).toBe(0);
+  });
+
+  it('leaves every property it tweens to GSAP: no CSS transition, animation or state rule on it', async () => {
+    const warn = vi.spyOn(console, 'warn');
+    const { container } = render(<Phase />);
+    // Timeline-bound triggers measure on refresh; the timer-driven sequences then create their reveals.
+    act(() => ScrollTrigger.refresh());
+    act(() => vi.advanceTimersByTime(EARLY_MS));
+    expect(await gsapCssConflicts(container), 'mid-sequence').toEqual([]);
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS - EARLY_MS));
+    expect(vi.getTimerCount(), 'every scheduled step has run').toBe(0);
+
+    const tweened = tweenedElements(container);
+    const expected = targets(container);
+    expect(expected).toHaveLength(count);
+    for (const target of expected) {
+      expect(target, `${name}: a target is missing`).not.toBeNull();
+      expect(
+        tweened.get(target as Element),
+        `${name}: what GSAP tweens on ${target?.className}`,
+      ).toEqual(new Set(tweens));
+    }
+    expect(await gsapCssConflicts(container), 'after the whole sequence').toEqual([]);
+    // A target GSAP could not find is only a console warning.
+    expect(warn.mock.calls.filter(([message]) => String(message).includes('GSAP'))).toEqual([]);
+
+    if (name === 'GauntletPhase') {
+      // The panel's child keeps the transition it always had; only the element GSAP writes matters.
+      expect(await cssTransitions((expected[0] as Element).firstElementChild as Element)).toContain(
+        'all',
+      );
+    }
+
+    // And the check can fail on these very elements: the class this fix removed is flagged again.
+    (expected[0] as Element).classList.add('transition-all');
+    expect(await gsapCssConflicts(container)).toContainEqual(
+      expect.stringMatching(/GSAP tweens \S+, which .*\.transition-all/),
+    );
+  });
 });
 
 describe('ExecutionPhase', () => {

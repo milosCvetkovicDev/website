@@ -172,10 +172,10 @@ export function LoopPhase() {
               </div>
             </div>
 
-            {/* Alert */}
+            {/* Alert. transition-colors only: GSAP's pulse writes its opacity and transform. */}
             <div
               ref={alertRef}
-              className={`rounded-lg border p-4 transition-all duration-500 ${
+              className={`rounded-lg border p-4 transition-colors duration-500 ${
                 shownAlertStatus === 'error'
                   ? 'border-[var(--status-err)]/50 bg-[var(--status-err)]/10'
                   : 'border-[var(--status-ok)]/50 bg-[var(--status-ok)]/10'

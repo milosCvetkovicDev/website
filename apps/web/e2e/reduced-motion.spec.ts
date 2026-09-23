@@ -8,7 +8,7 @@ import { expect, test, type Page } from '@playwright/test';
  * - R18 (hero-4) is ADR 0009 rule 4: an endless animation stops while nothing can see it. Seven
  *   `repeat: -1` animations keep running after the story has been scrolled past — `hero-section.tsx:40`
  *   and `:113`, `hero-content.tsx:78`, `hud-elements.tsx:291`, `execution-phase.tsx:284`,
- *   `game-complete.tsx:147`, `loop-phase.tsx:188` — off-screen or at `opacity: 0`, burning a phone
+ *   `game-complete.tsx:148`, `loop-phase.tsx:188` — off-screen or at `opacity: 0`, burning a phone
  *   battery for something nobody is looking at. Measured with `document.getAnimations()`, which sees
  *   both CSS and Web Animations API timelines, which is why it catches all seven despite their being
  *   written three different ways.

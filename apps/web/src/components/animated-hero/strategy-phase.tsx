@@ -68,7 +68,7 @@ export function StrategyPhase() {
       });
 
       // Tech tree items appear
-      const techItems = techTreeRef.current?.querySelectorAll('.tech-item');
+      const techItems = techTreeRef.current?.querySelectorAll('.tech-reveal');
       if (techItems) {
         tl.fromTo(
           techItems,
@@ -152,40 +152,42 @@ export function StrategyPhase() {
               TECH TREE
             </h3>
             {techChoices.map((tech) => (
-              <div
-                key={tech.category}
-                className="tech-item group hover-lift relative flex cursor-default items-center gap-4 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4"
-              >
-                {/* Selection indicator */}
-                <div className="absolute top-0 bottom-0 left-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
+              // The timeline animates this wrapper and the card inside it keeps hover-lift: on one
+              // element its transform transition re-eases GSAP's entrance, and GSAP's inline
+              // transform cancels the lift.
+              <div key={tech.category} className="tech-reveal">
+                <div className="tech-item group hover-lift relative flex cursor-default items-center gap-4 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
+                  {/* Selection indicator */}
+                  <div className="absolute top-0 bottom-0 left-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
 
-                <span className="text-2xl transition-transform duration-300 group-hover:scale-125">
-                  {tech.icon}
-                </span>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
-                      {tech.category}
-                    </span>
-                    <span className="text-[var(--accent-text)] transition-transform duration-300 group-hover:translate-x-1">
-                      →
-                    </span>
-                    <span className="font-semibold">{tech.choice}</span>
+                  <span className="text-2xl transition-transform duration-300 group-hover:scale-125">
+                    {tech.icon}
+                  </span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
+                        {tech.category}
+                      </span>
+                      <span className="text-[var(--accent-text)] transition-transform duration-300 group-hover:translate-x-1">
+                        →
+                      </span>
+                      <span className="font-semibold">{tech.choice}</span>
+                    </div>
+                    <p className="text-sm text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
+                      {tech.reason}
+                    </p>
                   </div>
-                  <p className="text-sm text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
-                    {tech.reason}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[var(--status-ok)] transition-transform duration-300 group-hover:scale-110">
-                    ✓
-                  </span>
-                  <span
-                    className="font-mono text-[10px] text-[var(--status-ok)] opacity-0 transition-opacity group-hover:opacity-100"
-                    aria-hidden="true"
-                  >
-                    LOCKED
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[var(--status-ok)] transition-transform duration-300 group-hover:scale-110">
+                      ✓
+                    </span>
+                    <span
+                      className="font-mono text-[10px] text-[var(--status-ok)] opacity-0 transition-opacity group-hover:opacity-100"
+                      aria-hidden="true"
+                    >
+                      LOCKED
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
