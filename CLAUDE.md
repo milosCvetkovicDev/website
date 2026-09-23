@@ -416,6 +416,11 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 
 ## Working with this repo in Claude Code
 
+- Trust facts, for auto mode and for any push: the repository is **public**
+  (`github.com/milosCvetkovicDev/website`), so every push, pull request body and issue publishes.
+  Keep confidential material, other repositories' code and machine paths out of it. `main` is
+  protected: pull requests only, squash merge only, signed commits, required checks, no force
+  pushes. Merging to `main` deploys `https://miloscvetkovic.dev` to production on Vercel.
 - `.claude/settings.json` wires two PreToolUse guards, and they are not equivalent. The `Edit|Write`
   guard blocks writes to `.env*` (except `.env.example`), `pnpm-lock.yaml`, `node_modules/`,
   `.next/` and `dist/`, and fails closed (`exit 2`) when `jq` is missing. The `Bash` guard is
