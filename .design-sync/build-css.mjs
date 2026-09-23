@@ -49,14 +49,14 @@ if (warnings.length) {
 
 // Claude Design's design-system check registers every custom property in the shipped CSS as a
 // token and guesses its kind from its value: Tailwind's internals made 28 of them unclassifiable,
-// and the site's --accent-text came out as a font (see NOTES.md, "Claude Design's report"). Every
-// custom property of Tailwind's own (`--tw-*`, and the theme's `--ease-*`, `--animate-*` and
-// `--default-*`) is tagged `/* @kind other */`, and the site's twelve theme colours
-// `/* @kind color */`, as the design agent suggested. The tags are comments, so nothing renders
-// differently. Nothing in the converter documents them: whether the check honours them is read
-// from the `_ds_manifest.json` it regenerates. (Dropping Tailwind's `@layer properties` fallback
-// instead was tried: the converter's validator then reports nine `--tw-*` variables as undefined,
-// because it does not read `@property` initial values.)
+// and the site's --accent-text came out as a font (see NOTES.md, "Claude Design's report"). The
+// owner wants only the twelve theme colours below treated as tokens, so each of them is tagged
+// `/* @kind color */` and every other custom property, Tailwind's and the site's own `--tmux-*`
+// and `--log-*` alike, `/* @kind other */`, as the design agent suggested. The tags are comments,
+// so nothing renders differently. Nothing in the converter documents them: whether the check
+// honours them is read from the `_ds_manifest.json` it regenerates. (Dropping Tailwind's
+// `@layer properties` fallback instead was tried: the converter's validator then reports nine
+// `--tw-*` variables as undefined, because it does not read `@property` initial values.)
 const SITE_COLOURS = new Set(
   [
     'background',
@@ -74,18 +74,11 @@ const SITE_COLOURS = new Set(
   ].map((name) => `--${name}`),
 );
 result.root.walkDecls(/^--/, (decl) => {
-  const kind = SITE_COLOURS.has(decl.prop)
-    ? 'color'
-    : /^--(tw|ease|animate|default)-/.test(decl.prop)
-      ? 'other'
-      : null;
-  if (!kind) return;
+  const kind = SITE_COLOURS.has(decl.prop) ? 'color' : 'other';
   // `raws` spell it `--x: 0; /* @kind other */`, the form the design agent quoted.
-  const tag = postcss.comment({
-    text: `@kind ${kind}`,
-    raws: { before: ' ', left: ' ', right: ' ' },
-  });
-  decl.after(tag);
+  decl.after(
+    postcss.comment({ text: `@kind ${kind}`, raws: { before: ' ', left: ' ', right: ' ' } }),
+  );
 });
 const css = result.root.toString();
 

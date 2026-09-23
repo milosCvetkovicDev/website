@@ -9,7 +9,9 @@ document.head.appendChild(pauseBlink);
 export const Size14 = () => (
   <div className="flex items-center gap-2 text-[var(--foreground)]">
     <Logo size={14} />
-    <p className="text-sm text-[var(--muted)]">2026 Milos Cvetkovic. Built with Next.js.</p>
+    <p className="text-sm text-[var(--muted)]">
+      {new Date().getFullYear()} Milos Cvetkovic. Built with Next.js.
+    </p>
   </div>
 );
 
