@@ -140,13 +140,29 @@ interface Rule {
   declarations: string;
 }
 
-/** Every block in `css`, nested ones included, with its selector or at-rule and its declarations. */
+/**
+ * Every block in `css`, nested ones included, with its selector or at-rule and its declarations. A
+ * comment is dropped, and a quoted string or an escaped character is copied whole, so that a brace
+ * or a semicolon inside one ends nothing: `content: "}"` stays a declaration.
+ */
 function rulesIn(css: string): Rule[] {
   const rules: Rule[] = [];
   const open: Rule[] = [];
   let text = '';
-  for (const char of withoutComments(css)) {
-    if (char === '{') {
+  for (let at = 0; at < css.length; at++) {
+    const char = css[at];
+    if (char === '/' && css[at + 1] === '*') {
+      const end = css.indexOf('*/', at + 2);
+      at = end === -1 ? css.length : end + 1;
+    } else if (char === '"' || char === "'") {
+      let end = at + 1;
+      while (end < css.length && css[end] !== char) end += css[end] === '\\' ? 2 : 1;
+      text += css.slice(at, end + 1);
+      at = end;
+    } else if (char === '\\') {
+      text += css.slice(at, at + 2);
+      at += 1;
+    } else if (char === '{') {
       open.push({ selector: text.trim(), declarations: '' });
       text = '';
     } else if (char === '}') {
@@ -566,17 +582,24 @@ function propertyKey(property: ts.ObjectLiteralElementLike): string | undefined 
   return undefined;
 }
 
-/** A property's value; a shorthand property's is the name it repeats. */
+/**
+ * A property's value; a shorthand property's is the name it repeats, and a method's or a getter's
+ * is the function itself, which the callers read through what it returns.
+ */
 function propertyValue(property: ts.ObjectLiteralElementLike): ts.Node | undefined {
   if (ts.isPropertyAssignment(property)) return property.initializer;
   if (ts.isShorthandPropertyAssignment(property)) return property.name;
+  if (ts.isMethodDeclaration(property) || ts.isGetAccessorDeclaration(property)) return property;
   return undefined;
 }
 
 const propertyNamed = (object: ts.ObjectLiteralExpression, key: string) =>
   object.properties.find(
     (property) =>
-      (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property)) &&
+      (ts.isPropertyAssignment(property) ||
+        ts.isShorthandPropertyAssignment(property) ||
+        ts.isMethodDeclaration(property) ||
+        ts.isGetAccessorDeclaration(property)) &&
       propertyKey(property) === key,
   );
 
@@ -626,10 +649,12 @@ function objectLiteralsOf(
   if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
     const key = staticKey(expression);
     if (key === undefined) return [];
-    return objectLiteralsOf(expression.expression, seen, sometimes).flatMap((found) => {
+    const entries = objectLiteralsOf(expression.expression, seen, sometimes).flatMap((found) => {
       const property = propertyNamed(found.object, key);
       return property ? objectLiteralsOf(propertyValue(property), seen, found.sometimes) : [];
     });
+    if (entries.length > 0) return entries;
+    return handedMember(expression).flatMap((value) => objectLiteralsOf(value, seen, true));
   }
   if (ts.isCallExpression(expression)) {
     const callee = callableOf(expression.expression);
@@ -714,14 +739,17 @@ function declarationOf(name: ts.Identifier, constantsOnly = false): ts.Node | un
 /**
  * Every value a name can hold that the source shows, and whether it holds any of them only some of
  * the time: a `const` holds its value, a `let` its first value and every later assignment in its
- * scope, and a parameter its default only when a caller passes nothing.
+ * scope, and a parameter its default only when a caller passes nothing. A component's prop also
+ * holds what the module's own elements hand it.
  */
 function valuesOf(name: ts.Identifier): { values: ts.Node[]; sometimes: boolean } {
   const declared = declarationOf(name);
   const binding = bindingOf(name);
   if (!binding) return { values: declared ? [declared] : [], sometimes: false };
   if (ts.isParameter(binding) || (ts.isBindingElement(binding) && !variableOf(binding))) {
-    return { values: declared ? [declared] : [], sometimes: true };
+    const prop = propOf(binding);
+    const handed = prop ? handedTo(prop.component, prop.key) : [];
+    return { values: [...(declared ? [declared] : []), ...handed], sometimes: true };
   }
   const variable = ts.isVariableDeclaration(binding) ? binding : variableOf(binding);
   const list = variable?.parent;
@@ -745,6 +773,94 @@ function valuesOf(name: ts.Identifier): { values: ts.Node[]; sometimes: boolean 
   if (scope) visit(scope);
   const values = [...(declared ? [declared] : []), ...assigned];
   return { values, sometimes: assigned.length > 0 };
+}
+
+/** A function that can be a component: what `localComponent` finds behind a tag. */
+const isComponentFunction = (
+  node: ts.Node,
+): node is ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression =>
+  ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node);
+
+/** The component and prop a parameter's binding reads: `tone` in `function Label({ tone })`. */
+function propOf(
+  binding: Binding,
+): { component: ts.FunctionLikeDeclaration; key: string } | undefined {
+  if (!ts.isBindingElement(binding) || binding.dotDotDotToken) return undefined;
+  const pattern = binding.parent;
+  const parameter = pattern.parent;
+  if (!ts.isObjectBindingPattern(pattern) || !ts.isParameter(parameter)) return undefined;
+  const component = parameter.parent;
+  if (!isComponentFunction(component) || component.parameters[0] !== parameter) return undefined;
+  const key = binding.propertyName ?? binding.name;
+  return ts.isIdentifier(key) || ts.isStringLiteral(key) ? { component, key: key.text } : undefined;
+}
+
+/** What the module's own elements hand `props.tone`, where `props` is a component's parameter. */
+function handedMember(node: ts.PropertyAccessExpression | ts.ElementAccessExpression): ts.Node[] {
+  const key = staticKey(node);
+  const object = unwrap(node.expression);
+  if (key === undefined || !ts.isIdentifier(object)) return [];
+  const parameter = bindingOf(object);
+  if (!parameter || !ts.isParameter(parameter) || !ts.isIdentifier(parameter.name)) return [];
+  const component = parameter.parent;
+  return isComponentFunction(component) && component.parameters[0] === parameter
+    ? handedTo(component, key)
+    : [];
+}
+
+/** The elements of a module that render each of its own components, found once per module. */
+const renderers = new WeakMap<ts.SourceFile, Map<ts.Node, ts.JsxOpeningLikeElement[]>>();
+
+function renderersOf(component: ts.FunctionLikeDeclaration): ts.JsxOpeningLikeElement[] {
+  const sourceFile = component.getSourceFile();
+  let byComponent = renderers.get(sourceFile);
+  if (!byComponent) {
+    // Stored before the walk, so that a lookup that needs the map again finds it, if partly.
+    const found = new Map<ts.Node, ts.JsxOpeningLikeElement[]>();
+    renderers.set(sourceFile, found);
+    const visit = (node: ts.Node): void => {
+      if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+        const rendered = localComponent(node.tagName);
+        if (rendered) found.set(rendered, [...(found.get(rendered) ?? []), node]);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+    byComponent = found;
+  }
+  return byComponent.get(component) ?? [];
+}
+
+/** The component props being resolved, so that a component that hands a prop to itself ends. */
+const handing: { component: ts.Node; key: string }[] = [];
+
+/**
+ * What the module's own elements hand a component's prop: the `tone={…}` of each `<Label>`, or
+ * the `tone` of an object one spreads. A class or a style prop is left out, because it lands on
+ * the `<Label>` element itself, where the scan judges it against what the component renders.
+ */
+function handedTo(component: ts.FunctionLikeDeclaration, key: string): ts.Node[] {
+  if (isClassName(key) || key === 'style') return [];
+  if (handing.some((entry) => entry.component === component && entry.key === key)) return [];
+  handing.push({ component, key });
+  try {
+    return renderersOf(component).flatMap((opening) =>
+      opening.attributes.properties.flatMap((attribute): ts.Node[] => {
+        if (ts.isJsxSpreadAttribute(attribute)) {
+          return objectLiteralsOf(attribute.expression).flatMap(({ object }) => {
+            const property = propertyNamed(object, key);
+            const value = property && propertyValue(property);
+            return value ? [value] : [];
+          });
+        }
+        const value = attribute.name.getText() === key ? attribute.initializer : undefined;
+        if (!value) return [];
+        return ts.isJsxExpression(value) ? (value.expression ? [value.expression] : []) : [value];
+      }),
+    );
+  } finally {
+    handing.pop();
+  }
 }
 
 /** The declaration a binding element sits in, when it is a variable's rather than a parameter's. */
@@ -805,15 +921,37 @@ function bindingOf(name: ts.Identifier): Binding | undefined {
   return undefined;
 }
 
-/** A function literal, or the same-module function a name refers to. */
-function callableOf(node: ts.Node | undefined): ts.FunctionLikeDeclaration | undefined {
-  const target = node && ts.isIdentifier(node) ? declarationOf(node) : node;
-  return target &&
-    (ts.isArrowFunction(target) ||
-      ts.isFunctionExpression(target) ||
-      ts.isFunctionDeclaration(target))
-    ? target
-    : undefined;
+/** A function whose returns the scan reads: a literal, a declaration, a method or a getter. */
+const isReadableFunction = (node: ts.Node): node is ts.FunctionLikeDeclaration =>
+  ts.isArrowFunction(node) ||
+  ts.isFunctionExpression(node) ||
+  ts.isFunctionDeclaration(node) ||
+  ts.isMethodDeclaration(node) ||
+  ts.isGetAccessorDeclaration(node);
+
+/**
+ * A function literal, or the same-module function a name or an object's entry refers to, through
+ * other names: `const f = S.cls`.
+ */
+function callableOf(
+  node: ts.Node | undefined,
+  seen = new Set<ts.Node>(),
+): ts.FunctionLikeDeclaration | undefined {
+  if (!node || seen.has(node)) return undefined;
+  seen.add(node);
+  const target = ts.isExpression(node) ? unwrap(node) : node;
+  if (ts.isIdentifier(target)) return callableOf(declarationOf(target), seen);
+  if (ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)) {
+    const key = staticKey(target);
+    if (key === undefined) return undefined;
+    for (const { object } of objectLiteralsOf(target.expression)) {
+      const property = propertyNamed(object, key);
+      const found = property && callableOf(propertyValue(property), seen);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  return isReadableFunction(target) ? target : undefined;
 }
 
 function propertyChunks(
@@ -872,13 +1010,18 @@ function classChunks(
     return next(node.expression);
   }
   if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-    // `STYLES.icon` reads that entry alone; `tones[tone]` could be any of them.
+    // `STYLES.icon` reads that entry alone; `tones[tone]` could be any of them; `props.tone` is
+    // what the module's own elements hand the component.
     const key = staticKey(node);
     const objects = key === undefined ? [] : objectLiteralsOf(node.expression);
     const found = objects.find(({ object }) => key !== undefined && propertyNamed(object, key));
     const property = found && key !== undefined ? propertyNamed(found.object, key) : undefined;
-    return property
-      ? next(propertyValue(property), conditional || found!.sometimes || objects.length > 1)
+    if (property) {
+      return next(propertyValue(property), conditional || found!.sometimes || objects.length > 1);
+    }
+    const handed = handedMember(node);
+    return handed.length > 0
+      ? handed.flatMap((value) => next(value, true))
       : next(node.expression, true);
   }
   if (ts.isConditionalExpression(node)) {
@@ -900,7 +1043,7 @@ function classChunks(
     const held = valuesOf(node);
     return held.values.flatMap((value) => next(value, conditional || held.sometimes));
   }
-  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node)) {
+  if (isReadableFunction(node)) {
     const returned = returnedExpressions(node);
     return returned.flatMap((expression) => next(expression, conditional || returned.length > 1));
   }
@@ -988,9 +1131,24 @@ function neverAClass(node: ts.Node): boolean {
 
 // --- Styles and attributes -----------------------------------------------------------------------
 
-/** SVG elements whose paint reaches text: text itself, and the containers that pass it down. */
+/**
+ * SVG elements whose paint reaches text: text itself, and the containers that pass it down. `a` is
+ * one only inside an `<svg>`, since an HTML link ignores presentation attributes.
+ */
 const SVG_TEXT = new Set(['text', 'tspan', 'textPath']);
 const PAINT_HOSTS = new Set(['svg', 'g', 'a', 'symbol', 'switch', ...SVG_TEXT]);
+
+/** Whether an element sits in an `<svg>` of the same markup, and not in its `<foreignObject>`. */
+function insideSvg(opening: ts.JsxOpeningLikeElement): boolean {
+  const element = ts.isJsxOpeningElement(opening) ? opening.parent : opening;
+  for (let node = element.parent; node; node = node.parent) {
+    if (!ts.isJsxElement(node)) continue;
+    const tag = node.openingElement.tagName.getText();
+    if (tag === 'foreignObject') return false;
+    if (tag === 'svg') return true;
+  }
+  return false;
+}
 
 /**
  * Every opacity a value can take that the scan can read: literals, the branches of a condition or a
@@ -1009,6 +1167,9 @@ function amountsOf(node: ts.Node | undefined, seen = new Set<ts.Node>()): number
   }
   if (ts.isBinaryExpression(expression) && LOGICAL.has(expression.operatorToken.kind)) {
     return [...amountsOf(expression.left, seen), ...amountsOf(expression.right, seen)];
+  }
+  if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) {
+    return handedMember(expression).flatMap((value) => amountsOf(value, seen));
   }
   if (!ts.isIdentifier(expression)) return [];
   return valuesOf(expression).values.flatMap((value) => amountsOf(value, seen));
@@ -1065,7 +1226,8 @@ function styleProperties(
 
 /** Dimming an element's `style` sets, or, on an SVG element, its `opacity`, `fill` and `color`. */
 function declaredDimmings(opening: ts.JsxOpeningLikeElement): Declared[] {
-  const svg = PAINT_HOSTS.has(opening.tagName.getText());
+  const tag = opening.tagName.getText();
+  const svg = PAINT_HOSTS.has(tag) && (tag !== 'a' || insideSvg(opening));
   return opening.attributes.properties.flatMap((attribute): Declared[] => {
     if (!ts.isJsxAttribute(attribute) || !attribute.initializer) return [];
     const name = attribute.name.getText();
@@ -1084,21 +1246,52 @@ function declaredDimmings(opening: ts.JsxOpeningLikeElement): Declared[] {
   });
 }
 
+/** Words in a prop's name that make its paint something other than text's. */
+const NOT_TEXT_PAINT = new Set([
+  'backdrop',
+  'background',
+  'bg',
+  'border',
+  'caret',
+  'decoration',
+  'divider',
+  'dot',
+  'from',
+  'glow',
+  'gradient',
+  'icon',
+  'outline',
+  'overlay',
+  'ring',
+  'scrollbar',
+  'selection',
+  'separator',
+  'shadow',
+  'stop',
+  'stroke',
+  'thumb',
+  'to',
+  'track',
+  'via',
+]);
+
 /**
  * A colour or an opacity handed to a component in a prop named for one, which it may use on text.
- * The scan does not follow a value into the component, so it reports it where it is handed over.
+ * The scan reports it where it is handed over: it cannot follow the value into a component of
+ * another module, and one of the same module may pass it on to a helper the scan does not follow.
  */
 function handedDimmings(opening: ts.JsxOpeningLikeElement): Declared[] {
   if (isIntrinsic(opening.tagName.getText())) return [];
   return opening.attributes.properties.flatMap((attribute): Declared[] => {
     if (!ts.isJsxAttribute(attribute) || !attribute.initializer) return [];
     const name = attribute.name.getText();
-    // `color`, `fill`, `opacity`, or one of them for text: `textColor`, `labelOpacity`. A border's or
-    // a glow's colour is not text's, so `borderColor` and `glowOpacity` are left alone.
-    const paint = /^(?:(?:text|label|title|caption|font|fore)[\w-]*)?(colou?r|fill|opacity)$/i.exec(
-      name,
-    )?.[1];
+    // `color`, `fill` or `opacity`, alone or after words that say whose: `textColor`, `valueColor`,
+    // `labelOpacity`. A border's, a background's or a glow's paint is not text's, so `borderColor`,
+    // `labelBgColor` and `glowOpacity` are left alone.
+    const [, owner = '', paint] = /^(.*?)(colou?r|fill|opacity)$/i.exec(name) ?? [];
     if (!paint) return [];
+    const words = owner.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+/g) ?? [];
+    if (words.some((word) => NOT_TEXT_PAINT.has(word.toLowerCase()))) return [];
     const opacity = /^opacity$/i.test(paint);
     const dims = opacity
       ? amountsOf(attribute.initializer).some(partial)
