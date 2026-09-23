@@ -160,7 +160,7 @@ describe('the case-study JSON-LD blocks', () => {
         description: study.description,
         url,
         mainEntityOfPage: url,
-        image: `${url}/opengraph-image`,
+        image: `${url}/og-image.png`,
         author: { '@id': 'https://example.test/#person' },
         isPartOf: { '@id': 'https://example.test/#website' },
         datePublished: study.publishedAt,

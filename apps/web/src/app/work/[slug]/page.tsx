@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { BreadcrumbListJsonLd, TechArticleJsonLd } from '@/components/json-ld';
 import { adjacentCaseStudies, caseStudies, getCaseStudy } from '@/data/case-studies';
 import { buildMetadata } from '@/lib/metadata';
+import { cardAlt } from '@/lib/og-image';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -37,6 +38,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description: caseStudy.description,
     path: `/work/${caseStudy.slug}`,
     type: 'article',
+    image: {
+      url: `/work/${caseStudy.slug}/og-image.png`,
+      alt: cardAlt(`Case study: ${caseStudy.title}`),
+    },
   });
 }
 

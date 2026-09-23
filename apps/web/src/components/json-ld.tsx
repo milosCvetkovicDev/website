@@ -97,7 +97,7 @@ export function TechArticleJsonLd({ caseStudy }: { caseStudy: CaseStudy }) {
         description: caseStudy.description,
         url,
         mainEntityOfPage: url,
-        image: `${url}/opengraph-image`,
+        image: `${url}/og-image.png`,
         author,
         isPartOf: { '@id': WEBSITE_ID },
         datePublished: caseStudy.publishedAt,

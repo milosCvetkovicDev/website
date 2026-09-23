@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { OG_CONTENT_TYPE, OG_SIZE } from './og-image';
 
 /**
  * The per-route half of the head. The root layout keeps only what is true of every response, the
@@ -25,6 +26,12 @@ interface PageMetadata {
   socialTitle?: string;
   /** `false` keeps the page out of search while it can still be followed. */
   index?: boolean;
+  /**
+   * A card served by a route handler, with alt text of its own. Only for a card whose alt has to
+   * vary with the route's params, which an `opengraph-image` file cannot do; a segment with such a
+   * file leaves this out, and Next adds the file's card by itself.
+   */
+  image?: { url: string; alt: string };
 }
 
 // A pathname and nothing else: a leading slash, no trailing one (the root aside), no query, no
@@ -38,6 +45,7 @@ export function buildMetadata({
   type = 'website',
   socialTitle,
   index = true,
+  image,
 }: PageMetadata): Metadata {
   if (!PATHNAME.test(path)) {
     throw new Error(`buildMetadata: "${path}" is not a clean pathname such as /work or /`);
@@ -55,6 +63,9 @@ export function buildMetadata({
       locale: 'en_US',
       title: shareTitle,
       description,
+      // twitter:image and its alt follow from these: Next copies og:image into a twitter block that
+      // has no images of its own.
+      ...(image && { images: [{ ...image, ...OG_SIZE, type: OG_CONTENT_TYPE }] }),
     },
     twitter: {
       card: 'summary_large_image',

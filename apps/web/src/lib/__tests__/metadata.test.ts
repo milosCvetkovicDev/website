@@ -87,6 +87,32 @@ describe('buildMetadata()', () => {
     expect(metadata.openGraph).toMatchObject({ type: 'article', url: '/work/self-healing-agent' });
   });
 
+  it('describes a route-handler card completely, and adds no image to a route without one', () => {
+    // A segment with an `opengraph-image` file gets its card from Next, so the helper must not name
+    // one of its own there; the case studies' card is a route handler, which Next knows nothing of.
+    expect(about.openGraph).not.toHaveProperty('images');
+    const study = buildMetadata({
+      title: 't',
+      description: 'd',
+      path: '/work/self-healing-agent',
+      image: {
+        url: '/work/self-healing-agent/og-image.png',
+        alt: 'Case study: Self-Healing Agent',
+      },
+    });
+    expect(study.openGraph).toMatchObject({
+      images: [
+        {
+          url: '/work/self-healing-agent/og-image.png',
+          alt: 'Case study: Self-Healing Agent',
+          width: 1200,
+          height: 630,
+          type: 'image/png',
+        },
+      ],
+    });
+  });
+
   it('serves an indexable robots directive by default, and noindex when asked', () => {
     // Per route rather than in the root layout: whatever the layout declares also reaches the 404
     // pages, where it sat beside the `noindex` Next injects (#48, live-13).

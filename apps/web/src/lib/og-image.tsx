@@ -3,8 +3,9 @@ import { ImageResponse } from 'next/og';
 
 /**
  * The link-preview card every route serves as its og:image (and, through Next's fallback, its
- * twitter:image). One renderer, so the cards share a design; each `opengraph-image.tsx` passes only
- * its words, read from the page's own metadata or the case-study data rather than restated.
+ * twitter:image). One renderer, so the cards share a design; each `opengraph-image.tsx`, and the
+ * case studies' `og-image.png` route, passes only its words, read from the page's own metadata or
+ * the case-study data rather than restated.
  *
  * Rendered at build time: every route that uses it is static. It draws with ImageResponse's bundled
  * Geist Regular, because the site's own files are woff2, which ImageResponse cannot read, and any

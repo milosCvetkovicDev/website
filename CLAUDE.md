@@ -55,10 +55,13 @@ description, a link-preview title or a robots directive.
 
 `apps/web/src/app` also holds `error.tsx`, `not-found.tsx` and the metadata files: `sitemap.ts`,
 `robots.ts`, `manifest.ts`, `icon.tsx` and `apple-icon.tsx` (the navigation's "MC" mark, drawn by
-`src/lib/brand-mark.tsx`), and an `opengraph-image.tsx` in the root, in each static route's folder
-and in `work/[slug]`, all over one card design in `src/lib/og-image.tsx`. Each folder needs
-its own: a root image never reaches a page that declares its own `openGraph`. The one route handler,
-`favicon.ico/route.ts`, packs the same mark into an ICO. All of them prerender at build time.
+`src/lib/brand-mark.tsx`), and an `opengraph-image.tsx` in the root and in each static route's
+folder, all over one card design in `src/lib/og-image.tsx`. Each folder needs its own: a root image
+never reaches a page that declares its own `openGraph`. There are two route handlers:
+`favicon.ico/route.ts` packs the same mark into an ICO, and `work/[slug]/og-image.png/route.ts`
+draws the case-study card, whose alt text has to name the study, which an `opengraph-image` file's
+single `alt` cannot; the page points og:image at it through `buildMetadata()`'s `image`. All of them
+prerender at build time.
 `sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
 `NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
 
