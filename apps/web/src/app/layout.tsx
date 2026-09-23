@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 // Self-hosted through next/font/local rather than fetched from Google Fonts at build time: outside
 // dev, Next turns a failed Google Fonts fetch into a build error, so an outage or a network block on a
 // runner blocked every production deploy. The files are subsets of Geist; see fonts/README.md.
@@ -76,6 +76,17 @@ export const metadata: Metadata = {
   },
   // No `robots` here: each page sets its own through buildMetadata(), and one declared here would
   // also reach the 404s, beside the `noindex` Next injects there.
+};
+
+// Browser chrome in each scheme's `--background` (globals.css). The media queries follow the
+// operating system, not the site's toggle, which Next cannot see; `color-scheme` in globals.css is
+// what follows the toggle, and the meta tag tells the browser both schemes exist before CSS loads.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
+  colorScheme: 'light dark',
 };
 
 export default function RootLayout({

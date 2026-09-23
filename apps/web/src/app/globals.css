@@ -47,6 +47,8 @@
  *   text with an opacity modifier: even green-800 at /70 is 3.2:1 on its tint.
  */
 :root {
+  /* Native UI (scrollbars, form controls, the canvas) follows the theme, not the OS. */
+  color-scheme: light;
   --background: #fafafa;
   --foreground: #171717;
   --accent: #7c3aed;
@@ -82,6 +84,8 @@
 }
 
 .dark {
+  /* On `.dark` rather than `:root.dark`: `Terminal` scopes the class on a dark surface of its own. */
+  color-scheme: dark;
   --background: #0a0a0a;
   --foreground: #fafafa;
   --accent: #7c3aed;

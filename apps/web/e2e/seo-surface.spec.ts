@@ -275,9 +275,6 @@ test('the head declares theme-color and color-scheme, and color-scheme follows t
   page,
   request,
 }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R29, #48' });
-
   const head = await fetchHead(request, '/');
   const problems: string[] = [];
   if (!head.meta.get('theme-color')) problems.push('no theme-color in the served head');
