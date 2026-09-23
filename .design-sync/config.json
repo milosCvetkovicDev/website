@@ -18,6 +18,8 @@
     "HydrationMarker": null,
     "PersonJsonLd": null,
     "WebsiteJsonLd": null,
+    "TechArticleJsonLd": null,
+    "BreadcrumbListJsonLd": null,
     "ThemeProvider": null
   },
   "dtsPropsFor": {
