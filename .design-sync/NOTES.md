@@ -73,7 +73,9 @@ expects, and what each workaround depends on.
   module scope, which is the path those components already honour (the same one the accessibility
   gate checks) and renders the settled state. The stub sits above the exports, so it never reaches
   the usage examples. `TypingCursor` pauses its blink the same way, with a `<style>` element,
-  because the capture always landed in the caret's hidden half.
+  because the capture always landed in the caret's hidden half. `Logo` blinks four times on load,
+  so its card and the two that render it, `Navigation` and `Footer`, pause
+  `[class*="mc-blink"]` the same way.
 - **Fixed-position components need a sized wrapper in their story.** A card renders inside a
   transformed element, which becomes the containing block for `position: fixed`, so
   `CircuitBackground` (fixed overlay) came out blank with no wrapper height, and `SectionProgress`
@@ -139,8 +141,17 @@ expects, and what each workaround depends on.
   custom properties out of the token list: `lib/css.mjs` says the app's scope filter is a permissive
   heuristic and accepts the noise as the price of shipping component CSS to designs. Removing them
   from `_ds_bundle.css` would break every transform, shadow and easing utility in a design. Treat
-  the report entry as known, not new. The design agent also suggested tagging them
-  `/* @kind other */`; nothing in the skill or the converter reads such a tag, so it was not tried.
+  the report entry as known, not new.
+- Since the brand-logo branch, `build-css.mjs` tags every custom property in the shipped CSS: the
+  twelve theme colours `/* @kind color */` and everything else, Tailwind's and the site's own
+  `--tmux-*` and `--log-*` alike, `/* @kind other */`, as the design agent suggested and the owner
+  asked (only those twelve are meant as tokens). Nothing in the skill or the converter reads the
+  tag; only the check's regenerated `_ds_manifest.json` can show whether it does. Before tagging,
+  the manifest held 289 tokens: 28 `other`, the "couldn't be classified" count, all Tailwind
+  internals; 63 utility-class selectors under `themes`; and `--accent-text` classed as `font`.
+  Dropping Tailwind's `@layer properties` fallback was tried as well and reverted: the converter's
+  validator then reports nine `--tw-*` variables as undefined, since it does not read `@property`
+  initial values.
 
 ## Findings in the codebase
 
