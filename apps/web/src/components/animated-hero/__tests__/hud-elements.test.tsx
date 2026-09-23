@@ -4,9 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
+import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap } from '../use-gsap-scroll';
-import { DataStream, StatDisplay } from '../hud-elements';
+import { DataStream, PipelineStage, StatDisplay } from '../hud-elements';
+import { cssTransitions } from './gsap-css-conflicts';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
 // it at import time, so the stub must exist before the imports above are evaluated.
@@ -386,4 +388,51 @@ describe('StatDisplay', () => {
       );
     expect(smearing).toEqual([]);
   });
+});
+
+/** Every status `PipelineStage` accepts, checked against its props so a new one cannot go untested. */
+const PIPELINE_STATUSES = [
+  'pending',
+  'running',
+  'passed',
+  'failed',
+] as const satisfies readonly ComponentProps<typeof PipelineStage>['status'][];
+const everyStatusListed: [
+  Exclude<ComponentProps<typeof PipelineStage>['status'], (typeof PIPELINE_STATUSES)[number]>,
+] extends [never]
+  ? true
+  : never = true;
+
+describe('PipelineStage', () => {
+  afterEach(() => cleanup());
+
+  // GauntletPhase rewrites the fill's width every frame from a GSAP tween on a plain object, so a
+  // transition on width restarts on every frame and the bar trails its own progress: measured in
+  // Chromium, `transition-all duration-500` left the fill at 3-7% when the stage reached 100%, and
+  // full 467-483 ms later. The status colour still eases, which is the change CSS should animate.
+  it.each(PIPELINE_STATUSES)(
+    'transitions nothing on the fill but its colours, width least of all, while %s',
+    async (status) => {
+      expect(everyStatusListed).toBe(true);
+      render(<PipelineStage name="UNIT TESTS" status={status} progress={40} />);
+      const fill = screen
+        .getByText('UNIT TESTS')
+        .parentElement?.querySelector<HTMLElement>('.overflow-hidden > div');
+      // The element React writes the progress to.
+      expect(fill?.style.width).toBe('40%');
+
+      // What the fill may transition is what `transition-colors` covers in the installed Tailwind,
+      // read the same way, so `transition-[inline-size]` or a bare duration fails as well as
+      // `transition-all`.
+      const colours = document.createElement('div');
+      colours.className = 'transition-colors duration-500';
+      const allowed = await cssTransitions(colours);
+      const transitioned = await cssTransitions(fill!);
+      expect(
+        [...transitioned].filter((property) => !allowed.has(property)),
+        `the fill transitions ${[...transitioned].join(', ')}`,
+      ).toEqual([]);
+      expect(transitioned).toContain('background-color');
+    },
+  );
 });
