@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Test code is not a source of classes. src/test/dimmed-text.test.ts spells out dozens of the
+   dimming utilities it forbids, and automatic source detection would compile every one of them into
+   the site's stylesheet. */
+@source not '../test';
+
 /* Geist's fallback faces, with the override values Next generated for the Google Fonts copy of
    Geist before the fonts were self-hosted. Characters Geist lacks, such as arrows and circles,
    render in these, so they keep the size they had. layout.tsx turns off the faces
