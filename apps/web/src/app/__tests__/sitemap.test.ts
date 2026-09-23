@@ -55,6 +55,11 @@ describe('sitemap()', () => {
     }
   });
 
+  it('leaves out /blog while it is a noindex placeholder', () => {
+    // The page says noindex (R26); a sitemap entry would offer it to the same crawler anyway.
+    expect(sitemap().map(({ url }) => url)).not.toContain(`${BASE}/blog`);
+  });
+
   it('lists no URL twice', () => {
     // Green. Two entries for one URL is the shape a copy-paste edit leaves behind.
     const urls = sitemap().map(({ url }) => url);

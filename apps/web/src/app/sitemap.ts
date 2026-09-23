@@ -29,12 +29,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly' as const,
       priority: 0.7,
     },
-    {
-      url: `${baseUrl}/blog`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly' as const,
-      priority: 0.6,
-    },
+    // No /blog while it is a Coming Soon placeholder: the page is noindex (`blog/page.tsx`), and a
+    // sitemap offering it would contradict that. Add it back when the first post ships, together
+    // with deleting `index: false` there.
     {
       url: `${baseUrl}/contact`,
       lastModified: new Date(),

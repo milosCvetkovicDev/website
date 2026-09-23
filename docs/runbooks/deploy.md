@@ -392,8 +392,9 @@ already `light` when navigation committed, so there was no flash. Claude Code's 
 pane logs React error #418 on these pages while an unmodified Chromium does not, so use a real
 browser or Playwright for the console check.
 
-Then walk the site by hand. The App Router serves nine pages; `sitemap.ts` lists all nine, six
-static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
+Then walk the site by hand. The App Router serves nine pages; `sitemap.ts` lists eight of them,
+five static plus one per entry in `apps/web/src/data/case-studies.ts` (three today). `/blog` is left
+out, and served `noindex`, while it is a Coming Soon placeholder.
 
 - [ ] `/` loads, the hero animation runs, and scrolling does not stall
 - [ ] `/about`
@@ -404,7 +405,8 @@ static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
 - [ ] `/skills`
 - [ ] `/blog`
 - [ ] `/contact`
-- [ ] `/sitemap.xml` lists exactly those nine URLs, all on the apex origin
+- [ ] `/sitemap.xml` lists exactly those URLs except `/blog`, eight, all on the apex origin
+- [ ] `/blog` serves `<meta name="robots" content="noindex, follow">`
 - [ ] `/robots.txt` allows `/`, disallows nothing (`/_next/` holds the CSS, scripts and fonts a
       crawler renders with), and points at the apex sitemap
 - [ ] `/work/does-not-exist` answers `404` and renders the site not-found page

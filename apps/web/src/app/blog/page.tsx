@@ -5,6 +5,9 @@ export const metadata = buildMetadata({
   description:
     'Hard-won lessons on AI agents, legacy rescue, and building systems that scale. No fluff, no hype—just what actually works.',
   path: '/blog',
+  // Out of search while this is a Coming Soon placeholder, as it is out of `sitemap.ts`; the nav
+  // link stays. When the first post ships, delete this line and put /blog back in the sitemap.
+  index: false,
 });
 
 export default function BlogPage() {

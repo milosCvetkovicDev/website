@@ -214,9 +214,6 @@ test('robots.txt allows what the site serves and names nothing it does not', asy
 });
 
 test('/blog is noindex while it is a placeholder', async ({ request }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R26, #48' });
-
   const head = await fetchHead(request, '/blog');
   const robots = (head.meta.get('robots') ?? []).join(' ');
 
