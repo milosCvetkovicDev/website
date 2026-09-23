@@ -60,6 +60,16 @@ CSS variables, light values in `:root` and dark ones in `.dark`:
 - `<CTA />`, the closing "Let's Connect" section with the LinkedIn, GitHub and X buttons, takes no
   props. It is on `window.Portfolio` but has no card of its own.
 
+### Brand mark
+
+- `mc_` is the primary mark: `<Logo />` (group `brand`) draws "mc" in Geist Mono semibold (600),
+  tracked in by 5%, with an underscore cursor filled with `--accent`. Props: `size` in px (default 20) and `className`. The site uses 20 in the header and 14 before the footer's copyright.
+- `<Logo />` is aria-hidden, so name its wrapper: `<a href="/" aria-label="MC"><Logo /></a>`. The
+  cursor blinks four times on load and then holds; never make it blink indefinitely.
+- `M/C` is the secondary mark, for covers and print. There is no component for it.
+- Favicons and the touch icon are not in the bundle: the site draws them with `markImage()`, which
+  drops the cursor and shows a lone "m" at 32 px and under, and "mc_" above.
+
 ### Example
 
 ```jsx
