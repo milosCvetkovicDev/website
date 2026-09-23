@@ -243,9 +243,6 @@ test('a 404 serves exactly one robots tag, and it says noindex', async ({ reques
 test('the icons and the web manifest are served, and the favicon is not boilerplate', async ({
   request,
 }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R28, #48' });
-
   const problems: string[] = [];
   for (const [path, expectedType] of [
     ['/icon', 'image/'],

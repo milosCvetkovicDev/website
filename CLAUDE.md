@@ -46,10 +46,21 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 
 `/`, `/about`, `/blog`, `/contact`, `/skills`, `/work`, `/work/[slug]`.
 
-`apps/web/src/app` also holds the metadata files `sitemap.ts` and `robots.ts`, plus `error.tsx` and
-`not-found.tsx`. `sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
-`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There are no route handlers
-(`route.ts`) and no middleware.
+Every route's head comes from `buildMetadata()` in `apps/web/src/lib/metadata.ts`: its canonical,
+complete Open Graph and Twitter blocks, and its robots directive. Next replaces `openGraph`,
+`twitter` and `robots` wholesale per segment rather than merging them, so the root layout keeps only
+what is true of every response, the 404s included (`metadataBase`, the title template and the
+default Next requires beside it, the author, card type, site name, locale), and never a URL, a
+description, a link-preview title or a robots directive.
+
+`apps/web/src/app` also holds `error.tsx`, `not-found.tsx` and the metadata files: `sitemap.ts`,
+`robots.ts`, `manifest.ts`, `icon.tsx` and `apple-icon.tsx` (the navigation's "MC" mark, drawn by
+`src/lib/brand-mark.tsx`), and an `opengraph-image.tsx` in the root, in each static route's folder
+and in `work/[slug]`, all over one card design in `src/lib/og-image.tsx`. Each folder needs
+its own: a root image never reaches a page that declares its own `openGraph`. The one route handler,
+`favicon.ico/route.ts`, packs the same mark into an ICO. All of them prerender at build time.
+`sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
+`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
 
 ## Commands
 
