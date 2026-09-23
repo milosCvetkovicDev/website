@@ -1,15 +1,13 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
+import { buildMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Connect',
+  socialTitle: 'Connect | Milos Cvetkovic',
   description:
     'Connect with Milos Cvetkovic on LinkedIn, GitHub, and X. Follow along for engineering insights and project updates.',
-  openGraph: {
-    title: 'Connect | Milos Cvetkovic',
-    description: 'Follow along for engineering insights, open-source work, and project updates.',
-  },
-};
+  path: '/contact',
+});
 
 const socialLinks = [
   {

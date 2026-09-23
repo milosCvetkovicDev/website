@@ -1,11 +1,13 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
+import { buildMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Skills',
+  socialTitle: 'Skills & Expertise',
   description:
     'Full-stack TypeScript, AI agents, legacy rescue, cloud infrastructure. The tools I use to ship production systems.',
-};
+  path: '/skills',
+});
 
 // Primary skills with depth indicators
 const coreSkills = [

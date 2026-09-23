@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { caseStudies, getCaseStudy } from '@/data/case-studies';
+import { buildMetadata } from '@/lib/metadata';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -30,20 +31,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: 'Not Found' };
   }
 
-  return {
+  return buildMetadata({
     title: caseStudy.title,
+    socialTitle: `${caseStudy.title} | Case Study`,
     description: caseStudy.description,
-    openGraph: {
-      title: `${caseStudy.title} | Case Study`,
-      description: caseStudy.description,
-      type: 'article',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: caseStudy.title,
-      description: caseStudy.description,
-    },
-  };
+    path: `/work/${caseStudy.slug}`,
+    type: 'article',
+  });
 }
 
 export default async function CaseStudyPage({ params }: PageProps) {

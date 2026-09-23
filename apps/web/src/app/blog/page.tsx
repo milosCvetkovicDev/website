@@ -1,14 +1,11 @@
-import type { Metadata } from 'next';
+import { buildMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Writing',
   description:
     'Hard-won lessons on AI agents, legacy rescue, and building systems that scale. No fluff, no hype—just what actually works.',
-  openGraph: {
-    title: 'Writing',
-    description: 'Hard-won lessons from the trenches.',
-  },
-};
+  path: '/blog',
+});
 
 export default function BlogPage() {
   return (

@@ -1,14 +1,12 @@
-import type { Metadata } from 'next';
+import { buildMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'About',
+  socialTitle: 'About Milos Cvetkovic',
   description:
     'I fix the systems everyone else gave up on. 10+ years rescuing legacy codebases, now building AI agents that fix their own bugs. Based in Belgrade, working globally.',
-  openGraph: {
-    title: 'About Milos Cvetkovic',
-    description: 'I fix the systems everyone else gave up on.',
-  },
-};
+  path: '/about',
+});
 
 const timeline = [
   {

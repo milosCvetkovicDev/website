@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 // runner blocked every production deploy. The files are subsets of Geist; see fonts/README.md.
 import localFont from 'next/font/local';
 import './globals.css';
+import { SITE_NAME, TWITTER_HANDLE } from '@/lib/metadata';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 // Imported from their own modules, not the `@/components` barrel: every client module reachable
 // from a server component's imports is bundled into that layout's client chunk whether it renders
@@ -35,14 +36,15 @@ const geistMono = localFont({
   fallback: ['Geist Mono Fallback'],
 });
 
+// Only what is true of every response, the 404 included. What names a route (the canonical, og:url,
+// the titles and descriptions) comes from each page's buildMetadata(): Next replaces `openGraph` and
+// `twitter` wholesale per segment, so a URL or title set here would reach every page that forgot one.
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: 'Milos Cvetkovic | Senior Full-Stack Engineer',
     template: '%s | Milos Cvetkovic',
   },
-  description:
-    'Senior Full Stack Engineer & Architect building systems that inherit chaos and ship clarity. 13 years of AI-native development, self-healing agents, and cloud-native architecture across TypeScript, React, NestJS, Azure, and Kubernetes.',
   keywords: [
     'Senior Full-Stack Engineer',
     'AI-Native Development',
@@ -66,18 +68,11 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: siteUrl,
-    siteName: 'Milos Cvetkovic',
-    title: 'Milos Cvetkovic | Senior Full-Stack Engineer',
-    description:
-      'Senior Full Stack Engineer & Architect building systems that inherit chaos and ship clarity. 13 years of AI-native development, self-healing agents, and cloud-native architecture.',
+    siteName: SITE_NAME,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Milos Cvetkovic | Senior Full-Stack Engineer',
-    description:
-      'Senior Full Stack Engineer & Architect building systems that inherit chaos and ship clarity. AI-native development, self-healing agents, cloud architecture.',
-    creator: '@milos_dev',
+    creator: TWITTER_HANDLE,
   },
   robots: {
     index: true,

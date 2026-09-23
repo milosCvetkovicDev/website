@@ -1,17 +1,15 @@
-import type { Metadata } from 'next';
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
+import { buildMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
+export const metadata = buildMetadata({
   title: 'Work',
+  socialTitle: 'Work & Case Studies',
   description:
     'Real projects, real constraints, real results. Case studies on AI agents, legacy modernization, and high-performance systems.',
-  openGraph: {
-    title: 'Work & Case Studies',
-    description: 'What happens when you point me at a hard problem.',
-  },
-};
+  path: '/work',
+});
 
 function CornerBrackets() {
   return (
