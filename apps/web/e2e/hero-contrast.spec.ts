@@ -223,6 +223,19 @@ for (const colorScheme of colorSchemes) {
     ).toEqual([]);
   });
 
+  test(`the line under the headline reaches AA in the ${colorScheme} theme`, async ({ page }) => {
+    // Green. The line naming who the site is about was sr-only until #48 made it visible, and on the
+    // island axe cannot decide it: it is one of the `incomplete` nodes in the `/` budget of
+    // accessibility.spec.ts, so without this nothing would measure its colour.
+    await openHero(page, colorScheme);
+    const line = await sampleColor(
+      page.getByRole('heading', { level: 1 }).locator('xpath=following-sibling::p[1]'),
+      'the line under the h1',
+    );
+    expect(line.alpha).toBe(1);
+    expect(passesAA(line), describeSample(line)).toBe(true);
+  });
+
   test(`the Scroll label and every skill tag reach AA at rest and hovered in the ${colorScheme} theme`, async ({
     page,
   }) => {

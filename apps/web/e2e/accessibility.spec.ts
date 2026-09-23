@@ -115,7 +115,7 @@ const pages = PAGE_ROUTES;
  *   /work/nx-remote-cache  43 → 35
  *
  * `/work` measuring 8 is not a mistake and is worth knowing: its cards are `backdrop-blur-sm`
- * (`work/page.tsx:54`), so axe cannot resolve what is behind their text and puts 55 of its 63 nodes in
+ * (`work/page.tsx:51`), so axe cannot resolve what is behind their text and puts 55 of its 63 nodes in
  * `incomplete` instead. The floor there is nearly meaningless; the budget below is the number that
  * matters for that route.
  */
@@ -151,8 +151,13 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * Measured on 2026-09-12, and this is the whole recorded baseline:
  *
  *   /       light 112   dark 111-112   the hero island, `backdrop-filter: blur(28px)` over a gradient
- *   /work   light  55   dark  55       the archive cards, `backdrop-blur-sm` (work/page.tsx:54)
+ *   /work   light  55   dark  55       the archive cards, `backdrop-blur-sm` (work/page.tsx:51)
  *   every other route: 0 in both schemes
+ *
+ * Re-measured on 2026-09-23 for #48, on production builds with the page at rest: `/` gave light
+ * 112-115 and dark 112-115 over six runs a scheme, against light 111-114 and dark 112-114 on `main`
+ * the same day. The node #48 added is the hero's line naming who the site is about, which was
+ * sr-only and is now visible text on the island; `e2e/hero-contrast.spec.ts` measures its colour.
  *
  * Eight of the ten routes have a budget of **zero**, which is the strongest form this can take: on those
  * pages axe decides every text node, and the first blurred panel or gradient put behind text fails here.

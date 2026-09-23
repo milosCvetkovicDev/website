@@ -175,7 +175,7 @@ export default function SkillsPage() {
         {/* Header */}
         <div className="mb-16">
           <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
-            Technical toolkit
+            Technical toolkit · Milos Cvetkovic, Senior Full-Stack Engineer
           </p>
           <h1 className="mb-6 text-3xl font-bold md:text-4xl lg:text-5xl">Tools are just tools.</h1>
           <p className="max-w-2xl text-xl text-[var(--muted)]">

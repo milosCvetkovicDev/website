@@ -23,7 +23,7 @@ test.describe('Hero Section', () => {
   });
 
   test('renders player card with CV data', async ({ page }) => {
-    // exact: true — the sr-only SEO paragraph and the footer also contain the name.
+    // exact: true — the subtitle under the headline and the footer also contain the name.
     await expect(page.getByText('Milos Cvetkovic', { exact: true })).toBeVisible();
     await expect(page.getByText('Full Stack Engineer & Architect', { exact: true })).toBeVisible();
     await expect(page.getByText('AI-Native Development', { exact: true })).toBeVisible();
@@ -194,7 +194,10 @@ test.describe('Hero Section', () => {
     expect(html).toContain('Milos Cvetkovic');
     expect(html).toContain('Full Stack Engineer');
     expect(html).toContain('TypeScript');
-    expect(html).toContain('AI-native development'); // sr-only SEO text
+    // In the body, not only in the head's description: the subtitle under the headline says it.
+    const body = html?.slice(html.indexOf('<body'));
+    expect(body).toContain('AI-native development');
+    await expect(page.getByText(/specializing in AI-native development/)).toBeVisible();
   });
 
   test('has proper semantic HTML', async ({ page }) => {

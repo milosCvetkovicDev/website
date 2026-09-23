@@ -219,19 +219,22 @@ export default function WorkPage() {
         {/* Header */}
         <div className="mb-12">
           <div className="mb-4 flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]" />
+            {/* The eyebrow wraps on a phone: the dot keeps its size and sits on the first line, and
+                the rule, which would be squeezed to nothing, shows only where there is room. */}
+            <div className="flex items-start gap-2">
+              <span className="mt-1 h-2 w-2 shrink-0 animate-pulse rounded-full bg-[var(--accent)]" />
               <p className="font-mono text-xs tracking-widest text-[var(--accent-text)] uppercase">
-                Case Studies
+                Case studies · Milos Cvetkovic, Senior Full-Stack Engineer
               </p>
             </div>
-            <div className="h-px flex-1 bg-gradient-to-r from-[var(--accent)]/50 to-transparent" />
+            <div className="hidden h-px flex-1 bg-gradient-to-r from-[var(--accent)]/50 to-transparent sm:block" />
           </div>
           <h1 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
             Problems solved. Systems shipped.
           </h1>
           <p className="max-w-2xl text-xl text-[var(--muted)]">
-            Real projects with real constraints. Each one pushed boundaries—and delivered results.
+            Real projects with real constraints: AI agents, legacy modernization and developer
+            tooling. Each one pushed boundaries—and delivered results.
           </p>
         </div>
 
