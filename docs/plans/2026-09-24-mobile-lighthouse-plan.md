@@ -58,7 +58,7 @@ git worktree remove --force "$OUT/base"
 
 It passes when all of these hold:
 
-- [ ] Only clean runs count: no `runWarnings`, `benchmarkIndex` at least 1000, and the load in
+- [x] Only clean runs count: no `runWarnings`, `benchmarkIndex` at least 1000, and the load in
       `loads.txt` at or below about 10 for the whole session. Otherwise rerun the pairs later.
       Other sessions' e2e suites inflate blocking time.
 - [ ] The branch's median performance score is at least 5 points above the baseline's median from
@@ -66,10 +66,10 @@ It passes when all of these hold:
 - [ ] No metric gets worse: the branch medians of LCP, TBT, Speed Index and FCP are each at or
       below the baseline's, and CLS is 0 in every branch run. A difference within one run's spread
       is measured again, not accepted.
-- [ ] Every branch run scores 100 for accessibility, best practices and SEO.
-- [ ] In every branch run the LCP element is the hero `h1`, or the paragraph that paints in the same
+- [x] Every branch run scores 100 for accessibility, best practices and SEO.
+- [x] In every branch run the LCP element is the hero `h1`, or the paragraph that paints in the same
       first frame, and the network-requests audit lists no `/?_rsc=` request.
-- [ ] For a production-like reading, each branch run's LCP is also re-simulated from its saved
+- [x] For a production-like reading, each branch run's LCP is also re-simulated from its saved
       trace and devtools log with the protocol set to HTTP/2 (a Lantern replay). Recorded, not
       gated.
 - [ ] Production: five Lighthouse 12.8.2 CLI runs against `https://miloscvetkovic.dev` before the
@@ -78,6 +78,56 @@ It passes when all of these hold:
       gate: it can only run after the merge.
 
 Every command below runs from the repository root, after loading nvm. Run one e2e suite at a time.
+
+### Result, 2026-09-24: the relative gate is not met
+
+The branch, rebased onto `a3d97f9`, against a baseline built from `a3d97f9`, in two sessions of
+interleaved pairs. No run has a run warning, and `benchmarkIndex` is 1323–2032. Medians, baseline →
+branch:
+
+| Set | Pairs | Load at run start | Perf    | LCP (ms)    | TBT (ms)  | Speed Index (ms) | FCP (ms)    |
+| --- | ----- | ----------------- | ------- | ----------- | --------- | ---------------- | ----------- |
+| 1   | 5     | 3.8–9.4           | 89 → 90 | 2954 → 2956 | 279 → 261 | 1601 → 1083      | 1080 → 1074 |
+| 2   | 7     | 2.3–4.6           | 88 → 92 | 2936 → 2937 | 303 → 183 | 1522 → 1067      | 1055 → 1067 |
+
+- The score gains +1 and +4, short of +5. Blocking time and Speed Index improve in both sets. LCP is
+  within 2 ms in both. FCP is 6 ms better in one set and 12 ms worse in the other, inside the
+  baseline's own spread of 1034–1155 ms.
+- Every branch run scores 100 for accessibility, best practices and SEO, has a CLS of 0, and has the
+  hero `h1` as its LCP element. No branch run requests `/?_rsc=`; every baseline run does.
+- The HTTP/2 replay of set 2 puts both sides at an LCP of 2162–2202 ms at the observed first frame.
+  At a fixed 400 ms cutoff the baseline rises to 2273–2300 ms in six of seven runs, while the branch
+  stays at 2170–2178 ms. The branch's LCP no longer depends on when the first frame lands.
+- Against the first baseline, `d1da60f`, the branch measured +6: 94 against 88, LCP 2771 against
+  3294 ms, TBT 156 against 253 ms. Between then and `a3d97f9`, main merged #118 to #124 and the two
+  sides converged on LCP. The baseline's median fell to 2.94–2.95 s, and the branch's rose to the
+  same value. The review stage attributed the branch's rise to #120's headers (+456 B on each early
+  response) but did not isolate the cause.
+- What is left of LCP, and why this plan's changes cannot move it:
+  - The Lantern estimate counts every request that starts before the observed first frame. On both
+    sides those are the framework JavaScript, the two preloaded fonts and the stylesheet.
+  - Replayed at fixed cutoffs over HTTP/1.1, the baseline's LCP rises to 3204 ms at 400 ms and to
+    3416 ms at 600 ms, while the branch stays at 2937 ms. The branch's LCP advantage appears only in
+    runs where the first frame is late.
+- What is left of blocking time is the framework start-up task. A V8 CPU profile under 4× CPU
+  throttling, three runs a side:
+  - The longest script task has a median of 155 ms on the baseline and 162 ms on the branch.
+  - In five of the six runs, 87–107 ms of that task is the Turbopack runtime instantiating
+    framework modules, the same on both sides.
+  - So the branch's blocking-time gain comes from tasks outside that start-up task.
+- "If the relative gate fails" was followed:
+  1. The pairs were measured again as set 2: seven pairs, at a load of 5 or less.
+  2. LCP (2.94 s, over 2.80 s) and TBT (183 ms, over 140 ms) were investigated as above.
+  3. The lever the profile pointed to, deferring the hydration of the story phases below the fold,
+     was estimated from it as short of +5 on its own. The other levers are the owner decisions
+     below.
+  4. On 2026-09-24 the owner chose to open the pull request with these numbers stated rather than
+     make a third attempt.
+- Production before the pull request: five runs of `a3d97f9` on `https://miloscvetkovic.dev`, at a
+  load of 2.1–4.1 at run start:
+  - Scores 68, 93, 93, 91 and 92, a median of 92. The 68 is the first run, with a TBT of 1708 ms.
+  - The other four runs: LCP 2134–2290 ms, TBT 249–324 ms, CLS 0.0001.
+  - The runs after the deploy are still to be taken.
 
 ---
 
@@ -616,7 +666,7 @@ visitor's first scroll, and this task breaks it up.
 
 ### Last: the full gates
 
-- [ ] Screenshots, before and after, of the hero, Strategy, Execution, Loop and GameComplete at
+- [x] Screenshots, before and after, of the hero, Strategy, Execution, Loop and GameComplete at
       320, 375, 412, 640, 768 and 1280 px in light and dark, for the pull request and
       `ui-reviewer`.
 - [ ] Every gate CI runs and a production build, then the whole e2e suite in CI mode and in dev
@@ -735,6 +785,10 @@ locally over HTTP/1.1, and at 0 (within ±8 ms) over HTTP/2 and on the productio
   effect on any metric.
 
 ## Coordination
+
+On 2026-09-24 all of #118, #119, #120, #122 and #124 have merged. The branch is rebased onto
+`a3d97f9`, #122's two cherry-picked commits dropped out in the rebase, and the baseline was rebuilt
+at `a3d97f9`. The notes below are as written before those merges.
 
 - **#118** (brand logo, open) changes `lib/brand-mark.tsx` and adds a Logo in Geist Mono semibold,
   drawn from the variable mono file that is already preloaded, plus a four-cycle blink. `main`

@@ -6333,24 +6333,24 @@
       "anchor": "| 0024 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0024's record carries the status line \"Proposed\".",
+      "claim": "ADR 0024's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0024-gsap-loads-on-first-intent.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Proposed"
+        "equals": "Accepted"
       }
     },
     {
       "id": "adr-index-0024-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0024 |",
-      "claim": "The index row for ADR 0024 gives the record's status line, \"Proposed\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0024 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0024 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Proposed"
+        "equals": "Accepted"
       }
     },
     {

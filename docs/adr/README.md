@@ -48,7 +48,7 @@ perform an operation.
 | 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)                   | Accepted                                      | 2026-09-13 |
 | 0022 | [The home page renders no boot loader](0022-no-boot-loader.md)                                                                           | Superseded by ADR-0024                        | 2026-09-23 |
 | 0023 | [Six static security headers on every page and asset](0023-static-security-headers.md)                                                   | Accepted                                      | 2026-09-23 |
-| 0024 | [GSAP loads on the visitor's first intent](0024-gsap-loads-on-first-intent.md)                                                           | Proposed                                      | 2026-09-24 |
+| 0024 | [GSAP loads on the visitor's first intent](0024-gsap-loads-on-first-intent.md)                                                           | Accepted                                      | 2026-09-24 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
