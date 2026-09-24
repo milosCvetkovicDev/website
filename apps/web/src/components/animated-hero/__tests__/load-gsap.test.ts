@@ -191,6 +191,30 @@ describe('loadGsap', () => {
     expect(added).toHaveBeenCalledTimes(INTENT.length);
   });
 
+  it('fetches nothing after the story disarms the wait, and arms afresh when asked again', async () => {
+    // A soft navigation to `/` and out again before any intent: the next page's scroll is not one.
+    const { added, removed, intend } = stubPage();
+    const { loadGsap, disarmGsapIntent } = await freshLoader();
+
+    void loadGsap();
+    disarmGsapIntent();
+    expect(removed.mock.calls).toEqual(added.mock.calls);
+    for (const type of INTENT) intend(type);
+    await settle();
+    expect(runtime.evaluations).toBe(0);
+
+    // Back on `/`: a new wait, which the first intent ends as before.
+    const loading = loadGsap();
+    expect(added).toHaveBeenCalledTimes(2 * INTENT.length);
+    intend('wheel');
+    await loading;
+    expect(runtime.evaluations).toBe(1);
+
+    // Once intent has been reached there is nothing left to disarm, and the load stays shared.
+    disarmGsapIntent();
+    expect(loadGsap()).toBe(loading);
+  });
+
   it('never starts on the server, where there is no visitor', async () => {
     expect(globalThis.window).toBeUndefined();
     const { loadGsap } = await freshLoader();

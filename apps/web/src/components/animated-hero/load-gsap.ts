@@ -68,6 +68,8 @@ const INTENT_LISTENER = { capture: true, passive: true } as const;
 let intent: Promise<void> | undefined;
 /** Set while the intent listeners are armed: resolves `intent` and removes them. */
 let intentReached: (() => void) | undefined;
+/** Set while the intent listeners are armed: removes them without resolving, and forgets the wait. */
+let disarm: (() => void) | undefined;
 
 /**
  * Resolves on the visitor's first intent, and is memoised: armed once per page. A page that is
@@ -81,12 +83,22 @@ function whenIntent(): Promise<void> {
       resolve();
       return;
     }
-    const reached = () => {
+    const stop = () => {
       for (const type of INTENT_EVENTS) window.removeEventListener(type, reached, INTENT_LISTENER);
       intentReached = undefined;
+      disarm = undefined;
+    };
+    const reached = () => {
+      stop();
       resolve();
     };
     intentReached = reached;
+    // The abandoned promises never settle; the next `loadGsap()` arms a fresh wait.
+    disarm = () => {
+      stop();
+      intent = undefined;
+      loading = undefined;
+    };
     for (const type of INTENT_EVENTS) window.addEventListener(type, reached, INTENT_LISTENER);
   });
   return intent;
@@ -200,6 +212,17 @@ export function loadGsap(): Promise<GsapRuntime> {
  */
 export function preloadGsap(): void {
   loadGsap().catch(noop);
+}
+
+/**
+ * Takes the wait for intent down again, for the story to call when it leaves the page: a visitor
+ * who arrives on `/` by a soft navigation and leaves it without scrolling, touching, pressing or
+ * typing there would otherwise start the load on the next page's first scroll, where nothing waits
+ * for GSAP. Does nothing once intent has been reached (the load is under way and stays shared) or
+ * when nothing is armed. A later `loadGsap()`, `runWithGsap()` or `requestGsap()` arms it afresh.
+ */
+export function disarmGsapIntent(): void {
+  disarm?.();
 }
 
 /**

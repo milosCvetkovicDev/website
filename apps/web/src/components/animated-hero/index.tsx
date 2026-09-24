@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, memo, type ReactNode } from 'react';
-import { preloadGsap } from './load-gsap';
+import { disarmGsapIntent, preloadGsap } from './load-gsap';
 import { HeroSection } from './hero-section';
 import { SectionProgress } from './section-progress';
 import { DiscoveryPhase } from './discovery-phase';
@@ -35,9 +35,11 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
   // as in the phases because under reduced motion a phase mounted on the client, after a soft
   // navigation to `/`, returns before asking for it (on a hard load the hydration pass still asks,
   // with the reduced-motion hook's server snapshot, false), and the hover effects in
-  // animated-text.tsx still use it under `reduce`.
+  // animated-text.tsx still use it under `reduce`. Leaving `/` before any intent takes the wait
+  // down again, so the next page's first scroll does not fetch GSAP for nothing.
   useEffect(() => {
     preloadGsap();
+    return disarmGsapIntent;
   }, []);
 
   return (
