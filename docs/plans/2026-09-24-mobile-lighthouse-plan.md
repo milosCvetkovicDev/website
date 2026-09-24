@@ -325,21 +325,23 @@ Commit: `fix(web): keep the hero chrome to what fits on a phone` (layout items 1
 - Modify: `apps/web/src/components/animated-hero/section-progress.tsx`
 - Create: `apps/web/e2e/mobile/hero-chrome.spec.ts`
 
-- [ ] **Step 1:** `tmux-background.tsx`: both pane containers (the live pane and the reduced-motion
+- [x] **Step 1:** `tmux-background.tsx`: both pane containers (the live pane and the reduced-motion
       `StaticPane`) are `hidden … first:flex md:flex`, so a phone shows the first pane only; the
       `staging` and `logs` tabs are `hidden sm:block`; `milos@obsidian22` in the top bar is
       `hidden sm:inline`; in the status bar the `·` and `5 panes` spans, and the uptime, separators
       and region spans, are `hidden sm:inline` (the uptime span keeps its inline colour). The
       `3 alerts` span and the clock stay.
-- [ ] **Step 2:** `hero-section.tsx`: the section is `min-h-svh … px-4 sm:px-6` (not the patch's
+- [x] **Step 2:** `hero-section.tsx`: the section is `min-h-svh … px-4 sm:px-6` (not the patch's
       `py-20 sm:py-24`, whose rationale was wrong and which pushes the skill tags below the fold at
       375×667); the scroll indicator is `hidden lg:flex`.
-- [ ] **Step 3:** `section-progress.tsx`: the corner-bracket layer is `hidden lg:block`.
-- [ ] **Step 4:** New phone spec: exactly one tmux pane is displayed, and the corner-bracket layer
-      and the scroll indicator are `display: none`. Desktop coverage stays with `hero.spec.ts`
+- [x] **Step 3:** `section-progress.tsx`: the corner-bracket layer is `hidden lg:block`.
+- [x] **Step 4:** New phone spec: exactly one tmux pane is displayed, and the corner-bracket layer
+      and the scroll indicator are `display: none`, with motion allowed and reduced (the
+      reduced-motion snapshot renders its own panes). Desktop coverage stays with `hero.spec.ts`
       (five panes, the indicator fade).
-- [ ] **Step 5:** Verify in CI mode: `mobile/accessibility`, `hero`, `section-progress` and the new
-      spec. Screenshots at 320, 375, 412 and 1280 px, light and dark.
+- [x] **Step 5:** Verify in CI mode: `mobile/accessibility`, `hero`, `section-progress`,
+      `mobile/layout-overflow` and the new spec. Screenshots at 320, 375, 412 and 1280 px, light and
+      dark, are part of the set under "Last".
 
 **Measured side effects** (no score change): DOM size 1575 → 1451, tmux log slots 155 → 31,
 legible-text share 86.7% → 94.3%, incomplete nodes in the phone axe pass 74 → 38.
@@ -446,7 +448,8 @@ Commit: `fix(web): fit the hero island to phone widths` (layout item 2).
 - [ ] **Step 3:** #46 AC8's last clause in the phone spec at 320 px: the box of a `Range` over the
       `h1`'s contents lies inside the hero island's box.
 - [ ] **Step 4:** Verify: `served-html`, `hero-contrast`, both axe gates and the dimmed-text scanner
-      stay green; screenshots at 320, 375, 412, 640, 768 and 1280 px, light and dark.
+      stay green; screenshots at 320, 375, 412, 640, 768 and 1280 px, light and dark, are part of
+      the set under "Last".
 
 **Measured:** the LCP element stays the `h1` (6 runs), which paints in the same first frame; CLS 0;
 at 320 px the headline spans x 88.5–231.5, inside the island at 24–296.
@@ -573,6 +576,9 @@ visitor's first scroll, and this task breaks it up.
 
 ### Last: the full gates
 
+- [ ] Screenshots, before and after, of the hero, Strategy, Execution, Loop and GameComplete at
+      320, 375, 412, 640, 768 and 1280 px in light and dark, for the pull request and
+      `ui-reviewer`.
 - [ ] Every gate CI runs and a production build, then the whole e2e suite in CI mode and in dev
       mode, one at a time:
 

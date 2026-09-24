@@ -348,7 +348,7 @@ const TabBar = memo(function TabBar({ clock }: { clock: string }) {
         {'\u2B24'} production-monitor
       </div>
       <div
-        className="border-r px-3.5 py-1"
+        className="hidden border-r px-3.5 py-1 sm:block"
         style={{
           color: 'var(--tmux-bar-text)',
           borderColor: 'var(--tmux-border)',
@@ -357,7 +357,7 @@ const TabBar = memo(function TabBar({ clock }: { clock: string }) {
         {'\u25CB'} staging
       </div>
       <div
-        className="border-r px-3.5 py-1"
+        className="hidden border-r px-3.5 py-1 sm:block"
         style={{
           color: 'var(--tmux-bar-text)',
           borderColor: 'var(--tmux-border)',
@@ -371,7 +371,7 @@ const TabBar = memo(function TabBar({ clock }: { clock: string }) {
         className="ml-auto flex gap-4"
         style={{ color: 'var(--tmux-bar-text)', fontSize: '11px' }}
       >
-        <span>milos@obsidian22</span>
+        <span className="hidden sm:inline">milos@obsidian22</span>
         <span>{clock}</span>
       </div>
     </div>
@@ -435,16 +435,18 @@ const StatusBar = memo(function StatusBar({ clock }: { clock: string }) {
       <div className="flex gap-3">
         <span style={{ color: 'var(--tmux-status-ok)' }}>{'\u25A0'}</span>
         <span>[0] production-monitor</span>
-        <span>{'\u00B7'}</span>
-        <span>5 panes</span>
+        <span className="hidden sm:inline">{'\u00B7'}</span>
+        <span className="hidden sm:inline">5 panes</span>
       </div>
       <div className="ml-auto flex gap-4">
         <span style={{ color: 'var(--tmux-status-alerts)' }}>{'\u26A1'} 3 alerts</span>
-        <span>{'\u2502'}</span>
-        <span style={{ color: 'var(--tmux-status-uptime)' }}>{'\u2191'} 99.97%</span>
-        <span>{'\u2502'}</span>
-        <span>us-east-1</span>
-        <span>{'\u2502'}</span>
+        <span className="hidden sm:inline">{'\u2502'}</span>
+        <span className="hidden sm:inline" style={{ color: 'var(--tmux-status-uptime)' }}>
+          {'\u2191'} 99.97%
+        </span>
+        <span className="hidden sm:inline">{'\u2502'}</span>
+        <span className="hidden sm:inline">us-east-1</span>
+        <span className="hidden sm:inline">{'\u2502'}</span>
         <span>{clock}</span>
       </div>
     </div>
@@ -458,7 +460,7 @@ function StaticPane({ config }: { config: PaneConfig }) {
   const lines = config.seq.slice(0, 15);
   return (
     <div
-      className="flex min-w-0 flex-1 flex-col overflow-hidden border-r last:border-r-0"
+      className="hidden min-w-0 flex-1 flex-col overflow-hidden border-r first:flex last:border-r-0 md:flex"
       style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
     >
       <PaneTitle title={config.title} host={config.host} />
@@ -621,7 +623,7 @@ function AnimatedPane({
 
   return (
     <div
-      className="flex min-w-0 flex-1 flex-col overflow-hidden border-r last:border-r-0"
+      className="hidden min-w-0 flex-1 flex-col overflow-hidden border-r first:flex last:border-r-0 md:flex"
       style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
     >
       <PaneTitle title={config.title} host={config.host} />

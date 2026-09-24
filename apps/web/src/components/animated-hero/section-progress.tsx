@@ -235,7 +235,7 @@ export function SectionProgress({
 
       {/* Corner frame elements and the section readout: visual chrome only. The dots above carry
           the accessible navigation, so this layer is hidden from assistive technology. */}
-      <div className="pointer-events-none fixed inset-0 z-40" aria-hidden="true">
+      <div className="pointer-events-none fixed inset-0 z-40 hidden lg:block" aria-hidden="true">
         {/* Top-left corner */}
         <div className="absolute top-4 left-4">
           <svg width="40" height="40" viewBox="0 0 40 40" className="text-[var(--accent)]/30">
