@@ -75,9 +75,10 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   soft navigation needs neither, and a spec with JavaScript off must call neither, because the
   marker never flips. Never wait for hydration by watching page text (ADR 0022). The marker
   hydrates with the layout, so content a page wraps in `<Suspense>` or puts under a `loading.tsx`
-  would hydrate after it flips. No route puts `<main>` inside a
-  boundary; the one boundary with content today, the decorative `TmuxBackground` on `/`, may
-  hydrate after the marker. `e2e/hero.spec.ts` asserts the page title.
+  would hydrate after it flips. No route puts content inside a
+  boundary today: no component renders a `<Suspense>` or a `lazy()` component and no route has a
+  `loading.tsx`, since the decorative `TmuxBackground` on `/` is imported statically.
+  `e2e/hero.spec.ts` asserts the page title.
   That assertion is only a smoke check that the app rendered: it never could catch a second
   checkout of this site, which serves the same title character for character, and the not-found and
   error pages carry it too. Status and path are what catch a wrong page.

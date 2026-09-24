@@ -1,10 +1,7 @@
 'use client';
 
-import { lazy, Suspense, useSyncExternalStore, type ReactNode } from 'react';
-
-const TmuxBackground = lazy(() =>
-  import('./tmux-background').then((m) => ({ default: m.TmuxBackground })),
-);
+import { useSyncExternalStore, type ReactNode } from 'react';
+import { TmuxBackground } from './tmux-background';
 
 const SCROLL_THRESHOLD_PX = 100;
 const subscribeToScroll = (onChange: () => void) => {
@@ -24,10 +21,10 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       aria-label="Hero - Milos Cvetkovic, Senior Full Stack Engineer"
       className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6"
     >
-      {/* 1. TmuxBackground -- absolute-positioned background (lazy loaded) */}
-      <Suspense fallback={null}>
-        <TmuxBackground />
-      </Suspense>
+      {/* 1. TmuxBackground -- absolute-positioned background. Imported statically and hydrated
+          with the hero: as a lazy chunk it was a request of its own, made only once hydration
+          asked for it, and its Suspense boundary hydrated after the rest of the page. */}
+      <TmuxBackground />
 
       {/* 2. Overlay layers (decorative) */}
       {/* Glow */}

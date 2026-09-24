@@ -53,6 +53,46 @@ test.describe('Hero Section', () => {
     await expect(page.getByText('prometheus', { exact: false }).first()).toBeVisible();
   });
 
+  test('the server-rendered tmux background survives hydration', async ({ page }) => {
+    // The status bar's `[0] production-monitor` span, recorded as the parser creates it, must be the
+    // very node on the page once it has hydrated and settled. While TmuxBackground sat in a lazy
+    // Suspense boundary, the theme context changing right after hydration made React give up on
+    // hydrating that boundary: it deleted the served background and built a new one, which cost a
+    // long task inside the window Lighthouse measures, 8 of 8 times on the production build.
+    await page.addInitScript(() => {
+      const find = () =>
+        [...document.querySelectorAll('span')].find(
+          (span) => span.textContent === '[0] production-monitor',
+        );
+      new MutationObserver((_, observer) => {
+        const span = find();
+        if (!span) return;
+        (window as { servedTmuxStatus?: Element }).servedTmuxStatus = span;
+        observer.disconnect();
+      }).observe(document, { childList: true, subtree: true, characterData: true });
+    });
+    await page.goto('/');
+    await expectHydrated(page);
+    // The lazy chunk used to arrive, and the rebuild to land, a few hundred milliseconds after the
+    // marker flipped: wait well past it.
+    await page.waitForTimeout(3_000);
+
+    const status = await page.evaluate(() => {
+      const served = (window as { servedTmuxStatus?: Element }).servedTmuxStatus;
+      const current = [...document.querySelectorAll('span')].find(
+        (span) => span.textContent === '[0] production-monitor',
+      );
+      return {
+        recorded: served !== undefined,
+        connected: served?.isConnected ?? false,
+        same: served !== undefined && served === current,
+      };
+    });
+    expect(status.recorded, 'the served page had no tmux status span').toBe(true);
+    expect(status.connected, 'React deleted the server-rendered tmux background').toBe(true);
+    expect(status.same, 'the tmux status span on the page is not the one served').toBe(true);
+  });
+
   test('tmux log lines animate into panes', async ({ page }) => {
     // The kubectl pane always starts with the same entries; later ones arrive every ~650 ms.
     await expect(page.getByText('$ kubectl get pods -n production -w').first()).toBeVisible({

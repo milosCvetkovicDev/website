@@ -281,7 +281,8 @@ Commit: `perf(web): render the tmux background with the hero instead of a lazy c
 
 - Modify: `apps/web/src/components/animated-hero/hero-section.tsx`
 - Modify: `CLAUDE.md` (the Testing bullet on the hydration marker)
-- Modify: `apps/web/e2e/support/hydration.ts` (the same comment)
+- Modify: `apps/web/e2e/support/hydration.ts` (the same comment), `apps/web/e2e/served-html.spec.ts`
+  (a comment naming the `/` boundary's `<template id="B:0">`, which is no longer served)
 - Test: `apps/web/e2e/hero.spec.ts`
 
 **Why.** Hydration requested the lazy tmux chunk at about 300 ms, a serial link after the framework
@@ -291,20 +292,21 @@ replays). In production: LCP about 0, and the rebuild task (69–72 ms) goes. It
 streamed boundary and its DOM move. Cost: +17 KB raw (5.5 KB gzip) of initial JavaScript on `/`,
 and the tmux intervals start at hydration.
 
-- [ ] **Step 1:** Import `TmuxBackground` statically and render it without `Suspense`; drop `lazy`
+- [x] **Step 1:** Import `TmuxBackground` statically and render it without `Suspense`; drop `lazy`
       and `Suspense` from the imports and the "lazy loaded" comment.
-- [ ] **Step 2:** Grep `apps/web/src` for `Suspense` and `lazy(`, then correct the CLAUDE.md
+- [x] **Step 2:** Grep `apps/web/src` for `Suspense` and `lazy(`, then correct the CLAUDE.md
       Testing bullet and the header comment of `e2e/support/hydration.ts`, which both say the
       decorative `TmuxBackground` on `/` is the one boundary with content that may hydrate after the
       marker.
-- [ ] **Step 3:** Add "the server-rendered tmux background survives hydration" to
+- [x] **Step 3:** Add "the server-rendered tmux background survives hydration" to
       `e2e/hero.spec.ts`: an init-script MutationObserver records the first element whose text is
       exactly `[0] production-monitor` (the status-bar span); after hydration and 3 s, the recorded
       node is still in the document and is the node found now. On `main` it fails (the node is
-      deleted and rebuilt); it passes after Task 1 or Task 3. Keep the tests for five panes and CLS.
-- [ ] **Step 4:** Verify in CI mode: `hero`, `served-html`, `console-clean`, `accessibility`,
-      `mobile/accessibility` and `hydration-marker`. Screenshots of the hero in light, dark and
-      phone viewports.
+      deleted and rebuilt: 2 of 2 on a production build with `main`'s theme provider); it passes
+      after Task 1 or Task 3. Keep the tests for five panes and CLS.
+- [x] **Step 4:** Verify in CI mode: `hero`, `served-html`, `console-clean`, `accessibility`,
+      `mobile/accessibility` and `hydration-marker`. The hero looks the same, so its screenshots
+      are taken with Task 4's.
 
 **Rules.** ADR 0009 rule 4 and the comment in `animated-hero/index.tsx` concern the story phases
 only. ADR 0022: nothing covers the `h1` (`served-html.spec.ts` checks it). No Suspense boundary is
