@@ -506,7 +506,8 @@ function dataStreamStyle() {
   const tileSize = `${svgNumber(STREAM_TILE_W)}px ${STREAM_TILE_H}px`;
   return {
     // Carried once in a custom property, so the tile is not serialised twice. It is a data: URI,
-    // so a Content-Security-Policy, which the site does not send today, would need img-src data:.
+    // which the production Content-Security-Policy refuses (img-src 'self', ADR 0023): no route
+    // renders DataStream today, and one that did would need img-src data: first.
     '--data-stream-tile': dataStreamTile(),
     maskImage: 'var(--data-stream-tile)',
     WebkitMaskImage: 'var(--data-stream-tile)',
