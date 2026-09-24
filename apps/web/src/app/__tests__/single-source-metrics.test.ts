@@ -41,7 +41,6 @@ const COPY_MODULES = [
   'app/blog/page.tsx',
   'app/contact/page.tsx',
   'app/skills/page.tsx',
-  'app/skills/layout.tsx',
   'app/work/page.tsx',
   'app/work/[slug]/page.tsx',
   'app/not-found.tsx',
@@ -121,9 +120,10 @@ describe('metrics and biography live in one place', () => {
   it.fails(
     'R34 (#49): no page, layout or JSON-LD module hard-codes a years-of-experience figure',
     () => {
-      // Three different numbers ship today for one fact: `13 years` in layout.tsx:44, :60 and
-      // json-ld.tsx:14 and hero-content.tsx:19; `10+ years` in about/page.tsx:6, :70 and
-      // skills/layout.tsx:9; and /skills' own `2+` for AI. Whichever is right, it cannot be three.
+      // Two numbers ship today for one fact: `13 years` in json-ld.tsx and hero-content.tsx, and
+      // `10+` in about/page.tsx, in its description and its "Years shipping code" stat; /skills adds
+      // its own `2+` for AI. #48 took the figure out of the page descriptions and deleted
+      // skills/layout.tsx, which leaves four hits. Whichever figure is right, it cannot be two.
       const yearPatterns = [
         /\b\d{1,2}\+? years\b/,
         /\b\d{1,2}\+? yrs\b/,
@@ -141,7 +141,7 @@ describe('metrics and biography live in one place', () => {
 
       expect(
         hits.map(describeHit),
-        'the years of experience is stated in seven places with three different values. Put it in ' +
+        'the years of experience is stated in several places with different values. Put it in ' +
           'src/data and derive it, so the biography cannot disagree with itself.',
       ).toEqual([]);
     },

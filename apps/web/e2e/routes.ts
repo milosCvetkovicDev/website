@@ -10,9 +10,9 @@ import { caseStudies } from '../src/data/case-studies';
  * they are written out *once*, and the case studies are derived from the data file, so a new case
  * study reaches every gate without touching a spec.
  *
- * Consolidating the *source* side, so `src/app/sitemap.ts` reads this same set, belongs to the SEO
- * task (#48): a module under `src/app` importing from `e2e/` would ship the spec directory into the
- * build. `src/app/__tests__/sitemap.test.ts` asserts the two agree in the meantime.
+ * The *source* side stays separate: `src/app/sitemap.ts` lists the static routes itself, dated from
+ * `src/data/static-routes.ts`, because a module under `src/app` importing from `e2e/` would ship the
+ * spec directory into the build. `src/app/__tests__/sitemap.test.ts` asserts the two agree.
  */
 
 /** The six routes backed by a `page.tsx` under `src/app`, in navigation order. */

@@ -1,4 +1,12 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+// A title of its own, through the root template, so a 404 does not claim the home page's (and its
+// twitter:title, which Next fills from the title). No `robots`: Next already serves `noindex` here,
+// and a second robots tag is exactly what R27 forbids.
+export const metadata: Metadata = {
+  title: 'Page not found',
+};
 
 export default function NotFound() {
   return (

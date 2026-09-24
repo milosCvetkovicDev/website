@@ -3,10 +3,10 @@
  *
  * `robots()`'s rules.
  *
- * All green: the shape of the output is already right, and it is the *content* of one array that is
- * wrong — `disallow: ['/api/', '/_next/']`, which `e2e/seo-surface.spec.ts` owns as R25 because the
- * question there is what a crawler receives over HTTP. These assertions are the regression floor
- * underneath that fix: they say the sitemap reference and the wildcard user-agent must survive it.
+ * The file used to disallow `/api/` and `/_next/` (R25, #48). `/_next/` holds every stylesheet, chunk
+ * and font, so a crawler that obeyed it rendered the pages unstyled; `/api/` names a segment this app
+ * does not have. The whole output is pinned below, so a rule can only come back deliberately.
+ * `e2e/seo-surface.spec.ts` checks the same thing over HTTP, which is what a crawler receives.
  *
  * No DOM, so `node` rather than jsdom (CLAUDE.md, Testing).
  */
@@ -55,6 +55,13 @@ describe('robots()', () => {
       if (original === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
       else process.env.NEXT_PUBLIC_SITE_URL = original;
     }
+  });
+
+  it('is exactly one allow-all rule and the sitemap line', () => {
+    expect(robots()).toEqual({
+      rules: { userAgent: '*', allow: '/' },
+      sitemap: `${BASE}/sitemap.xml`,
+    });
   });
 
   it('disallows nothing that would hide a page from search', () => {

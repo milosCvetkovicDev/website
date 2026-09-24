@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { getActiveConnections } from '../src/data/architecture-graph';
 import { featuredProjects } from '../src/data/featured-projects';
 import { formatMetric } from '../src/data/case-studies';
+import { expectGsapLoaded } from './support/gsap';
 import { gotoHydrated } from './support/hydration';
 
 /** How long the story's scroll-triggered timers may take to finish; see the hover test. */
@@ -28,6 +29,10 @@ test.describe('Featured Work', () => {
     // 20-240, each time a bare "Test timeout" pending on a different line: throughput, not a hang.
     test.setTimeout(60_000);
     await gotoHydrated(page, '/');
+    // The sequences waited on below run on GSAP, which arrives after hydration. Waiting for it also
+    // keeps the jump out of the moment after hydration in which Chromium can undo a scripted scroll
+    // (hero.spec.ts, 'scroll indicator fades on scroll').
+    await expectGsapLoaded(page);
     const section = page.getByRole('region', { name: /featured work/i });
     await section.scrollIntoViewIfNeeded();
     // The last layout change of each phase: the Gauntlet's panel turning to success and the Loop's
@@ -74,9 +79,9 @@ test.describe('Featured Work', () => {
     // Under `reduce` the phases above render their finished state in the re-render right after
     // hydration, which gotoHydrated waits through, so no growth moves the card here.
     //
-    // The hydration wait includes the home page's loader. Under a 6x and a 10x CDP CPU throttle
-    // this test ran out of the 30 s default in 1 of 20 and 3 of 5 runs, every time still waiting
-    // for the loader to hide, so it gets the same room past that wait as the hover test.
+    // Under a 6x and a 10x CDP CPU throttle this test ran out of the 30 s default in 1 of 20 and 3
+    // of 5 runs, every time in the hydration wait (then still including the boot loader ADR 0022
+    // removed), so it gets the same room past that wait as the hover test.
     test.setTimeout(60_000);
     await gotoHydrated(page, '/');
     const section = page.getByRole('region', { name: /featured work/i });

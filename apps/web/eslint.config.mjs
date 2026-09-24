@@ -6,6 +6,46 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    // GSAP loads after hydration, through the `import()` in load-gsap.ts, so that it stays out of
+    // the home page's initial chunk. A static import of it, or of the module that wraps it, from
+    // anything the page reaches puts ~44 KB gzip back in, and nothing else would notice. Type
+    // imports are erased and allowed, and a dynamic `import()` is not an import declaration, so it
+    // passes. The typescript-eslint rule rather than the core one, for `allowTypeImports`; being a
+    // different rule, it also applies to layouts without replacing the barrel rule below.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      // The one module that imports GSAP, fetched lazily by load-gsap.ts.
+      'src/components/animated-hero/gsap-runtime.ts',
+      // Rendered by no route, and deleted by #47 (hero-6). Rendering it would ship GSAP and two
+      // plugins with the page, so it would have to load through load-gsap.ts first.
+      'src/components/animated-hero/circuit-background.tsx',
+      // Tests import GSAP directly to drive and inspect it; they ship nowhere.
+      'src/**/__tests__/**',
+      'src/test/**',
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['gsap', 'gsap/*'],
+              allowTypeImports: true,
+              message:
+                'GSAP loads after hydration: run GSAP work through runWithGsap or useWithGsap (animated-hero/load-gsap.ts).',
+            },
+            {
+              regex: '(^|/)gsap-runtime(\\.[jt]sx?)?$',
+              allowTypeImports: true,
+              message:
+                'Only load-gsap.ts may reach gsap-runtime, and only through import(): a static import ships GSAP in the initial chunk.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Every client module reachable from a layout's imports ships to every route, so layouts import
     // components from their own modules, never through the barrel (ADR 0009).
     files: ['src/app/**/layout.tsx'],

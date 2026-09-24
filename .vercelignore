@@ -31,6 +31,12 @@
 /build
 /out
 /dist
+# The Claude Design sync's compiled stylesheet (.design-sync/build-css.mjs), its staged converter
+# and its bundle. The site never reads any of .design-sync/, so the committed inputs stay out too.
+/apps/web/dist
+/.ds-sync
+/ds-bundle
+/.design-sync
 
 # Test output.
 /apps/web/coverage

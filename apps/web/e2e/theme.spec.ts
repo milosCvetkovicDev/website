@@ -64,7 +64,7 @@ test.describe('the pre-paint theme script', () => {
   test('a seeded light choice beats a dark OS preference before hydration', async ({ browser }) => {
     const { context, page } = await darkMachine(browser, 'light');
     try {
-      // /about rather than /: no boot loader, so nothing to wait for and no animation in the way.
+      // /about rather than /: no animation in the way.
       await page.goto('/about');
 
       const latched = await themeAtParseTime(page);
@@ -107,16 +107,22 @@ test.describe('the pre-paint theme script', () => {
     });
 
     test('a choice made in the UI survives a reload and a soft navigation', async ({ page }) => {
+      // The computed `color-scheme` is what paints the browser's own scrollbars and canvas, and it
+      // has to follow the site's class rather than the OS (globals.css; R29, #48).
+      const colorScheme = () =>
+        page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
       await page.emulateMedia({ colorScheme: 'dark' });
       await gotoHydrated(page, '/about');
       const html = page.locator('html');
       await expect(html).toContainClass('dark');
+      expect(await colorScheme()).toBe('dark');
 
       await page
         .getByRole('button', { name: /Switch to light mode/ })
         .first()
         .click();
       await expect(html).toContainClass('light');
+      expect(await colorScheme(), 'the toggle, not the dark OS, decides').toBe('light');
       expect(await page.evaluate((key) => localStorage.getItem(key), THEME_STORAGE_KEY)).toBe(
         'light',
       );
@@ -125,6 +131,7 @@ test.describe('the pre-paint theme script', () => {
       await expectHydrated(page);
       await expect(html).toContainClass('light');
       await expect(html).not.toContainClass('dark');
+      expect(await colorScheme()).toBe('light');
 
       // And across a soft navigation, where the provider is not remounted and the init script does
       // not run again: the class has to survive in the live document.

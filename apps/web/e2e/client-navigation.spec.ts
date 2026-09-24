@@ -1,13 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { caseStudies } from '../src/data/case-studies';
 import { warmRoutes } from './support/warm-routes';
+import { expectHydrated } from './support/hydration';
 
 /**
  * A real client-side navigation, by clicking links.
  *
  * Every other spec reaches a page with `page.goto` or `request.get`, which is a full document load:
- * the App Router's soft navigation — the one the comment at `animated-hero/index.tsx:36` is about —
- * was never executed by any test. That leaves a whole class of bug uncovered. A soft navigation keeps
+ * the App Router's soft navigation was never executed by any test. That leaves a whole class of bug uncovered. A soft navigation keeps
  * the React tree and the module registry alive, so state that should be per-route survives, an effect
  * that should have torn down keeps running, and a GSAP timeline built on the old DOM can write into
  * nodes React has since replaced. None of that is reachable from a `goto`.
@@ -86,7 +86,7 @@ test.describe('client-side navigation', () => {
   // 90 s is the budget for a slow walk, not the sum of the waits. The slowest passing run measured
   // took 79.2 s (dev server, CDP CPU throttling at 12x, load average 56-69), so under that much
   // starvation this budget is close to its limit too. The waits' own limits add up to more than
-  // 90 s (a 30 s loader wait, three 15 s URL waits, a 30 s glow poll and several 5 s defaults), so
+  // 90 s (a 30 s hydration wait, three 15 s URL waits, a 30 s glow poll and several 5 s defaults), so
   // a walk where many of them run long fails on this budget before any one of them runs out. No
   // retries: this is the regression floor for four tasks that all change components on this path,
   // and a retry would turn an intermittent hydration mismatch on a soft navigation — the exact
@@ -109,7 +109,7 @@ test.describe('client-side navigation', () => {
     const problems = collectProblems(page);
 
     await page.goto('/');
-    await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+    await expectHydrated(page);
     await markDocument(page);
 
     // The header, scoped as `banner` rather than `navigation`: the `MC` home link is a sibling of the
@@ -146,10 +146,6 @@ test.describe('client-side navigation', () => {
     await header.getByRole('link', { name: 'MC', exact: true }).click();
     await expect(page).toHaveURL(/\/$/, { timeout: SOFT_NAVIGATION_TIMEOUT_MS });
 
-    // The loader must not be up on arrival. That alone cannot tell a remount from a soft
-    // navigation: `toBeHidden` retries, and after a full load the loader hides again within the
-    // expect timeout. The document marker is what catches a document load.
-    await expect(page.getByText('System Boot', { exact: true })).toBeHidden();
     await expect(page.getByRole('heading', { level: 1 })).toContainText('This happened at 3am');
     await expectSameDocument(page, 'the MC home link');
 
