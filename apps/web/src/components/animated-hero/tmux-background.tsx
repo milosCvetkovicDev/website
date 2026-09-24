@@ -447,7 +447,8 @@ const StatusBar = memo(function StatusBar({ clock }: { clock: string }) {
         <span className="hidden sm:inline">{'\u2502'}</span>
         <span className="hidden sm:inline">us-east-1</span>
         <span className="hidden sm:inline">{'\u2502'}</span>
-        <span>{clock}</span>
+        {/* Below `sm` the bar wraps onto two lines with the clock in it; the tab bar shows it. */}
+        <span className="hidden sm:inline">{clock}</span>
       </div>
     </div>
   );
@@ -460,8 +461,8 @@ function StaticPane({ config }: { config: PaneConfig }) {
   const lines = config.seq.slice(0, 15);
   return (
     <div
-      className="hidden min-w-0 flex-1 flex-col overflow-hidden border-r first:flex last:border-r-0 md:flex"
-      style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
+      className="hidden min-w-0 flex-1 flex-col overflow-hidden border-r-2 first:flex last:border-r-0 max-md:border-r-0 md:flex"
+      style={{ borderColor: 'var(--tmux-border)' }}
     >
       <PaneTitle title={config.title} host={config.host} />
       <div className="relative flex-1 overflow-hidden">
@@ -623,8 +624,8 @@ function AnimatedPane({
 
   return (
     <div
-      className="hidden min-w-0 flex-1 flex-col overflow-hidden border-r first:flex last:border-r-0 md:flex"
-      style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
+      className="hidden min-w-0 flex-1 flex-col overflow-hidden border-r-2 first:flex last:border-r-0 max-md:border-r-0 md:flex"
+      style={{ borderColor: 'var(--tmux-border)' }}
     >
       <PaneTitle title={config.title} host={config.host} />
       <div ref={viewportRef} className="relative flex-1 overflow-hidden">

@@ -8,7 +8,8 @@ import { gotoHydrated } from '../support/hydration';
  * section-progress corner brackets and readout on top of the hero card, and a scroll indicator over
  * its skill tags. Below `md` the tmux background now shows its first pane only, and below `lg` the
  * corner layer and the scroll indicator are not displayed, all by CSS breakpoints, so the served
- * markup is the same at every width (ADR 0006). The desktop project keeps the full chrome, which
+ * markup is the same at every width (ADR 0006). The one pane draws no border at the screen edge, and
+ * the status bar keeps to one line down to 320 px. The desktop project keeps the full chrome, which
  * `e2e/hero.spec.ts` covers (five panes, the indicator fading on scroll).
  *
  * Both motion settings are checked, because the reduced-motion snapshot renders its own panes.
@@ -38,6 +39,27 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
         if (await pane.isVisible()) shown.push(title);
       }
       expect(shown).toEqual([PANE_TITLES[0]]);
+    });
+
+    test('draws no border at the screen edge of the one pane it shows', async ({ page }) => {
+      // The title sits in the pane's title bar, which is the pane's first child.
+      const pane = page.getByText(PANE_TITLES[0], { exact: true }).locator('../..');
+      await expect(pane).toHaveCSS('border-right-width', '0px');
+    });
+
+    test('keeps the tmux status bar on one line down to 320 px', async ({ page }) => {
+      // Wrapped, its spans stand 33 px tall in a 27 px bar and overflow it.
+      const bar = page.getByText('[0] production-monitor', { exact: true }).locator('../..');
+      for (const width of [320, 360, 375]) {
+        await page.setViewportSize({ width, height: 700 });
+        const { scrollHeight, clientHeight } = await bar.evaluate((el) => ({
+          scrollHeight: el.scrollHeight,
+          clientHeight: el.clientHeight,
+        }));
+        expect(scrollHeight, `the status bar wraps at ${width} px`).toBeLessThanOrEqual(
+          clientHeight,
+        );
+      }
     });
 
     test('does not display the corner brackets or the scroll indicator', async ({ page }) => {

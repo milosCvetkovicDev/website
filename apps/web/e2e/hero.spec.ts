@@ -53,6 +53,23 @@ test.describe('Hero Section', () => {
     await expect(page.getByText('prometheus', { exact: false }).first()).toBeVisible();
   });
 
+  test('tmux panes are divided by a 2 px border, with none at the right edge', async ({ page }) => {
+    const titles = [
+      'kubectl — pods',
+      'psql — slow query log',
+      'gh actions — CI pipeline',
+      'nginx — access + error',
+      'prometheus — alerts',
+    ];
+    const widths: string[] = [];
+    for (const title of titles) {
+      // The title sits in the pane's title bar, which is the pane's first child.
+      const pane = page.getByText(title, { exact: true }).locator('../..');
+      widths.push(await pane.evaluate((el) => getComputedStyle(el).borderRightWidth));
+    }
+    expect(widths).toEqual(['2px', '2px', '2px', '2px', '0px']);
+  });
+
   test('the server-rendered tmux background survives hydration', async ({ page }) => {
     // The status bar's `[0] production-monitor` span, recorded as the parser creates it, must be the
     // very node on the page once it has hydrated and settled. While TmuxBackground sat in a lazy
