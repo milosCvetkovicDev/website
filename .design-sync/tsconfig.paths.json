@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["apps/web/src/*"],
+      "next/link": [".design-sync/next/link.tsx"],
+      "next/navigation": [".design-sync/next/navigation.ts"]
+    }
+  }
+}

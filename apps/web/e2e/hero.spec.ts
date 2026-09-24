@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectHydrated } from './support/hydration';
 
 test.describe('Hero Section', () => {
   test.beforeEach(async ({ page }) => {
@@ -11,8 +12,8 @@ test.describe('Hero Section', () => {
     // (ADR 0014). It never caught a second checkout of this site either, and the not-found and error
     // pages carry this title too; status and path are what catch a wrong page, in the specs below.
     await expect(page).toHaveTitle(/Milos Cvetkovic/);
-    // The boot loader is removed once React has hydrated; interactions before that are lost.
-    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
+    // Interactions before hydration are lost.
+    await expectHydrated(page);
   });
 
   test('renders the headline', async ({ page }) => {
@@ -22,7 +23,7 @@ test.describe('Hero Section', () => {
   });
 
   test('renders player card with CV data', async ({ page }) => {
-    // exact: true — the sr-only SEO paragraph and the footer also contain the name.
+    // exact: true — the subtitle under the headline and the footer also contain the name.
     await expect(page.getByText('Milos Cvetkovic', { exact: true })).toBeVisible();
     await expect(page.getByText('Full Stack Engineer & Architect', { exact: true })).toBeVisible();
     await expect(page.getByText('AI-Native Development', { exact: true })).toBeVisible();
@@ -101,7 +102,7 @@ test.describe('Hero Section', () => {
     // and the closing call to action left the document until the visitor scrolled to them. This is
     // the guard for that: read the live DOM well after hydration, without scrolling.
     await page.goto('/');
-    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
+    await expectHydrated(page);
     await page.waitForTimeout(3_000);
     for (const copy of ['TECH TREE', 'CI/CD PIPELINE', 'SELF-HEALING LOG']) {
       await expect(page.getByText(copy, { exact: false }).first()).toBeAttached();
@@ -152,7 +153,14 @@ test.describe('Hero Section', () => {
     const indicator = page.getByText('Scroll', { exact: true }).first().locator('..');
     await expect(indicator).toHaveCSS('opacity', '1');
 
-    await page.evaluate(() => window.scrollTo(0, 500));
+    // A wheel scroll, as a visitor makes, not window.scrollTo. Chromium can undo a scripted scroll made
+    // this soon after hydration: the page snaps back to the top, with no script scrolling it, some 70 ms
+    // after Next's post-hydration history.replaceState. A user scroll is never undone. Measured on
+    // production builds of this branch and of main alike: 0 of 10 wheel scrolls and 2 to 5 of 10
+    // scripted ones snapped back. The boot loader used to hide it, holding every test 600 ms past
+    // hydration (ADR 0022).
+    await page.mouse.move(640, 360);
+    await page.mouse.wheel(0, 500);
 
     // Playwright counts opacity:0 elements as visible, so assert the computed style the fade produces.
     await expect(indicator).toHaveCSS('opacity', '0');
@@ -186,7 +194,10 @@ test.describe('Hero Section', () => {
     expect(html).toContain('Milos Cvetkovic');
     expect(html).toContain('Full Stack Engineer');
     expect(html).toContain('TypeScript');
-    expect(html).toContain('AI-native development'); // sr-only SEO text
+    // In the body, not only in the head's description: the subtitle under the headline says it.
+    const body = html?.slice(html.indexOf('<body'));
+    expect(body).toContain('AI-native development');
+    await expect(page.getByText(/specializing in AI-native development/)).toBeVisible();
   });
 
   test('has proper semantic HTML', async ({ page }) => {

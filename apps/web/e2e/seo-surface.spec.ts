@@ -1,5 +1,11 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
-import { NOT_FOUND_ROUTE, PAGE_ROUTES, STATIC_ROUTES, expectedStatus } from './routes';
+import {
+  CASE_STUDY_ROUTES,
+  NOT_FOUND_ROUTE,
+  PAGE_ROUTES,
+  STATIC_ROUTES,
+  expectedStatus,
+} from './routes';
 
 /**
  * The head every crawler and link-preview bot reads.
@@ -63,6 +69,16 @@ const first = (map: Map<string, string[]>, key: string) => map.get(key)?.[0];
 /** Every route a crawler can reach, with the status it answers. */
 const routes = PAGE_ROUTES.map((path) => ({ path, status: expectedStatus(path) }));
 
+/** A pathname from a head URL, with the trailing slash of anything but the root dropped. */
+const pathOf = (url: string) =>
+  new URL(url, 'https://miloscvetkovic.dev').pathname.replace(/(.)\/$/, '$1');
+
+// A 404 is one prerendered document served for every unknown URL, so nothing in its head can name
+// the URL that was asked for: a canonical or og:url there would name `/_not-found`, or the home page,
+// and every broken link would claim that URL. Making the page render per request would fix that
+// only by making every route dynamic. The owner decision of 2026-09-23: a 404 names no URL at all.
+const NAMES_NO_URL = 'a 404 must name no URL: it is one static document for every unknown path';
+
 test('the head parser reads the tags that are actually there', async ({ request }) => {
   // Green, and the control for all eight rows below. Every one of them asserts that something is
   // *missing*, so a parser that found nothing at all would make them all fail convincingly and the
@@ -79,39 +95,37 @@ test('the head parser reads the tags that are actually there', async ({ request 
   expect(head.raw).toContain('application/ld+json');
 });
 
-test('every route serves one canonical link for its own path', async ({ request }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R22, #48' });
-
+test('every page serves one canonical link for its own path, and a 404 serves none', async ({
+  request,
+}) => {
   const problems: string[] = [];
   for (const { path, status } of routes) {
     const head = await fetchHead(request, path);
     expect(head.status, `${path} should answer ${status}`).toBe(status);
     const canonicals = head.link.get('canonical') ?? [];
+    if (status === 404) {
+      if (canonicals.length > 0) problems.push(`${path}: ${NAMES_NO_URL}, got ${canonicals}`);
+      continue;
+    }
     if (canonicals.length !== 1) {
       problems.push(`${path}: ${canonicals.length} canonical links, expected 1`);
       continue;
     }
     // The path must be its own, not the home page's: one canonical pointing everywhere is worse than
     // none, because it tells a crawler these are all the same document.
-    const pathname = new URL(canonicals[0], 'https://miloscvetkovic.dev').pathname.replace(
-      /(.)\/$/,
-      '$1',
-    );
-    if (pathname !== path) problems.push(`${path}: canonical points at ${canonicals[0]}`);
+    if (pathOf(canonicals[0]) !== path) {
+      problems.push(`${path}: canonical points at ${canonicals[0]}`);
+    }
   }
 
   expect(
     problems,
-    '`canonical` and `alternates` appear nowhere in apps/web/src. Set `alternates.canonical` per ' +
-      'route (metadataBase is already set in layout.tsx, so a relative path resolves).',
+    'every page sets `alternates.canonical` to its own path through buildMetadata() ' +
+      '(src/lib/metadata.ts); nothing in the root layout may, or it would reach the 404s.',
   ).toEqual([]);
 });
 
 test('every route serves an og:image that answers with an image', async ({ request }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R23, #48' });
-
   const problems: string[] = [];
   const reachability = new Map<string, string>();
   for (const { path } of routes) {
@@ -157,15 +171,21 @@ test('every route serves an og:image that answers with an image', async ({ reque
 test('every route serves the full Open Graph set and its own twitter:title', async ({
   request,
 }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R24, #48' });
-
   const problems: string[] = [];
   const twitterTitles = new Map<string, string>();
-  for (const { path } of routes) {
+  for (const { path, status } of routes) {
     const head = await fetchHead(request, path);
-    for (const key of ['og:url', 'og:site_name', 'og:locale', 'og:type']) {
+    for (const key of ['og:site_name', 'og:locale', 'og:type']) {
       if (!first(head.meta, key)) problems.push(`${path}: no ${key}`);
+    }
+    const url = first(head.meta, 'og:url');
+    if (status === 404) {
+      if (url) problems.push(`${path}: ${NAMES_NO_URL}, got og:url ${url}`);
+    } else if (!url) {
+      problems.push(`${path}: no og:url`);
+    } else if (pathOf(url) !== path) {
+      // Its own URL, the same one the canonical names, not the home page's.
+      problems.push(`${path}: og:url points at ${url}`);
     }
     const twitterTitle = first(head.meta, 'twitter:title');
     if (!twitterTitle) problems.push(`${path}: no twitter:title`);
@@ -173,8 +193,8 @@ test('every route serves the full Open Graph set and its own twitter:title', asy
   }
 
   // A sub-page that serves the home page's twitter:title is a second bug with the same cause: an
-  // `openGraph: { title, description }` on a route *replaces* the root object from layout.tsx:65-73
-  // rather than merging into it, so the inherited fields vanish and the card falls back to the root.
+  // `openGraph` or `twitter` object on a route *replaces* the root's rather than merging into it, so
+  // the inherited fields vanish and the card falls back to whatever the root still declares.
   const home = twitterTitles.get('/');
   const borrowed = [...twitterTitles]
     .filter(([path, title]) => path !== '/' && title === home)
@@ -185,17 +205,14 @@ test('every route serves the full Open Graph set and its own twitter:title', asy
 
   expect(
     problems,
-    'a per-route `openGraph` object replaces the root one instead of merging: spread the shared ' +
-      'fields, or set them per route.',
+    'a per-route `openGraph` object replaces the root one instead of merging: every page builds ' +
+      'its whole set through buildMetadata() (src/lib/metadata.ts).',
   ).toEqual([]);
 });
 
 test('robots.txt allows what the site serves and names nothing it does not', async ({
   request,
 }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R25, #48' });
-
   const response = await request.get('/robots.txt');
   expect(response.status()).toBe(200);
   const body = await response.text();
@@ -220,9 +237,6 @@ test('robots.txt allows what the site serves and names nothing it does not', asy
 });
 
 test('/blog is noindex while it is a placeholder', async ({ request }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R26, #48' });
-
   const head = await fetchHead(request, '/blog');
   const robots = (head.meta.get('robots') ?? []).join(' ');
 
@@ -235,16 +249,14 @@ test('/blog is noindex while it is a placeholder', async ({ request }) => {
 });
 
 test('a 404 serves exactly one robots tag, and it says noindex', async ({ request }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R27, #48' });
-
   const head = await fetchHead(request, NOT_FOUND_ROUTE);
   expect(head.status).toBe(404);
   const robots = head.meta.get('robots') ?? [];
 
-  // Two tags that contradict each other are worse than the wrong one: the root `robots` block
-  // (layout.tsx:81-91) applies to the not-found page too, and not-found.tsx exports no metadata of its
-  // own, so `index, follow` is emitted alongside whatever else — plus a googlebot `index, follow`.
+  // Two tags that contradict each other are worse than the wrong one. Next injects `noindex` on every
+  // 404, and anything the root layout's metadata declares reaches the not-found page too, which is how
+  // it used to serve `index, follow` alongside it, plus a googlebot `index, follow`. So robots
+  // directives are set per page (lib/metadata.ts) and never in the root layout.
   expect(
     { robots, googlebot: head.meta.get('googlebot') ?? [] },
     'a 404 must be noindex, and must not also claim index, follow.',
@@ -254,9 +266,6 @@ test('a 404 serves exactly one robots tag, and it says noindex', async ({ reques
 test('the icons and the web manifest are served, and the favicon is not boilerplate', async ({
   request,
 }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R28, #48' });
-
   const problems: string[] = [];
   for (const [path, expectedType] of [
     ['/icon', 'image/'],
@@ -289,9 +298,6 @@ test('the head declares theme-color and color-scheme, and color-scheme follows t
   page,
   request,
 }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R29, #48' });
-
   const head = await fetchHead(request, '/');
   const problems: string[] = [];
   if (!head.meta.get('theme-color')) problems.push('no theme-color in the served head');
@@ -327,7 +333,7 @@ test('the sitemap and robots.txt are served and agree with the routes', async ({
   expect(sitemap.headers()['content-type']).toContain('xml');
   const xml = await sitemap.text();
   // Compared by pathname, not by full URL: the origin comes from NEXT_PUBLIC_SITE_URL with a fallback
-  // (`sitemap.ts:5`), so pinning `https://miloscvetkovic.dev` would fail for anyone who sets that
+  // (`baseUrl` in sitemap.ts), so pinning `https://miloscvetkovic.dev` would fail for anyone who sets that
   // variable — and the origin is not what this test is about. R31 pins the URL *set* against the data.
   const listed = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(([, url]) =>
     new URL(url).pathname.replace(/(.)\/$/, '$1'),
@@ -346,23 +352,36 @@ test('the sitemap and robots.txt are served and agree with the routes', async ({
   expect(body, 'robots.txt must point at the sitemap').toContain('Sitemap:');
 });
 
-test('both JSON-LD blocks are served and parse', async ({ request }) => {
-  // Green. `json-ld.tsx` writes its objects straight into the script element without escaping, so a
-  // malformed object would ship as broken JSON with nothing failing. The escape hole in that same
-  // function is R32, unit tested in src/components/__tests__/json-ld.test.tsx.
-  const response = await request.get('/');
-  const html = await response.text();
-  const blocks = [
-    ...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
-  ].map(([, body]) => body);
-  expect(blocks, 'layout.tsx renders PersonJsonLd and WebsiteJsonLd').toHaveLength(2);
+test('the JSON-LD blocks are served and parse, and a case study adds its own two', async ({
+  request,
+}) => {
+  // Green. `json-ld.tsx` writes its objects straight into script elements, so a malformed object would
+  // ship as broken JSON with nothing failing. The escape they all go through is R32, unit tested in
+  // src/components/__tests__/json-ld.test.tsx.
+  const blocksOf = async (path: string) => {
+    const html = await (await request.get(path)).text();
+    return [
+      ...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
+    ].map(([, body]) => JSON.parse(body) as { '@type': string; '@context': string; url?: string });
+  };
 
-  const parsed = blocks.map(
-    (body) => JSON.parse(body) as { '@type': string; '@context': string; url: string },
-  );
-  expect(parsed.map((block) => block['@type'])).toEqual(['Person', 'WebSite']);
-  for (const block of parsed) {
+  const home = await blocksOf('/');
+  expect(
+    home.map((block) => block['@type']),
+    'layout.tsx renders PersonJsonLd and WebsiteJsonLd, and only those, on every route',
+  ).toEqual(['Person', 'WebSite']);
+  for (const block of home) {
     expect(block['@context']).toBe('https://schema.org');
     expect(block.url).toMatch(/^https?:\/\//);
+  }
+
+  for (const path of CASE_STUDY_ROUTES) {
+    const blocks = await blocksOf(path);
+    expect(
+      blocks.map((block) => block['@type']),
+      path,
+    ).toEqual(['Person', 'WebSite', 'TechArticle', 'BreadcrumbList']);
+    const article = blocks[2];
+    expect(new URL(String(article.url)).pathname, `${path}: the article's own URL`).toBe(path);
   }
 });

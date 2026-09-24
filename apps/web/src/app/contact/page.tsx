@@ -1,15 +1,13 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
+import { buildMetadata } from '@/lib/metadata';
 
-export const metadata: Metadata = {
-  title: 'Connect',
+export const metadata = buildMetadata({
+  title: 'Contact',
+  socialTitle: 'Contact Milos Cvetkovic',
   description:
     'Connect with Milos Cvetkovic on LinkedIn, GitHub, and X. Follow along for engineering insights and project updates.',
-  openGraph: {
-    title: 'Connect | Milos Cvetkovic',
-    description: 'Follow along for engineering insights, open-source work, and project updates.',
-  },
-};
+  path: '/contact',
+});
 
 const socialLinks = [
   {
@@ -55,6 +53,9 @@ export default function ContactPage() {
     <div className="py-16 md:py-24">
       <div className="mx-auto max-w-3xl px-6">
         {/* Header */}
+        <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
+          Contact · Milos Cvetkovic, Senior Full-Stack Engineer
+        </p>
         <h1 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">Let&apos;s connect.</h1>
         <p className="mb-12 text-xl text-[var(--muted)]">
           I share what I&apos;m building, lessons from production, and engineering insights. Pick

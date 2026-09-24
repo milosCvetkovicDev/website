@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gsap, ScrollTrigger } from '../use-gsap-scroll';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { gsap, ScrollTrigger } from '../gsap-runtime';
+import { loadGsap } from '../load-gsap';
 import { LoopPhase } from '../loop-phase';
 
 /**
@@ -13,20 +14,21 @@ import { LoopPhase } from '../loop-phase';
  *
  * `GauntletPhase` is the same shape done right, and the comparison is the point of both rows:
  *
- * - R20. `animateHealing` (`loop-phase.tsx:46-89`) schedules the sequence but never resets
+ * - R20. `animateHealing` (`loop-phase.tsx:52-98`) schedules the sequence but never resets
  *   `visibleEvents`, `alertStatus` or `showProtocol` (`:35-37`). Entering the section a second time
  *   therefore continues from wherever the last run finished: the log already holds all seven rows and
  *   the alert already reads RESOLVED while the sequence starts over. `GauntletPhase` resets its stage
  *   states on every entry, which is why its own restart test is green.
- * - R21. The three reveals (`loop-phase.tsx:49`, `:70`, `:77`) are created *inside* the `later` timers,
- *   which fire long after `gsap.context` (`:97`) has closed. A context only owns what was created while
- *   it was open, so `ctx.revert()` in the cleanup (`:121-125`) cannot see them: an unmount mid-run
- *   leaves a live tween writing into a detached element, and the inline opacity it wrote stays behind.
- *   `GauntletPhase` tracks its reveals in a ref and reverts them by hand (`gauntlet-phase.tsx:47`,
- *   `:51-58`).
+ * - R21. The three reveals (`loop-phase.tsx:56`, `:77`, `:84`) are created *inside* the `later`
+ *   timers, which fire long after `gsap.context` (`:112`) has closed. A context only owns what was
+ *   created while it was open, so `ctx.revert()` in the cleanup (`:141-146`) cannot see them: an
+ *   unmount mid-run leaves a live tween writing into a detached element, and the inline opacity it
+ *   wrote stays behind.
+ *   `GauntletPhase` tracks its reveals in a ref and reverts them by hand (`gauntlet-phase.tsx:51`,
+ *   `:55-62`).
  */
 
-// GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers it at
+// GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it at
 // import time, so the stub must exist before the imports above are evaluated.
 const media = vi.hoisted(() => {
   type Listener = (event: MediaQueryListEvent) => void;
@@ -88,6 +90,14 @@ function enterAgain() {
 }
 
 describe('LoopPhase', () => {
+  // The phase asks load-gsap.ts for GSAP, which arrives when the browser is idle. Waited for once,
+  // with real timers, before beforeEach fakes setTimeout: from then on the phase builds its trigger
+  // synchronously on mount, as it does in the browser once GSAP has arrived, and R20 and R21 below
+  // describe the same component they did when GSAP was imported statically.
+  beforeAll(async () => {
+    await loadGsap();
+  });
+
   beforeEach(() => {
     media.reduce = false;
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
@@ -186,7 +196,7 @@ describe('LoopPhase', () => {
       expect(
         gsap.getTweensOf(target),
         'a tween created inside a timer outlives the context revert: track the reveals in a ref and ' +
-          'revert them in the cleanup, as GauntletPhase does (gauntlet-phase.tsx:47, :51-58).',
+          'revert them in the cleanup, as GauntletPhase does (gauntlet-phase.tsx:51, :55-62).',
       ).toHaveLength(0);
       // And the inline style the fromTo wrote is still on the element, so a remount inherits it.
       expect(

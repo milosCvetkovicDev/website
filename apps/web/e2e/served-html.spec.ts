@@ -8,11 +8,11 @@ import { expect, test, type Page } from '@playwright/test';
  * The page is prerendered, so a crawler or a reader without JavaScript gets the whole story in the
  * first response — every section, every panel, every line of the code sample. Four of those blocks are
  * nevertheless *invisible* in that response, because their visibility is gated on client state that
- * never arrives: `gauntlet-phase.tsx:302` and `loop-phase.tsx:243` put `opacity-0` on the headline
- * blocks and `:287` / `:228` on the toasts whenever `achievementVisible` / `protocolVisible` is false,
+ * never arrives: `gauntlet-phase.tsx:324` and `loop-phase.tsx:264` put `opacity-0` on the headline
+ * blocks and `:309` / `:249` on the toasts whenever `achievementVisible` / `protocolVisible` is false,
  * and both are false without hydration — `usePrefersReducedMotion`'s server snapshot is `false`
  * (`use-prefers-reduced-motion.ts:17`), so the reduced-motion escape hatch that would have rendered
- * them does not apply either. `execution-phase.tsx:274-277` is the same shape written inline:
+ * them does not apply either. `execution-phase.tsx:294-297` is the same shape written inline:
  * all 22 code spans are `opacity: complete ? 1 : 0`.
  *
  * So the markup is there and the text is transparent, which is the worst of both worlds: it costs the
@@ -21,12 +21,10 @@ import { expect, test, type Page } from '@playwright/test';
  *
  * Two mechanics specific to this file:
  *
- * - It waits for nothing. The boot loader renders on `visible={!mounted}` from `useIsHydrated()`
- *   (`animated-hero/index.tsx:186`, `:195`), so with JavaScript disabled it never unmounts and the
- *   `System Boot` wait every other spec uses would time out here.
- * - It asserts computed `opacity`, not `toBeVisible()`. The loader sits over the story in the same
- *   stacking context, so Playwright's visibility check is the wrong instrument: it would report the
- *   story hidden for a reason that has nothing to do with this row.
+ * - It waits for nothing. With JavaScript disabled the hydration marker never flips, so the
+ *   `expectHydrated` wait every other spec uses would time out here (CLAUDE.md, Testing).
+ * - It asserts computed `opacity`, not `toBeVisible()`: this row is about text painted transparent,
+ *   which Playwright's visibility check does not measure.
  */
 
 test.describe.configure({ retries: 0 });
@@ -124,13 +122,33 @@ test('the whole story is in the served markup with JavaScript off', async ({ pag
   }
 });
 
+test('the hero headline and its paragraph are on top in the served page', async ({ page }) => {
+  // The hero H1 is the largest contentful paint of `/`, so it has to be paintable from the served
+  // HTML alone: an overlay the client removes after hydration would hold every visitor's LCP back to
+  // hydration time (ADR 0022). With JavaScript off the page is exactly the served HTML, so whatever
+  // is topmost at the centre of each is what the first paint shows there.
+  await page.goto('/');
+  const targets = [
+    page.getByRole('heading', { level: 1 }),
+    page.getByText('I build systems that inherit chaos'),
+  ];
+  for (const target of targets) {
+    await expect(target).toBeVisible();
+    const cover = await target.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return top && element.contains(top) ? null : (top?.outerHTML.slice(0, 160) ?? 'nothing');
+    });
+    expect(cover, 'another element is painted over the hero text').toBeNull();
+  }
+});
+
 test('nothing in the story is painted transparent with JavaScript off', async ({ page }) => {
   test.fail();
   test.info().annotations.push({ type: 'fixed-by', description: 'R16, #47' });
 
   await page.goto('/');
-  // No hydration wait: the loader is rendered on `visible={!mounted}` from `useIsHydrated()`, so with
-  // JavaScript off it never unmounts and the `System Boot` wait every other spec uses would time out.
+  // No hydration wait: with JavaScript off the marker never flips, so `expectHydrated` would time out.
   //
   // Instead, prove JavaScript really is off, or this whole file would be measuring an ordinary hydrated
   // page and the row would be green for the wrong reason. The proof is the page's own first script: the
@@ -171,7 +189,7 @@ test('nothing in the story is painted transparent with JavaScript off', async ({
   if (hiddenSpans > 0) {
     transparent.push(
       `the Execution code sample: ${hiddenSpans} of ${codeSpanOpacities.length} spans at opacity 0 ` +
-        '(execution-phase.tsx:274-277)',
+        '(execution-phase.tsx:294-297)',
     );
   }
 

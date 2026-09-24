@@ -135,9 +135,14 @@ export function HeroContent() {
           <br />
           Nobody woke up.
         </h1>
-        <p className="sr-only">
+        {/* Who this is, visible rather than screen-reader-only: text that only crawlers see is what
+            Google's hidden-text policy describes, and the headline alone does not say it. */}
+        <p
+          className="mb-3 font-medium text-[var(--muted)]"
+          style={{ fontSize: '15px', lineHeight: 1.5 }}
+        >
           Milos Cvetkovic, Senior Full Stack Engineer specializing in AI-native development,
-          TypeScript, React, and cloud architecture
+          TypeScript, React, and cloud architecture.
         </p>
 
         {/* Subtitle */}
