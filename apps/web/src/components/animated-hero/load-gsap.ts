@@ -31,7 +31,7 @@ export type GsapRuntime = typeof GsapRuntimeModule;
 export type Gsap = GsapRuntime['gsap'];
 
 /**
- * The User Timing mark set the moment GSAP has loaded, before any callback waiting for it has run.
+ * The User Timing mark set once GSAP has loaded and every callback that was waiting for it has run.
  * `e2e/support/gsap.ts` waits on it: the story's from-states and any hover that landed before the
  * load only exist from this point on.
  */
@@ -141,15 +141,35 @@ function invoke(callback: () => void) {
   }
 }
 
-function arrived(loaded: GsapRuntime): GsapRuntime {
-  runtime = loaded;
-  mark(GSAP_LOADED_MARK);
-  // A Set iterates in insertion order, skips an entry deleted before it is reached and visits none
-  // added meanwhile (with GSAP loaded, a new callback runs at once instead of being queued).
-  for (const entry of waiting) {
+type YieldingScheduler = { yield?: () => Promise<void> };
+
+/** Hands the main thread back to the browser: `scheduler.yield()` where it exists, a task otherwise. */
+function yieldToBrowser(): Promise<void> {
+  const scheduler = (globalThis as { scheduler?: YieldingScheduler }).scheduler;
+  if (typeof scheduler?.yield === 'function') return scheduler.yield();
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * Hands GSAP to the callbacks that waited for it, one per task. Each phase builds its timeline in a
+ * callback, and building all of them in one go was a single long task, 28 to 38 ms of CPU here and
+ * about four times that on a mid-range phone, landing in the visitor's first scroll. Yielding after
+ * each lets the browser handle input and paint in between.
+ *
+ * `runtime` stays unset until the queue is empty, so a callback passed meanwhile joins the end of
+ * the queue instead of running ahead of the ones before it, and one cancelled meanwhile never runs.
+ * The loaded mark, and the load's own promise, follow the last callback.
+ */
+async function arrived(loaded: GsapRuntime): Promise<GsapRuntime> {
+  while (waiting.size > 0) {
+    // A Set iterates in insertion order: the first entry is the one that has waited longest.
+    const [entry] = waiting;
     waiting.delete(entry);
     invoke(() => entry.run(loaded));
+    await yieldToBrowser();
   }
+  runtime = loaded;
+  mark(GSAP_LOADED_MARK);
   return loaded;
 }
 
@@ -196,10 +216,11 @@ export function requestGsap(): Promise<GsapRuntime> {
 }
 
 /**
- * Runs `run` with GSAP: synchronously when it has already loaded, which is exactly what the static
- * import used to do, and otherwise as soon as it has, in the order the callbacks were passed in and
- * before anything a later event could start. When the load fails for good, `run` never runs and
- * `onUnavailable` does instead, asynchronously; a phase passes one to render its finished state.
+ * Runs `run` with GSAP: synchronously once it has loaded and the callbacks that waited for it have
+ * run, which is exactly what the static import used to do, and otherwise once it has arrived, in
+ * the order the callbacks were passed in, one per task. A callback passed while that queue drains
+ * joins its end. When the load fails for good, `run` never runs and `onUnavailable` does instead,
+ * asynchronously; a phase passes one to render its finished state.
  *
  * Returns a function that stops a callback which has not run yet from ever running, and releases
  * it; it does nothing afterwards.

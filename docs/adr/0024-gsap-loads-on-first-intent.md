@@ -48,6 +48,11 @@ entrances of sections below the fold, and the first of those starts 73 px below 
 - Until GSAP arrives every section shows what the server rendered. A phase whose section is already
   in view when its timeline is built finishes its entrance at once (`isAlreadyReached`), as it did
   when GSAP arrived late at idle.
+- When GSAP arrives, the callbacks that waited for it run one per task, yielding to the browser
+  between them (`scheduler.yield()` where it exists, a zero-delay timeout otherwise), so building
+  every phase's timeline is a string of short tasks in the visitor's first scroll rather than one
+  long one. A callback passed meanwhile joins the end of the queue, and the loaded mark and the
+  load's promise follow the last callback.
 - The end-to-end helper `expectGsapLoaded` sends that intent, a synthetic `scroll` on `window`,
   before it waits. `apps/web/e2e/gsap-lazy.spec.ts` and `apps/web/e2e/mobile/gsap-intent.spec.ts`
   pin the page before intent: no request for GSAP without input, each kind of intent loading it,
@@ -77,7 +82,11 @@ entrances of sections below the fold, and the first of those starts 73 px below 
 - The accessibility gate at rest measures the page after GSAP, because its helper sends intent; the
   page before GSAP is measured by the specs named above instead.
 - The work GSAP does when it arrives, 28 to 38 ms of CPU here and roughly four times that on a Moto
-  G-class phone, moves into the visitor's first scroll.
+  G-class phone, moves into the visitor's first scroll. Split into one task per phase it no longer
+  blocks input for all of that time: with GSAP still loading at idle, the split alone took GSAP's
+  blocking time from 60 to 117 ms to about 0, and its largest piece to 45 ms simulated.
+- A callback that waits for GSAP now runs a task or more after the one before it, not in the same
+  task, so a spec measuring what GSAP does waits for the loaded mark, which follows the last one.
 
 ## Alternatives considered
 

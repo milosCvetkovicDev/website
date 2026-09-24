@@ -589,19 +589,23 @@ Commit: `perf(web): build the story's timelines one task at a time when GSAP arr
 
 - Modify: `apps/web/src/components/animated-hero/load-gsap.ts`, `apps/web/e2e/support/gsap.ts`,
   `docs/adr/0024-gsap-loads-on-first-intent.md`
-- Test: `apps/web/src/components/animated-hero/__tests__/load-gsap.test.ts`
+- Test: `apps/web/src/components/animated-hero/__tests__/load-gsap.test.ts`,
+  `lazy-gsap.test.tsx` (its walk fakes `setTimeout`, so it advances the drain's timers)
 
-- [ ] **Step 1:** `arrived` becomes an asynchronous drain: `runtime` stays unset until the queue is
+- [x] **Step 1:** `arrived` becomes an asynchronous drain: `runtime` stays unset until the queue is
       empty; each waiting callback runs, then the drain yields (`scheduler.yield()` where it exists,
       `setTimeout(0)` otherwise); callbacks queued during the drain join the queue in order;
       `runtime` and the loaded mark are set after the last callback. Update the docs on the mark,
       on `runWithGsap`'s ordering promise ("synchronously" applies once the queue has drained), and
       in `e2e/support/gsap.ts`.
-- [ ] **Step 2:** Tests (`runWithGsap`): callbacks run in order across tasks, and under fake timers
+- [x] **Step 2:** Tests (`runWithGsap`): callbacks run in order across tasks, and under fake timers
       only the first has run until the timers advance; a callback queued during the drain runs after
       those queued before it; the mark is set once, after the last callback; a callback that throws
       does not stop the rest. The gsap-lazy IN_VIEW tests stay green.
-- [ ] **Step 3:** Record the drain in ADR 0024's Decision (it is not yet accepted).
+- [x] **Step 3:** Record the drain in ADR 0024's Decision (it is not yet accepted).
+- [x] **Step 4:** Verify: the unit suite (the two drain tests fail against the synchronous
+      `arrived`), and `gsap-lazy`, `story`, `console-clean`, `client-navigation`, `reduced-motion`,
+      `hero-contrast` and `mobile/gsap-intent` in CI mode. The whole suite runs under "Last".
 
 **Why.** With GSAP still loading at idle (4 runs), GSAP's blocking fell from 60–117 ms to about 0
 (largest piece 45 ms simulated) and TBT 213 → 154 ms. After Task 8 Lighthouse no longer sees GSAP;

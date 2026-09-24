@@ -35,10 +35,10 @@ export async function sendIntent(page: Page): Promise<void> {
  * inside a sampling window, has to measure after it, or it measures the server-rendered page instead
  * and passes or fails on timing. So this sends that intent (`sendIntent`) and then waits.
  *
- * The loader sets the User Timing mark `GSAP_LOADED_MARK` before any callback waiting for GSAP
- * runs, and those callbacks all run before the browser's next task, so once the mark is visible
- * here every phase has built its timeline and every early hover has started. A load that fails
- * sets `GSAP_FAILED_MARK` instead, and this fails at once, saying so.
+ * The loader hands GSAP to the callbacks that waited for it one task at a time, and sets the User
+ * Timing mark `GSAP_LOADED_MARK` after the last of them, so once the mark is visible here every
+ * phase has built its timeline and every early hover has started. A load that fails sets
+ * `GSAP_FAILED_MARK` instead, and this fails at once, saying so.
  *
  * Call it after `expectHydrated` (or `gotoHydrated`) on `/`. The marks belong to the document, so
  * after a soft navigation away from `/` they are still there, and on a document that never

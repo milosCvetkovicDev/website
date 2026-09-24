@@ -154,9 +154,17 @@ describe('before GSAP has loaded', () => {
     early.unmount();
 
     // The load the first hover started arrives. No scroll, wheel, touch or key was ever sent: the
-    // hover alone brought GSAP in, so a hover before any scroll still plays.
+    // hover alone brought GSAP in, so a hover before any scroll still plays. GSAP is handed to the
+    // waiting callbacks one task at a time, on the timers this file fakes, so they are advanced until
+    // the load's promise, which follows the last callback, has settled.
     await act(async () => {
-      await loadGsap();
+      let settled = false;
+      void loadGsap().finally(() => (settled = true));
+      // The chunk itself arrives on real time, not on the faked timers. A zero-delay timer set while
+      // the fake clock is ticking is due 1 ms later, so each step advances by that.
+      await vi.dynamicImportSettled();
+      for (let task = 0; task < 100 && !settled; task += 1) await vi.advanceTimersByTimeAsync(1);
+      expect(settled, 'the waiting callbacks never finished').toBe(true);
     });
 
     // One trigger each for the two phases still mounted, on their own sections: StrictMode's

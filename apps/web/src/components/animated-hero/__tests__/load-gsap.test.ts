@@ -321,6 +321,63 @@ describe('runWithGsap', () => {
     expect(ran).toEqual(['enter', 'leave with gsap']);
   });
 
+  it('hands GSAP to the waiting callbacks one task at a time, and marks it after the last', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const { intend } = stubPage();
+    const { loadGsap, runWithGsap, GSAP_LOADED_MARK } = await freshLoader();
+    const marked = () => performance.getEntriesByName(GSAP_LOADED_MARK, 'mark').length;
+    const ran: string[] = [];
+    let markedWhenLastRan: number | undefined;
+
+    runWithGsap(() => ran.push('discovery'));
+    runWithGsap(() => ran.push('strategy'));
+    runWithGsap(() => {
+      ran.push('execution');
+      markedWhenLastRan = marked();
+    });
+    const loading = loadGsap();
+    let loaded = false;
+    void loading.then(() => (loaded = true));
+
+    intend();
+    await settle();
+    // The chunk has arrived and the first callback has run; the rest wait for later tasks.
+    expect(ran).toEqual(['discovery']);
+    expect(marked()).toBe(0);
+    expect(loaded).toBe(false);
+
+    await vi.runAllTimersAsync();
+    await loading;
+    expect(ran).toEqual(['discovery', 'strategy', 'execution']);
+    expect(markedWhenLastRan).toBe(0);
+    expect(marked()).toBe(1);
+    expect(loaded).toBe(true);
+  });
+
+  it('runs a callback passed while the queue drains after the ones before it', async () => {
+    const { intend } = stubPage();
+    const { loadGsap, runWithGsap } = await freshLoader();
+    const ran: string[] = [];
+    const unmounted = vi.fn();
+    let unmount = () => {};
+
+    runWithGsap(() => {
+      ran.push('first');
+      // Passed from inside the drain: GSAP is here, but three callbacks are still waiting for it.
+      runWithGsap(() => ran.push('passed during the drain'));
+      // And a phase still waiting unmounts, as on a soft navigation mid-drain.
+      unmount();
+    });
+    runWithGsap(() => ran.push('second'));
+    unmount = runWithGsap(unmounted);
+    runWithGsap(() => ran.push('third'));
+
+    intend();
+    await loadGsap();
+    expect(ran).toEqual(['first', 'second', 'third', 'passed during the drain']);
+    expect(unmounted).not.toHaveBeenCalled();
+  });
+
   it('runs synchronously once GSAP has loaded, as the static import did', async () => {
     const { intend } = stubPage();
     const { loadGsap, runWithGsap } = await freshLoader();
