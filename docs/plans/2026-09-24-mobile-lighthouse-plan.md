@@ -669,7 +669,7 @@ visitor's first scroll, and this task breaks it up.
 - [x] Screenshots, before and after, of the hero, Strategy, Execution, Loop and GameComplete at
       320, 375, 412, 640, 768 and 1280 px in light and dark, for the pull request and
       `ui-reviewer`.
-- [ ] Every gate CI runs and a production build, then the whole e2e suite in CI mode and in dev
+- [x] Every gate CI runs and a production build, then the whole e2e suite in CI mode and in dev
       mode, one at a time:
 
 ```bash
