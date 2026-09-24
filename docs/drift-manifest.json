@@ -3634,6 +3634,23 @@
       }
     },
     {
+      "id": "plans-readme-link-2026-09-24-mobile-lighthouse-plan",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-09-24-mobile-lighthouse-plan.md)",
+      "claim": "The link to 2026-09-24-mobile-lighthouse-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-24-mobile-lighthouse-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-24-mobile-lighthouse-plan.md"
+      }
+    },
+    {
       "id": "plans-readme-link-claude-epics-audit-remediation-2026-09-epi",
       "doc": "docs/plans/README.md",
       "anchor": "](../../.claude/epics/audit-remediation-2026-09/epic.md)",
@@ -7931,6 +7948,19 @@
         "file": "docs/plans/README.md",
         "regex": "^\\| \\[2026\\-09\\-15\\-route\\-hydration\\-marker\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
         "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-24-mobile-lighthouse-plan-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-24-mobile-lighthouse-plan.md](2026-09-24-mobile-lighthouse-plan.md)",
+      "claim": "The plans index gives 2026-09-24-mobile-lighthouse-plan.md the status \"Planned\" (no pull request is open yet).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-24\\-mobile\\-lighthouse\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "Planned"
       }
     },
     {
