@@ -8096,13 +8096,13 @@
       "id": "plans-index-2026-09-24-mobile-lighthouse-plan-cell-status",
       "doc": "docs/plans/README.md",
       "anchor": "| [2026-09-24-mobile-lighthouse-plan.md](2026-09-24-mobile-lighthouse-plan.md)",
-      "claim": "The plans index gives 2026-09-24-mobile-lighthouse-plan.md the status \"In review\" (pull request #125 is open).",
+      "claim": "The plans index gives 2026-09-24-mobile-lighthouse-plan.md the status \"Shipped\".",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/plans/README.md",
         "regex": "^\\| \\[2026\\-09\\-24\\-mobile\\-lighthouse\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
-        "equals": "In review"
+        "equals": "Shipped"
       }
     },
     {
