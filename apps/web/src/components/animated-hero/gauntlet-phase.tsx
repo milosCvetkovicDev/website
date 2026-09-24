@@ -170,10 +170,14 @@ export function GauntletPhase() {
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap, ScrollTrigger }) => {
-        const reached = isAlreadyReached(sectionRef.current);
+        // The element, read once, never the ref: a soft navigation away from `/` nulls the ref a
+        // frame before this effect's cleanup runs (runWithGsap).
+        const section = sectionRef.current;
+        if (!section) return;
+        const reached = isAlreadyReached(section);
         ctx = gsap.context(() => {
           ScrollTrigger.create({
-            trigger: sectionRef.current,
+            trigger: section,
             start: 'top center',
             onEnter: () => animatePipeline(gsap),
           });
@@ -187,14 +191,14 @@ export function GauntletPhase() {
               y: 0,
               duration: 0.5,
               scrollTrigger: {
-                trigger: sectionRef.current,
+                trigger: section,
                 start: 'top center',
               },
             },
           );
 
           if (reached) fadeIn.progress(1);
-        }, sectionRef);
+        }, section);
       },
       () => setGsapUnavailable(true),
     );

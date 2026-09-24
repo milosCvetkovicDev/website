@@ -1,7 +1,9 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
+import { useLayoutEffect, type ComponentType } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as gsapRuntime from '../gsap-runtime';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
-import { loadGsap } from '../load-gsap';
+import { loadGsap, runWithGsap, type GsapRuntime } from '../load-gsap';
 import { DiscoveryPhase } from '../discovery-phase';
 import { StrategyPhase } from '../strategy-phase';
 import { ExecutionPhase } from '../execution-phase';
@@ -46,6 +48,13 @@ const media = vi.hoisted(() => {
   return state;
 });
 
+// runWithGsap passes through to the real loader, so a test can hold the builds a mount asks for and
+// run them itself, as GSAP arriving at a moment of its choosing would.
+vi.mock('../load-gsap', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../load-gsap')>();
+  return { ...actual, runWithGsap: vi.fn(actual.runWithGsap) };
+});
+
 // The phases do not import GSAP: they ask load-gsap.ts for it, which fetches it once the browser is
 // idle after hydration. Every test here is about what a phase does with GSAP, so the file waits for
 // that load once, with real timers, before any test installs fake ones. From then on each phase
@@ -67,6 +76,23 @@ const phases = [
   { name: 'GameComplete', Phase: GameComplete },
 ];
 
+/** Ticks GSAP from the layout phase of the commit that mounts it. */
+function TickGsapOnMount() {
+  useLayoutEffect(() => {
+    gsap.ticker.tick();
+  }, []);
+  return null;
+}
+
+/**
+ * The phase, or in its place a GSAP tick. Swapping one for the other in a single render reproduces
+ * a soft navigation away from `/`: React detaches the phase's refs in that commit and ticks GSAP in
+ * its layout phase, before the phase's passive effect cleanup runs.
+ */
+function PhaseOrTick({ Phase, show }: { Phase: ComponentType; show: boolean }) {
+  return show ? <Phase /> : <TickGsapOnMount />;
+}
+
 /** Fires a phase's trigger again, as scrolling back above the section and down does. */
 function enterAgain() {
   const trigger = ScrollTrigger.getAll().find((candidate) => candidate.vars.onEnter);
@@ -83,6 +109,7 @@ describe.each(phases)('$name', ({ Phase }) => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    vi.restoreAllMocks();
     // Asserted last: a throw here must not skip the global restoration above it.
     expect(media.listenerCount()).toBe(0);
   });
@@ -129,6 +156,56 @@ describe.each(phases)('$name', ({ Phase }) => {
     unmount();
     expect(ScrollTrigger.getAll()).toHaveLength(0);
   }, 15_000);
+
+  // A soft navigation away from `/` removes the section in one commit. React detaches its refs in
+  // that commit but runs this effect's cleanup a frame later, and a GSAP tick can land in between.
+  // ScrollTrigger defers a timeline trigger's first refresh by 0.01 s, and GSAP runs the deferred
+  // call inside the context that created it. So when GSAP had arrived just before the navigation,
+  // that refresh ran with `sectionRef.current` already null, and a context scoped to the ref logged
+  // "Invalid scope" (1 in 10 runs of the client-navigation walk).
+  it('logs nothing when GSAP ticks after the commit that removes it', () => {
+    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom
+    // does not implement.
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn');
+
+    const { rerender } = render(<PhaseOrTick Phase={Phase} show />);
+    // The deferred refresh is 0.01 s away in GSAP time, and GSAP's clock is the real Date.now it
+    // captured at load, which fake timers do not move. Waiting 20 ms guarantees the tick fires it.
+    const built = Date.now();
+    while (Date.now() - built < 20) {
+      // Busy-wait: nothing may run between the build and the swap.
+    }
+    rerender(<PhaseOrTick Phase={Phase} show={false} />);
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  // The same frame from the other side: GSAP arrives after the commit that removed the section but
+  // before the cleanup that would have cancelled the build, so the build finds its refs null. Each
+  // build is held and its cancel does nothing, then run after the unmount has nulled the refs.
+  it('builds nothing when GSAP arrives after the commit that removes it', () => {
+    const held = vi.mocked(runWithGsap);
+    const passThrough = held.getMockImplementation();
+    const builds: ((runtime: GsapRuntime) => void)[] = [];
+    held.mockImplementation((run) => {
+      builds.push(run);
+      return () => {};
+    });
+    const warn = vi.spyOn(console, 'warn');
+    try {
+      const { unmount } = render(<Phase />);
+      unmount();
+      expect(builds.length).toBeGreaterThan(0);
+      for (const build of builds) build(gsapRuntime);
+    } finally {
+      // vi.restoreAllMocks() restores spies only, not a vi.fn's implementation.
+      held.mockImplementation(passThrough!);
+    }
+
+    expect(ScrollTrigger.getAll()).toHaveLength(0);
+    expect(warn).not.toHaveBeenCalled();
+  });
 });
 
 /** Long enough for every timer-driven sequence to create its last reveal: Gauntlet's runs 6.6 s. */

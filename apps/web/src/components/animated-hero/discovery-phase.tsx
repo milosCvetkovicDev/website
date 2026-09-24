@@ -32,11 +32,15 @@ export function DiscoveryPhase() {
     // once rather than hide what the visitor is reading (isAlreadyReached).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(({ gsap }) => {
-      const reached = isAlreadyReached(sectionRef.current);
+      // The element, read once, never the ref: a soft navigation away from `/` nulls the ref a
+      // frame before this effect's cleanup runs (runWithGsap).
+      const section = sectionRef.current;
+      if (!section) return;
+      const reached = isAlreadyReached(section);
       ctx = gsap.context(() => {
         const tl = gsap.timeline({
           scrollTrigger: {
-            trigger: sectionRef.current,
+            trigger: section,
             start: 'top center',
             end: 'bottom center',
             toggleActions: 'play none none reverse',
@@ -91,7 +95,7 @@ export function DiscoveryPhase() {
         );
 
         if (reached) tl.progress(1);
-      }, sectionRef);
+      }, section);
     });
 
     return () => {

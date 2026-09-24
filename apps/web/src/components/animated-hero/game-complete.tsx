@@ -23,7 +23,11 @@ export function GameComplete() {
     // once rather than hide what the visitor is reading (isAlreadyReached).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(({ gsap }) => {
-      const reached = isAlreadyReached(sectionRef.current);
+      // The element, read once, never the ref: a soft navigation away from `/` nulls the ref a
+      // frame before this effect's cleanup runs (runWithGsap).
+      const section = sectionRef.current;
+      if (!section) return;
+      const reached = isAlreadyReached(section);
       ctx = gsap.context(() => {
         // The breathing glow is deliberately NOT a child of the timeline below. GSAP gives a child
         // with `repeat: -1` a total duration of 1e10 seconds, and a timeline takes its duration from
@@ -58,7 +62,7 @@ export function GameComplete() {
             glow.pause(0);
           },
           scrollTrigger: {
-            trigger: sectionRef.current,
+            trigger: section,
             start: 'top center',
             // `pause`/`resume` keep the entrance from finishing, and so from starting the glow,
             // while the section is scrolled past.
@@ -92,7 +96,7 @@ export function GameComplete() {
         // Events suppressed: the glow starts from the trigger (resumeGlowIfEntranceDone) while the
         // section is in range, not from onComplete wherever the visitor happens to be.
         if (reached) tl.progress(1, true);
-      }, sectionRef);
+      }, section);
     });
 
     return () => {
