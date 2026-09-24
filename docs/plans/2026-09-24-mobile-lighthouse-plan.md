@@ -202,7 +202,7 @@ Never `--no-verify`.
 
 ### Task 1: Keep the theme out of React context
 
-Commit: `perf(web): keep the theme context value stable through hydration`.
+Commit: `perf(web): read the theme from its store instead of a context that changes on hydration`.
 
 **Files:**
 
@@ -215,19 +215,21 @@ changes, and React client-renders any still-dehydrated Suspense boundary below a
 it deleted the server-rendered TmuxBackground and rebuilt it, 8 of 8 times on `main` (dark included,
 because `mounted` flips anyway), and 0 of 8 with a stable value.
 
-- [ ] **Step 1:** `toggleTheme` becomes a module-level function that only reads and writes the
+- [x] **Step 1:** `toggleTheme` becomes a module-level function that only reads and writes the
       store. The context goes: `useTheme()` keeps its return shape `{ theme, toggleTheme, mounted }`
       and reads `theme` itself with `useSyncExternalStore(subscribe, readTheme, getServerTheme)`,
       `mounted` with `useIsHydrated()`, and returns the module-level `toggleTheme`. `ThemeProvider`
       keeps only the effect that mirrors the theme onto `<html>`, unchanged. `navigation.tsx` and
       the components barrel need no edit.
-- [ ] **Step 2:** Keep every assertion in the existing test file, and add a regression test:
-      server-render `<ThemeProvider><Suspense fallback={null}><Inner/></Suspense></ThemeProvider>`
-      with `react-dom/server`, with `'light'` stored while the server snapshot is `'dark'`;
+- [x] **Step 2:** Keep every assertion in the existing test file, and add a regression test:
+      server-render a `ThemeProvider` holding a theme consumer and, inside an element, a
+      `<Suspense fallback={null}><Inner/></Suspense>`, with `react-dom/server`, with `'light'` stored while the server snapshot is `'dark'`;
       `hydrateRoot` the same tree with `Inner` replaced by a `React.lazy` whose promise is still
       pending, and flush; assert that Inner's server DOM node is still connected and is the same
       node; resolve the lazy and assert it again. It fails on the parent commit and passes here.
-- [ ] **Step 3:** Verify: the new test red on the parent and green here, the full unit suite, and
+      The element around the boundary matters: React 19 propagates a context change lazily, from a
+      parent that bails out of rendering, so a boundary straight below the provider never sees it.
+- [x] **Step 3:** Verify: the new test red on the parent and green here, the full unit suite, and
       `e2e/console-clean.spec.ts` and `e2e/accessibility.spec.ts` in CI mode.
 
 **Rules.** ADR 0006: the state stays in `useSyncExternalStore` with a server snapshot, and no
