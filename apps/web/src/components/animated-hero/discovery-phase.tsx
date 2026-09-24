@@ -105,7 +105,10 @@ export function DiscoveryPhase() {
   }, [prefersReducedMotion]);
 
   return (
-    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
+    <section
+      ref={sectionRef}
+      className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
+    >
       <div className="w-full max-w-5xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">

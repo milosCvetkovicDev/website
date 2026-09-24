@@ -174,7 +174,10 @@ export function LoopPhase() {
   };
 
   return (
-    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
+    <section
+      ref={sectionRef}
+      className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
+    >
       <div className="w-full max-w-3xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">
@@ -189,17 +192,17 @@ export function LoopPhase() {
         {/* Dashboard */}
         <div ref={dashboardRef}>
           <HudPanel title="MONITORING DASHBOARD">
-            <div className="mb-6 grid grid-cols-3 gap-4">
-              <div className="rounded-lg bg-[var(--background)] p-3 text-center">
-                <div className="text-2xl font-bold text-[var(--status-ok)]">99.9%</div>
+            <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
+              <div className="rounded-lg bg-[var(--background)] p-2 text-center sm:p-3">
+                <div className="text-xl font-bold text-[var(--status-ok)] sm:text-2xl">99.9%</div>
                 <div className="text-xs text-[var(--muted)]">UPTIME</div>
               </div>
-              <div className="rounded-lg bg-[var(--background)] p-3 text-center">
-                <div className="text-2xl font-bold text-[var(--accent-text)]">47ms</div>
+              <div className="rounded-lg bg-[var(--background)] p-2 text-center sm:p-3">
+                <div className="text-xl font-bold text-[var(--accent-text)] sm:text-2xl">47ms</div>
                 <div className="text-xs text-[var(--muted)]">AVG LATENCY</div>
               </div>
-              <div className="rounded-lg bg-[var(--background)] p-3 text-center">
-                <div className="text-2xl font-bold text-[var(--status-warn)]">3</div>
+              <div className="rounded-lg bg-[var(--background)] p-2 text-center sm:p-3">
+                <div className="text-xl font-bold text-[var(--status-warn)] sm:text-2xl">3</div>
                 <div className="text-xs text-[var(--muted)]">AUTO-FIXES TODAY</div>
               </div>
             </div>

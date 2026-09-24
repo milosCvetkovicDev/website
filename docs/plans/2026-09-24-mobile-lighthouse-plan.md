@@ -362,20 +362,24 @@ Commit: `fix(web): fit the story sections to phone widths` (layout items 5, 7, 8
   `loop-phase.tsx`, `game-complete.tsx` and `load-gsap.ts`, all in
   `apps/web/src/components/animated-hero/`
 
-- [ ] **Step 1:** The six phase sections become
+- [x] **Step 1:** The six phase sections become
       `flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24`, and the comment
       on `isAlreadyReached` in `load-gsap.ts` says "`py-16`, and `py-24` from `sm`". The function
       itself is unchanged, because it measures the first child.
-- [ ] **Step 2:** Strategy: the Ideas→Production row wraps, as
+- [x] **Step 2:** Strategy: in each tech card the category → choice row wraps, as
       `flex flex-wrap items-center gap-x-2 gap-y-0.5` inside a `min-w-0 flex-1` column; the card is
-      `p-3 gap-3 sm:p-4 sm:gap-4` and the chart `h-40 sm:h-48` (cosmetic, approved).
-- [ ] **Step 3:** Loop: the stat grid is `gap-2 sm:gap-4`, each cell `p-2 sm:p-3`, each value
+      `gap-3 p-3 sm:gap-4 sm:p-4` and the architecture diagram `h-40 sm:h-48` (cosmetic, approved).
+- [x] **Step 3:** Loop: the stat grid is `gap-2 sm:gap-4`, each cell `p-2 sm:p-3`, each value
       `text-xl sm:text-2xl` with its status or accent token kept; the labels stay `text-xs`.
-- [ ] **Step 4:** GameComplete: the stats line wraps (`flex flex-wrap … gap-x-2 gap-y-1`) and the
-      button is `w-full sm:w-auto`.
+- [x] **Step 4:** GameComplete: the Ideas → Architecture → Code → Production line wraps
+      (`flex flex-wrap … gap-x-2 gap-y-1`), and the LinkedIn button is `w-full sm:w-auto`.
+- [x] **Step 5:** Verify: the unit suite (the `gsap-css-conflicts` guard and the dimmed-text
+      scanner), and `story`, `gsap-lazy`, `mobile/accessibility` and `mobile/layout-overflow` in CI
+      mode.
 
-**Measured:** Loop cells at 320 px fit 79 in 79 (83 in 69 before); the Ideas→Production row fits
-at 320, 375 and 390 px. The tests land with Task 6, which fixes the grid tracks these items sit in.
+**Measured:** Loop cells at 320 px fit 79 in 79 (83 in 69 before); the Ideas→Production line fits
+at 320, 375 and 390 px (254/254, 309/309, 324/324); the tech items fit at 320 px (270 in 270) once
+Task 6 fixes their grid track. The tests land with Task 6.
 
 **Rules.** Status tokens stay (ADR 0010), with no alpha or opacity. No text below 12 px. No
 transition on any tweened element.

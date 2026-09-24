@@ -106,7 +106,10 @@ export function GameComplete() {
   }, [prefersReducedMotion]);
 
   return (
-    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
+    <section
+      ref={sectionRef}
+      className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
+    >
       <div className="w-full max-w-xl text-center">
         <div ref={terminalRef}>
           <Terminal className="text-left">
@@ -118,7 +121,7 @@ export function GameComplete() {
               </div>
 
               <div className="space-y-2 py-4">
-                <div className="flex items-center justify-center gap-2 text-[var(--muted)]">
+                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[var(--muted)]">
                   <span>Ideas</span>
                   <span className="text-[var(--accent-text)]">→</span>
                   <span>Architecture</span>
@@ -154,7 +157,7 @@ export function GameComplete() {
           href="https://www.linkedin.com/in/milos-cvetkovic-dev"
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-8 inline-flex items-center justify-center rounded-lg bg-[var(--accent)] px-8 py-4 text-lg font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+          className="mt-8 inline-flex w-full items-center justify-center rounded-lg bg-[var(--accent)] px-8 py-4 text-lg font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-auto"
         >
           Connect on LinkedIn
         </a>

@@ -222,9 +222,9 @@ export function runWithGsap(
  * playing it again: the entrance is for arriving at the section, and the visitor has arrived.
  *
  * Measured at the section's first child, where its content starts, not at its own box: every phase
- * section is `min-h-screen` with `py-24` and centred content, so its top edge is 96 px or more of
- * empty padding, and one wheel notch past the hero would otherwise count as arriving and skip an
- * entrance nobody had seen.
+ * section is `min-h-screen` with `py-16`, and `py-24` from `sm`, and centred content, so its top
+ * edge is 64 px (96 px from `sm`) or more of empty padding, and one wheel notch past the hero would
+ * otherwise count as arriving and skip an entrance nobody had seen.
  */
 export function isAlreadyReached(section: Element | null): boolean {
   if (!section || window.scrollY <= 0) return false;
