@@ -41,10 +41,17 @@ export function LoopPhase() {
   // the derived values below.
   const finished = prefersReducedMotion || gsapUnavailable;
 
-  // Every timer is tracked so unmounting (or a reduced-motion switch) cancels the sequence.
+  // Every timer is tracked so unmounting (or a reduced-motion switch) cancels the sequence. A timer
+  // that comes due after the commit that removed the section, but before the cleanup that clears
+  // it, does nothing: its refs are already null, and GSAP would warn about a null target
+  // (runWithGsap).
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const later = useCallback((callback: () => void, delayMs: number) => {
-    timersRef.current.push(setTimeout(callback, delayMs));
+    timersRef.current.push(
+      setTimeout(() => {
+        if (sectionRef.current) callback();
+      }, delayMs),
+    );
   }, []);
 
   // Only ever called from the ScrollTrigger below, which exists once GSAP has loaded; it passes
@@ -108,8 +115,8 @@ export function LoopPhase() {
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap, ScrollTrigger }) => {
-        // The element, read once, never the ref: a soft navigation away from `/` nulls the ref a
-        // frame before this effect's cleanup runs (runWithGsap).
+        // The element, read once, never the ref: a soft navigation away from `/` nulls the ref
+        // before this effect's cleanup runs (runWithGsap).
         const section = sectionRef.current;
         if (!section) return;
         const reached = isAlreadyReached(section);

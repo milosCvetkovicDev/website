@@ -67,30 +67,32 @@ beforeAll(async () => {
 // All six story sections, so the shared lifecycle below covers every one of them. LoopPhase was the
 // one omission: its own defects are pinned in `loop-phase.test.tsx` (rows R20 and R21), and this list
 // is what says its build/teardown/rebuild behaves like its five siblings'.
+//
+// `timelineTrigger`: its entrance is a timeline with a scrollTrigger, whose first refresh
+// ScrollTrigger defers. `timerSequence`: its trigger starts a sequence of timers.
 const phases = [
-  { name: 'DiscoveryPhase', Phase: DiscoveryPhase },
-  { name: 'StrategyPhase', Phase: StrategyPhase },
-  { name: 'ExecutionPhase', Phase: ExecutionPhase },
-  { name: 'GauntletPhase', Phase: GauntletPhase },
-  { name: 'LoopPhase', Phase: LoopPhase },
-  { name: 'GameComplete', Phase: GameComplete },
+  { name: 'DiscoveryPhase', Phase: DiscoveryPhase, timelineTrigger: true, timerSequence: false },
+  { name: 'StrategyPhase', Phase: StrategyPhase, timelineTrigger: true, timerSequence: false },
+  { name: 'ExecutionPhase', Phase: ExecutionPhase, timelineTrigger: true, timerSequence: false },
+  { name: 'GauntletPhase', Phase: GauntletPhase, timelineTrigger: false, timerSequence: true },
+  { name: 'LoopPhase', Phase: LoopPhase, timelineTrigger: false, timerSequence: true },
+  { name: 'GameComplete', Phase: GameComplete, timelineTrigger: true, timerSequence: false },
 ];
 
-/** Ticks GSAP from the layout phase of the commit that mounts it. */
-function TickGsapOnMount() {
-  useLayoutEffect(() => {
-    gsap.ticker.tick();
-  }, []);
+/** Runs `action` in the layout phase of the commit that mounts it. */
+function InRemovingCommit({ action }: { action: () => void }) {
+  useLayoutEffect(() => action(), [action]);
   return null;
 }
 
 /**
- * The phase, or in its place a GSAP tick. Swapping one for the other in a single render reproduces
- * a soft navigation away from `/`: React detaches the phase's refs in that commit and ticks GSAP in
- * its layout phase, before the phase's passive effect cleanup runs.
+ * The phase, or in its place `action`. Swapping one for the other in a single render reproduces a
+ * soft navigation away from `/`: React detaches the phase's refs in that commit and runs `action`
+ * in its layout phase, before the phase's passive effect cleanup. RTL's `rerender` runs inside
+ * `act`, which flushes passive effects before it returns, so the layout phase is the only gap.
  */
-function PhaseOrTick({ Phase, show }: { Phase: ComponentType; show: boolean }) {
-  return show ? <Phase /> : <TickGsapOnMount />;
+function PhaseOr({ Phase, action }: { Phase: ComponentType; action?: () => void }) {
+  return action ? <InRemovingCommit action={action} /> : <Phase />;
 }
 
 /** Fires a phase's trigger again, as scrolling back above the section and down does. */
@@ -109,7 +111,6 @@ describe.each(phases)('$name', ({ Phase }) => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
-    vi.restoreAllMocks();
     // Asserted last: a throw here must not skip the global restoration above it.
     expect(media.listenerCount()).toBe(0);
   });
@@ -156,62 +157,136 @@ describe.each(phases)('$name', ({ Phase }) => {
     unmount();
     expect(ScrollTrigger.getAll()).toHaveLength(0);
   }, 15_000);
-
-  // A soft navigation away from `/` removes the section in one commit. React detaches its refs in
-  // that commit but runs this effect's cleanup a frame later, and a GSAP tick can land in between.
-  // ScrollTrigger defers a timeline trigger's first refresh by 0.01 s, and GSAP runs the deferred
-  // call inside the context that created it. So when GSAP had arrived just before the navigation,
-  // that refresh ran with `sectionRef.current` already null, and a context scoped to the ref logged
-  // "Invalid scope" (1 in 10 runs of the client-navigation walk).
-  it('logs nothing when GSAP ticks after the commit that removes it', () => {
-    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom
-    // does not implement.
-    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
-    const warn = vi.spyOn(console, 'warn');
-
-    const { rerender } = render(<PhaseOrTick Phase={Phase} show />);
-    // The deferred refresh is 0.01 s away in GSAP time, and GSAP's clock is the real Date.now it
-    // captured at load, which fake timers do not move. Waiting 20 ms guarantees the tick fires it.
-    const built = Date.now();
-    while (Date.now() - built < 20) {
-      // Busy-wait: nothing may run between the build and the swap.
-    }
-    rerender(<PhaseOrTick Phase={Phase} show={false} />);
-
-    expect(warn).not.toHaveBeenCalled();
-  });
-
-  // The same frame from the other side: GSAP arrives after the commit that removed the section but
-  // before the cleanup that would have cancelled the build, so the build finds its refs null. Each
-  // build is held and its cancel does nothing, then run after the unmount has nulled the refs.
-  it('builds nothing when GSAP arrives after the commit that removes it', () => {
-    const held = vi.mocked(runWithGsap);
-    const passThrough = held.getMockImplementation();
-    const builds: ((runtime: GsapRuntime) => void)[] = [];
-    held.mockImplementation((run) => {
-      builds.push(run);
-      return () => {};
-    });
-    const warn = vi.spyOn(console, 'warn');
-    try {
-      const { unmount } = render(<Phase />);
-      unmount();
-      expect(builds.length).toBeGreaterThan(0);
-      for (const build of builds) build(gsapRuntime);
-    } finally {
-      // vi.restoreAllMocks() restores spies only, not a vi.fn's implementation.
-      held.mockImplementation(passThrough!);
-    }
-
-    expect(ScrollTrigger.getAll()).toHaveLength(0);
-    expect(warn).not.toHaveBeenCalled();
-  });
 });
 
 /** Long enough for every timer-driven sequence to create its last reveal: Gauntlet's runs 6.6 s. */
 const WHOLE_SEQUENCE_MS = 10_000;
 /** Just past the loop alert's pulse at 500 ms, while it still reads ERROR DETECTED. */
 const EARLY_MS = 600;
+
+// A soft navigation away from `/` removes the section in one commit. React detaches its refs in
+// that commit, but a navigation is a transition, and React yields to the browser before it runs a
+// transition's passive effects, where this section's cleanup cancels or reverts its build. GSAP's
+// arrival, a GSAP tick or a due timer can land in between: the client-navigation walk logged
+// "Invalid scope" in 1 run in 10 on it. Each test runs one of the three in the removing commit.
+describe.each(phases)(
+  '$name, removed by a soft navigation',
+  ({ Phase, timelineTrigger, timerSequence }) => {
+    beforeEach(() => {
+      media.reduce = false;
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom
+      // does not implement.
+      vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      try {
+        cleanup();
+      } finally {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+      }
+      // Asserted last: a throw here must not skip the global restoration above it.
+      expect(media.listenerCount()).toBe(0);
+    });
+
+    // ScrollTrigger defers the first refresh of a timeline's trigger by 0.01 s, and every refresh
+    // resolves the trigger through the scope of the context that created it. A context scoped to
+    // sectionRef found the ref null there and logged "Invalid scope".
+    it.runIf(timelineTrigger)('logs nothing when GSAP ticks in that commit', () => {
+      const warn = vi.spyOn(console, 'warn');
+      const delayedCall = vi.spyOn(gsap, 'delayedCall');
+      const { rerender } = render(<PhaseOr Phase={Phase} />);
+      const deferred = delayedCall.mock.calls.flatMap(([delay], call) =>
+        delay === 0.01 ? [delayedCall.mock.results[call].value as gsap.core.Tween] : [],
+      );
+      expect(deferred.length, 'the build deferred a refresh').toBeGreaterThan(0);
+
+      // GSAP's clock is the real Date.now it captured at load, which fake timers do not move.
+      // Waiting 20 ms puts the deferred refresh behind the next tick.
+      const built = Date.now();
+      while (Date.now() - built < 20) {
+        // Busy-wait: nothing may run between the build and the swap.
+      }
+      let progressInCommit: number[] = [];
+      rerender(
+        <PhaseOr
+          Phase={Phase}
+          action={() => {
+            gsap.ticker.tick();
+            progressInCommit = deferred.map((call) => call.progress());
+          }}
+        />,
+      );
+
+      expect(progressInCommit, 'the deferred refresh ran in the removing commit').toEqual(
+        deferred.map(() => 1),
+      );
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    // GSAP arriving in that commit: the build it had queued runs with the refs already null, before
+    // the cleanup that would revert it. Each build is held, and its cancel does nothing, because
+    // by the time the cleanup calls it the build has already run.
+    it('builds nothing when GSAP arrives in that commit', () => {
+      const held = vi.mocked(runWithGsap);
+      const passThrough = held.getMockImplementation();
+      const builds: ((runtime: GsapRuntime) => void)[] = [];
+      held.mockImplementation((run) => {
+        builds.push(run);
+        return () => {};
+      });
+      const warn = vi.spyOn(console, 'warn');
+      let triggersBuilt = -1;
+      try {
+        const { rerender } = render(<PhaseOr Phase={Phase} />);
+        expect(builds.length, 'the mount asked for a build').toBeGreaterThan(0);
+        rerender(
+          <PhaseOr
+            Phase={Phase}
+            action={() => {
+              for (const build of builds) build(gsapRuntime);
+              triggersBuilt = ScrollTrigger.getAll().length;
+            }}
+          />,
+        );
+      } finally {
+        // vi.restoreAllMocks() restores spies only, not a vi.fn's implementation.
+        held.mockImplementation(passThrough!);
+      }
+
+      expect(triggersBuilt).toBe(0);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    // A timer coming due in that commit: the Gauntlet's and the Loop's sequences reveal their
+    // panels from timers that read refs when they fire, outside any context.
+    it.runIf(timerSequence)('logs nothing when its sequence timers come due in that commit', () => {
+      const warn = vi.spyOn(console, 'warn');
+      const { rerender } = render(<PhaseOr Phase={Phase} />);
+      // jsdom lays nothing out, so the trigger starts in view and the sequence has begun.
+      expect(vi.getTimerCount(), 'the sequence scheduled its timers').toBeGreaterThan(0);
+
+      let timersLeft = -1;
+      rerender(
+        <PhaseOr
+          Phase={Phase}
+          action={() => {
+            vi.advanceTimersByTime(WHOLE_SEQUENCE_MS);
+            timersLeft = vi.getTimerCount();
+            // A tween those timers made initialises on the next tick and can warn then, which
+            // would land in whichever test ticks next.
+            gsap.ticker.tick();
+          }}
+        />,
+      );
+
+      expect(timersLeft, 'every timer came due in the removing commit').toBe(0);
+      expect(warn).not.toHaveBeenCalled();
+    });
+  },
+);
 
 // What each phase tweens that CSS used to fight, and must now leave alone: the discovery tags and the
 // strategy tech cards (a transition and a hover transform each), the loop alert and the closing CTA

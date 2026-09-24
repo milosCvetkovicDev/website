@@ -129,8 +129,8 @@ export function ExecutionPhase() {
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap }) => {
-        // The element, read once, never the ref: a soft navigation away from `/` nulls the ref a
-        // frame before this effect's cleanup runs (runWithGsap).
+        // The element, read once, never the ref: a soft navigation away from `/` nulls the ref
+        // before this effect's cleanup runs (runWithGsap).
         const section = sectionRef.current;
         if (!section) return;
         const reached = isAlreadyReached(section);
