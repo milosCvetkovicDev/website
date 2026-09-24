@@ -72,7 +72,7 @@ It passes when all of these hold:
 - [x] For a production-like reading, each branch run's LCP is also re-simulated from its saved
       trace and devtools log with the protocol set to HTTP/2 (a Lantern replay). Recorded, not
       gated.
-- [ ] Production: five Lighthouse 12.8.2 CLI runs against `https://miloscvetkovic.dev` before the
+- [x] Production: five Lighthouse 12.8.2 CLI runs against `https://miloscvetkovic.dev` before the
       pull request, and five after the merge has deployed, with the load logged. The expectation is
       a median of 96–97 after the deploy, from blocking time alone. This is evidence, not a merge
       gate: it can only run after the merge.
@@ -127,7 +127,37 @@ branch:
   load of 2.1–4.1 at run start:
   - Scores 68, 93, 93, 91 and 92, a median of 92. The 68 is the first run, with a TBT of 1708 ms.
   - The other four runs: LCP 2134–2290 ms, TBT 249–324 ms, CLS 0.0001.
-  - The runs after the deploy are still to be taken.
+- Production after the deploy: #125 merged as `23ef7a6`, and `main` had not moved when the runs
+  were taken. The live page carried all 30 class attributes unique to the build of the pull
+  request's head, whose `apps/` tree `23ef7a6` shares, and none of the 25 unique to `a3d97f9`.
+  Five runs followed at 19:33Z, four hours after the runs before the pull request (15:23Z), from
+  the same machine with the same Lighthouse 12.8.2 settings (mobile, simulated 1.6 Mbps and 150 ms
+  RTT, 4× CPU slowdown), at a load of 2.6–3.6 at run start. Neither set has a run warning, and
+  `benchmarkIndex` is 1675–2023.5 before and 1794.5–2079.5 after. Each column's own median over
+  the five runs, before → after:
+
+  | Perf    | LCP (ms)    | TBT (ms)  | Speed Index (ms) | FCP (ms)   | CLS        |
+  | ------- | ----------- | --------- | ---------------- | ---------- | ---------- |
+  | 92 → 97 | 2236 → 2303 | 321 → 135 | 1502 → 1214      | 993 → 1181 | 0.0001 → 0 |
+  - The scores after the deploy are 99, 97, 97, 94 and 97. The median, 97, is inside the 96–97
+    the plan expected from blocking time alone.
+  - Every run in both sets scores 100 for accessibility, best practices and SEO and has the hero
+    `h1` as its LCP element. Every run before the deploy made three `/?_rsc=` requests, and none
+    after it makes one.
+  - The first run of each set is cold: its observed first paint is 2283 ms before and 850 ms
+    after, against 388–462 ms for every other run. The ranges below leave both out.
+  - Blocking time is 126–226 ms after the deploy against 249–324 ms before.
+  - LCP is later: 2298–2312 ms after against 2134–2290 ms before, and the five-run median is 67 ms
+    later.
+  - The simulated FCP is later too, 1172–1268 ms against 991–1198 ms. The observed first paint,
+    which Lighthouse measures without throttling, is unchanged at 388–462 ms against 413–445 ms,
+    so the server is not slower and nothing delays the paint of an unthrottled load. It cannot
+    show a cost that only the simulated 1.6 Mbps link or the 4× CPU slowdown imposes.
+  - In each of those runs, the requests that start before the first paint carry 3.4 KB more
+    transfer size, 260.4 KB from 15 requests against 257.0 KB from 16. The largest change among
+    them is the page chunk, which grew by 4.9 KB because the tmux background now ships in it
+    instead of in a lazy chunk. At 1.6 Mbps, 3.4 KB is about 17 ms, so the cause of the rest of
+    the FCP and LCP difference is not isolated.
 
 ---
 
