@@ -58,10 +58,11 @@ export interface CaseStudy {
 // page improvements (#2)", 2026-02-23. But the site was undeployed until 2026-09-09
 // (docs/adr/0002-monorepo-toolchain.md:170; docs/runbooks/deploy.md:14-18 puts the first
 // production deployment, a8b4a91, on that day), so 2026-09-09 may be the truer publish date.
-// UPDATED_AT is 2026-09-23, the day d1da60f (#116) redrafted the studies' visible copy; the
-// rewrite from public sources changes it again, so bump it to the day that rewrite merges.
+// UPDATED_AT is 2026-09-24, the day the rewrite from public sources merged. It changed every
+// study's approach, and its howItWorks or its lessons; d1da60f (#116) had redrafted them on
+// 2026-09-23.
 const PUBLISHED_AT = '2026-02-23';
-const UPDATED_AT = '2026-09-23';
+const UPDATED_AT = '2026-09-24';
 
 export const caseStudies: CaseStudy[] = [
   // TODO(milos): copy rewritten on 2026-09-23 from public sources (the claude-code-monorepo
