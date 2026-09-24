@@ -70,7 +70,8 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   through. It does not see a dynamic `import()`, and it reads layouts only.
 - GSAP is loaded lazily, never imported by a rendered component.
   `apps/web/src/components/animated-hero/gsap-runtime.ts` imports `gsap`, and only `load-gsap.ts`
-  reaches it, through `import()`, once the browser is idle after hydration. Effects run GSAP work
+  reaches it, through `import()`, on the visitor's first scroll, wheel, touch, pointer press or key
+  press, or at once when the page loads already scrolled (ADR 0024). Effects run GSAP work
   through `runWithGsap` and event handlers through `useWithGsap`; `import type` is fine. A static
   import from anything the home page reaches puts about 44 KB gzip back into its initial chunk, so
   `@typescript-eslint/no-restricted-imports` in `apps/web/eslint.config.mjs` refuses one everywhere

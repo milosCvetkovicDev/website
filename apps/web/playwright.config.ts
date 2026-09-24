@@ -1,9 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
+import { servesProductionBuild } from './e2e/support/build-mode';
 
 // GitHub Actions sets CI=true; anything else (including "false") is treated as local. This chooses
 // the command and the runner hardening below, not the port: docs/runbooks/deploy.md sets CI=true by
-// hand to reproduce the CI path on a developer machine, where 3000 is usually taken.
-const isCI = process.env.CI === 'true' || process.env.CI === '1';
+// hand to reproduce the CI path on a developer machine, where 3000 is usually taken. Specs that
+// depend on the production build ask the same helper.
+const isCI = servesProductionBuild();
 
 // 3000 belongs to `pnpm dev`, and on a machine running several checkouts of this repository it
 // belongs to whichever one claimed it first, so the suite serves 3210 instead. CI overrides this

@@ -1,10 +1,7 @@
 'use client';
 
-import { lazy, Suspense, useSyncExternalStore, type ReactNode } from 'react';
-
-const TmuxBackground = lazy(() =>
-  import('./tmux-background').then((m) => ({ default: m.TmuxBackground })),
-);
+import { useSyncExternalStore, type ReactNode } from 'react';
+import { TmuxBackground } from './tmux-background';
 
 const SCROLL_THRESHOLD_PX = 100;
 const subscribeToScroll = (onChange: () => void) => {
@@ -22,12 +19,12 @@ export function HeroSection({ children }: { children?: ReactNode }) {
   return (
     <section
       aria-label="Hero - Milos Cvetkovic, Senior Full Stack Engineer"
-      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6"
+      className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-4 py-8 sm:px-6 sm:py-12"
     >
-      {/* 1. TmuxBackground -- absolute-positioned background (lazy loaded) */}
-      <Suspense fallback={null}>
-        <TmuxBackground />
-      </Suspense>
+      {/* 1. TmuxBackground -- absolute-positioned background. Imported statically and hydrated
+          with the hero: as a lazy chunk it was a request of its own, made only once hydration
+          asked for it, and its Suspense boundary hydrated after the rest of the page. */}
+      <TmuxBackground />
 
       {/* 2. Overlay layers (decorative) */}
       {/* Glow */}
@@ -92,7 +89,7 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       {/* 4. Scroll indicator -- fixed, bottom-11, z-20 */}
       <div
         aria-hidden="true"
-        className={`fixed bottom-11 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1.5 transition-opacity duration-300 ${
+        className={`fixed bottom-11 left-1/2 z-20 hidden -translate-x-1/2 flex-col items-center gap-1.5 transition-opacity duration-300 lg:flex ${
           showScrollIndicator ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >

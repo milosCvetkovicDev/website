@@ -193,7 +193,7 @@ export function StatDisplay({
   // and the label's colour. One paused timeline is restarted on every hover, so re-entering
   // mid-shake starts it again from rest rather than stacking a second timeline on the value, and
   // the context reverts it, inline transform included, on unmount or when reduced motion turns on.
-  // GSAP arrives after hydration (load-gsap.ts): a hover before then finds no timeline and does
+  // GSAP arrives on the first intent (load-gsap.ts): a hover before then finds no timeline and does
   // nothing rather than playing late, and the cleanup cancels a build that has not run yet.
   useEffect(() => {
     const row = rowRef.current;

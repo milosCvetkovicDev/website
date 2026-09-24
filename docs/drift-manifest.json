@@ -3634,6 +3634,23 @@
       }
     },
     {
+      "id": "plans-readme-link-2026-09-24-mobile-lighthouse-plan",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-09-24-mobile-lighthouse-plan.md)",
+      "claim": "The link to 2026-09-24-mobile-lighthouse-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-24-mobile-lighthouse-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-24-mobile-lighthouse-plan.md"
+      }
+    },
+    {
       "id": "plans-readme-link-claude-epics-audit-remediation-2026-09-epi",
       "doc": "docs/plans/README.md",
       "anchor": "](../../.claude/epics/audit-remediation-2026-09/epic.md)",
@@ -6126,24 +6143,24 @@
       "anchor": "| 0022 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0022's record carries the status line \"Accepted\".",
+      "claim": "ADR 0022's record carries the status line \"Superseded by ADR-0024\".",
       "check": {
         "file": "docs/adr/0022-no-boot-loader.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0024"
       }
     },
     {
       "id": "adr-index-0022-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0022 |",
-      "claim": "The index row for ADR 0022 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0022 gives the record's status line, \"Superseded by ADR-0024\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0022 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0024"
       }
     },
     {
@@ -6213,6 +6230,23 @@
       ],
       "check": {
         "path": "docs/adr/0023-static-security-headers.md"
+      }
+    },
+    {
+      "id": "adr-readme-link-0024-gsap-loads-on-first-intent",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0024-gsap-loads-on-first-intent.md)",
+      "claim": "The link to 0024-gsap-loads-on-first-intent.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0024-gsap-loads-on-first-intent.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0024-gsap-loads-on-first-intent.md"
       }
     },
     {
@@ -6291,6 +6325,118 @@
         "file": "docs/adr/README.md",
         "regex": "^\\| 0023 \\| \\[(.+?)\\]\\(0023-",
         "equals": "Six static security headers on every page and asset"
+      }
+    },
+    {
+      "id": "adr-index-0024-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0024's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0024-gsap-loads-on-first-intent.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0024-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "claim": "The index row for ADR 0024 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0024 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0024-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0024's record carries the Date \"2026-09-24\".",
+      "check": {
+        "file": "docs/adr/0024-gsap-loads-on-first-intent.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-24"
+      }
+    },
+    {
+      "id": "adr-index-0024-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "claim": "The index row for ADR 0024 gives the record's Date, \"2026-09-24\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0024 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-24"
+      }
+    },
+    {
+      "id": "adr-index-0024-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0024's record carries the H1 title \"GSAP loads on the visitor's first intent\".",
+      "check": {
+        "file": "docs/adr/0024-gsap-loads-on-first-intent.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "GSAP loads on the visitor's first intent"
+      }
+    },
+    {
+      "id": "adr-index-0024-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "claim": "The index row for ADR 0024 gives the record's H1 title, \"GSAP loads on the visitor's first intent\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0024 \\| \\[(.+?)\\]\\(0024-",
+        "equals": "GSAP loads on the visitor's first intent"
+      }
+    },
+    {
+      "id": "adr-0022-link-0024-gsap-loads-on-first-intent",
+      "doc": "docs/adr/0022-no-boot-loader.md",
+      "anchor": "](0024-gsap-loads-on-first-intent.md)",
+      "claim": "The link to 0024-gsap-loads-on-first-intent.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0024-gsap-loads-on-first-intent.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0024-gsap-loads-on-first-intent.md"
+      }
+    },
+    {
+      "id": "adr-0024-link-0022-no-boot-loader",
+      "doc": "docs/adr/0024-gsap-loads-on-first-intent.md",
+      "anchor": "](0022-no-boot-loader.md)",
+      "claim": "The link to 0022-no-boot-loader.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0022-no-boot-loader.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0022-no-boot-loader.md"
       }
     },
     {
@@ -6861,11 +7007,24 @@
       "anchor": "`apps/web/playwright.config.ts` treats `CI=true` or `CI=1`",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "Only CI=true or CI=1 selects the CI path.",
+      "claim": "Only CI=true or CI=1 selects the CI path: playwright.config.ts takes isCI from servesProductionBuild().",
       "check": {
         "file": "apps/web/playwright.config.ts",
         "regex": "^const isCI = (.+);$",
-        "equals": "process.env.CI === 'true' || process.env.CI === '1'"
+        "equals": "servesProductionBuild()"
+      }
+    },
+    {
+      "id": "adr-0004-playwright-ci-detection-condition",
+      "doc": "docs/adr/0004-ci-pipeline-and-quality-gates.md",
+      "anchor": "`apps/web/playwright.config.ts` treats `CI=true` or `CI=1`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "servesProductionBuild(), which playwright.config.ts takes isCI from, is true for CI=true or CI=1 only.",
+      "check": {
+        "file": "apps/web/e2e/support/build-mode.ts",
+        "regex": "^  return (.+);$",
+        "equals": "env.CI === 'true' || env.CI === '1'"
       }
     },
     {
@@ -7931,6 +8090,19 @@
         "file": "docs/plans/README.md",
         "regex": "^\\| \\[2026\\-09\\-15\\-route\\-hydration\\-marker\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
         "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-24-mobile-lighthouse-plan-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-24-mobile-lighthouse-plan.md](2026-09-24-mobile-lighthouse-plan.md)",
+      "claim": "The plans index gives 2026-09-24-mobile-lighthouse-plan.md the status \"In review\" (pull request #125 is open).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-24\\-mobile\\-lighthouse\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "In review"
       }
     },
     {

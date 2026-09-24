@@ -73,9 +73,10 @@ const SERVED_MARKERS = [
  * `page.evaluate` works with `javaScriptEnabled: false`, for the reason given in the second test.
  *
  * - `script`, `style` and `template` contribute one space and none of their content. Script and style
- *   text is code rather than copy, and a template's content is inert until a script clones it (on `/`,
- *   React's pending Suspense placeholder `<template id="B:0">` is one). The space keeps the words either
- *   side apart, as the regular expressions did for script and style.
+ *   text is code rather than copy, and a template's content is inert until a script clones it (React's
+ *   placeholder for a Suspense boundary still pending when the shell is sent, `<template id="B:0">`, is
+ *   one; `/` served one while its tmux background was lazy). The space keeps the words either side
+ *   apart, as the regular expressions did for script and style.
  * - `noscript` is kept. With scripting disabled the parser reads its content as ordinary markup, which
  *   is exactly what a crawler that runs no JavaScript does with it. None of the ten routes serves one
  *   today, but a fallback added later is copy written for that very reader, so it has to count.

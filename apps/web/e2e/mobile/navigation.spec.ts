@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { STATIC_ROUTES } from '../routes';
+import { servesProductionBuild } from '../support/build-mode';
 import { gotoHydrated } from '../support/hydration';
 import { warmRoutes } from '../support/warm-routes';
 
@@ -7,7 +8,7 @@ import { warmRoutes } from '../support/warm-routes';
  * The mobile header and its menu, on a real phone viewport.
  *
  * Nothing tested this before: the header's mobile half and `MobileMenu` are `md:hidden`
- * (`src/components/navigation.tsx:155`, `:77`), and the whole suite ran one 1280x720 project, where
+ * (`src/components/navigation.tsx:161`, `:77`), and the whole suite ran one 1280x720 project, where
  * that half of the component does not exist. This file runs on the two phone projects only — see
  * `MOBILE_SPECS` in `playwright.config.ts` — so `isMobile` and `hasTouch` are real and `tap()` is a
  * touch event rather than a synthesised click.
@@ -20,7 +21,7 @@ import { warmRoutes } from '../support/warm-routes';
  * annotation the stop condition rather than a comment.
  *
  * Two of them are about the same single bug. `<header>` carries `backdrop-blur-sm`
- * (`navigation.tsx:123`), and a `backdrop-filter` makes an element the containing block for its
+ * (`navigation.tsx:126`), and a `backdrop-filter` makes an element the containing block for its
  * `position: fixed` descendants. `MobileMenu` renders inside that header, so its `fixed inset-0`
  * wrapper, backdrop and drawer are all clipped to the header's own 375x72 box instead of filling the
  * viewport: measured 256x72 for the drawer at 375x812. The links paint over the page text with no
@@ -116,6 +117,58 @@ test.describe('the mobile header', () => {
       // The link's own onClick closes the menu; the panel must not survive the navigation.
       await expect(closeButton(page)).toBeHidden();
     });
+  });
+
+  // On a phone the header logo is the only link in view at load, and on `/` it prefetched `/`
+  // itself: three `?_rsc=` requests racing the page's own, inside the window Lighthouse measures.
+  // The control on `/about`, where the logo keeps Next's default, shows that the same wait sees that
+  // prefetch. `next dev` prefetches nothing, so there the check on `/` would pass without testing
+  // anything: the test runs against the production build only.
+  test('the header logo does not prefetch the page it is on', async ({ page }) => {
+    test.skip(!servesProductionBuild(), 'Next prefetches a Link only in a production build');
+    const prefetched: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.searchParams.has('_rsc')) prefetched.push(url.pathname);
+    });
+
+    await open(page, '/about');
+    await page.waitForLoadState('networkidle');
+    expect(prefetched, 'on /about the logo should still prefetch /').toContain('/');
+
+    prefetched.length = 0;
+    await open(page, '/');
+    await page.waitForLoadState('networkidle');
+    expect(
+      prefetched.filter((path) => path === '/'),
+      'on / the header logo prefetched the page it is on',
+    ).toEqual([]);
+  });
+
+  // The menu's own Home entry did the same once the menu was open: three `/?_rsc=` requests on `/`.
+  // The other entries keep Next's default, and prefetching them is the control.
+  test('the open menu does not prefetch the page it is on', async ({ page }) => {
+    test.skip(!servesProductionBuild(), 'Next prefetches a Link only in a production build');
+    const prefetched: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.searchParams.has('_rsc')) prefetched.push(url.pathname);
+    });
+
+    await open(page, '/');
+    await page.waitForLoadState('networkidle');
+    prefetched.length = 0;
+    await openMenu(page);
+    // The page is already idle, so `networkidle` would not wait. Next schedules the entries'
+    // prefetches together once the links are visible, Home's ahead of About's in document order, so
+    // About's arriving is the control and the point by which Home's would have been requested.
+    await expect
+      .poll(() => prefetched, { message: 'the open menu should prefetch the other routes' })
+      .toContain('/about');
+    expect(
+      prefetched.filter((path) => path === '/'),
+      'on / the open menu prefetched the page it is on',
+    ).toEqual([]);
   });
 
   test('switches the theme from the mobile toggle', async ({ page }) => {
@@ -214,7 +267,7 @@ test.describe('the mobile header', () => {
     test.info().annotations.push({ type: 'fixed-by', description: 'R5, #46' });
     await open(page, '/');
     const button = menuButton(page);
-    // `navigation.tsx:157` carries `aria-label` only: no `aria-expanded`, no `aria-controls`.
+    // `navigation.tsx:163` carries `aria-label` only: no `aria-expanded`, no `aria-controls`.
     await expect(button).toHaveAttribute('aria-expanded', 'false');
 
     await openMenu(page);
@@ -230,7 +283,7 @@ test.describe('the mobile header', () => {
 
     await page.keyboard.press('Escape');
 
-    // `navigation.tsx:71-116` has no keydown handler, so the close button is still attached.
+    // `navigation.tsx:71-119` has no keydown handler, so the close button is still attached.
     await expect(closeButton(page)).toBeHidden();
   });
 
@@ -271,7 +324,7 @@ test.describe('the mobile header', () => {
     await open(page, '/work/self-healing-agent');
     await openMenu(page);
 
-    // `pathname === link.href` (`navigation.tsx:102`) is an exact match, so on /work/<slug> no link
+    // `pathname === link.href` (`navigation.tsx:105`) is an exact match, so on /work/<slug> no link
     // is current and the header says nothing about where the visitor is. /work is the section.
     const current = drawer(page).locator('[aria-current="page"]');
     await expect(current).toHaveCount(1);

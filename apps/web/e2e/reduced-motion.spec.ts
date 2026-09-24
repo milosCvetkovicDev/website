@@ -111,10 +111,10 @@ test('under reduce, hovering an animated heading moves nothing', async ({ page }
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
     'the whole point of this case is the reduce branch',
   ).toBe(true);
-  // The hover handlers run their tweens through GSAP, which arrives when the browser is idle after
-  // hydration (`load-gsap.ts`), under `reduce` as well. A hover that lands earlier and stays still
-  // plays, but only once GSAP is in, which can be after the 200 ms read below: a clean read, and
-  // for an expected failure a lucky pass fails the whole run.
+  // The hover handlers run their tweens through GSAP, which arrives on the visitor's first intent
+  // (`load-gsap.ts`), under `reduce` as well; a hover is intent too, but it plays only once GSAP is
+  // in, which can be after the 200 ms read below: a clean read, and for an expected failure a lucky
+  // pass fails the whole run. So the helper sends intent and waits for GSAP first.
   await expectGsapLoaded(page);
 
   // Every phase renders its finished state on mount under `reduce`, so all six headings are already

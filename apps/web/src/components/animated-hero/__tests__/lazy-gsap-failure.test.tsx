@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GSAP_FAILED_MARK, loadGsap, NO_IDLE_CALLBACK_DELAY_MS } from '../load-gsap';
+import { GSAP_FAILED_MARK, loadGsap } from '../load-gsap';
 import { DiscoveryPhase } from '../discovery-phase';
 import { ExecutionPhase } from '../execution-phase';
 import { GauntletPhase } from '../gauntlet-phase';
@@ -79,11 +79,12 @@ describe('when GSAP fails to load', () => {
     expect(revealContainer(/It worked on my machine/)).toHaveClass('opacity-0');
     expect(revealContainer(/This happened at 3:14am/)).toHaveClass('opacity-0');
 
-    // A hover that was waiting for GSAP is dropped with the load, and throws nothing.
+    // The visitor scrolls, which starts the load, and hovers while it is in flight. That hover is
+    // waiting for GSAP, so it is dropped with the load, and throws nothing.
+    fireEvent.scroll(window);
     fireEvent.mouseEnter(glitch.container.querySelector('[class*="cursor-pointer"]')!);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(NO_IDLE_CALLBACK_DELAY_MS);
       await expect(loadGsap()).rejects.toThrow();
     });
 
