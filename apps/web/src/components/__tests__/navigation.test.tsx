@@ -1,8 +1,13 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-type LinkProps = { href: string; prefetch?: boolean | null; children?: ReactNode };
+type LinkProps = {
+  href: string;
+  prefetch?: boolean | null;
+  onClick?: () => void;
+  children?: ReactNode;
+};
 
 const route = vi.hoisted(() => ({ pathname: '/' }));
 const links = vi.hoisted(() => [] as LinkProps[]);
@@ -41,5 +46,21 @@ describe('Navigation', () => {
     route.pathname = '/about';
     render(<Navigation />);
     for (const logo of logoLinks()) expect(logo.prefetch).toBeUndefined();
+  });
+
+  // The menu's links are the ones that close it on click. Opening it must not prefetch the page the
+  // visitor is on from that page's own entry, and leaves every other entry on Next's default.
+  it.each(['/', '/about'])('does not let the open menu prefetch %s from its own link', (path) => {
+    route.pathname = path;
+    render(<Navigation />);
+    links.length = 0;
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    const menu = links.filter((props) => props.onClick);
+    expect(menu.length, 'the open menu should render its links').toBeGreaterThan(0);
+    for (const link of menu) {
+      expect(link.prefetch, link.href).toBe(link.href === path ? false : undefined);
+    }
+    expect(menu.some((link) => link.href === path)).toBe(true);
   });
 });

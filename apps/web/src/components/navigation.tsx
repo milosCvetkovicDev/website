@@ -94,10 +94,13 @@ function MobileMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
           </svg>
         </button>
         <nav className="mt-12 flex flex-col gap-4">
+          {/* Opening the menu on a page would otherwise prefetch that page from its own link, as
+              the header logo would on `/`. */}
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
+              prefetch={pathname === link.href ? false : undefined}
               onClick={onClose}
               aria-current={pathname === link.href ? 'page' : undefined}
               className={`text-lg transition-colors ${
