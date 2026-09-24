@@ -7007,11 +7007,24 @@
       "anchor": "`apps/web/playwright.config.ts` treats `CI=true` or `CI=1`",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "Only CI=true or CI=1 selects the CI path.",
+      "claim": "Only CI=true or CI=1 selects the CI path: playwright.config.ts takes isCI from servesProductionBuild().",
       "check": {
         "file": "apps/web/playwright.config.ts",
         "regex": "^const isCI = (.+);$",
-        "equals": "process.env.CI === 'true' || process.env.CI === '1'"
+        "equals": "servesProductionBuild()"
+      }
+    },
+    {
+      "id": "adr-0004-playwright-ci-detection-condition",
+      "doc": "docs/adr/0004-ci-pipeline-and-quality-gates.md",
+      "anchor": "`apps/web/playwright.config.ts` treats `CI=true` or `CI=1`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "servesProductionBuild(), which playwright.config.ts takes isCI from, is true for CI=true or CI=1 only.",
+      "check": {
+        "file": "apps/web/e2e/support/build-mode.ts",
+        "regex": "^  return (.+);$",
+        "equals": "env.CI === 'true' || env.CI === '1'"
       }
     },
     {

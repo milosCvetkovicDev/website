@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { STATIC_ROUTES } from '../routes';
+import { servesProductionBuild } from '../support/build-mode';
 import { gotoHydrated } from '../support/hydration';
 import { warmRoutes } from '../support/warm-routes';
 
@@ -28,13 +29,6 @@ import { warmRoutes } from '../support/warm-routes';
  * page and the menu stays open (R3). It is also why WebKit is here: whether a `backdrop-filter`
  * ancestor becomes that containing block is engine-specific.
  */
-
-/**
- * Whether the suite serves the production build, the same test `playwright.config.ts` uses to choose
- * `pnpm start` over `pnpm dev`. Next prefetches a `<Link>` that enters the viewport only in a
- * production build.
- */
-const SERVES_PRODUCTION_BUILD = process.env.CI === 'true' || process.env.CI === '1';
 
 /** Every test here interacts, on `/` and on other routes alike, so each one starts hydrated. */
 async function open(page: Page, path: string) {
@@ -128,8 +122,10 @@ test.describe('the mobile header', () => {
   // On a phone the header logo is the only link in view at load, and on `/` it prefetched `/`
   // itself: three `?_rsc=` requests racing the page's own, inside the window Lighthouse measures.
   // The control on `/about`, where the logo keeps Next's default, shows that the same wait sees that
-  // prefetch whenever the served build prefetches at all.
+  // prefetch. `next dev` prefetches nothing, so there the check on `/` would pass without testing
+  // anything: the test runs against the production build only.
   test('the header logo does not prefetch the page it is on', async ({ page }) => {
+    test.skip(!servesProductionBuild(), 'Next prefetches a Link only in a production build');
     const prefetched: string[] = [];
     page.on('request', (request) => {
       const url = new URL(request.url());
@@ -138,9 +134,7 @@ test.describe('the mobile header', () => {
 
     await open(page, '/about');
     await page.waitForLoadState('networkidle');
-    if (SERVES_PRODUCTION_BUILD) {
-      expect(prefetched, 'on /about the logo should still prefetch /').toContain('/');
-    }
+    expect(prefetched, 'on /about the logo should still prefetch /').toContain('/');
 
     prefetched.length = 0;
     await open(page, '/');
