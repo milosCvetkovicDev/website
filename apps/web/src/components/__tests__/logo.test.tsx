@@ -35,6 +35,18 @@ describe('Logo', () => {
     expect(parseFloat(duration) * Number(count)).toBeLessThan(5);
   });
 
+  it('keeps the cursor at least 2px tall and offsets it in layout, not with a transform', () => {
+    const { container } = render(<Logo size={14} />);
+    const cursor = container.firstElementChild?.lastElementChild as HTMLElement;
+    const classes = cursor.className.split(/\s+/);
+
+    // 0.1em of the footer's 14px is 1.4px, which WebKit paints 1px tall at 1x density.
+    expect(classes).toContain('h-[max(0.1em,2px)]');
+    // Layout offsets are rounded to whole pixels before painting; a translate is not, and blurs.
+    expect(classes).toEqual(expect.arrayContaining(['relative', 'top-[0.12em]']));
+    expect(classes.filter((c) => /(^|:)-?translate-/.test(c))).toEqual([]);
+  });
+
   it('defaults to 20px and passes a className through', () => {
     const { container } = render(<Logo className="text-[var(--foreground)]" />);
     const mark = container.firstElementChild as HTMLElement;
