@@ -328,8 +328,11 @@ test.describe('the first intent', () => {
     await page.goto('/');
     await expectHydrated(page);
     expect(await marksSet(page)).toEqual([]);
-    await page.keyboard.press('ArrowDown');
+    // A key that does not scroll: an arrow key would scroll the document, and the scroll listener
+    // alone would then start the load, so the test could not tell that the key press did.
+    await page.keyboard.press('Shift');
     await waitForGsapLoadedMark(page);
+    expect(await page.evaluate(() => scrollY), 'the key press scrolled the page').toBe(0);
   });
 
   test('a reload at a restored scroll position loads GSAP with no further input', async ({
