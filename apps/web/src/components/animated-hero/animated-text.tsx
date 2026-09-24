@@ -391,7 +391,10 @@ const GlitchText = memo(function GlitchText({
 
   const handleMouseEnter = useCallback(() => {
     withGsap((gsap) => {
-      if (timelineRef.current?.isActive()) return;
+      // A hover queued behind GSAP's load can run after a navigation has removed the heading: read
+      // the ref once and do nothing when it is null (runWithGsap).
+      const el = containerRef.current;
+      if (!el || timelineRef.current?.isActive()) return;
       setIsGlitching(true);
 
       timelineRef.current = gsap.timeline({
@@ -400,12 +403,12 @@ const GlitchText = memo(function GlitchText({
 
       // Quick glitch bursts
       for (let i = 0; i < 5; i++) {
-        timelineRef.current.to(containerRef.current, {
+        timelineRef.current.to(el, {
           x: (Math.random() - 0.5) * 4,
           duration: 0.05,
         });
       }
-      timelineRef.current.to(containerRef.current, {
+      timelineRef.current.to(el, {
         x: 0,
         duration: 0.1,
       });
