@@ -9,6 +9,13 @@ fonts are under the SIL Open Font License, reproduced in [OFL.txt](OFL.txt).
 | -------------------------------- | ------------------------------ | ----------------------------- | ------- |
 | `geist-latin.woff2`              | Geist, weights 100 to 900      | Google Fonts' latin range     | 28.2 KB |
 | `geist-mono-latin-symbols.woff2` | Geist Mono, weights 100 to 900 | latin, plus the symbols range | 26.3 KB |
+| `geist-mono-600-mark.ttf`        | Geist Mono, weight 600 only    | `m`, `c` and `_`              | 2.3 KB  |
+
+`geist-mono-600-mark.ttf` is not loaded by the layout. `../../lib/brand-mark.tsx` passes it to
+ImageResponse, which draws `/icon`, `/apple-icon` and `/favicon.ico` and cannot read woff2 or
+variable fonts, so it is a static TrueType instance of the mono file above, cut to the three
+characters the mark uses. The mark must stay within them: for any other character ImageResponse
+would fetch a font from the network at build time.
 
 Google Fonts preloaded only its latin files and fetched the other ranges when a page used them. The
 symbols range is in Geist Mono's file because the hero's tmux background draws box-drawing
@@ -48,4 +55,17 @@ pyftsubset geist-mono/GeistMono-Variable.woff2 --unicodes="$LATIN,$SYMBOLS" \
   --layout-features=ccmp,dnom,frac,locl,numr,mark,mkmk \
   --no-hinting --glyph-names --name-IDs='*' --name-languages='*' --notdef-outline --flavor=woff2 \
   --output-file=geist-mono-latin-symbols.woff2
+```
+
+The mark font is cut from `geist-mono-latin-symbols.woff2` itself, from this directory, with the
+same fontTools. `SOURCE_DATE_EPOCH`, the time of the commit that added the source file, pins the
+timestamp fontTools writes into the `head` table; without it every run gives different bytes.
+
+```bash
+export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct -- geist-mono-latin-symbols.woff2)
+fonttools varLib.instancer geist-mono-latin-symbols.woff2 wght=600 --static --output=mono600.woff2
+pyftsubset mono600.woff2 --unicodes='U+005F,U+0063,U+006D' \
+  --no-hinting --glyph-names --name-IDs='*' --name-languages='*' --notdef-outline \
+  --output-file=geist-mono-600-mark.ttf
+rm mono600.woff2
 ```

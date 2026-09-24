@@ -7,7 +7,7 @@ import { warmRoutes } from '../support/warm-routes';
  * The mobile header and its menu, on a real phone viewport.
  *
  * Nothing tested this before: the header's mobile half and `MobileMenu` are `md:hidden`
- * (`src/components/navigation.tsx:151`, `:76`), and the whole suite ran one 1280x720 project, where
+ * (`src/components/navigation.tsx:155`, `:77`), and the whole suite ran one 1280x720 project, where
  * that half of the component does not exist. This file runs on the two phone projects only — see
  * `MOBILE_SPECS` in `playwright.config.ts` — so `isMobile` and `hasTouch` are real and `tap()` is a
  * touch event rather than a synthesised click.
@@ -20,7 +20,7 @@ import { warmRoutes } from '../support/warm-routes';
  * annotation the stop condition rather than a comment.
  *
  * Two of them are about the same single bug. `<header>` carries `backdrop-blur-sm`
- * (`navigation.tsx:122`), and a `backdrop-filter` makes an element the containing block for its
+ * (`navigation.tsx:123`), and a `backdrop-filter` makes an element the containing block for its
  * `position: fixed` descendants. `MobileMenu` renders inside that header, so its `fixed inset-0`
  * wrapper, backdrop and drawer are all clipped to the header's own 375x72 box instead of filling the
  * viewport: measured 256x72 for the drawer at 375x812. The links paint over the page text with no
@@ -201,7 +201,7 @@ test.describe('the mobile header', () => {
     await open(page, '/');
     await openMenu(page);
 
-    // The wrapper is a plain `<div>` (`navigation.tsx:76`), so a screen-reader user gets no
+    // The wrapper is a plain `<div>` (`navigation.tsx:77`), so a screen-reader user gets no
     // announcement that a dialog opened and no boundary for it.
     await expect(page.getByRole('dialog')).toHaveCount(1);
     await expect(page.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
@@ -214,7 +214,7 @@ test.describe('the mobile header', () => {
     test.info().annotations.push({ type: 'fixed-by', description: 'R5, #46' });
     await open(page, '/');
     const button = menuButton(page);
-    // `navigation.tsx:153` carries `aria-label` only: no `aria-expanded`, no `aria-controls`.
+    // `navigation.tsx:157` carries `aria-label` only: no `aria-expanded`, no `aria-controls`.
     await expect(button).toHaveAttribute('aria-expanded', 'false');
 
     await openMenu(page);
@@ -230,7 +230,7 @@ test.describe('the mobile header', () => {
 
     await page.keyboard.press('Escape');
 
-    // `navigation.tsx:70-115` has no keydown handler, so the close button is still attached.
+    // `navigation.tsx:71-116` has no keydown handler, so the close button is still attached.
     await expect(closeButton(page)).toBeHidden();
   });
 
@@ -271,7 +271,7 @@ test.describe('the mobile header', () => {
     await open(page, '/work/self-healing-agent');
     await openMenu(page);
 
-    // `pathname === link.href` (`navigation.tsx:101`) is an exact match, so on /work/<slug> no link
+    // `pathname === link.href` (`navigation.tsx:102`) is an exact match, so on /work/<slug> no link
     // is current and the header says nothing about where the visitor is. /work is the section.
     const current = drawer(page).locator('[aria-current="page"]');
     await expect(current).toHaveCount(1);

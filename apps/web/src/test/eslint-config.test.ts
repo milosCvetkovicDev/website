@@ -123,3 +123,80 @@ describe('the layout barrel-import rule (ADR 0009)', () => {
     expect(await restrictedImportMessages('@/components', 'src/app/page.tsx')).toEqual([]);
   });
 });
+
+describe('the lazy GSAP import rule', () => {
+  const GSAP_RULE = '@typescript-eslint/no-restricted-imports';
+
+  /** The GSAP rule's messages for `source` linted as `filePath`; throws if it was not linted. */
+  async function gsapImportMessages(source: string, filePath: string) {
+    const [result] = await eslint.lintText(source, { filePath: path.join(appDir, filePath) });
+    const unlinted = result.messages.filter((message) => message.ruleId === null);
+    if (result.fatalErrorCount > 0 || unlinted.length > 0) {
+      const reasons = unlinted.map((message) => message.message).join('; ');
+      throw new Error(`ESLint did not lint ${filePath}: ${reasons}`);
+    }
+    return result.messages.filter((message) => message.ruleId === GSAP_RULE);
+  }
+
+  // The barrel-rule block above loads the configuration first when the whole file runs; this one
+  // does not rely on it, for a run filtered to these cases alone.
+  beforeAll(async () => {
+    eslint ??= new ESLint({ cwd: appDir });
+    await eslint.lintText('export {};\n', {
+      filePath: path.join(appDir, 'src/components/animated-hero/index.tsx'),
+    });
+  }, 60_000);
+
+  // Each of these, anywhere `/` reaches, puts GSAP back into the home page's initial chunk.
+  it.each([
+    ["import gsap from 'gsap';", 'src/components/animated-hero/discovery-phase.tsx'],
+    ["import { gsap } from 'gsap';", 'src/components/featured-work.tsx'],
+    ["import { ScrollTrigger } from 'gsap/ScrollTrigger';", 'src/hooks/use-scroll.ts'],
+    ["import { gsap } from './gsap-runtime';", 'src/components/animated-hero/strategy-phase.tsx'],
+    ["import * as runtime from './gsap-runtime.ts';", 'src/components/animated-hero/x.tsx'],
+    ["export { gsap } from './gsap-runtime';", 'src/components/animated-hero/x.ts'],
+    ["import { gsap } from '@/components/animated-hero/gsap-runtime';", 'src/app/page.tsx'],
+    ["import { gsap } from '../components/animated-hero/gsap-runtime';", 'src/app/layout.tsx'],
+  ])('rejects %j in %s', async (source, filePath) => {
+    const messages = await gsapImportMessages(`${source}\nexport const used = 1;\n`, filePath);
+    expect(messages).toHaveLength(1);
+  });
+
+  it.each([
+    // Types are erased, so they ship nothing.
+    [
+      "import type * as GsapRuntimeModule from './gsap-runtime';",
+      'src/components/animated-hero/load-gsap.ts',
+    ],
+    ["import type { gsap } from 'gsap';", 'src/components/animated-hero/x.ts'],
+    // The one sanctioned way in, and the module it loads.
+    [
+      "export const load = () => import('./gsap-runtime');",
+      'src/components/animated-hero/load-gsap.ts',
+    ],
+    ["import gsap from 'gsap';", 'src/components/animated-hero/gsap-runtime.ts'],
+    // Tests drive GSAP directly and ship nowhere.
+    [
+      "import { gsap } from '../gsap-runtime';",
+      'src/components/animated-hero/__tests__/x.test.tsx',
+    ],
+    // Near misses.
+    ["import { runWithGsap } from './load-gsap';", 'src/components/animated-hero/x.tsx'],
+    ["import { thing } from './gsap-runtime-notes';", 'src/components/animated-hero/x.tsx'],
+    ["import { thing } from 'gsapx';", 'src/components/x.tsx'],
+  ])('allows %j in %s', async (source, filePath) => {
+    expect(await gsapImportMessages(`${source}\nexport const used = 1;\n`, filePath)).toEqual([]);
+  });
+
+  // A different rule from the layout barrel rule, so a layout gets both instead of the later block
+  // replacing the earlier one's options, which is what two `no-restricted-imports` blocks would do.
+  it('applies to layouts alongside the barrel rule', async () => {
+    const source = `import { gsap } from 'gsap';\n${layout('@/components')}`;
+    const [result] = await eslint.lintText(source, {
+      filePath: path.join(appDir, 'src/app/layout.tsx'),
+    });
+    const rules = result.messages.map((message) => message.ruleId);
+    expect(rules).toContain('no-restricted-imports');
+    expect(rules).toContain(GSAP_RULE);
+  });
+});

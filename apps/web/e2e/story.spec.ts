@@ -1,8 +1,13 @@
 import { expect, test } from '@playwright/test';
+import { expectGsapLoaded } from './support/gsap';
+import { gotoHydrated } from './support/hydration';
 
 test.describe('Story sections', () => {
   test('scrolling back up reverses the closing section at once', async ({ page }) => {
-    await page.goto('/');
+    // GSAP arrives after hydration; waiting for it means the scroll below lands on built timelines,
+    // so the entrance plays through to the onComplete the glow check relies on.
+    await gotoHydrated(page, '/');
+    await expectGsapLoaded(page);
 
     // The footer links to the same profile, so match the closing section's own call to action by
     // the text it carries rather than by the destination.

@@ -1,0 +1,148 @@
+{
+  "pkg": "web",
+  "projectId": "dc7f0ab0-bcc0-46cd-a078-f9211fa590cd",
+  "globalName": "Portfolio",
+  "shape": "package",
+  "entry": "apps/web/dist/index.js",
+  "buildCmd": "node .design-sync/build-css.mjs",
+  "srcDir": "src/components",
+  "tsconfig": "../../.design-sync/tsconfig.paths.json",
+  "cssEntry": "dist/design-sync/styles.css",
+  "extraFonts": ["../../.design-sync/fonts.css"],
+  "extraEntries": ["../../.design-sync/process-polyfill.mjs"],
+  "provider": {
+    "component": "ThemeProvider"
+  },
+  "docsDir": "../../.design-sync/docs",
+  "componentSrcMap": {
+    "HydrationMarker": null,
+    "PersonJsonLd": null,
+    "WebsiteJsonLd": null,
+    "TechArticleJsonLd": null,
+    "BreadcrumbListJsonLd": null,
+    "ThemeProvider": null
+  },
+  "dtsPropsFor": {
+    "ActivityEntry": "  status: 'success' | 'error' | 'pending';\n  children: React.ReactNode;\n  timestamp?: string;",
+    "AnimatedHero": "  children?: React.ReactNode;",
+    "AnimatedText": "  children: string;\n  animation: 'scramble' | 'wave' | 'magnetic' | 'scatter' | 'glitch' | 'typewriter' | 'elastic' | 'stagger-up' | 'rainbow' | 'perspective' | 'gravity' | 'blur-reveal' | 'highlight' | 'morse';\n  className?: string;\n  as?: 'span' | 'p' | 'h1' | 'h2' | 'h3' | 'div';\n  delay?: number;",
+    "ArchitectureBackground": "  activeNodes?: ReadonlyArray<'client' | 'gateway' | 'auth' | 'backend' | 'worker' | 'db' | 'cache' | 'ai' | 'storage'>;",
+    "CircuitBackground": "  progressRef: React.RefObject<number>;",
+    "CodeLine": "  lineNumber?: number;\n  children: React.ReactNode;\n  className?: string;\n  highlighted?: boolean;",
+    "CTA": "  // Takes no props.",
+    "DataStream": "  className?: string;",
+    "DiscoveryPhase": "  // Takes no props.",
+    "ExecutionPhase": "  // Takes no props.",
+    "FeaturedWork": "  projects: ReadonlyArray<{ slug: string; title: string; description: string; tags: Array<string>; activeNodes: Array<'client' | 'gateway' | 'auth' | 'backend' | 'worker' | 'db' | 'cache' | 'ai' | 'storage'>; category: string; status: 'LIVE' | 'PRODUCTION'; metric: { value: number; label: string; prefix?: string; suffix?: string; decimals?: number } }>;",
+    "Footer": "  // Takes no props.",
+    "GameComplete": "  // Takes no props.",
+    "GauntletPhase": "  // Takes no props.",
+    "HeroContent": "  // Takes no props.",
+    "HeroSection": "  children?: React.ReactNode;",
+    "HexBadge": "  children: React.ReactNode;\n  className?: string;",
+    "Highlights": "  // Takes no props.",
+    "HudPanel": "  children: React.ReactNode;\n  className?: string;\n  title?: React.ReactNode;\n  glow?: boolean;",
+    "Logo": "  className?: string;\n  size?: number;",
+    "LoopPhase": "  // Takes no props.",
+    "MetricCounter": "  active: boolean;\n  value: number;\n  label: string;\n  prefix?: string;\n  suffix?: string;\n  decimals?: number;",
+    "Navigation": "  // Takes no props.",
+    "NotificationToast": "  children: React.ReactNode;\n  type?: 'success' | 'warning' | 'error' | 'info';",
+    "PipelineStage": "  name: string;\n  status: 'pending' | 'running' | 'passed' | 'failed';\n  progress?: number;",
+    "ProgressBar": "  progress: number;\n  label?: string;\n  className?: string;\n  variant?: 'default' | 'success' | 'warning' | 'error';",
+    "QuestItem": "  completed: boolean;\n  children: React.ReactNode;",
+    "SectionProgress": "  storyRef: React.RefObject<HTMLElement | null>;",
+    "StatDisplay": "  label: string;\n  value: string | number;\n  className?: string;\n  highlight?: boolean;",
+    "StrategyPhase": "  // Takes no props.",
+    "TechStack": "  // Takes no props.",
+    "Terminal": "  children: React.ReactNode;\n  className?: string;\n  title?: string;",
+    "TmuxBackground": "  // Takes no props.",
+    "TypingCursor": "  color?: 'accent' | 'white' | 'green';"
+  },
+  "overrides": {
+    "Highlights": {
+      "cardMode": "column"
+    },
+    "DiscoveryPhase": {
+      "cardMode": "column",
+      "viewport": "1200x1000"
+    },
+    "StrategyPhase": {
+      "cardMode": "column",
+      "viewport": "1200x1000"
+    },
+    "ExecutionPhase": {
+      "cardMode": "column",
+      "viewport": "1200x1000"
+    },
+    "GauntletPhase": {
+      "cardMode": "column",
+      "viewport": "1200x1000"
+    },
+    "LoopPhase": {
+      "cardMode": "column",
+      "viewport": "1200x1000"
+    },
+    "GameComplete": {
+      "cardMode": "column",
+      "viewport": "1200x1000"
+    },
+    "ActivityEntry": {
+      "cardMode": "column"
+    },
+    "Navigation": {
+      "cardMode": "column"
+    },
+    "Footer": {
+      "cardMode": "column"
+    },
+    "TechStack": {
+      "cardMode": "column",
+      "viewport": "1200x700"
+    },
+    "FeaturedWork": {
+      "cardMode": "column",
+      "viewport": "1200x1300"
+    },
+    "ArchitectureBackground": {
+      "cardMode": "column"
+    },
+    "MetricCounter": {
+      "cardMode": "column"
+    },
+    "AnimatedHero": {
+      "cardMode": "single",
+      "primaryStory": "Landing",
+      "viewport": "1200x900"
+    },
+    "HeroSection": {
+      "cardMode": "single",
+      "primaryStory": "WithHeroContent",
+      "viewport": "1200x900"
+    },
+    "HeroContent": {
+      "cardMode": "column",
+      "viewport": "1200x800"
+    },
+    "AnimatedText": {
+      "cardMode": "column"
+    },
+    "CircuitBackground": {
+      "cardMode": "single",
+      "primaryStory": "FullyDrawn",
+      "viewport": "1200x800"
+    },
+    "TmuxBackground": {
+      "cardMode": "column",
+      "viewport": "1200x700"
+    },
+    "SectionProgress": {
+      "cardMode": "single",
+      "primaryStory": "AtTheStart",
+      "viewport": "1200x700"
+    },
+    "Logo": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

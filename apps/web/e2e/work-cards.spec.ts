@@ -150,7 +150,7 @@ test('a case study status reads as one colour on / and on /work, in both themes'
   page,
 }) => {
   test.info().annotations.push({ type: 'fixed-by', description: 'R39, #49' });
-  // Four navigations and two waits on the home page's loader, and the loader waits alone may take
+  // Four navigations and two hydration waits on the home page, and those waits alone may take
   // 30 s each: more than the 30 s default holds, which is why `client-navigation.spec.ts` gives the
   // same shape 90 s. Under the default this ran out of time before the colour comparison on 4 of 5
   // dev-server runs under load (2026-09-13).
@@ -186,7 +186,7 @@ test('a case study status reads as one colour on / and on /work, in both themes'
   }
 
   // Expected to fail from here on only. Declared at the top, a prerequisite that fails above (a
-  // loader that never hides, a theme class that never lands) would count as the disagreement this
+  // page that never hydrates, a theme class that never lands) would count as the disagreement this
   // row records and pass the run; under the 30 s default it timed out instead, which did not.
   test.fail();
   expect(
@@ -205,9 +205,9 @@ test('both routes render the same status string for the same case study', async 
   // Under load on the dev server this test passed in up to 23 s and twice ran out of the 30 s
   // default (2 of 20 runs, 2026-09-16), each time with a bare "Test timeout" naming no step: the
   // call pending at the deadline finished before teardown closed the page, so nothing was left to
-  // blame. The largest share of its time goes on the wait for the home page's loader, which may
-  // take 30 s on its own, so the test gets room past that wait, and a loader that never hides
-  // still fails on its own assertion.
+  // blame. The largest share of its time goes on the home page's hydration wait, which may take
+  // 30 s on its own, so the test gets room past that wait, and a page that never hydrates still
+  // fails on its own assertion.
   test.setTimeout(60_000);
   const [study] = caseStudies;
   const status = study.highlight.status;

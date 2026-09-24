@@ -6,7 +6,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from 'vitest';
-import { caseStudies, formatMetric } from '../case-studies';
+import { adjacentCaseStudies, caseStudies, formatMetric } from '../case-studies';
 
 describe('formatMetric', () => {
   it('renders a whole number with a suffix', () => {
@@ -39,10 +39,46 @@ describe('caseStudies', () => {
     expect(new Set(caseStudies.map((study) => study.slug)).size).toBe(caseStudies.length);
   });
 
+  it('dates every study with real calendar dates, updated no earlier than published', () => {
+    for (const { slug, publishedAt, updatedAt } of caseStudies) {
+      for (const date of [publishedAt, updatedAt]) {
+        expect(date, slug).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        expect(new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10), slug).toBe(date);
+      }
+      expect(updatedAt >= publishedAt, `${slug}: updatedAt before publishedAt`).toBe(true);
+    }
+  });
+
   it('states every headline metric as a finite number', () => {
     for (const study of caseStudies) {
       expect(Number.isFinite(study.highlight.metric.value)).toBe(true);
       expect(study.highlight.metric.label.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('adjacentCaseStudies', () => {
+  it('links every study to the studies either side of it, never to itself', () => {
+    const count = caseStudies.length;
+    caseStudies.forEach(({ slug }, index) => {
+      const adjacent = adjacentCaseStudies(slug);
+      expect(adjacent.map(({ study }) => study.slug)).not.toContain(slug);
+      expect(adjacent).toEqual([
+        { direction: 'previous', study: caseStudies[(index - 1 + count) % count] },
+        { direction: 'next', study: caseStudies[(index + 1) % count] },
+      ]);
+    });
+    expect(count, 'with three studies, previous and next are the other two').toBe(3);
+  });
+
+  it('reaches every study from some other study, so none is left without an inbound link', () => {
+    const linked = new Set(
+      caseStudies.flatMap(({ slug }) => adjacentCaseStudies(slug).map(({ study }) => study.slug)),
+    );
+    expect([...linked].sort()).toEqual(caseStudies.map(({ slug }) => slug).sort());
+  });
+
+  it('returns nothing for a slug it does not know', () => {
+    expect(adjacentCaseStudies('no-such-study')).toEqual([]);
   });
 });

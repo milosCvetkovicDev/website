@@ -1,15 +1,19 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gsap, ScrollTrigger } from '../use-gsap-scroll';
+import { useLayoutEffect, type ComponentType } from 'react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as gsapRuntime from '../gsap-runtime';
+import { gsap, ScrollTrigger } from '../gsap-runtime';
+import { loadGsap, runWithGsap, type GsapRuntime } from '../load-gsap';
 import { DiscoveryPhase } from '../discovery-phase';
 import { StrategyPhase } from '../strategy-phase';
 import { ExecutionPhase } from '../execution-phase';
 import { GauntletPhase } from '../gauntlet-phase';
 import { LoopPhase } from '../loop-phase';
 import { GameComplete } from '../game-complete';
+import { cssTransitions, gsapCssConflicts, tweenedElements } from './gsap-css-conflicts';
 
-// GSAP's ScrollTrigger calls window.matchMedia while it registers, and use-gsap-scroll registers
-// it at import time, so the stub must exist before the imports above are evaluated.
+// GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
+// at import time, so the stub must exist before the imports above are evaluated.
 const media = vi.hoisted(() => {
   type Listener = (event: MediaQueryListEvent) => void;
   const listeners = new Set<Listener>();
@@ -44,17 +48,52 @@ const media = vi.hoisted(() => {
   return state;
 });
 
+// runWithGsap passes through to the real loader, so a test can hold the builds a mount asks for and
+// run them itself, as GSAP arriving at a moment of its choosing would.
+vi.mock('../load-gsap', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../load-gsap')>();
+  return { ...actual, runWithGsap: vi.fn(actual.runWithGsap) };
+});
+
+// The phases do not import GSAP: they ask load-gsap.ts for it, which fetches it once the browser is
+// idle after hydration. Every test here is about what a phase does with GSAP, so the file waits for
+// that load once, with real timers, before any test installs fake ones. From then on each phase
+// builds its timeline synchronously on mount, as it does in the browser once GSAP has arrived. A
+// phase mounted before the load is lazy-gsap.test.tsx's subject.
+beforeAll(async () => {
+  await loadGsap();
+});
+
 // All six story sections, so the shared lifecycle below covers every one of them. LoopPhase was the
 // one omission: its own defects are pinned in `loop-phase.test.tsx` (rows R20 and R21), and this list
 // is what says its build/teardown/rebuild behaves like its five siblings'.
+//
+// `timelineTrigger`: its entrance is a timeline with a scrollTrigger, whose first refresh
+// ScrollTrigger defers. `timerSequence`: its trigger starts a sequence of timers.
 const phases = [
-  { name: 'DiscoveryPhase', Phase: DiscoveryPhase },
-  { name: 'StrategyPhase', Phase: StrategyPhase },
-  { name: 'ExecutionPhase', Phase: ExecutionPhase },
-  { name: 'GauntletPhase', Phase: GauntletPhase },
-  { name: 'LoopPhase', Phase: LoopPhase },
-  { name: 'GameComplete', Phase: GameComplete },
+  { name: 'DiscoveryPhase', Phase: DiscoveryPhase, timelineTrigger: true, timerSequence: false },
+  { name: 'StrategyPhase', Phase: StrategyPhase, timelineTrigger: true, timerSequence: false },
+  { name: 'ExecutionPhase', Phase: ExecutionPhase, timelineTrigger: true, timerSequence: false },
+  { name: 'GauntletPhase', Phase: GauntletPhase, timelineTrigger: false, timerSequence: true },
+  { name: 'LoopPhase', Phase: LoopPhase, timelineTrigger: false, timerSequence: true },
+  { name: 'GameComplete', Phase: GameComplete, timelineTrigger: true, timerSequence: false },
 ];
+
+/** Runs `action` in the layout phase of the commit that mounts it. */
+function InRemovingCommit({ action }: { action: () => void }) {
+  useLayoutEffect(() => action(), [action]);
+  return null;
+}
+
+/**
+ * The phase, or in its place `action`. Swapping one for the other in a single render reproduces a
+ * soft navigation away from `/`: React detaches the phase's refs in that commit and runs `action`
+ * in its layout phase, before the phase's passive effect cleanup. RTL's `rerender` runs inside
+ * `act`, which flushes passive effects before it returns, so the layout phase is the only gap.
+ */
+function PhaseOr({ Phase, action }: { Phase: ComponentType; action?: () => void }) {
+  return action ? <InRemovingCommit action={action} /> : <Phase />;
+}
 
 /** Fires a phase's trigger again, as scrolling back above the section and down does. */
 function enterAgain() {
@@ -118,6 +157,303 @@ describe.each(phases)('$name', ({ Phase }) => {
     unmount();
     expect(ScrollTrigger.getAll()).toHaveLength(0);
   }, 15_000);
+});
+
+/** Long enough for every timer-driven sequence to create its last reveal: Gauntlet's runs 6.6 s. */
+const WHOLE_SEQUENCE_MS = 10_000;
+/** Just past the loop alert's pulse at 500 ms, while it still reads ERROR DETECTED. */
+const EARLY_MS = 600;
+
+// A soft navigation away from `/` removes the section in one commit. React detaches its refs in
+// that commit, but a navigation is a transition, and React yields to the browser before it runs a
+// transition's passive effects, where this section's cleanup cancels or reverts its build. GSAP's
+// arrival, a GSAP tick or a due timer can land in between: the client-navigation walk logged
+// "Invalid scope" in 1 run in 10 on it. Each test runs one of the three in the removing commit.
+describe.each(phases)(
+  '$name, removed by a soft navigation',
+  ({ Phase, timelineTrigger, timerSequence }) => {
+    beforeEach(() => {
+      media.reduce = false;
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom
+      // does not implement.
+      vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      try {
+        cleanup();
+      } finally {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+      }
+      // Asserted last: a throw here must not skip the global restoration above it.
+      expect(media.listenerCount()).toBe(0);
+    });
+
+    // ScrollTrigger defers the first refresh of a timeline's trigger by 0.01 s, and every refresh
+    // resolves the trigger through the scope of the context that created it. A context scoped to
+    // sectionRef found the ref null there and logged "Invalid scope".
+    it.runIf(timelineTrigger)('logs nothing when GSAP ticks in that commit', () => {
+      const warn = vi.spyOn(console, 'warn');
+      const delayedCall = vi.spyOn(gsap, 'delayedCall');
+      const { rerender } = render(<PhaseOr Phase={Phase} />);
+      const deferred = delayedCall.mock.calls.flatMap(([delay], call) =>
+        delay === 0.01 ? [delayedCall.mock.results[call].value as gsap.core.Tween] : [],
+      );
+      expect(deferred.length, 'the build deferred a refresh').toBeGreaterThan(0);
+
+      // GSAP's clock is the real Date.now it captured at load, which fake timers do not move.
+      // Waiting 20 ms puts the deferred refresh behind the next tick.
+      const built = Date.now();
+      while (Date.now() - built < 20) {
+        // Busy-wait: nothing may run between the build and the swap.
+      }
+      let progressInCommit: number[] = [];
+      rerender(
+        <PhaseOr
+          Phase={Phase}
+          action={() => {
+            gsap.ticker.tick();
+            progressInCommit = deferred.map((call) => call.progress());
+          }}
+        />,
+      );
+
+      expect(progressInCommit, 'the deferred refresh ran in the removing commit').toEqual(
+        deferred.map(() => 1),
+      );
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    // GSAP arriving in that commit: the build it had queued runs with the refs already null, before
+    // the cleanup that would revert it. Each build is held, and its cancel does nothing, because
+    // by the time the cleanup calls it the build has already run.
+    it('builds nothing when GSAP arrives in that commit', () => {
+      const held = vi.mocked(runWithGsap);
+      const passThrough = held.getMockImplementation();
+      const builds: ((runtime: GsapRuntime) => void)[] = [];
+      held.mockImplementation((run) => {
+        builds.push(run);
+        return () => {};
+      });
+      const warn = vi.spyOn(console, 'warn');
+      let triggersBuilt = -1;
+      try {
+        const { rerender } = render(<PhaseOr Phase={Phase} />);
+        expect(builds.length, 'the mount asked for a build').toBeGreaterThan(0);
+        rerender(
+          <PhaseOr
+            Phase={Phase}
+            action={() => {
+              for (const build of builds) build(gsapRuntime);
+              triggersBuilt = ScrollTrigger.getAll().length;
+            }}
+          />,
+        );
+      } finally {
+        // vi.restoreAllMocks() restores spies only, not a vi.fn's implementation.
+        held.mockImplementation(passThrough!);
+      }
+
+      expect(triggersBuilt).toBe(0);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    // A timer coming due in that commit: the Gauntlet's and the Loop's sequences reveal their
+    // panels from timers that read refs when they fire, outside any context.
+    it.runIf(timerSequence)('logs nothing when its sequence timers come due in that commit', () => {
+      const warn = vi.spyOn(console, 'warn');
+      const { rerender } = render(<PhaseOr Phase={Phase} />);
+      // jsdom lays nothing out, so the trigger starts in view and the sequence has begun.
+      expect(vi.getTimerCount(), 'the sequence scheduled its timers').toBeGreaterThan(0);
+
+      let timersLeft = -1;
+      rerender(
+        <PhaseOr
+          Phase={Phase}
+          action={() => {
+            vi.advanceTimersByTime(WHOLE_SEQUENCE_MS);
+            timersLeft = vi.getTimerCount();
+            // A tween those timers made initialises on the next tick and can warn then, which
+            // would land in whichever test ticks next.
+            gsap.ticker.tick();
+          }}
+        />,
+      );
+
+      expect(timersLeft, 'every timer came due in the removing commit').toBe(0);
+      expect(warn).not.toHaveBeenCalled();
+    });
+  },
+);
+
+// What each phase tweens that CSS used to fight, and must now leave alone: the discovery tags and the
+// strategy tech cards (a transition and a hover transform each), the loop alert and the closing CTA
+// (a transition each). Execution's commit-streak counter and Gauntlet's deploy panel never were;
+// they are listed so the check is seen to pass elements that were always fine, and Gauntlet's also
+// shows a transition on a child is fine. Each must be among the elements the check inspects, with
+// exactly the properties listed, so the check cannot pass by inspecting nothing.
+const tweenedTargets = [
+  {
+    name: 'DiscoveryPhase',
+    Phase: DiscoveryPhase,
+    targets: (root: HTMLElement) => [...root.querySelectorAll('.requirement-reveal')],
+    count: 4,
+    tweens: ['opacity', 'transform'],
+  },
+  {
+    name: 'StrategyPhase',
+    Phase: StrategyPhase,
+    targets: (root: HTMLElement) => [...root.querySelectorAll('.tech-reveal')],
+    count: 4,
+    tweens: ['opacity', 'transform'],
+  },
+  {
+    name: 'ExecutionPhase',
+    Phase: ExecutionPhase,
+    targets: () => [screen.getByText('COMMIT STREAK').parentElement],
+    count: 1,
+    tweens: ['opacity', 'transform'],
+  },
+  {
+    name: 'GauntletPhase',
+    Phase: GauntletPhase,
+    targets: () => [screen.getByText('DEPLOYMENT SUCCESSFUL').closest('.mt-6')],
+    count: 1,
+    tweens: ['opacity', 'transform'],
+  },
+  {
+    name: 'LoopPhase',
+    Phase: LoopPhase,
+    targets: () => [screen.getByText(/^(ERROR DETECTED|RESOLVED)$/).closest('.border')],
+    count: 1,
+    tweens: ['opacity', 'transform'],
+  },
+  {
+    name: 'GameComplete',
+    Phase: GameComplete,
+    targets: () => [screen.getByRole('link', { name: /connect on linkedin/i })],
+    count: 1,
+    tweens: ['opacity', 'transform', 'box-shadow'],
+  },
+];
+
+describe.each(tweenedTargets)('$name against CSS', ({ name, Phase, targets, count, tweens }) => {
+  beforeEach(() => {
+    media.reduce = false;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    // Nothing plays by itself, so no tween completes and leaves GSAP's timeline before it is read.
+    gsap.ticker.remove(gsap.updateRoot);
+    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom does
+    // not implement.
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    try {
+      cleanup();
+    } finally {
+      // Restored even when an unmount throws, so the next test does not start with GSAP stopped.
+      gsap.ticker.add(gsap.updateRoot);
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
+    // Asserted last: a throw here must not skip the global restoration above it.
+    expect(media.listenerCount()).toBe(0);
+  });
+
+  it('leaves every property it tweens to GSAP: no CSS transition, animation or state rule on it', async () => {
+    const warn = vi.spyOn(console, 'warn');
+    const { container } = render(<Phase />);
+    // Timeline-bound triggers measure on refresh; the timer-driven sequences then create their reveals.
+    act(() => ScrollTrigger.refresh());
+    act(() => vi.advanceTimersByTime(EARLY_MS));
+    expect(await gsapCssConflicts(container), 'mid-sequence').toEqual([]);
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS - EARLY_MS));
+    expect(vi.getTimerCount(), 'every scheduled step has run').toBe(0);
+
+    const tweened = tweenedElements(container);
+    const expected = targets(container);
+    expect(expected).toHaveLength(count);
+    for (const target of expected) {
+      expect(target, `${name}: a target is missing`).not.toBeNull();
+      expect(
+        tweened.get(target as Element),
+        `${name}: what GSAP tweens on ${target?.className}`,
+      ).toEqual(new Set(tweens));
+    }
+    expect(await gsapCssConflicts(container), 'after the whole sequence').toEqual([]);
+    // A target GSAP could not find is only a console warning.
+    expect(warn.mock.calls.filter(([message]) => String(message).includes('GSAP'))).toEqual([]);
+
+    if (name === 'GauntletPhase') {
+      // The panel's child keeps the transition it always had; only the element GSAP writes matters.
+      expect(await cssTransitions((expected[0] as Element).firstElementChild as Element)).toContain(
+        'all',
+      );
+    }
+
+    // And the check can fail on these very elements: the class this fix removed is flagged again.
+    (expected[0] as Element).classList.add('transition-all');
+    expect(await gsapCssConflicts(container)).toContainEqual(
+      expect.stringMatching(/GSAP tweens \S+, which .*\.transition-all/),
+    );
+  });
+});
+
+// A phase built after the visitor has scrolled its section into view, because GSAP arrived late or
+// a soft navigation back restored the scroll position, finishes its entrance at once: nothing the
+// visitor is already reading is hidden behind a from-state (isAlreadyReached in load-gsap.ts). At
+// the top of the page, where every build above happens, the entrances wait for the scroll.
+describe.each(phases)('$name, built with its section already in view', ({ Phase }) => {
+  let scrollY: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    media.reduce = false;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    // jsdom lays nothing out: scrolled two screens down, with every box's top on screen.
+    scrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 2400 });
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ x: 0, y: 120, width: 1024, height: 900 }),
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    if (scrollY) Object.defineProperty(window, 'scrollY', scrollY);
+    else delete (window as { scrollY?: number }).scrollY;
+  });
+
+  it('finishes its entrance instead of hiding the section', () => {
+    const timeline = vi.spyOn(gsap, 'timeline');
+    const fromTo = vi.spyOn(gsap, 'fromTo');
+    render(<Phase />);
+
+    const entrances = [...timeline.mock.results, ...fromTo.mock.results].map(
+      (result) => result.value as gsap.core.Timeline | gsap.core.Tween,
+    );
+    expect(entrances.length).toBeGreaterThan(0);
+    const targets: unknown[] = [];
+    for (const entrance of entrances) {
+      expect(entrance.progress()).toBe(1);
+      const tweens =
+        'getChildren' in entrance
+          ? (entrance.getChildren(true, true, false) as gsap.core.Tween[])
+          : [entrance];
+      for (const tween of tweens) targets.push(...tween.targets());
+    }
+    // Every element an entrance fades is at full opacity, not at its from-state.
+    const faded = targets.filter(
+      (target): target is HTMLElement => target instanceof HTMLElement && !!target.style.opacity,
+    );
+    expect(faded.length).toBeGreaterThan(0);
+    for (const element of faded) expect(element.style.opacity).toBe('1');
+  });
 });
 
 describe('ExecutionPhase', () => {

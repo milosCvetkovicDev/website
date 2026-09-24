@@ -1,5 +1,6 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectHydrated } from './support/hydration';
 
 // The dots name the seven sections of the AnimatedHero story, but `/` keeps going with Featured
 // Work, Tech Stack and the footer below it — the story is a little over three quarters of the
@@ -69,8 +70,8 @@ test.describe('Section progress', () => {
     await page.goto('/');
     // Guard against reuseExistingServer attaching to some other project's dev server on :3000.
     await expect(page).toHaveTitle(/Milos Cvetkovic/);
-    // The boot loader is removed once React has hydrated; interactions before that are lost.
-    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
+    // Interactions before hydration are lost.
+    await expectHydrated(page);
   });
 
   test('sends the last dot to the closing section rather than the footer', async ({ page }) => {
@@ -101,7 +102,7 @@ test.describe('Section progress', () => {
     expect(scrolled).toBeGreaterThan(0);
 
     await page.reload();
-    await expect(page.getByText('System Boot')).toBeHidden({ timeout: 30_000 });
+    await expectHydrated(page);
 
     // The browser puts the page back where it was and tells nobody: scroll restoration dispatches
     // no scroll event the indicator could listen for. It is also not ordered against hydration, so

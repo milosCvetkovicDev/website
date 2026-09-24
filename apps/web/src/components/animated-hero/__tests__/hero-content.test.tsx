@@ -37,13 +37,16 @@ describe('HeroContent', () => {
     expect(screen.getByText('Kubernetes')).toBeInTheDocument();
   });
 
-  it('renders sr-only SEO text for crawlers as a separate paragraph', () => {
+  it('says who this is in a visible line under the headline, hiding nothing from sighted readers', () => {
     render(<HeroContent />);
-    const srOnly = document.querySelector('p.sr-only');
-    expect(srOnly).toBeInTheDocument();
-    expect(srOnly?.textContent).toContain('AI-native development');
-    expect(srOnly?.textContent).toContain('TypeScript');
-    expect(srOnly?.textContent).toContain('React');
+    const subtitle = screen.getByRole('heading', { level: 1 }).nextElementSibling;
+    expect(subtitle?.tagName).toBe('P');
+    expect(subtitle?.textContent).toContain('Milos Cvetkovic, Senior Full Stack Engineer');
+    expect(subtitle?.textContent).toContain('AI-native development');
+    expect(subtitle?.textContent).toContain('TypeScript');
+    expect(subtitle?.textContent).toContain('React');
+    // Text only crawlers see is hidden text in Google's sense; the hero carries none.
+    expect(document.querySelector('.sr-only')).toBeNull();
   });
 
   it('uses semantic HTML for player card (dl/dt/dd)', () => {

@@ -17,8 +17,8 @@ import { warmRoutes } from './support/warm-routes';
  * `dynamicParams = false` rather than reaching a render-time `notFound()` (ADR 0015). They should be
  * indistinguishable to a visitor, and this is what says so.
  *
- * The robots tags on these responses are a separate matter and currently wrong — a 404 emits both
- * `noindex` and `index, follow` — which is row R27 in `e2e/seo-surface.spec.ts`.
+ * The robots tags on these responses are a separate matter: exactly one, `noindex`, which is row R27 in
+ * `e2e/seo-surface.spec.ts`.
  */
 
 test.describe.configure({ retries: 0 });

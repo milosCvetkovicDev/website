@@ -46,10 +46,31 @@ fixes it. See `docs/adr/0018-dependency-update-policy.md`.
 
 `/`, `/about`, `/blog`, `/contact`, `/skills`, `/work`, `/work/[slug]`.
 
-`apps/web/src/app` also holds the metadata files `sitemap.ts` and `robots.ts`, plus `error.tsx` and
-`not-found.tsx`. `sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
-`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There are no route handlers
-(`route.ts`) and no middleware.
+Every route's head comes from `buildMetadata()` in `apps/web/src/lib/metadata.ts`: its canonical,
+complete Open Graph and Twitter blocks, and its robots directive. Next replaces `openGraph`,
+`twitter` and `robots` wholesale per segment rather than merging them, so the root layout keeps only
+what is true of every response, the 404s included (`metadataBase`, the title template and the
+default Next requires beside it, the author, card type, site name, locale), and never a URL, a
+description, a link-preview title or a robots directive.
+
+`apps/web/src/app` also holds `error.tsx`, `not-found.tsx` and the metadata files: `sitemap.ts`,
+`robots.ts`, `manifest.ts`, `icon.tsx` and `apple-icon.tsx` (the mc_ mark of the header's `Logo`,
+drawn by `src/lib/brand-mark.tsx` in `src/app/fonts/geist-mono-600-mark.ttf`), and an
+`opengraph-image.tsx` in the root and in each static route's folder, all over one card design in
+`src/lib/og-image.tsx`. Each folder needs its own: a root image
+never reaches a page that declares its own `openGraph`. There are two route handlers:
+`favicon.ico/route.ts` packs the same mark into an ICO, and `work/[slug]/og-image.png/route.ts`
+draws the case-study card, whose alt text has to name the study, which an `opengraph-image` file's
+single `alt` cannot; the page points og:image at it through `buildMetadata()`'s `image`. All of them
+prerender at build time.
+`sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
+`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
+Response headers come from one static `headers()` entry in `apps/web/next.config.ts` whose source,
+`/:path*`, matches every path, `/_next/static` assets and the 404s included:
+`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a Content-Security-Policy, a
+`Permissions-Policy` and a `Cross-Origin-Opener-Policy` (ADR 0023). Next's router sends a few
+answers before it applies `headers()`, and those carry none of them: the 308s that strip a trailing
+slash or collapse repeated slashes, and the plain 500 for a malformed percent-encoding.
 
 ## Commands
 
@@ -253,20 +274,18 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   act: supersede the record and delete the matching assertion in the same pull request.
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
   grouped into one pull request and open npm pull requests are capped at five; github-actions bumps
-  are not grouped. Dependabot alerts are on; automated security updates stay off until the owner
-  switches them on after #71, which clears the lockfile's advisories, has merged, so until then an
-  alert opens no pull request. Once they are on, they are triggered by alerts rather than the Monday
-  schedule, and a `security` group (`applies-to: security-updates`, `patterns: ['*']`) batches the
-  security updates of each run into one pull request so they cannot fill the five-slot cap. Three
-  majors are ignored, each with the upstream event that reopens it: `eslint` and `@eslint/js`
-  (eslint-config-next pulls an eslint-plugin-react that ESLint 10 breaks —
-  jsx-eslint/eslint-plugin-react#3977), `typescript` `>=7` (no classic compiler API at the root;
-  typescript-eslint peers `<6.1.0`) and `@types/node` majors (they follow `.nvmrc` by hand). Adding
-  one is a policy change, so read `docs/adr/0018-dependency-update-policy.md` first; deleting one
-  without the trigger having fired puts the red pull request back. A `vite` group (`vite`,
-  `@vitejs/*`, `vitest`, `@vitest/*`, majors included) goes ahead of `minor-and-patch` in the same
-  pull request that makes `apps/web` declare `vite` directly, and not before: added now it would
-  regenerate a red grouped pull request.
+  are not grouped. Dependabot alerts and automated security updates are both on. Security updates
+  are triggered by alerts rather than the Monday schedule, and a `security` group
+  (`applies-to: security-updates`, `patterns: ['*']`) batches the security updates of each run into
+  one pull request so they cannot fill the five-slot cap. Three majors are ignored, each with the
+  upstream event that reopens it: `eslint` and `@eslint/js` (eslint-config-next pulls an
+  eslint-plugin-react that ESLint 10 breaks — jsx-eslint/eslint-plugin-react#3977), `typescript`
+  `>=7` (no classic compiler API at the root; typescript-eslint peers `<6.1.0`) and `@types/node`
+  majors (they follow `.nvmrc` by hand). Adding one is a policy change, so read
+  `docs/adr/0018-dependency-update-policy.md` first; deleting one without the trigger having fired
+  puts the red pull request back. A `vite` group (`vite`, `@vitejs/*`, `vitest`, `@vitest/*`, majors
+  included) goes ahead of `minor-and-patch` in the same pull request that makes `apps/web` declare
+  `vite` directly, and not before: added now it would regenerate a red grouped pull request.
 
 ## Conventions
 
@@ -275,7 +294,11 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 - Formatting comes only from `packages/prettier-config`: semicolons, single quotes, trailing commas,
   two-space indent, 100 columns, LF, plus `prettier-plugin-tailwindcss`. Do not add local overrides.
 - Data lives in `apps/web/src/data`. `case-studies.ts` is the single source of truth for project
-  copy, metrics and tech stacks; pages read from it rather than restating any of it.
+  copy, metrics and tech stacks; pages read from it rather than restating any of it. Content dates
+  live there too: each study's `publishedAt` and `updatedAt`, and `STATIC_ROUTE_UPDATED` in
+  `static-routes.ts` for the static routes. They are the sitemap's `lastmod` and the case studies'
+  TechArticle dates, so the commit that changes what a page visibly says bumps its date, and no
+  other commit does.
 - Server components by default. Add `'use client'` only where browser APIs, React state or GSAP are
   actually needed.
 - Tailwind v4 is CSS-first: the theme is declared in `apps/web/src/app/globals.css` and compiled by
@@ -304,8 +327,9 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   their dark values in both themes.
 - Components live in `apps/web/src/components`. `index.ts` is a barrel for the page-level ones
   (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `Highlights`, `FeaturedWork`, `TechStack`,
-  `CTA`, `PersonJsonLd`, `WebsiteJsonLd`). The hero and its phases live in
-  `components/animated-hero` and are imported from there directly, not through the barrel.
+  `CTA`, `PersonJsonLd`, `WebsiteJsonLd`), plus the `Logo` wordmark the header and footer draw.
+  The hero and its phases live in `components/animated-hero` and are imported from there
+  directly, not through the barrel.
   Layouts import from the component modules directly, never through the barrel: every client module
   reachable from a server component's imports lands in that layout's client chunk, so a barrel
   import in `app/layout.tsx` would ship `FeaturedWork` to every route (see ADR 0009). A
@@ -315,6 +339,15 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   and `../components`, bare, with a trailing slash, or as `/index` with or without a `.ts`, `.tsx`,
   `.js` or `.jsx` extension, and a nested layout's `../../components`) and the near misses it lets
   through. It does not see a dynamic `import()`, and it reads layouts only.
+- GSAP is loaded lazily, never imported by a rendered component.
+  `apps/web/src/components/animated-hero/gsap-runtime.ts` imports `gsap`, and only `load-gsap.ts`
+  reaches it, through `import()`, once the browser is idle after hydration. Effects run GSAP work
+  through `runWithGsap` and event handlers through `useWithGsap`; `import type` is fine. A static
+  import from anything the home page reaches puts about 44 KB gzip back into its initial chunk, so
+  `@typescript-eslint/no-restricted-imports` in `apps/web/eslint.config.mjs` refuses one everywhere
+  in `src` except that module, the tests and `circuit-background.tsx`, which still imports GSAP and
+  two plugins statically and is rendered by no route. `apps/web/src/test/eslint-config.test.ts`
+  pins the rule.
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
   keep relative imports for siblings inside one folder.
@@ -346,15 +379,20 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   React has hydrated. Wait through `e2e/support/hydration.ts` rather than writing a wait of your
   own: `gotoHydrated(page, path)` for a navigation, `expectHydrated(page)` after `page.reload()`. A
   soft navigation needs neither, and a spec with JavaScript off must call neither, because the
-  marker never flips. The helper also waits out the home page's `System Boot` loader until #47
-  deletes it; #74 moves six of the inline loader waits into the helper, and #47 removes the rest
-  with the loader. The marker hydrates with the layout, so content a page wraps in `<Suspense>` or
-  puts under a `loading.tsx` would hydrate after it flips. No route puts `<main>` inside a
+  marker never flips. Never wait for hydration by watching page text (ADR 0022). The marker
+  hydrates with the layout, so content a page wraps in `<Suspense>` or puts under a `loading.tsx`
+  would hydrate after it flips. No route puts `<main>` inside a
   boundary; the one boundary with content today, the decorative `TmuxBackground` on `/`, may
   hydrate after the marker. `e2e/hero.spec.ts` asserts the page title.
   That assertion is only a smoke check that the app rendered: it never could catch a second
   checkout of this site, which serves the same title character for character, and the not-found and
   error pages carry it too. Status and path are what catch a wrong page.
+- On `/`, GSAP arrives after hydration: `src/components/animated-hero/load-gsap.ts` fetches it once
+  the browser is idle, and the story builds its timelines then. A spec that measures anything GSAP
+  does on `/`, a from-state at rest, a hover tween or a scroll-driven reveal, waits for it with
+  `expectGsapLoaded(page)` from `e2e/support/gsap.ts` after `expectHydrated`; measured earlier, it
+  reads the server-rendered page instead. The helper fails at once when the load failed.
+  `e2e/gsap-lazy.spec.ts` covers the window before GSAP arrives and a load that fails.
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build
   with `pnpm start` inside `apps/web`, sets `forbidOnly`, retries twice, uses one worker and a 10s
   expect timeout, and sets `failOnFlakyTests`: a test that passes only on a retry fails the run, on
@@ -416,6 +454,11 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 
 ## Working with this repo in Claude Code
 
+- Trust facts, for auto mode and for any push: the repository is **public**
+  (`github.com/milosCvetkovicDev/website`), so every push, pull request body and issue publishes.
+  Keep confidential material, other repositories' code and machine paths out of it. `main` is
+  protected: pull requests only, squash merge only, signed commits, required checks, no force
+  pushes. Merging to `main` deploys `https://miloscvetkovic.dev` to production on Vercel.
 - `.claude/settings.json` wires two PreToolUse guards, and they are not equivalent. The `Edit|Write`
   guard blocks writes to `.env*` (except `.env.example`), `pnpm-lock.yaml`, `node_modules/`,
   `.next/` and `dist/`, and fails closed (`exit 2`) when `jq` is missing. The `Bash` guard is
@@ -448,7 +491,7 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   authorising once per machine before its tools work, and nothing in the repository depends on it.
 - `.claude/agents/ui-reviewer.md` is a read-only review agent for `apps/web/src/components`: visual
   quality, GSAP cleanup and reduced motion, accessibility, component structure. Run it after
-  changing a component.
+  changing a component, and name the changed files in its task: it has no shell to find them.
 - Every change ships as a pull request, because `main`'s protection refuses direct pushes: branch,
   commit with a Conventional Commit title (Quality gates describes how the squash title is linted),
   open it with `gh pr create`, and poll CI until every check on the head commit is green before
@@ -526,6 +569,22 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   evaluated as `<projectDir>/next.config.compiled.js`, so the starting directory is whatever Next
   was invoked on, not this file, and `next info` from a subdirectory then resolves outside the
   repository. `apps/web/src/test/next-config.test.ts` pins all of this.
+- `apps/web/next.config.ts` also sends the security headers (ADR 0023), and its CSP allows this
+  origin only: a script, stylesheet, font, image (a `data:` one included) or connection from
+  anywhere else is refused, and the browser logs the refusal as a console error.
+  `e2e/console-clean.spec.ts` fails on it in the desktop `chromium` project, the only one that runs
+  that spec; no WebKit project has a console gate, so a refusal only WebKit makes is not caught in
+  CI. Adding an origin means widening `contentSecurityPolicy()` and its test in
+  `src/test/next-config.test.ts` in the same change. `'unsafe-inline'` is in `script-src`
+  on purpose: the theme script and the RSC payload are inline, and a per-request token instead is
+  refused by ADR 0017 (`scripts/ai-refusals.test.mjs` fails on the word anywhere in the config).
+  `next dev` alone adds `'unsafe-eval'` and `ws:` (NODE_ENV=development), and a Vercel preview
+  build alone adds the Vercel Toolbar's origins and relaxes `Cross-Origin-Opener-Policy` from
+  `same-origin` to `same-origin-allow-popups` (VERCEL_ENV=preview). `turbo.json` declares
+  `VERCEL_ENV` in the `build` task's `env` so that it splits the cache key: Turborepo's strict mode
+  passes `VERCEL_*` through to `next build` anyway, but leaves an undeclared one out of the hash.
+  Never add `upgrade-insecure-requests`: WebKit applies it to `http://localhost`, which breaks the
+  `mobile-safari` project.
 - Never hand-edit `pnpm-lock.yaml`, `.next/`, `node_modules/` or `.env*`; change dependencies through
   pnpm. pnpm's peer-suffix resolution for this dependency graph is not deterministic: now and then
   a resolution, on `main` as well, flips a few peer suffixes the other way (on 2026-09-16, the
@@ -578,9 +637,10 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 - Two checkouts running the local e2e suite at the same moment both want 3210, and the second aborts
   with Playwright's `is already used` error. Give it another port:
   `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`.
-- Nothing reuses a server any more, so a run killed part-way can leave an orphaned `next dev` holding
-  3210 and every later run in that checkout aborts. Clear it with
-  `lsof -ti tcp:3210 | xargs kill` rather than moving to another port, which only leaks the orphan.
+- The Playwright config never reuses a server (`reuseExistingServer: false`), so a run killed
+  part-way can leave an orphaned `next dev` holding 3210 and every later run in that checkout
+  aborts. Clear it with `lsof -ti tcp:3210 | xargs kill` rather than moving to another port, which
+  only leaks the orphan.
 - `.next-e2e` is known to seven places, not one: both `.gitignore` files, `.prettierignore`,
   `globalIgnores` in `apps/web/eslint.config.mjs`, the `include` list in `apps/web/tsconfig.json`,
   `.vercelignore` (the Vercel CLI never reads `.gitignore`, and the directory runs to ~150 MB) and
