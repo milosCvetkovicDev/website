@@ -15,7 +15,7 @@ import type * as GsapRuntimeModule from './gsap-runtime';
  * Not at idle, as before, and not on a timer or when the first phase nears the viewport: each of
  * those fetches GSAP, and builds every timeline, inside the window Lighthouse measures blocking
  * time in, and the first phase starts 73 px below the fold on a 412x823 phone, so any observer
- * margin fires at load. ADR 0023 records the decision.
+ * margin fires at load. ADR 0024 records the decision.
  *
  * Only this module may reach `./gsap-runtime`, and only through `import()`: a static import from
  * anywhere in the home page's client graph puts GSAP back into the initial chunk. Everything else
