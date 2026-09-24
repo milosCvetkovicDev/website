@@ -16,7 +16,7 @@ say so and stop instead of reviewing the whole tree. Check them for these issues
 ## Visual Quality
 
 - Colours come from theme tokens, never palette classes such as `blue-500` or `text-green-400`. The
-  rules are in the Conventions section of `CLAUDE.md` (ADRs 0010 and 0011); flag every breach,
+  rules are in `.claude/rules/ui-components.md` (ADRs 0010 and 0011); flag every breach,
   because CI's axe gate catches one only when it lowers measured contrast on a rendered route:
   - Accent as text is `--accent-text`, never `text-[var(--accent)]`.
   - Status colours are `--status-ok`, `--status-warn` and `--status-err`, with no `/NN` alpha when
