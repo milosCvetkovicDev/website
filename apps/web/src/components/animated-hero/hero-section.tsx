@@ -19,7 +19,7 @@ export function HeroSection({ children }: { children?: ReactNode }) {
   return (
     <section
       aria-label="Hero - Milos Cvetkovic, Senior Full Stack Engineer"
-      className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-4 sm:px-6"
+      className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-4 py-8 sm:px-6 sm:py-12"
     >
       {/* 1. TmuxBackground -- absolute-positioned background. Imported statically and hydrated
           with the hero: as a lazy chunk it was a request of its own, made only once hydration

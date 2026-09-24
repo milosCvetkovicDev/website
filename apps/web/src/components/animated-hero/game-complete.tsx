@@ -123,12 +123,13 @@ export function GameComplete() {
               <div className="space-y-2 py-4">
                 <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[var(--muted)]">
                   <span>Ideas</span>
-                  <span className="text-[var(--accent-text)]">→</span>
-                  <span>Architecture</span>
-                  <span className="text-[var(--accent-text)]">→</span>
-                  <span>Code</span>
-                  <span className="text-[var(--accent-text)]">→</span>
-                  <span>Production</span>
+                  {/* Each arrow wraps with the step it points at, never alone at a line's end. */}
+                  {['Architecture', 'Code', 'Production'].map((step) => (
+                    <span key={step} className="flex gap-2">
+                      <span className="text-[var(--accent-text)]">→</span>
+                      <span>{step}</span>
+                    </span>
+                  ))}
                 </div>
                 <div className="text-center text-sm text-[var(--muted)]">
                   Time: <span className="text-[var(--accent-text)]">1 conversation</span>
