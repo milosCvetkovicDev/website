@@ -172,6 +172,18 @@ export function preloadGsap(): void {
  *
  * Returns a function that stops a callback which has not run yet from ever running, and releases
  * it; it does nothing afterwards.
+ *
+ * A callback that builds on a component's DOM reads its refs once, returns when they are already
+ * null, and scopes its `gsap.context` to the element, never to the ref. A soft navigation that
+ * removes the component nulls its refs in that commit, but the effect cleanup that cancels or
+ * reverts the build runs in a later task: a navigation is a transition, and React yields to the
+ * browser before it runs a transition's passive effects. GSAP's arrival, a GSAP tick or a timer
+ * can land in between. A build that lands there finds no element. And GSAP resolves targets
+ * through a context's scope whenever it runs work the context owns, whether or not the context is
+ * current: every refresh of a ScrollTrigger created in it (the deferred first refresh of a
+ * timeline's trigger, one a resize starts) and its trigger callbacks. A null ref logs "Invalid
+ * scope", while an element still answers after it has left the page. A timer that reads refs when
+ * it fires checks for them the same way.
  */
 export function runWithGsap(
   run: (runtime: GsapRuntime) => void,

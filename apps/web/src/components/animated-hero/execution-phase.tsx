@@ -129,11 +129,15 @@ export function ExecutionPhase() {
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap }) => {
-        const reached = isAlreadyReached(sectionRef.current);
+        // The element, read once, never the ref: a soft navigation away from `/` nulls the ref
+        // before this effect's cleanup runs (runWithGsap).
+        const section = sectionRef.current;
+        if (!section) return;
+        const reached = isAlreadyReached(section);
         ctx = gsap.context(() => {
           const tl = gsap.timeline({
             scrollTrigger: {
-              trigger: sectionRef.current,
+              trigger: section,
               start: 'top center',
               end: 'bottom center',
               toggleActions: 'play none none reverse',
@@ -227,7 +231,7 @@ export function ExecutionPhase() {
           );
 
           if (reached) tl.progress(1);
-        }, sectionRef);
+        }, section);
       },
       () => setGsapUnavailable(true),
     );

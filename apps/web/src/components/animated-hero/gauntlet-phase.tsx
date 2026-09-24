@@ -45,12 +45,18 @@ export function GauntletPhase() {
   // unmount, or on a reduced-motion switch, rather than left to set state on a component that is
   // gone. Progress tweens only drive React state, so killing them is enough; the reveal tweens are
   // reverted, because revert restores the inline styles they set, where kill would freeze them
-  // mid-flight and that inline opacity would beat the class-driven state.
+  // mid-flight and that inline opacity would beat the class-driven state. A timer that comes due
+  // after the commit that removed the section, but before the cleanup that cancels it, does
+  // nothing: its refs are already null, and GSAP would warn about a null target (runWithGsap).
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const progressTweensRef = useRef<gsap.core.Tween[]>([]);
   const revealTweensRef = useRef<gsap.core.Tween[]>([]);
   const later = useCallback((callback: () => void, delayMs: number) => {
-    timersRef.current.push(setTimeout(callback, delayMs));
+    timersRef.current.push(
+      setTimeout(() => {
+        if (sectionRef.current) callback();
+      }, delayMs),
+    );
   }, []);
   const cancelSequence = useCallback(() => {
     timersRef.current.forEach(clearTimeout);
@@ -170,10 +176,14 @@ export function GauntletPhase() {
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap, ScrollTrigger }) => {
-        const reached = isAlreadyReached(sectionRef.current);
+        // The element, read once, never the ref: a soft navigation away from `/` nulls the ref
+        // before this effect's cleanup runs (runWithGsap).
+        const section = sectionRef.current;
+        if (!section) return;
+        const reached = isAlreadyReached(section);
         ctx = gsap.context(() => {
           ScrollTrigger.create({
-            trigger: sectionRef.current,
+            trigger: section,
             start: 'top center',
             onEnter: () => animatePipeline(gsap),
           });
@@ -187,14 +197,14 @@ export function GauntletPhase() {
               y: 0,
               duration: 0.5,
               scrollTrigger: {
-                trigger: sectionRef.current,
+                trigger: section,
                 start: 'top center',
               },
             },
           );
 
           if (reached) fadeIn.progress(1);
-        }, sectionRef);
+        }, section);
       },
       () => setGsapUnavailable(true),
     );
