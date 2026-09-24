@@ -267,20 +267,18 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   act: supersede the record and delete the matching assertion in the same pull request.
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
   grouped into one pull request and open npm pull requests are capped at five; github-actions bumps
-  are not grouped. Dependabot alerts are on; automated security updates stay off until the owner
-  switches them on after #71, which clears the lockfile's advisories, has merged, so until then an
-  alert opens no pull request. Once they are on, they are triggered by alerts rather than the Monday
-  schedule, and a `security` group (`applies-to: security-updates`, `patterns: ['*']`) batches the
-  security updates of each run into one pull request so they cannot fill the five-slot cap. Three
-  majors are ignored, each with the upstream event that reopens it: `eslint` and `@eslint/js`
-  (eslint-config-next pulls an eslint-plugin-react that ESLint 10 breaks —
-  jsx-eslint/eslint-plugin-react#3977), `typescript` `>=7` (no classic compiler API at the root;
-  typescript-eslint peers `<6.1.0`) and `@types/node` majors (they follow `.nvmrc` by hand). Adding
-  one is a policy change, so read `docs/adr/0018-dependency-update-policy.md` first; deleting one
-  without the trigger having fired puts the red pull request back. A `vite` group (`vite`,
-  `@vitejs/*`, `vitest`, `@vitest/*`, majors included) goes ahead of `minor-and-patch` in the same
-  pull request that makes `apps/web` declare `vite` directly, and not before: added now it would
-  regenerate a red grouped pull request.
+  are not grouped. Dependabot alerts and automated security updates are both on. Security updates
+  are triggered by alerts rather than the Monday schedule, and a `security` group
+  (`applies-to: security-updates`, `patterns: ['*']`) batches the security updates of each run into
+  one pull request so they cannot fill the five-slot cap. Three majors are ignored, each with the
+  upstream event that reopens it: `eslint` and `@eslint/js` (eslint-config-next pulls an
+  eslint-plugin-react that ESLint 10 breaks — jsx-eslint/eslint-plugin-react#3977), `typescript`
+  `>=7` (no classic compiler API at the root; typescript-eslint peers `<6.1.0`) and `@types/node`
+  majors (they follow `.nvmrc` by hand). Adding one is a policy change, so read
+  `docs/adr/0018-dependency-update-policy.md` first; deleting one without the trigger having fired
+  puts the red pull request back. A `vite` group (`vite`, `@vitejs/*`, `vitest`, `@vitest/*`, majors
+  included) goes ahead of `minor-and-patch` in the same pull request that makes `apps/web` declare
+  `vite` directly, and not before: added now it would regenerate a red grouped pull request.
 
 ## Conventions
 
@@ -373,9 +371,9 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   React has hydrated. Wait through `e2e/support/hydration.ts` rather than writing a wait of your
   own: `gotoHydrated(page, path)` for a navigation, `expectHydrated(page)` after `page.reload()`. A
   soft navigation needs neither, and a spec with JavaScript off must call neither, because the
-  marker never flips. No spec keys a wait on page text: the home page's boot loader, which the
-  inline waits once watched, is gone (ADR 0022). The marker hydrates with the layout, so content a page wraps in `<Suspense>` or
-  puts under a `loading.tsx` would hydrate after it flips. No route puts `<main>` inside a
+  marker never flips. Never wait for hydration by watching page text (ADR 0022). The marker
+  hydrates with the layout, so content a page wraps in `<Suspense>` or puts under a `loading.tsx`
+  would hydrate after it flips. No route puts `<main>` inside a
   boundary; the one boundary with content today, the decorative `TmuxBackground` on `/`, may
   hydrate after the marker. `e2e/hero.spec.ts` asserts the page title.
   That assertion is only a smoke check that the app rendered: it never could catch a second
@@ -485,7 +483,7 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   authorising once per machine before its tools work, and nothing in the repository depends on it.
 - `.claude/agents/ui-reviewer.md` is a read-only review agent for `apps/web/src/components`: visual
   quality, GSAP cleanup and reduced motion, accessibility, component structure. Run it after
-  changing a component.
+  changing a component, and name the changed files in its task: it has no shell to find them.
 - Every change ships as a pull request, because `main`'s protection refuses direct pushes: branch,
   commit with a Conventional Commit title (Quality gates describes how the squash title is linted),
   open it with `gh pr create`, and poll CI until every check on the head commit is green before
@@ -615,9 +613,10 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 - Two checkouts running the local e2e suite at the same moment both want 3210, and the second aborts
   with Playwright's `is already used` error. Give it another port:
   `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`.
-- Nothing reuses a server any more, so a run killed part-way can leave an orphaned `next dev` holding
-  3210 and every later run in that checkout aborts. Clear it with
-  `lsof -ti tcp:3210 | xargs kill` rather than moving to another port, which only leaks the orphan.
+- The Playwright config never reuses a server (`reuseExistingServer: false`), so a run killed
+  part-way can leave an orphaned `next dev` holding 3210 and every later run in that checkout
+  aborts. Clear it with `lsof -ti tcp:3210 | xargs kill` rather than moving to another port, which
+  only leaks the orphan.
 - `.next-e2e` is known to seven places, not one: both `.gitignore` files, `.prettierignore`,
   `globalIgnores` in `apps/web/eslint.config.mjs`, the `include` list in `apps/web/tsconfig.json`,
   `.vercelignore` (the Vercel CLI never reads `.gitignore`, and the directory runs to ~150 MB) and

@@ -25,9 +25,10 @@ Run every node or pnpm command after `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/n
    conventional header and the message has no other body), and never `Merge …` or `fixup! …`.
    Let the hooks run; never `--no-verify`.
 5. **Review.** Someone other than the author reads the diff: `ui-reviewer` for
-   `apps/web/src/components`, otherwise a review agent that sees only the diff (for example a
-   user-level `adversarial-reviewer`, when one is installed). Fix what is confirmed
-   and record every finding as fixed, deferred with reason or rejected with reason.
+   `apps/web/src/components` (name the changed files in its task), otherwise a review agent that
+   sees only the diff (for example a user-level `adversarial-reviewer`, when one is installed). Fix
+   what is confirmed and record every finding as fixed, deferred with reason or rejected with
+   reason.
 6. **Open the PR.** `git push -u origin HEAD`. Write the body from
    `.github/pull_request_template.md` into the session scratchpad: Summary, Verification with the
    pasted commands and output from step 3, Review with the triage from step 5. Then
