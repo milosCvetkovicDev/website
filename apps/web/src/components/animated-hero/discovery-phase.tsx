@@ -120,7 +120,7 @@ export function DiscoveryPhase() {
           </AnimatedText>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Chat Interface */}
           <div ref={chatRef}>
             <Terminal>

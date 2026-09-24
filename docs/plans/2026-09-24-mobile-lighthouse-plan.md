@@ -397,33 +397,39 @@ Commit: `fix(web): stop the story grids and the stats from-state widening the pa
   `apps/web/src/components/animated-hero/`
 - Modify: `apps/web/e2e/mobile/layout-overflow.spec.ts`, `apps/web/e2e/layout-overflow.spec.ts`
 - Test: `apps/web/src/components/animated-hero/__tests__/story-phases.test.tsx`
-- Modify: `.claude/epics/audit-remediation-2026-09/43.md` (R10 and R11, recorded the way that file
-  records other fixes)
+- Modify: `.claude/epics/audit-remediation-2026-09/46.md`. `43.md` holds the manifest rows but
+  records no fixes; fixes are recorded in the fixing task's file, as `50.md` does, so R10, R11 and
+  AC 10 are noted under #46's acceptance criteria (AC 10 ticked; AC 7 and AC 9 partly done, with
+  what is left)
 
-- [ ] **Step 1:** The three `grid gap-8 md:grid-cols-2` grids become
+- [x] **Step 1:** The three `grid gap-8 md:grid-cols-2` grids become
       `grid grid-cols-1 gap-8 md:grid-cols-2`: Tailwind v4's `grid-cols-1` is `minmax(0,1fr)`, the
       fix measured to remove the horizontal pan at 320, 375 and 390 px.
-- [ ] **Step 2:** Execution's code sample scrolls in a named, keyboard-reachable region: its
+- [x] **Step 2:** Execution's code sample scrolls in a named, keyboard-reachable region: its
       `pre` gets `tabIndex={0}`, `role="region"`, `aria-label="ErrorAnalyzer source"` and
       `focus-ring overflow-x-auto text-xs leading-relaxed sm:text-sm`. The gate disables
       `scrollable-region-focusable`, so axe would not catch a scroller nobody can reach. Check that
       `.focus-ring`'s 2 px offset is not clipped by the Terminal's `overflow-hidden`; if it is, add
-      `focus-visible:-outline-offset-2`. The metric label column is `w-20 shrink-0 sm:w-24`.
-- [ ] **Step 3:** The Execution stats reveal starts from `{ opacity: 0, y: 20 }` instead of
+      `focus-visible:-outline-offset-2`. It is not: the `pre` sits in the Terminal's `p-4` body, so
+      the 4 px the outline reaches is inside 16 px of padding. The metric label column is
+      `w-20 shrink-0 sm:w-24`.
+- [x] **Step 3:** The Execution stats reveal starts from `{ opacity: 0, y: 20 }` instead of
       `{ opacity: 0, x: 30 }` (#46 hero-v1). R10 walks the story with motion allowed, so the
       `x: 30` from-state comes back on the way up and leaves 6 px of overflow.
-- [ ] **Step 4:** Before deleting the expected-failure annotations, run R10 on `mobile-safari`
+- [x] **Step 4:** Before deleting the expected-failure annotations, run R10 on `mobile-safari`
       (WebKit): the fix was measured in Chromium only. If WebKit still overflows, keep an expected
-      failure for it alone (`test.fail(browserName === 'webkit', …)`).
-- [ ] **Step 5:** Delete the `test.fail()` annotations for R10 (phone) and R11 (desktop) and reword
+      failure for it alone (`test.fail(browserName === 'webkit', …)`). It does not: R10 passed on
+      both phone projects at all three widths, so both annotations go.
+- [x] **Step 5:** Delete the `test.fail()` annotations for R10 (phone) and R11 (desktop) and reword
       each file's header comment, which calls the row RED; add 820 to `DESKTOP_WIDTHS` (#46 AC9);
       add #46 AC8's checks at 320 px to the phone spec: the `pre` lies inside the viewport and
       scrolls (`scrollWidth > clientWidth`) with `tabindex="0"` and a non-empty accessible name; the
       TIME ELAPSED and commit-streak values end at or before x = 320; every `.tech-item` has
       `scrollWidth <= clientWidth`; the three loop stat cells fit their boxes.
-- [ ] **Step 6:** #46 AC10 in `story-phases.test.tsx`: spy on `fromTo` across every phase and
-      assert that no from-state has a positive `x`. It fails on the parent commit.
-- [ ] **Step 7:** Verify: `git grep -n "R10, #46\|R11, #46" apps/web` prints nothing; both
+- [x] **Step 6:** #46 AC10 in `story-phases.test.tsx`: spy on `fromTo` (and `from`, on `gsap` and on
+      the timeline prototype) across every phase and its timer-driven reveals, and assert that no
+      from-state has a positive `x`. It fails with the stats panel's `x: 30`.
+- [x] **Step 7:** Verify: `git grep -n "R10, #46\|R11, #46" apps/web` prints nothing; both
       `layout-overflow` specs, `story`, `gsap-lazy`, `accessibility` and `mobile/accessibility` in
       CI mode on all three projects; the `story-phases` unit file.
 

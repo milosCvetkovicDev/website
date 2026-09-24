@@ -610,3 +610,49 @@ describe('GameComplete', () => {
     expect(gsap.getTweensOf(cta)).toHaveLength(0);
   });
 });
+
+// #46 AC10. A from-state is drawn the moment its timeline is built, before any trigger fires, so an
+// element that starts to the right of where it belongs widens the page by that much for as long as
+// it waits: the Execution stats panel's `x: 30` measured 774 px at a 768 px viewport (row R11).
+// Every entrance, the timer-driven reveals included, starts in place or from the left.
+describe.each(phases)('$name, its from-states', ({ Phase }) => {
+  beforeEach(() => {
+    media.reduce = false;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom does
+    // not implement.
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    // Asserted last: a throw here must not skip the global restoration above it.
+    expect(media.listenerCount()).toBe(0);
+  });
+
+  it('start no element to the right of where it belongs', () => {
+    const spies = [
+      vi.spyOn(gsap, 'fromTo'),
+      vi.spyOn(gsap, 'from'),
+      vi.spyOn(gsap.core.Timeline.prototype, 'fromTo'),
+      vi.spyOn(gsap.core.Timeline.prototype, 'from'),
+    ];
+    render(<Phase />);
+    // Timeline-bound triggers measure on refresh; the timer-driven sequences then build their reveals.
+    act(() => ScrollTrigger.refresh());
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+
+    // Each spy's second argument is the from-state: `fromTo(targets, from, to)` and
+    // `from(targets, from)`, on gsap and on a timeline alike.
+    const fromStates = spies
+      .flatMap((spy) => spy.mock.calls as unknown[][])
+      .map((call) => call[1] as gsap.TweenVars | undefined);
+    expect(fromStates.length, 'the phase built no entrance at all').toBeGreaterThan(0);
+    const rightward = fromStates.filter(
+      (from) => from !== undefined && Number.parseFloat(String(from.x ?? 0)) > 0,
+    );
+    expect(rightward).toEqual([]);
+  });
+});

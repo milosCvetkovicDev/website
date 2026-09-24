@@ -58,7 +58,7 @@ const AnimatedProgressBar = ({
   complete: boolean;
 }) => (
   <div className="group flex items-center gap-3">
-    <span className="w-24 shrink-0 font-mono text-xs text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
+    <span className="w-20 shrink-0 font-mono text-xs text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)] sm:w-24">
       {label}
     </span>
     <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
@@ -198,11 +198,12 @@ export function ExecutionPhase() {
           // Code panel slides in
           tl.fromTo(codeRef.current, { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.5 });
 
-          // Stats panel slides in
+          // Stats panel rises in. Not from the right: a positive x from-state is drawn the moment
+          // the timeline is built and pushed the page 30 px wider than the viewport.
           tl.fromTo(
             statsRef.current,
-            { opacity: 0, x: 30 },
-            { opacity: 1, x: 0, duration: 0.5 },
+            { opacity: 0, y: 20 },
+            { opacity: 1, y: 0, duration: 0.5 },
             '<0.1',
           );
 
@@ -285,11 +286,18 @@ export function ExecutionPhase() {
           </AnimatedText>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Code Streaming */}
           <div ref={codeRef}>
             <Terminal className="h-full">
-              <pre className="text-sm leading-relaxed">
+              {/* Scrolls sideways on a phone rather than widening the page, so it is a named
+                  region the keyboard can reach and scroll. */}
+              <pre
+                tabIndex={0}
+                role="region"
+                aria-label="ErrorAnalyzer source"
+                className="focus-ring overflow-x-auto text-xs leading-relaxed sm:text-sm"
+              >
                 <code>
                   {codeLines.map((line, i) => (
                     <span

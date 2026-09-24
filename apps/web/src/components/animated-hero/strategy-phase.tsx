@@ -164,7 +164,7 @@ export function StrategyPhase() {
           </AnimatedText>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Tech Tree */}
           <div ref={techTreeRef} className="space-y-3">
             <h3 className="mb-4 font-mono text-xs tracking-wider text-[var(--muted)] uppercase">

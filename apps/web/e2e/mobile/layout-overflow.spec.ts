@@ -5,30 +5,32 @@ import { expectHydrated } from '../support/hydration';
 /**
  * `/` must not scroll sideways on a phone.
  *
- * Row R10 of the RED manifest, fixed by #46. The Execution phase's grid is
- * `grid gap-8 md:grid-cols-2` (`execution-phase.tsx:281`), so below `md` it is a single track — and a
- * grid track sizes to its content's min-content width, which for the `<pre>` holding the code sample
- * is 438.6px. In a 327px content box that overflows, and the document measures 463px wide at every
- * phone width: the whole page can be dragged sideways, on the one viewport class where that is most
- * obvious and most annoying.
+ * Row R10 of the RED manifest, an expected failure until #46's phone-width fixes landed. The
+ * Execution phase's grid was `grid gap-8 md:grid-cols-2`, so below `md` it was a single track, and a
+ * grid track sized by content cannot shrink below its content's min-content width, which for the
+ * `<pre>` holding the code sample is 438.6px. In a 327px content box that overflowed, and the
+ * document measured 463px wide at every phone width: the whole page could be dragged sideways, on
+ * the one viewport class where that is most obvious. The three story grids are now
+ * `grid-cols-1` (`minmax(0, 1fr)`), and the code sample scrolls inside its own named, focusable
+ * region instead (`execution-phase.tsx`).
  *
  * Measured at three widths rather than the project's own, because the number to beat is the
- * viewport's and a single width cannot tell a fixed-width overflow from a proportional one: 463 is
- * wider than 320, 375 and 414 alike, which is what says the offender has a hard minimum rather than
- * a percentage. `setViewportSize` narrows the phone project's viewport and leaves `isMobile` and
- * `hasTouch` in place, so the mobile header is still the one being laid out.
+ * viewport's and a single width cannot tell a fixed-width overflow from a proportional one.
+ * `setViewportSize` narrows the phone project's viewport and leaves `isMobile` and `hasTouch` in
+ * place, so the mobile header is still the one being laid out.
  *
- * Asserted after the walk and back up, not at rest, and that is deliberate: at rest the Execution
- * section is still at `opacity: 0`, but an invisible element in the flow lays out and overflows all
- * the same, so the row would be RED either way. Walking is what would also catch a phase that only
- * overflows once its reveal has run, and coming back up catches one that overflows on the way out.
- * The walk starts once GSAP has loaded, which is after hydration (`load-gsap.ts`): walked before
- * it, a section would be measured in its server-rendered state and no reveal would run.
+ * Asserted after the walk and back up, not at rest, and that is deliberate: walking is what catches
+ * a phase that only overflows once its reveal has run, and coming back up catches one that overflows
+ * on the way out. The walk starts once GSAP has loaded (`load-gsap.ts`): walked before it, a section
+ * would be measured in its server-rendered state and no reveal would run.
+ *
+ * At 320px the story's narrowest parts are checked one by one as well (#46 AC 8), because the
+ * document can fit while a panel inside it clips its own text: the code sample, the Execution stats,
+ * the Strategy tech cards and the Loop stat cells.
  */
 
-// No retries. CI sets `retries: 2`, and an expected failure that passes on its first attempt is the
-// signal that the defect is fixed; with retries on, Playwright would run it again, see it fail as
-// annotated, and report the pair as flaky instead of failing the run.
+// No retries. These were expected failures, and they stay a guard a retry cannot turn into a green
+// "flaky" run.
 //
 // 60 s rather than the 30 s default, and the number is not the walk's cost: the walk itself measured
 // 770 ms over 20 steps on Pixel 7 and 1.6 s over 40 on iPhone 13, against a ~10,400 px document. What
@@ -93,9 +95,6 @@ async function widestOffenders(page: Page, limit = 6) {
 
 for (const width of PHONE_WIDTHS) {
   test(`/ does not scroll sideways at ${width}px`, async ({ page }) => {
-    test.fail();
-    test.info().annotations.push({ type: 'fixed-by', description: 'R10, #46' });
-
     // Height from the project's own device, so only the width under test changes.
     const height = page.viewportSize()?.height ?? 812;
     await page.setViewportSize({ width, height });
@@ -116,3 +115,55 @@ for (const width of PHONE_WIDTHS) {
     ).toBeLessThanOrEqual(clientWidth);
   });
 }
+
+test("/ fits the story's narrowest parts into 320px", async ({ page }) => {
+  const height = page.viewportSize()?.height ?? 812;
+  await page.setViewportSize({ width: 320, height });
+  await page.goto('/');
+  await expectHydrated(page);
+  await expectGsapLoaded(page);
+  await walkTheStory(page);
+
+  // The code sample scrolls inside its own box, which a keyboard can reach, rather than widening
+  // the page or wrapping.
+  const code = page.getByRole('region', { name: 'ErrorAnalyzer source' });
+  await expect(code).toHaveAttribute('tabindex', '0');
+  const codeBox = await code.boundingBox();
+  if (!codeBox) throw new Error('the code sample is not rendered');
+  expect(codeBox.x, 'the code sample starts off the left edge').toBeGreaterThanOrEqual(0);
+  expect(codeBox.x + codeBox.width, 'the code sample ends past the viewport').toBeLessThanOrEqual(
+    320,
+  );
+  const codeScroll = await code.evaluate((pre) => ({
+    scrollWidth: pre.scrollWidth,
+    clientWidth: pre.clientWidth,
+  }));
+  expect(codeScroll.scrollWidth, 'the code sample should scroll sideways').toBeGreaterThan(
+    codeScroll.clientWidth,
+  );
+
+  const measured = await page.evaluate(() => {
+    const byText = (text: string) =>
+      [...document.querySelectorAll('span, div')].find((el) => el.textContent?.trim() === text);
+    const right = (el: Element | null | undefined) =>
+      el ? Math.round(el.getBoundingClientRect().right * 10) / 10 : Infinity;
+    const overflow = (el: Element) => el.scrollWidth - el.clientWidth;
+    return {
+      timeElapsed: right(byText('TIME ELAPSED')?.nextElementSibling),
+      commitStreak: right(byText('COMMIT STREAK')?.previousElementSibling),
+      techItems: [...document.querySelectorAll('.tech-item')].map((item) => ({
+        text: item.textContent?.trim().slice(0, 30),
+        overflow: overflow(item),
+      })),
+      loopCells: ['UPTIME', 'AVG LATENCY', 'AUTO-FIXES TODAY'].map((label) => {
+        const cell = byText(label)?.parentElement;
+        return { label, overflow: cell ? overflow(cell) : Infinity };
+      }),
+    };
+  });
+  expect(measured.timeElapsed, 'the TIME ELAPSED value ends past 320px').toBeLessThanOrEqual(320);
+  expect(measured.commitStreak, 'the commit streak value ends past 320px').toBeLessThanOrEqual(320);
+  expect(measured.techItems.length, 'no Strategy tech card was found').toBeGreaterThan(0);
+  expect(measured.techItems.filter((item) => item.overflow > 0)).toEqual([]);
+  expect(measured.loopCells.filter((cell) => cell.overflow > 0)).toEqual([]);
+});
