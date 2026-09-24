@@ -267,11 +267,9 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   act: supersede the record and delete the matching assertion in the same pull request.
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
   grouped into one pull request and open npm pull requests are capped at five; github-actions bumps
-  are not grouped. Dependabot alerts are on; automated security updates stay off until the owner
-  switches them on after #71, which clears the lockfile's advisories, has merged, so until then an
-  alert opens no pull request. Once they are on, they are triggered by alerts rather than the Monday
-  schedule, and a `security` group (`applies-to: security-updates`, `patterns: ['*']`) batches the
-  security updates of each run into one pull request so they cannot fill the five-slot cap. Three
+  are not grouped. Dependabot alerts and automated security updates are both on. Security updates
+  are triggered by alerts rather than the Monday schedule, and a `security` group
+  (`applies-to: security-updates`, `patterns: ['*']`) batches the security updates of each run into one pull request so they cannot fill the five-slot cap. Three
   majors are ignored, each with the upstream event that reopens it: `eslint` and `@eslint/js`
   (eslint-config-next pulls an eslint-plugin-react that ESLint 10 breaks —
   jsx-eslint/eslint-plugin-react#3977), `typescript` `>=7` (no classic compiler API at the root;
@@ -373,8 +371,8 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   React has hydrated. Wait through `e2e/support/hydration.ts` rather than writing a wait of your
   own: `gotoHydrated(page, path)` for a navigation, `expectHydrated(page)` after `page.reload()`. A
   soft navigation needs neither, and a spec with JavaScript off must call neither, because the
-  marker never flips. No spec keys a wait on page text: the home page's boot loader, which the
-  inline waits once watched, is gone (ADR 0022). The marker hydrates with the layout, so content a page wraps in `<Suspense>` or
+  marker never flips. Do not key a wait on page text; wait on the marker (ADR 0022). The marker
+  hydrates with the layout, so content a page wraps in `<Suspense>` or
   puts under a `loading.tsx` would hydrate after it flips. No route puts `<main>` inside a
   boundary; the one boundary with content today, the decorative `TmuxBackground` on `/`, may
   hydrate after the marker. `e2e/hero.spec.ts` asserts the page title.
@@ -615,7 +613,7 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 - Two checkouts running the local e2e suite at the same moment both want 3210, and the second aborts
   with Playwright's `is already used` error. Give it another port:
   `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`.
-- Nothing reuses a server any more, so a run killed part-way can leave an orphaned `next dev` holding
+- Playwright never reuses a server, so a run killed part-way can leave an orphaned `next dev` holding
   3210 and every later run in that checkout aborts. Clear it with
   `lsof -ti tcp:3210 | xargs kill` rather than moving to another port, which only leaks the orphan.
 - `.next-e2e` is known to seven places, not one: both `.gitignore` files, `.prettierignore`,
