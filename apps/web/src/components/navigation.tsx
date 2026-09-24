@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Logo } from './logo';
 import { useTheme } from './theme-provider';
 import { useState } from 'react';
 
@@ -121,11 +122,14 @@ export function Navigation() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+        {/* The mark is aria-hidden, so the link carries the name. "MC" keeps the visible "mc" in
+            the accessible name (WCAG 2.5.3), and e2e/client-navigation.spec.ts finds the link by it. */}
         <Link
           href="/"
-          className="text-lg font-semibold transition-colors hover:text-[var(--accent-text)]"
+          aria-label="MC"
+          className="transition-colors hover:text-[var(--accent-text)]"
         >
-          MC
+          <Logo size={20} />
         </Link>
 
         {/* Desktop Navigation */}

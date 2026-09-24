@@ -42,6 +42,7 @@
     "HexBadge": "  children: React.ReactNode;\n  className?: string;",
     "Highlights": "  // Takes no props.",
     "HudPanel": "  children: React.ReactNode;\n  className?: string;\n  title?: React.ReactNode;\n  glow?: boolean;",
+    "Logo": "  className?: string;\n  size?: number;",
     "LoopPhase": "  // Takes no props.",
     "MetricCounter": "  active: boolean;\n  value: number;\n  label: string;\n  prefix?: string;\n  suffix?: string;\n  decimals?: number;",
     "Navigation": "  // Takes no props.",
@@ -138,6 +139,9 @@
       "cardMode": "single",
       "primaryStory": "AtTheStart",
       "viewport": "1200x700"
+    },
+    "Logo": {
+      "cardMode": "column"
     }
   },
   "readmeHeader": ".design-sync/conventions.md"

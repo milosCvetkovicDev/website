@@ -8,8 +8,8 @@ import { Footer } from '../footer';
  * Row R38 of the RED manifest, fixed by #49, plus the green assertions that are the floor under it. The
  * footer's links were asserted nowhere before this file.
  *
- * The green half deliberately pins the *count and the shape*, not all three names. `footer.tsx:26`
- * still calls the X profile "Twitter", and that string is also the link's `aria-label` (`:82`); #49
+ * The green half deliberately pins the *count and the shape*, not all three names. `footer.tsx:27`
+ * still calls the X profile "Twitter", and that string is also the link's `aria-label` (`:86`); #49
  * renames it. Pinning three literal names here would make that rename read as a regression, so the X
  * profile is identified by its `x.com` href and the literal names are kept only for LinkedIn and
  * GitHub — which is the shape the task's Green-on-arrival notes ask for.
@@ -75,7 +75,7 @@ describe('Footer', () => {
 
     // The shape, not the year. The footer is a prerendered server component, so `getFullYear()` is
     // frozen at build time and a test pinning a literal year would pass in jsdom while saying nothing
-    // about what visitors see; what that year should be is #49's decision. `footer.tsx:72` renders
+    // about what visitors see; what that year should be is #49's decision. `footer.tsx:75` renders
     // "2026 Milos Cvetkovic. Built with Next.js." — the only thing missing is the mark itself.
     const copyright = screen.getByText(/Milos Cvetkovic\./).textContent ?? '';
     if (!/^© \d{4} Milos Cvetkovic\./.test(copyright.trim())) {
@@ -83,7 +83,7 @@ describe('Footer', () => {
     }
 
     // And the label. "Twitter" has not been the name of that product since 2023, and the glyph next to
-    // it (`footer.tsx:40`) is still the old bird.
+    // it (`footer.tsx:41`) is still the old bird.
     const xLink = screen.getByRole('link', { name: /twitter|^x$|x \(formerly twitter\)/i });
     const xName = xLink.getAttribute('aria-label') ?? '';
     if (/twitter/i.test(xName) && !/\bx\b/i.test(xName.replace(/twitter/gi, ''))) {

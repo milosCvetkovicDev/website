@@ -54,9 +54,10 @@ default Next requires beside it, the author, card type, site name, locale), and 
 description, a link-preview title or a robots directive.
 
 `apps/web/src/app` also holds `error.tsx`, `not-found.tsx` and the metadata files: `sitemap.ts`,
-`robots.ts`, `manifest.ts`, `icon.tsx` and `apple-icon.tsx` (the navigation's "MC" mark, drawn by
-`src/lib/brand-mark.tsx`), and an `opengraph-image.tsx` in the root and in each static route's
-folder, all over one card design in `src/lib/og-image.tsx`. Each folder needs its own: a root image
+`robots.ts`, `manifest.ts`, `icon.tsx` and `apple-icon.tsx` (the mc_ mark of the header's `Logo`,
+drawn by `src/lib/brand-mark.tsx` in `src/app/fonts/geist-mono-600-mark.ttf`), and an
+`opengraph-image.tsx` in the root and in each static route's folder, all over one card design in
+`src/lib/og-image.tsx`. Each folder needs its own: a root image
 never reaches a page that declares its own `openGraph`. There are two route handlers:
 `favicon.ico/route.ts` packs the same mark into an ICO, and `work/[slug]/og-image.png/route.ts`
 draws the case-study card, whose alt text has to name the study, which an `opengraph-image` file's
@@ -320,8 +321,9 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   their dark values in both themes.
 - Components live in `apps/web/src/components`. `index.ts` is a barrel for the page-level ones
   (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `Highlights`, `FeaturedWork`, `TechStack`,
-  `CTA`, `PersonJsonLd`, `WebsiteJsonLd`). The hero and its phases live in
-  `components/animated-hero` and are imported from there directly, not through the barrel.
+  `CTA`, `PersonJsonLd`, `WebsiteJsonLd`), plus the `Logo` wordmark the header and footer draw.
+  The hero and its phases live in `components/animated-hero` and are imported from there
+  directly, not through the barrel.
   Layouts import from the component modules directly, never through the barrel: every client module
   reachable from a server component's imports lands in that layout's client chunk, so a barrel
   import in `app/layout.tsx` would ship `FeaturedWork` to every route (see ADR 0009). A

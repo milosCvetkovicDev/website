@@ -73,7 +73,9 @@ expects, and what each workaround depends on.
   module scope, which is the path those components already honour (the same one the accessibility
   gate checks) and renders the settled state. The stub sits above the exports, so it never reaches
   the usage examples. `TypingCursor` pauses its blink the same way, with a `<style>` element,
-  because the capture always landed in the caret's hidden half.
+  because the capture always landed in the caret's hidden half. `Logo` blinks four times on load,
+  so its card and the two that render it, `Navigation` and `Footer`, pause
+  `[class*="mc-blink"]` the same way.
 - **Fixed-position components need a sized wrapper in their story.** A card renders inside a
   transformed element, which becomes the containing block for `position: fixed`, so
   `CircuitBackground` (fixed overlay) came out blank with no wrapper height, and `SectionProgress`
@@ -139,8 +141,22 @@ expects, and what each workaround depends on.
   custom properties out of the token list: `lib/css.mjs` says the app's scope filter is a permissive
   heuristic and accepts the noise as the price of shipping component CSS to designs. Removing them
   from `_ds_bundle.css` would break every transform, shadow and easing utility in a design. Treat
-  the report entry as known, not new. The design agent also suggested tagging them
-  `/* @kind other */`; nothing in the skill or the converter reads such a tag, so it was not tried.
+  the report entry as known, not new.
+- Since the brand-logo branch, `build-css.mjs` tags every custom property in the shipped CSS: the
+  twelve theme colours `/* @kind color */` and everything else, Tailwind's and the site's own
+  `--tmux-*` and `--log-*` alike, `/* @kind other */`, as the design agent suggested and the owner
+  asked (only those twelve are meant as tokens). Nothing in the skill or the converter reads the
+  tag, but the check does: it records each tag as the token's `annotation` and takes the kind from
+  it. Measured on the regenerated `_ds_manifest.json` (2026-09-24, first sync with the tags):
+  before, 289 tokens (140 `color`, 65 `font`, 27 `shadow`, 25 `spacing`, 4 `radius`, 28 `other`
+  that could not be classified), `--accent-text` as a `font`, and 63 utility-class selectors
+  under `themes`; after, 291 tokens, exactly the 24 theme-colour entries (twelve in each theme)
+  as `color` and the other 267 annotated `other`, `--accent-text` a `color`, and 65 `themes`
+  entries. The `themes` list is untouched by the tags: it counts selectors, the Tailwind utility
+  classes that set a `--tw-*` property, and keeping component CSS in designs means keeping them.
+  Dropping Tailwind's `@layer properties` fallback was tried as well and reverted: the converter's
+  validator then reports nine `--tw-*` variables as undefined, since it does not read `@property`
+  initial values.
 
 ## Findings in the codebase
 
