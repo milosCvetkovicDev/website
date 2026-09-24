@@ -21,8 +21,9 @@ import { expectHydrated } from '../support/hydration';
  *
  * Asserted after the walk and back up, not at rest, and that is deliberate: walking is what catches
  * a phase that only overflows once its reveal has run, and coming back up catches one that overflows
- * on the way out. The walk starts once GSAP has loaded (`load-gsap.ts`): walked before it, a section
- * would be measured in its server-rendered state and no reveal would run.
+ * on the way out. The walk starts once GSAP has loaded, on the intent the helper sends
+ * (`load-gsap.ts`): walked before it, a section would be measured in its server-rendered state and
+ * no reveal would run.
  *
  * At 320px the story's narrowest parts are checked one by one as well (#46 AC 8), because the
  * document can fit while a panel inside it clips its own text: the code sample, the Execution stats,

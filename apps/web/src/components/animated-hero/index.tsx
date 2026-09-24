@@ -29,9 +29,10 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
   // the story, and the wrapper's box is the story's box.
   const storyRef = useRef<HTMLDivElement>(null);
 
-  // GSAP is not in this route's initial chunk: it is fetched once the browser is idle after
-  // hydration (load-gsap.ts), and the phases build their timelines when it arrives. Started here as
-  // well as by the phases because under reduced motion a phase mounted on the client, after a soft
+  // GSAP is not in this route's initial chunk: load-gsap.ts fetches it on the visitor's first
+  // scroll, wheel, touch, pointer press or key press, or at once on a page that is already scrolled,
+  // and the phases build their timelines when it arrives. preloadGsap() arms that wait here as well
+  // as in the phases because under reduced motion a phase mounted on the client, after a soft
   // navigation to `/`, returns before asking for it (on a hard load the hydration pass still asks,
   // with the reduced-motion hook's server snapshot, false), and the hover effects in
   // animated-text.tsx still use it under `reduce`.

@@ -3,7 +3,7 @@ import { useLayoutEffect, type ComponentType } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as gsapRuntime from '../gsap-runtime';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
-import { loadGsap, runWithGsap, type GsapRuntime } from '../load-gsap';
+import { requestGsap, runWithGsap, type GsapRuntime } from '../load-gsap';
 import { DiscoveryPhase } from '../discovery-phase';
 import { StrategyPhase } from '../strategy-phase';
 import { ExecutionPhase } from '../execution-phase';
@@ -55,13 +55,13 @@ vi.mock('../load-gsap', async (importOriginal) => {
   return { ...actual, runWithGsap: vi.fn(actual.runWithGsap) };
 });
 
-// The phases do not import GSAP: they ask load-gsap.ts for it, which fetches it once the browser is
-// idle after hydration. Every test here is about what a phase does with GSAP, so the file waits for
-// that load once, with real timers, before any test installs fake ones. From then on each phase
-// builds its timeline synchronously on mount, as it does in the browser once GSAP has arrived. A
-// phase mounted before the load is lazy-gsap.test.tsx's subject.
+// The phases do not import GSAP: they ask load-gsap.ts for it, which fetches it on the visitor's
+// first scroll, tap or key. Every test here is about what a phase does with GSAP, so the file
+// requests that load outright and waits for it once, with real timers, before any test installs
+// fake ones. From then on each phase builds its timeline synchronously on mount, as it does in the
+// browser once GSAP has arrived. A phase mounted before the load is lazy-gsap.test.tsx's subject.
 beforeAll(async () => {
-  await loadGsap();
+  await requestGsap();
 });
 
 // All six story sections, so the shared lifecycle below covers every one of them. LoopPhase was the

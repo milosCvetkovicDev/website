@@ -6143,24 +6143,24 @@
       "anchor": "| 0022 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0022's record carries the status line \"Accepted\".",
+      "claim": "ADR 0022's record carries the status line \"Superseded by ADR-0024\".",
       "check": {
         "file": "docs/adr/0022-no-boot-loader.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0024"
       }
     },
     {
       "id": "adr-index-0022-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0022 |",
-      "claim": "The index row for ADR 0022 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0022 gives the record's status line, \"Superseded by ADR-0024\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0022 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0024"
       }
     },
     {
@@ -6230,6 +6230,23 @@
       ],
       "check": {
         "path": "docs/adr/0023-static-security-headers.md"
+      }
+    },
+    {
+      "id": "adr-readme-link-0024-gsap-loads-on-first-intent",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0024-gsap-loads-on-first-intent.md)",
+      "claim": "The link to 0024-gsap-loads-on-first-intent.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0024-gsap-loads-on-first-intent.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0024-gsap-loads-on-first-intent.md"
       }
     },
     {
@@ -6308,6 +6325,118 @@
         "file": "docs/adr/README.md",
         "regex": "^\\| 0023 \\| \\[(.+?)\\]\\(0023-",
         "equals": "Six static security headers on every page and asset"
+      }
+    },
+    {
+      "id": "adr-index-0024-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0024's record carries the status line \"Proposed\".",
+      "check": {
+        "file": "docs/adr/0024-gsap-loads-on-first-intent.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0024-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "claim": "The index row for ADR 0024 gives the record's status line, \"Proposed\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0024 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0024-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0024's record carries the Date \"2026-09-24\".",
+      "check": {
+        "file": "docs/adr/0024-gsap-loads-on-first-intent.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-24"
+      }
+    },
+    {
+      "id": "adr-index-0024-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "claim": "The index row for ADR 0024 gives the record's Date, \"2026-09-24\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0024 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-24"
+      }
+    },
+    {
+      "id": "adr-index-0024-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0024's record carries the H1 title \"GSAP loads on the visitor's first intent\".",
+      "check": {
+        "file": "docs/adr/0024-gsap-loads-on-first-intent.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "GSAP loads on the visitor's first intent"
+      }
+    },
+    {
+      "id": "adr-index-0024-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0024 |",
+      "claim": "The index row for ADR 0024 gives the record's H1 title, \"GSAP loads on the visitor's first intent\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0024 \\| \\[(.+?)\\]\\(0024-",
+        "equals": "GSAP loads on the visitor's first intent"
+      }
+    },
+    {
+      "id": "adr-0022-link-0024-gsap-loads-on-first-intent",
+      "doc": "docs/adr/0022-no-boot-loader.md",
+      "anchor": "](0024-gsap-loads-on-first-intent.md)",
+      "claim": "The link to 0024-gsap-loads-on-first-intent.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0024-gsap-loads-on-first-intent.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0024-gsap-loads-on-first-intent.md"
+      }
+    },
+    {
+      "id": "adr-0024-link-0022-no-boot-loader",
+      "doc": "docs/adr/0024-gsap-loads-on-first-intent.md",
+      "anchor": "](0022-no-boot-loader.md)",
+      "claim": "The link to 0022-no-boot-loader.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0022-no-boot-loader.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0022-no-boot-loader.md"
       }
     },
     {

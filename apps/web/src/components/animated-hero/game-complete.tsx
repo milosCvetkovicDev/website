@@ -17,7 +17,7 @@ export function GameComplete() {
     // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
     if (prefersReducedMotion) return;
 
-    // GSAP arrives after hydration (load-gsap.ts); until then the section keeps its
+    // GSAP arrives on the visitor's first intent (load-gsap.ts); until then the section keeps its
     // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached).

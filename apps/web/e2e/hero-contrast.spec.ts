@@ -287,10 +287,10 @@ test('no hero text sits at a resting partial opacity while hovered', async ({ pa
     'this case needs reduced motion, or a reveal mid-tween would be indistinguishable from a ' +
       'resting partial opacity',
   ).toBe(true);
-  // The glitch handler runs its timeline through GSAP, which arrives when the browser is idle after
-  // hydration (`load-gsap.ts`). A hover that lands earlier and stays still plays, but only once GSAP
-  // is in, which can be after the 45 frames below have been sampled: a clean read, and for an
-  // expected failure a lucky pass fails the whole run.
+  // The glitch handler runs its timeline through GSAP, which arrives on the visitor's first intent
+  // (`load-gsap.ts`); a hover is intent too, but it plays only once GSAP is in, which can be after
+  // the 45 frames below have been sampled: a clean read, and for an expected failure a lucky pass
+  // fails the whole run. So the helper sends intent and waits for GSAP first.
   await expectGsapLoaded(page);
 
   // `PHASE 3` uses `AnimatedText animation="glitch"` (`execution-phase.tsx:274`). Its duplicates only

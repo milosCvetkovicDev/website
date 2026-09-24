@@ -82,12 +82,16 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   That assertion is only a smoke check that the app rendered: it never could catch a second
   checkout of this site, which serves the same title character for character, and the not-found and
   error pages carry it too. Status and path are what catch a wrong page.
-- On `/`, GSAP arrives after hydration: `src/components/animated-hero/load-gsap.ts` fetches it once
-  the browser is idle, and the story builds its timelines then. A spec that measures anything GSAP
-  does on `/`, a from-state at rest, a hover tween or a scroll-driven reveal, waits for it with
-  `expectGsapLoaded(page)` from `e2e/support/gsap.ts` after `expectHydrated`; measured earlier, it
-  reads the server-rendered page instead. The helper fails at once when the load failed.
-  `e2e/gsap-lazy.spec.ts` covers the window before GSAP arrives and a load that fails.
+- On `/`, GSAP arrives on the visitor's first intent: `src/components/animated-hero/load-gsap.ts`
+  fetches it on the first scroll, wheel, touch, pointer press or key press (or at once on a page
+  that loads already scrolled), and the story builds its timelines then, so a page nobody touches
+  never loads it. A spec that measures anything GSAP does on `/`, a from-state at rest, a hover
+  tween or a scroll-driven reveal, waits for it with `expectGsapLoaded(page)` from
+  `e2e/support/gsap.ts` after `expectHydrated`: the helper sends that intent, a synthetic `scroll`
+  that moves nothing and leaves `:focus-visible` alone, then waits; measured earlier, a spec reads
+  the server-rendered page instead. The helper fails at once when the load failed.
+  `e2e/gsap-lazy.spec.ts` and `e2e/mobile/gsap-intent.spec.ts` cover the page before GSAP, each kind
+  of intent, and a load that fails.
 - `apps/web/playwright.config.ts` treats `CI=true` or `CI=1` as CI: it serves the production build
   with `pnpm start` inside `apps/web`, sets `forbidOnly`, retries twice, uses one worker and a 10s
   expect timeout, and sets `failOnFlakyTests`: a test that passes only on a retry fails the run, on

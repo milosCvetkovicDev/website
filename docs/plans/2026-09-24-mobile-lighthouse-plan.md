@@ -488,64 +488,84 @@ Commit: `perf(web): load GSAP on the visitor's first intent instead of at idle`.
   `gauntlet-phase.test.tsx`, `loop-phase.test.tsx`, `story-phases.test.tsx` and
   `hud-elements.test.tsx`, in `apps/web/src/components/animated-hero/__tests__/`
 - Modify: the "arrives when the browser is idle" comments in `e2e/console-clean.spec.ts`,
-  `e2e/hero-contrast.spec.ts`, `e2e/layout-overflow.spec.ts` and `e2e/reduced-motion.spec.ts`
-- Create: `docs/adr/0023-gsap-loads-on-first-intent.md` (take the number last, after checking open
-  pull requests)
+  `e2e/hero-contrast.spec.ts`, `e2e/layout-overflow.spec.ts` and `e2e/reduced-motion.spec.ts`, and
+  the GSAP wait comments in `e2e/accessibility.spec.ts`, `e2e/mobile/accessibility.spec.ts` and
+  `e2e/mobile/layout-overflow.spec.ts`
+- Create: `docs/adr/0024-gsap-loads-on-first-intent.md`. Planned as 0023, but open pull request
+  #120 had already taken 0023 when the number was picked, last, as the ADR index asks.
 - Modify: `docs/adr/0022-no-boot-loader.md`, `docs/adr/README.md`, `docs/drift-manifest.json`,
   `CLAUDE.md`
 
-- [ ] **Step 1:** `load-gsap.ts`: delete `IDLE_TIMEOUT_MS` and `NO_IDLE_CALLBACK_DELAY_MS`; replace
+- [x] **Step 1:** `load-gsap.ts`: delete `IDLE_TIMEOUT_MS` and `NO_IDLE_CALLBACK_DELAY_MS`; replace
       `whenIdle` with a memoised `whenIntent()` that resolves on the first `scroll`, `wheel`,
-      `touchstart`, `pointerdown` or `keydown` on `window` (capture, passive), or at once when
-      `window.scrollY > 0` at the moment it is armed (a restored position, a deep link, a soft
-      navigation back); it removes every listener on first use and guards `typeof window`. Export
-      `requestGsap()`, which resolves the intent, starts the load and returns the load promise. No
-      idle or timer fallback, and no IntersectionObserver near the first phase: that phase starts
-      73 px below the fold at 412×823, so any positive root margin fires at load and brings GSAP
-      back into the window Lighthouse measures. Rewrite the header comment and the `loadGsap` doc.
-- [ ] **Step 2:** `use-with-gsap.ts`: `withGsap` calls `requestGsap()` before `runWithGsap(…)`, since
+      `touchstart`, `pointerdown` or `keydown` on `window` (capture, passive; exported as
+      `INTENT_EVENTS`), or at once when `window.scrollY > 0` at the moment it is armed (a restored
+      position, a deep link, a soft navigation back); it removes every listener on first use, and
+      on the server, with no `window`, it never resolves. Export `requestGsap()`, which resolves the
+      intent, starts the load and returns the load promise, already handled so a caller may ignore
+      it. No idle or timer fallback, and no IntersectionObserver near the first phase: that phase
+      starts 73 px below the fold at 412×823, so any positive root margin fires at load and brings
+      GSAP back into the window Lighthouse measures. Rewrite the header comment and the `loadGsap`
+      doc.
+- [x] **Step 2:** `use-with-gsap.ts`: `withGsap` calls `requestGsap()` before `runWithGsap(…)`, since
       an event handler asking for GSAP is itself intent; hovers keep working under reduced motion.
       Effects keep calling `runWithGsap` and wait for intent. `index.tsx` and `gsap-runtime.ts`:
       comments only.
-- [ ] **Step 3:** `e2e/support/gsap.ts`: drop the `IDLE_TIMEOUT_MS` import; the settle timeout is
-      `LOAD_TIMEOUT_MS + 2_000`; before waiting, dispatch a synthetic `scroll` on `window`. A trusted
-      key press would put Chromium into keyboard modality and change `:focus-visible` for the rest
-      of the test, so the comment says why a synthetic scroll is used. `gsap-lazy.spec.ts`'s failure
-      test dispatches the same intent before waiting for the failure mark.
-- [ ] **Step 4:** Unit tests. `load-gsap.test.ts`: the idle-trigger tests become intent tests
+- [x] **Step 3:** `e2e/support/gsap.ts`: drop the `IDLE_TIMEOUT_MS` import; the settle timeout is
+      `LOAD_TIMEOUT_MS + 2_000`; before waiting, `expectGsapLoaded` sends a synthetic `scroll` on
+      `window` through a new export, `sendIntent`. A trusted key press would put Chromium into
+      keyboard modality and change `:focus-visible` for the rest of the test, so the comment says
+      why a synthetic scroll is used. `gsap-lazy.spec.ts`'s failure test sends the same intent
+      before waiting for the failure mark.
+- [x] **Step 4:** Unit tests. `load-gsap.test.ts`: the idle-trigger tests become intent tests
       (nothing is fetched before intent, even after 10 s of fake time; each of the five events
-      starts exactly one fetch; `scrollY > 0` when armed starts it at once; `requestGsap()` starts
-      it at once; the listeners are gone after the first intent); the other describes only swap the
-      idle wait for an intent event. `lazy-gsap.test.tsx` and `lazy-gsap-failure.test.tsx` use an
-      intent event instead of advancing by `NO_IDLE_CALLBACK_DELAY_MS`, keep every assertion, and
-      gain a test that a hover before any scroll plays once GSAP arrives. The four files that
-      `await loadGsap()` in `beforeAll` (`gauntlet-phase`, `loop-phase`, `story-phases`,
-      `hud-elements`) await `requestGsap()` instead, with their comments updated: under
-      `whenIntent` with no fallback, `loadGsap()` alone never resolves in jsdom.
-- [ ] **Step 5:** e2e. `gsap-lazy.spec.ts` gains: with no input for 3 s after hydration no script
+      starts exactly one fetch; `scrollY > 0` when armed starts it at once without listening;
+      `requestGsap()` starts it at once, armed or not; the listeners are gone after the first
+      intent; nothing starts on the server); the other describes only swap the idle wait for an
+      intent event. `lazy-gsap.test.tsx` gains a first step, nothing loads while ten seconds pass
+      with no intent, and its walk now shows that a hover before any scroll plays once GSAP
+      arrives: the walk's first hover is the intent that starts the load, and no scroll, wheel,
+      touch or key is ever sent, so it no longer advances by `NO_IDLE_CALLBACK_DELAY_MS` and keeps
+      every assertion (the `requestIdleCallback` precondition becomes "the page is at the top").
+      `lazy-gsap-failure.test.tsx` sends a scroll to start the load, keeping every assertion. The
+      four files that `await loadGsap()` in `beforeAll` (`gauntlet-phase`, `loop-phase`,
+      `story-phases`, `hud-elements`) await `requestGsap()` instead, with their comments updated:
+      under `whenIntent` with no fallback, `loadGsap()` alone never resolves in jsdom.
+- [x] **Step 5:** e2e. `gsap-lazy.spec.ts` gains: with no input for 3 s after hydration no script
       carrying GSAP is requested and no mark is set, and after a `mouse.wheel` GSAP loads; an
       ArrowDown key press loads it; a reload at a restored scroll position loads it with no further
       input; and before any intent, axe with the gate's rule set finds 0 violations on `/` in both
-      schemes, above the at-rest node floor. A new phone spec runs the "no input, no GSAP" and the
-      before-intent axe checks under both phone projects, since Lighthouse scores the page before
-      any input at 412 px. Record the incomplete count (about 118 on a phone was measured on
-      `main`); no new budget is invented. The IN_VIEW tests stay unchanged.
-- [ ] **Step 6:** ADR 0023, "GSAP loads on the first intent on `/`", in MADR order. Context: the
-      evidence below. Alternatives: idle (before); after the first contentful paint (still inside
-      Lighthouse's TBT window); an IntersectionObserver near the first phase (rejected above);
-      per-phase proximity builds (deferred). It supersedes ADR 0022 in part: 0022's status becomes
-      `Superseded by ADR-0023`, with the pointer line "No longer applies: the clause of the fourth
+      schemes, above the at-rest node floor. A new phone spec runs the "no input, no GSAP" check
+      (with a tap as the intent) and the before-intent axe check under both phone projects, since
+      Lighthouse scores the page before any input at 412 px. The axe passes hold the GSAP chunk
+      while they run, so nothing the audit does can bring GSAP in under it. Incomplete
+      colour-contrast nodes before intent, recorded and not gated: 146 on the desktop in both
+      schemes, 70 on both phone projects. The IN_VIEW tests stay unchanged.
+- [x] **Step 6:** ADR 0024, "GSAP loads on the visitor's first intent", in MADR order, `Proposed`
+      until the pull request is ready to merge. Context: the evidence below. Alternatives: idle
+      (before); after the first contentful paint (still inside Lighthouse's TBT window); an
+      IntersectionObserver near the first phase (rejected above); a timer fallback; per-phase
+      proximity builds (deferred). It supersedes ADR 0022 in part: 0022's status becomes
+      `Superseded by ADR-0024`, with the pointer line "No longer applies: the clause of the fourth
       Decision bullet saying `load-gsap.ts` fetches GSAP once the browser is idle after hydration;
       the rest of its decision stands." (the 0002, 0004 and 0005 precedent). `docs/adr/README.md`:
       the new row, 0022's status cell, and the paragraph on partial supersessions.
-      `docs/drift-manifest.json`: entries for the new record's links and citations, and both 0022
-      status entries (`adr-index-0022-status` and `adr-index-0022-cell-status`) in the same commit,
-      or the drift check fails.
-- [ ] **Step 7:** CLAUDE.md: "once the browser is idle after hydration" becomes the new trigger,
+      `docs/drift-manifest.json`: entries for the new record's links, its index row, the pointer
+      line's link, and both 0022 status entries (`adr-index-0022-status` and
+      `adr-index-0022-cell-status`) in the same commit, or the drift check fails.
+- [x] **Step 7:** CLAUDE.md: "once the browser is idle after hydration" becomes the new trigger,
       and the e2e helper bullet says the helper sends that intent. Check the wording against the
       new source first.
-- [ ] **Step 8:** Verify: the unit suite; the whole e2e suite in CI mode (ten specs go through the
+- [x] **Step 8:** Verify: the unit suite; the whole e2e suite in CI mode (ten specs go through the
       helper); the drift check.
+
+**Depends on #122.** The first full e2e run of this task failed `client-navigation.spec.ts` ("walks
+/ to /work to a case study and back by link clicks") 6 of 6 times at load 5, on GSAP's
+`Invalid scope` and null-target warnings. That is the race #122 fixes: a soft navigation away from
+`/` just after GSAP arrives, which fails about 1 run in 10 on `main`. Here the click that navigates
+away is itself the intent that starts the load, so GSAP lands in that window every time. The branch
+carries #122's two commits, cherry-picked unchanged (`git cherry-pick -x`), just before this task;
+merge #122 first, and they drop out when this branch is rebased onto `main`.
 
 **Why.** JavaScript investigation (CPU-normalised, 4 runs): this task alone takes JS-only blocking
 222 → 177 ms, and with Task 1 TBT 257 → 118 ms. Rendering investigation (GSAP chunk blocked, 5 runs,
@@ -568,7 +588,7 @@ Commit: `perf(web): build the story's timelines one task at a time when GSAP arr
 **Files:**
 
 - Modify: `apps/web/src/components/animated-hero/load-gsap.ts`, `apps/web/e2e/support/gsap.ts`,
-  `docs/adr/0023-gsap-loads-on-first-intent.md`
+  `docs/adr/0024-gsap-loads-on-first-intent.md`
 - Test: `apps/web/src/components/animated-hero/__tests__/load-gsap.test.ts`
 
 - [ ] **Step 1:** `arrived` becomes an asynchronous drain: `runtime` stays unset until the queue is
@@ -581,7 +601,7 @@ Commit: `perf(web): build the story's timelines one task at a time when GSAP arr
       only the first has run until the timers advance; a callback queued during the drain runs after
       those queued before it; the mark is set once, after the last callback; a callback that throws
       does not stop the rest. The gsap-lazy IN_VIEW tests stay green.
-- [ ] **Step 3:** Record the drain in ADR 0023's Decision (it is not yet accepted).
+- [ ] **Step 3:** Record the drain in ADR 0024's Decision (it is not yet accepted).
 
 **Why.** With GSAP still loading at idle (4 runs), GSAP's blocking fell from 60–117 ms to about 0
 (largest piece 45 ms simulated) and TBT 213 → 154 ms. After Task 8 Lighthouse no longer sees GSAP;
@@ -672,7 +692,7 @@ locally over HTTP/1.1, and at 0 (within ±8 ms) over HTTP/2 and on the productio
    - Lighthouse's accessibility audit now scores the page as it looks before GSAP. The new
      before-intent axe tests cover that; the pull request reports the incomplete count.
 2. **One pull request or two.** The critique recommends splitting the work: performance (Tasks 0–3,
-   8, 9 and ADR 0023) and phone layout (Tasks 4–7, `Refs #46`), because the performance stop
+   8, 9 and ADR 0024) and phone layout (Tasks 4–7, `Refs #46`), because the performance stop
    condition would otherwise hold back layout fixes that have no performance effect, and the
    overlap with #47, #118 and #119 grows with the size. Task 9 affects only the first scroll of real
    visitors and could also go alone. The commits are self-contained, so the split can be made when
@@ -718,6 +738,9 @@ locally over HTTP/1.1, and at 0 (within ±8 ms) over HTTP/2 and on the productio
   load and its LCP risk is low. It rewrites the logo `Link` that Task 2 edits (keep its
   `aria-label`, its `<Logo/>` and the `prefetch` prop) and edits `CLAUDE.md`. If it merges first,
   rebuild the baseline, because it changes `navigation.tsx` and the CSS.
+- **#122** (GSAP scope on a soft navigation, open) must merge before this plan: Task 8 depends on
+  its fix, and the branch carries its two commits until then (see Task 8).
+- **#120** (security headers, open) took ADR number 0023, so this plan's record is 0024.
 - **#119** (case-study copy) changes `case-studies.ts`, which feeds the page chunk and the RSC
   payload. If it merges first, rebuild the baseline.
 - **#46:** see "For the owner to confirm", item 3. Reference it with `Refs #46`.

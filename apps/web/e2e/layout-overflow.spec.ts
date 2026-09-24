@@ -16,10 +16,10 @@ import { expectHydrated } from './support/hydration';
  * Four widths, at rest, under `no-preference`, and each part of that matters:
  *
  * - At rest, because that is when the from-state is on screen and nothing has scrolled it away. This
- *   is what a visitor sees once the page has settled. GSAP arrives when the browser is idle after
- *   hydration (`load-gsap.ts`), and until then no timeline exists and no from-state is rendered, so
- *   the measurement waits for it: taken straight after hydration it would read the server-rendered
- *   page and pass for the wrong reason.
+ *   is what a visitor sees once the page has settled and they have started to scroll. GSAP arrives
+ *   on the visitor's first intent (`load-gsap.ts`), and until then no timeline exists and no
+ *   from-state is rendered, so the measurement sends that intent and waits for GSAP: taken straight
+ *   after hydration it would read the server-rendered page and pass for the wrong reason.
  * - `no-preference`, because under `reduce` every phase effect returns early (ADR 0009), no timeline
  *   is built, no from-state is rendered, and the page is clean. A reduced-motion run of this
  *   assertion passes and proves nothing, so the emulation is asserted rather than assumed —

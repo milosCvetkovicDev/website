@@ -4,8 +4,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * The lazy GSAP loader: one fetch for the whole page, started when the browser is idle, callers
- * served in the order they asked, and a failure that is final and says so. Its state is
+ * The lazy GSAP loader: one fetch for the whole page, started on the visitor's first intent,
+ * callers served in the order they asked, and a failure that is final and says so. Its state is
  * module-level (one load per page), so every test imports a fresh copy. GSAP itself is replaced by
  * a stand-in whose factory counts evaluations, which is the number of times the page would fetch
  * and run the chunk.
@@ -54,23 +54,20 @@ async function settle() {
   await vi.dynamicImportSettled();
 }
 
-/** A requestIdleCallback that only fires when the test says so. */
-function stubIdleCallback() {
-  const pending: IdleRequestCallback[] = [];
-  const requestIdleCallback = vi.fn<typeof globalThis.requestIdleCallback>((callback) => {
-    pending.push(callback);
-    return pending.length;
-  });
-  vi.stubGlobal('requestIdleCallback', requestIdleCallback);
-  const fire = (deadline: IdleDeadline) => {
-    for (const callback of pending.splice(0)) callback(deadline);
-  };
-  return {
-    requestIdleCallback,
-    goIdle: () => fire({ didTimeout: false, timeRemaining: () => 50 }),
-    // What the browser does once the timeout has passed on a page that never went idle.
-    timeOut: () => fire({ didTimeout: true, timeRemaining: () => 0 }),
-  };
+/** What counts as intent, pinned here as well as read from the loader. */
+const INTENT = ['scroll', 'wheel', 'touchstart', 'pointerdown', 'keydown'];
+
+/**
+ * A page for the node environment: `window` as an event target, scrolled to `scrollY`, whose
+ * listeners the test can count. `intend(type)` is the visitor's first scroll, wheel, touch, press or
+ * key.
+ */
+function stubPage(scrollY = 0) {
+  const page = Object.assign(new EventTarget(), { scrollY });
+  const added = vi.spyOn(page, 'addEventListener');
+  const removed = vi.spyOn(page, 'removeEventListener');
+  vi.stubGlobal('window', page);
+  return { added, removed, intend: (type = 'scroll') => page.dispatchEvent(new Event(type)) };
 }
 
 /** Every callback handed to queueMicrotask, kept instead of run: how the loader reports errors. */
@@ -99,9 +96,11 @@ afterEach(() => {
 });
 
 describe('loadGsap', () => {
-  it('fetches GSAP once for every caller, and only once the browser is idle', async () => {
-    const { requestIdleCallback, goIdle } = stubIdleCallback();
-    const { loadGsap, IDLE_TIMEOUT_MS } = await freshLoader();
+  it('fetches GSAP once for every caller, and only on the first intent however long that takes', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const { added, intend } = stubPage();
+    const { loadGsap, INTENT_EVENTS } = await freshLoader();
+    expect([...INTENT_EVENTS]).toEqual(INTENT);
 
     const calls = [loadGsap(), loadGsap(), loadGsap()];
     let loaded = false;
@@ -109,112 +108,107 @@ describe('loadGsap', () => {
       loaded = true;
     });
 
-    // One shared promise and one idle request, however many phases and handlers ask.
+    // One shared promise and one set of listeners, however many phases and handlers ask.
     expect(calls[1]).toBe(calls[0]);
     expect(calls[2]).toBe(calls[0]);
-    expect(requestIdleCallback).toHaveBeenCalledTimes(1);
-    expect(requestIdleCallback).toHaveBeenCalledWith(expect.any(Function), {
-      timeout: IDLE_TIMEOUT_MS,
-    });
+    expect(added.mock.calls.map(([type]) => type)).toEqual(INTENT);
+    for (const [, , options] of added.mock.calls) {
+      expect(options).toEqual({ capture: true, passive: true });
+    }
 
-    // Nothing is fetched until the browser has been idle.
+    // Nothing is fetched while the visitor only reads, not even ten seconds later.
+    await vi.advanceTimersByTimeAsync(10_000);
     await settle();
     expect(runtime.evaluations).toBe(0);
     expect(loaded).toBe(false);
 
-    goIdle();
+    intend();
     const [first, ...rest] = await Promise.all(calls);
     expect(runtime.evaluations).toBe(1);
     expect(loaded).toBe(true);
     for (const other of rest) expect(other).toBe(first);
 
-    // Asking again after the load neither schedules nor fetches anything more.
+    // Asking again after the load neither arms nor fetches anything more.
     expect(await loadGsap()).toBe(first);
-    expect(requestIdleCallback).toHaveBeenCalledTimes(1);
+    expect(added).toHaveBeenCalledTimes(INTENT.length);
     expect(runtime.evaluations).toBe(1);
   });
 
-  it('starts when the idle callback fires on its timeout, however busy the page still is', async () => {
-    const { timeOut } = stubIdleCallback();
+  it.each(INTENT)('starts the fetch on a %s, once', async (type) => {
+    const { intend } = stubPage();
     const { loadGsap } = await freshLoader();
 
     const loading = loadGsap();
-    // The browser calls back once IDLE_TIMEOUT_MS has passed, with no idle time left. The loader
-    // must take that as its cue rather than wait for time to spare.
-    timeOut();
-    await expect(loading).resolves.toMatchObject({ gsap: { stand: 'gsap' } });
+    intend(type);
+    // The other four arrive too, as they would once the visitor is moving: nothing more happens.
+    for (const other of INTENT) intend(other);
+    await loading;
+    await settle();
     expect(runtime.evaluations).toBe(1);
   });
 
-  describe('without requestIdleCallback, as in Safari', () => {
-    /** A page whose `load` event has not fired yet: `document` and `window` for the node test. */
-    function stubLoadingPage() {
-      const page = new EventTarget();
-      vi.stubGlobal('window', page);
-      vi.stubGlobal('document', { readyState: 'loading' });
-      return { fireLoad: () => page.dispatchEvent(new Event('load')) };
-    }
+  it('removes every listener at the first intent', async () => {
+    const { added, removed, intend } = stubPage();
+    const { loadGsap } = await freshLoader();
 
-    it('waits for the window load event, then a task more', async () => {
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-      expect(globalThis.requestIdleCallback).toBeUndefined();
-      const { fireLoad } = stubLoadingPage();
-      const { loadGsap, NO_IDLE_CALLBACK_DELAY_MS, IDLE_TIMEOUT_MS } = await freshLoader();
+    const loading = loadGsap();
+    intend('keydown');
+    await loading;
+    // The same five, the same handler and the same capture flag that added them.
+    expect(removed.mock.calls).toEqual(added.mock.calls);
+  });
 
-      const loading = loadGsap();
-      // Well past the short delay, but the page's own requests are still going.
-      await vi.advanceTimersByTimeAsync(IDLE_TIMEOUT_MS / 2);
-      await settle();
-      expect(runtime.evaluations).toBe(0);
+  it('starts at once, and listens for nothing, when the page is already scrolled', async () => {
+    // A restored scroll position, a deep link or a soft navigation back: the visitor has moved.
+    const { added } = stubPage(1200);
+    const { loadGsap } = await freshLoader();
 
-      fireLoad();
-      await settle();
-      expect(runtime.evaluations).toBe(0);
-      await vi.advanceTimersByTimeAsync(NO_IDLE_CALLBACK_DELAY_MS);
-      await loading;
-      expect(runtime.evaluations).toBe(1);
-      // The cap was cleared with the load, and the import's deadline with the import.
-      expect(vi.getTimerCount()).toBe(0);
-    });
+    await loadGsap();
+    expect(runtime.evaluations).toBe(1);
+    expect(added).not.toHaveBeenCalled();
+  });
 
-    it('waits no longer than IDLE_TIMEOUT_MS for a load event that does not come', async () => {
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-      stubLoadingPage();
-      const { loadGsap, IDLE_TIMEOUT_MS } = await freshLoader();
+  it('starts at once when an event handler requests it, and stops listening', async () => {
+    const { added, removed } = stubPage();
+    const { loadGsap, requestGsap } = await freshLoader();
 
-      const loading = loadGsap();
-      await vi.advanceTimersByTimeAsync(IDLE_TIMEOUT_MS - 1);
-      await settle();
-      expect(runtime.evaluations).toBe(0);
+    // The story armed the wait at hydration; a hover then asks for GSAP.
+    const armed = loadGsap();
+    const requested = requestGsap();
+    expect(requested).toBe(armed);
+    await requested;
+    expect(runtime.evaluations).toBe(1);
+    expect(removed.mock.calls).toEqual(added.mock.calls);
+  });
 
-      await vi.advanceTimersByTimeAsync(1);
-      await loading;
-      expect(runtime.evaluations).toBe(1);
-    });
+  it('requests on its own too, with nothing armed before it', async () => {
+    const { added } = stubPage();
+    const { requestGsap } = await freshLoader();
 
-    it('starts after a task once the page has already loaded', async () => {
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-      vi.stubGlobal('document', { readyState: 'complete' });
-      const { loadGsap, NO_IDLE_CALLBACK_DELAY_MS } = await freshLoader();
+    await requestGsap();
+    expect(runtime.evaluations).toBe(1);
+    // It armed the listeners and took them down again at once.
+    expect(added).toHaveBeenCalledTimes(INTENT.length);
+  });
 
-      const loading = loadGsap();
-      await settle();
-      expect(runtime.evaluations).toBe(0);
-      await vi.advanceTimersByTimeAsync(NO_IDLE_CALLBACK_DELAY_MS);
-      await loading;
-      expect(runtime.evaluations).toBe(1);
-    });
+  it('never starts on the server, where there is no visitor', async () => {
+    expect(globalThis.window).toBeUndefined();
+    const { loadGsap } = await freshLoader();
+
+    void loadGsap();
+    await settle();
+    expect(runtime.evaluations).toBe(0);
   });
 
   it('marks the moment GSAP arrived, once, for e2e/support/gsap.ts to wait on', async () => {
-    const { goIdle } = stubIdleCallback();
+    const { intend } = stubPage();
     const { loadGsap, GSAP_LOADED_MARK, GSAP_FAILED_MARK } = await freshLoader();
 
     void loadGsap();
     await settle();
     expect(performance.getEntriesByName(GSAP_LOADED_MARK, 'mark')).toHaveLength(0);
 
-    goIdle();
+    intend();
     await loadGsap();
     await loadGsap();
     expect(performance.getEntriesByName(GSAP_LOADED_MARK, 'mark')).toHaveLength(1);
@@ -223,7 +217,7 @@ describe('loadGsap', () => {
   });
 
   it('carries on when the browser refuses the mark', async () => {
-    const { goIdle } = stubIdleCallback();
+    const { intend } = stubPage();
     const { loadGsap, runWithGsap } = await freshLoader();
     vi.spyOn(performance, 'mark').mockImplementation(() => {
       throw new Error('no marks here');
@@ -231,20 +225,20 @@ describe('loadGsap', () => {
 
     const ran = vi.fn();
     runWithGsap(ran);
-    goIdle();
+    intend();
     await expect(loadGsap()).resolves.toMatchObject({ gsap: { stand: 'gsap' } });
     expect(ran).toHaveBeenCalledTimes(1);
   });
 
   it('treats a failed load as final: one request, a mark, one warning, and no retry', async () => {
-    const { goIdle, requestIdleCallback } = stubIdleCallback();
+    const { intend, added } = stubPage();
     const { loadGsap, preloadGsap, GSAP_FAILED_MARK, GSAP_LOADED_MARK } = await freshLoader();
 
     runtime.fail = true;
     const failed = loadGsap();
     // preloadGsap shares the failing promise and must not leave it unhandled.
     preloadGsap();
-    goIdle();
+    intend();
     // Vitest wraps the stand-in's error in one of its own, so only the rejection is asserted.
     await expect(failed).rejects.toThrow();
     expect(performance.getEntriesByName(GSAP_FAILED_MARK, 'mark')).toHaveLength(1);
@@ -257,20 +251,20 @@ describe('loadGsap', () => {
     expect(loadGsap()).toBe(failed);
     preloadGsap();
     await settle();
-    expect(requestIdleCallback).toHaveBeenCalledTimes(1);
+    expect(added).toHaveBeenCalledTimes(INTENT.length);
     expect(runtime.evaluations).toBe(1);
   });
 
   it('gives up on a request that stalls, after LOAD_TIMEOUT_MS', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    const { goIdle } = stubIdleCallback();
+    const { intend } = stubPage();
     const { loadGsap, LOAD_TIMEOUT_MS, GSAP_FAILED_MARK } = await freshLoader();
 
     runtime.stall = true;
     const loading = loadGsap();
     let settled = false;
     loading.catch(() => {}).finally(() => (settled = true));
-    goIdle();
+    intend();
     await vi.advanceTimersByTimeAsync(LOAD_TIMEOUT_MS - 1);
     expect(runtime.evaluations).toBe(1);
     expect(settled).toBe(false);
@@ -282,7 +276,7 @@ describe('loadGsap', () => {
 
   it('switches ScrollTrigger off again when the chunk arrives after the deadline', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    const { goIdle } = stubIdleCallback();
+    const { intend } = stubPage();
     const { loadGsap, runWithGsap, LOAD_TIMEOUT_MS } = await freshLoader();
 
     let release!: () => void;
@@ -291,7 +285,7 @@ describe('loadGsap', () => {
     runWithGsap(run);
     const loading = loadGsap();
     loading.catch(() => {});
-    goIdle();
+    intend();
     await vi.advanceTimersByTimeAsync(LOAD_TIMEOUT_MS);
     await expect(loading).rejects.toThrow(`GSAP did not load within ${LOAD_TIMEOUT_MS} ms`);
     expect(runtime.disabled).toBe(0);
@@ -307,7 +301,7 @@ describe('loadGsap', () => {
 
 describe('runWithGsap', () => {
   it('holds callbacks until GSAP arrives, runs them in order, and skips a cancelled one', async () => {
-    const { goIdle } = stubIdleCallback();
+    const { intend } = stubPage();
     const { loadGsap, runWithGsap } = await freshLoader();
     const ran: string[] = [];
 
@@ -321,17 +315,17 @@ describe('runWithGsap', () => {
     await settle();
     expect(ran).toEqual([]);
 
-    goIdle();
+    intend();
     await loadGsap();
     // Run by the time the load's own promise resolves: nothing more to wait for.
     expect(ran).toEqual(['enter', 'leave with gsap']);
   });
 
   it('runs synchronously once GSAP has loaded, as the static import did', async () => {
-    const { goIdle } = stubIdleCallback();
+    const { intend } = stubPage();
     const { loadGsap, runWithGsap } = await freshLoader();
     const loading = loadGsap();
-    goIdle();
+    intend();
     await loading;
 
     const ran: string[] = [];
@@ -344,7 +338,7 @@ describe('runWithGsap', () => {
   });
 
   it('when the load fails, runs onUnavailable instead, asynchronously, unless cancelled', async () => {
-    const { goIdle } = stubIdleCallback();
+    const { intend } = stubPage();
     const { loadGsap, runWithGsap } = await freshLoader();
     runtime.fail = true;
 
@@ -355,7 +349,7 @@ describe('runWithGsap', () => {
     runWithGsap(build, cancelledFallBack)();
     // A hover handler passes no fallback: its callback is simply dropped.
     runWithGsap(build);
-    goIdle();
+    intend();
     await expect(loadGsap()).rejects.toThrow();
 
     expect(build).not.toHaveBeenCalled();
@@ -376,7 +370,7 @@ describe('runWithGsap', () => {
   });
 
   it('reports an exception the same way before and after the load, and runs the rest', async () => {
-    const { goIdle } = stubIdleCallback();
+    const { intend } = stubPage();
     const { loadGsap, runWithGsap } = await freshLoader();
     const reported = captureMicrotasks();
     const early = new Error('a build that throws while waiting');
@@ -387,7 +381,7 @@ describe('runWithGsap', () => {
       throw early;
     });
     runWithGsap(() => ran.push('queued behind it'));
-    goIdle();
+    intend();
     await loadGsap();
     expect(ran).toEqual(['queued behind it']);
 

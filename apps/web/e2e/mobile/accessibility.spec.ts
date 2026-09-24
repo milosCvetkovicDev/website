@@ -42,7 +42,8 @@ async function openPage(page: Page, path: string) {
   expect(new URL(page.url()).pathname, `${path} should not redirect`).toBe(path);
   await expectHydrated(page);
   // On `/` the story's `opacity: 0` from-states, which decide what axe skips at rest, are built
-  // when GSAP arrives after hydration (load-gsap.ts). Waited for rather than raced, as on desktop.
+  // when GSAP arrives on the first intent (load-gsap.ts), which the helper sends, as on desktop.
+  // `gsap-intent.spec.ts` beside this file audits the page before GSAP.
   if (path === '/') await expectGsapLoaded(page);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 }
