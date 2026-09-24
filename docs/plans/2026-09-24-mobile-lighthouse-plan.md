@@ -256,15 +256,17 @@ prefetched `/` itself: three `/?_rsc=` requests at 1170–1176 ms in a local bas
 and 8–10 ms of CPU. Locally that is −136 to −149 ms of LCP on top of Task 3 (zero when the first
 frame is shown before about 1.1 s); in production about 0 (see Evidence).
 
-- [ ] **Step 1:** Give the logo `Link` `prefetch={pathname === '/' ? false : undefined}`.
+- [x] **Step 1:** Give the logo `Link` `prefetch={pathname === '/' ? false : undefined}`.
       `pathname` is the same on the server and the client, so hydration is safe, and `undefined`
       keeps Next 16's default on every other route.
-- [ ] **Step 2:** Unit test: mock `next/link` to record its props and `next/navigation`'s
+- [x] **Step 2:** Unit test: mock `next/link` to record its props and `next/navigation`'s
       `usePathname`; assert the logo link gets `prefetch: false` on `/` and no `prefetch` prop on
       `/about`.
-- [ ] **Step 3:** e2e, phone projects: on `/`, after hydration, no `/?_rsc=` request for `/` is
-      made. Prefetching only runs in production builds, so this runs in CI mode.
-- [ ] **Step 4:** Verify: the unit file, and `e2e/mobile/navigation.spec.ts` in CI mode.
+- [x] **Step 3:** e2e, phone projects: on `/`, after hydration and network idle, no `/?_rsc=`
+      request for `/` is made. Prefetching only runs in production builds, so in CI mode a control
+      on `/about` first shows that the same wait sees the logo's prefetch of `/`. It fails on the
+      parent commit in both phone projects.
+- [x] **Step 4:** Verify: the unit file, and `e2e/mobile/navigation.spec.ts` in CI mode.
 
 **Rules.** No hydration or accessibility change. #118 rewrites the same `Link` (an `aria-label` and
 a `<Logo/>`): keep both changes when rebasing.

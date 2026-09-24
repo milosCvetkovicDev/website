@@ -7,7 +7,7 @@ import { warmRoutes } from '../support/warm-routes';
  * The mobile header and its menu, on a real phone viewport.
  *
  * Nothing tested this before: the header's mobile half and `MobileMenu` are `md:hidden`
- * (`src/components/navigation.tsx:155`, `:77`), and the whole suite ran one 1280x720 project, where
+ * (`src/components/navigation.tsx:158`, `:77`), and the whole suite ran one 1280x720 project, where
  * that half of the component does not exist. This file runs on the two phone projects only — see
  * `MOBILE_SPECS` in `playwright.config.ts` — so `isMobile` and `hasTouch` are real and `tap()` is a
  * touch event rather than a synthesised click.
@@ -28,6 +28,13 @@ import { warmRoutes } from '../support/warm-routes';
  * page and the menu stays open (R3). It is also why WebKit is here: whether a `backdrop-filter`
  * ancestor becomes that containing block is engine-specific.
  */
+
+/**
+ * Whether the suite serves the production build, the same test `playwright.config.ts` uses to choose
+ * `pnpm start` over `pnpm dev`. Next prefetches a `<Link>` that enters the viewport only in a
+ * production build.
+ */
+const SERVES_PRODUCTION_BUILD = process.env.CI === 'true' || process.env.CI === '1';
 
 /** Every test here interacts, on `/` and on other routes alike, so each one starts hydrated. */
 async function open(page: Page, path: string) {
@@ -116,6 +123,32 @@ test.describe('the mobile header', () => {
       // The link's own onClick closes the menu; the panel must not survive the navigation.
       await expect(closeButton(page)).toBeHidden();
     });
+  });
+
+  // On a phone the header logo is the only link in view at load, and on `/` it prefetched `/`
+  // itself: three `?_rsc=` requests racing the page's own, inside the window Lighthouse measures.
+  // The control on `/about`, where the logo keeps Next's default, shows that the same wait sees that
+  // prefetch whenever the served build prefetches at all.
+  test('the header logo does not prefetch the page it is on', async ({ page }) => {
+    const prefetched: string[] = [];
+    page.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.searchParams.has('_rsc')) prefetched.push(url.pathname);
+    });
+
+    await open(page, '/about');
+    await page.waitForLoadState('networkidle');
+    if (SERVES_PRODUCTION_BUILD) {
+      expect(prefetched, 'on /about the logo should still prefetch /').toContain('/');
+    }
+
+    prefetched.length = 0;
+    await open(page, '/');
+    await page.waitForLoadState('networkidle');
+    expect(
+      prefetched.filter((path) => path === '/'),
+      'on / the header logo prefetched the page it is on',
+    ).toEqual([]);
   });
 
   test('switches the theme from the mobile toggle', async ({ page }) => {
@@ -214,7 +247,7 @@ test.describe('the mobile header', () => {
     test.info().annotations.push({ type: 'fixed-by', description: 'R5, #46' });
     await open(page, '/');
     const button = menuButton(page);
-    // `navigation.tsx:157` carries `aria-label` only: no `aria-expanded`, no `aria-controls`.
+    // `navigation.tsx:160` carries `aria-label` only: no `aria-expanded`, no `aria-controls`.
     await expect(button).toHaveAttribute('aria-expanded', 'false');
 
     await openMenu(page);
