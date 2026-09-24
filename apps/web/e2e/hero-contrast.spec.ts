@@ -1,4 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectGsapLoaded } from './support/gsap';
+import { expectHydrated } from './support/hydration';
 
 /**
  * The hero's own text colours, measured by computed style rather than by axe.
@@ -190,7 +192,7 @@ async function openHero(page: Page, colorScheme: (typeof colorSchemes)[number]) 
   await installColorProbe(page);
   await page.emulateMedia({ colorScheme });
   await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   // Playwright ignores an unknown emulation option silently: prove the scheme reached the page, or a
   // "dark" run would be measuring the light palette twice.
   await expect(page.locator('html')).toContainClass(colorScheme);
@@ -220,6 +222,19 @@ for (const colorScheme of colorSchemes) {
         'its background undecidable) and cannot pass AA at 9-10px. Use a token at full alpha and ' +
         '--muted for secondary text: docs/adr/0011-colour-roles-on-scoped-surfaces.md.',
     ).toEqual([]);
+  });
+
+  test(`the line under the headline reaches AA in the ${colorScheme} theme`, async ({ page }) => {
+    // Green. The line naming who the site is about was sr-only until #48 made it visible, and on the
+    // island axe cannot decide it: it is one of the `incomplete` nodes in the `/` budget of
+    // accessibility.spec.ts, so without this nothing would measure its colour.
+    await openHero(page, colorScheme);
+    const line = await sampleColor(
+      page.getByRole('heading', { level: 1 }).locator('xpath=following-sibling::p[1]'),
+      'the line under the h1',
+    );
+    expect(line.alpha).toBe(1);
+    expect(passesAA(line), describeSample(line)).toBe(true);
   });
 
   test(`the Scroll label and every skill tag reach AA at rest and hovered in the ${colorScheme} theme`, async ({
@@ -266,14 +281,19 @@ test('no hero text sits at a resting partial opacity while hovered', async ({ pa
   // no reduced-motion reference at all (`animated-text.tsx`), so it still fires — which is the point.
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(page.getByText('System Boot', { exact: true })).toBeHidden({ timeout: 30_000 });
+  await expectHydrated(page);
   expect(
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
     'this case needs reduced motion, or a reveal mid-tween would be indistinguishable from a ' +
       'resting partial opacity',
   ).toBe(true);
+  // The glitch handler runs its timeline through GSAP, which arrives when the browser is idle after
+  // hydration (`load-gsap.ts`). A hover that lands earlier and stays still plays, but only once GSAP
+  // is in, which can be after the 45 frames below have been sampled: a clean read, and for an
+  // expected failure a lucky pass fails the whole run.
+  await expectGsapLoaded(page);
 
-  // `PHASE 3` uses `AnimatedText animation="glitch"` (`execution-phase.tsx:254`). Its duplicates only
+  // `PHASE 3` uses `AnimatedText animation="glitch"` (`execution-phase.tsx:274`). Its duplicates only
   // exist while the glitch timeline runs — five 0.05 s bursts and a 0.1 s settle, about 350 ms — so the
   // opacities are sampled every frame from before the hover rather than read once afterwards. A single
   // read would race the timeline and could report a clean page, and for an expected failure a lucky
@@ -316,7 +336,7 @@ test('no hero text sits at a resting partial opacity while hovered', async ({ pa
   expect(
     offenders,
     'the glitch variant paints aria-hidden duplicates at `opacity-70` ' +
-      '(animated-text.tsx:384, :394). CLAUDE.md forbids dimming text with an opacity modifier even ' +
+      '(animated-text.tsx:428, :438). CLAUDE.md forbids dimming text with an opacity modifier even ' +
       'when it is aria-hidden, because axe measures it anyway.',
   ).toEqual([]);
 });

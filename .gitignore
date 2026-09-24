@@ -60,3 +60,12 @@ playwright-report
 # Agent handoff notes, checkpoints and the Stop hook's snapshots: per machine, full of local
 # paths.
 /.agent-state
+
+# Claude Design sync (/design-sync): the staged converter scripts and their node_modules, the
+# regenerated upload bundle, and per-machine state. The inputs under .design-sync/ (config, notes,
+# conventions, previews, the stylesheet sources) are committed.
+/.ds-sync/
+/ds-bundle/
+/.design-sync/.cache/
+/.design-sync/learnings/
+/.design-sync/node_modules

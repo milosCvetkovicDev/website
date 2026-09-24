@@ -2,17 +2,24 @@ import { expect, test } from '@playwright/test';
 import { CASE_STUDY_ROUTES, NOT_FOUND_ROUTE } from './routes';
 
 /**
- * The five static security headers every response should carry.
+ * The six static security headers every page, asset and 404 should carry.
  *
- * Row R30 of the RED manifest, fixed by #48. `nextConfig` (`next.config.ts:33-43`) sets only
- * `turbopack.root` and `distDir`: there is no `headers()` and no `vercel.json`, so the only security
- * header the site sends is the platform's default HSTS, and that only in production.
+ * Row R30 of the RED manifest, fixed by #48: `next.config.ts` declares one `headers()` entry whose
+ * `source` is `/:path*`, so every path gets the same headers from one place: R30's five, plus the
+ * `Cross-Origin-Opener-Policy` that #48's live-8 asks for as well. The values
+ * themselves, the CSP above all, are pinned by `src/test/next-config.test.ts` and explained in
+ * `docs/adr/0023-static-security-headers.md`; this spec proves they reach the wire, under `next start`
+ * (CI) and `next dev` (locally) alike.
  *
  * Four surfaces rather than one, because a `headers()` entry is matched by path and it is easy to write
  * one that covers the pages and misses everything else: a page, a case study (a statically prerendered
  * route), a `/_next/static` chunk (served by the asset handler) and a 404 (rendered through the error
  * path). A header missing on the chunk is not academic — `X-Content-Type-Options` is exactly what stops
  * a script chunk being sniffed as something else.
+ *
+ * Not every answer is covered, and ADR 0023 records the exceptions: Next's router sends the 308s
+ * that strip a trailing slash or collapse repeated slashes, and the plain 500 for a malformed
+ * percent-encoding, before it applies `headers()`. No browser renders or frames those bodies.
  *
  * Deliberately excluded, and recorded here so the next reader does not go looking: HSTS itself.
  * `Strict-Transport-Security` is meaningless over the plain HTTP this suite serves and is set by the
@@ -24,9 +31,9 @@ import { CASE_STUDY_ROUTES, NOT_FOUND_ROUTE } from './routes';
 test.describe.configure({ retries: 0, timeout: 60_000 });
 
 /**
- * Header -> what an acceptable value looks like. Deliberately loose on the values: the row is that the
- * header is absent, and #48 picks the policy. A CSP in particular is a judgement call this baseline
- * must not pre-empt, so it only has to exist and mention a directive.
+ * Header -> what an acceptable value looks like. Deliberately loose on most values: the row is that a
+ * header is present on every surface, and the exact policy is pinned by the unit test, where a change
+ * to it is one line in one diff. A CSP in particular only has to exist and mention a directive here.
  */
 const REQUIRED_HEADERS: { name: string; accepts: RegExp; why: string }[] = [
   {
@@ -51,15 +58,20 @@ const REQUIRED_HEADERS: { name: string; accepts: RegExp; why: string }[] = [
   },
   {
     name: 'permissions-policy',
-    accepts: /=\(/,
+    // Each of the three features with an empty allowlist, in any order.
+    accepts: /^(?=.*\bcamera=\(\))(?=.*\bmicrophone=\(\))(?=.*\bgeolocation=\(\))/,
     why: 'denies camera, microphone and geolocation, none of which this site uses',
+  },
+  {
+    name: 'cross-origin-opener-policy',
+    accepts: /^same-origin$/,
+    why: 'leaves a cross-origin page that opens the site no handle on its window',
   },
 ];
 
-test('every kind of response carries the five static security headers', async ({ request }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R30, #48' });
-
+test('a page, a case study, a chunk and a 404 carry the six static security headers', async ({
+  request,
+}) => {
   // A real chunk URL rather than a guessed one: the hashed filename changes every build, so it is read
   // out of the home page's own markup.
   const html = await (await request.get('/')).text();
@@ -86,16 +98,18 @@ test('every kind of response carries the five static security headers', async ({
 
   expect(
     missing,
-    'next.config.ts has no `headers()` and there is no vercel.json, so none of these is sent. Add ' +
-      'them in one place so they cover pages, prerendered routes, assets and the error path alike.',
+    'next.config.ts sends these from one `headers()` entry whose source is `/:path*`. A header missing ' +
+      'here means that entry, or its source, no longer covers pages, prerendered routes, assets and ' +
+      'the error path alike.',
   ).toEqual([]);
 });
 
 test('the four surfaces this row measures all answer, so the row is about headers', async ({
   request,
 }) => {
-  // Green, and the control: R30 asserts that headers are absent, so it would also "fail" convincingly
-  // against a server that answered nothing at all. This says each surface is really there.
+  // The control: R30 would also fail convincingly against a server that answered nothing at all, and
+  // before #48 it did fail, as an expected failure. This says each surface is really there, so a
+  // failure above is about headers.
   const html = await (await request.get('/')).text();
   const chunk = html.match(/["'](\/_next\/static\/[^"']+\.(?:js|css))["']/)?.[1];
   expect(chunk).toBeTruthy();

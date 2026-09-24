@@ -198,6 +198,12 @@ creating a project-wide bypass secret on first use (see **Not covered**).
 - `turbo.json` declares `NEXT_PUBLIC_SITE_URL` under the `build` task's `env`, so changing the value
   invalidates the local and CI Turborepo cache for `build`. That is intentional; the variable is
   inlined into the client bundle at build time.
+- It declares `VERCEL_ENV` there too, for the security headers: a preview build's
+  Content-Security-Policy also allows the Vercel Toolbar, and its `Cross-Origin-Opener-Policy` is
+  `same-origin-allow-popups` (ADR 0023). Turborepo's strict mode passes `VERCEL_*` variables through
+  to `next build` whether or not they are declared, but leaves an undeclared one out of the task's
+  hash. Without the declaration a preview build and a production build of the same tree would share
+  one cache entry on Vercel's remote cache, so production could be served a preview's headers.
 - Because `NEXT_PUBLIC_*` values are inlined at build time, editing the variable in Vercel has no
   effect until the next deployment. Changing it always requires a redeploy.
 - Turborepo **remote caching** is off locally and in CI: there is no `.turbo/config.json` or
@@ -376,6 +382,22 @@ curl -sS https://miloscvetkovic.dev/sitemap.xml | head
 curl -sS https://miloscvetkovic.dev/robots.txt
 # expect: every <loc> begins https://miloscvetkovic.dev, and robots ends with
 #         Sitemap: https://miloscvetkovic.dev/sitemap.xml
+
+# A page, a case study, a static chunk and a 404 each carry the six security headers from
+# next.config.ts (ADR 0023).
+chunk=$(curl -sS https://miloscvetkovic.dev/ | grep -oE '/_next/static/[^"]+\.js' | head -1)
+for p in / /work/self-healing-agent "$chunk" /no-such-page; do
+  echo "== $p"
+  curl -sI "https://miloscvetkovic.dev$p" |
+    grep -iE '^(x-content-type-options|x-frame-options|referrer-policy|content-security-policy|permissions-policy|cross-origin-opener-policy|strict-transport-security):'
+done
+# expect: under each path, x-content-type-options: nosniff, x-frame-options: DENY,
+#         referrer-policy: strict-origin-when-cross-origin, a content-security-policy that starts
+#         default-src 'self' and ends frame-ancestors 'none' with no vercel.live in it,
+#         permissions-policy: camera=(), microphone=(), geolocation=(),
+#         cross-origin-opener-policy: same-origin, and Vercel's own strict-transport-security.
+#         A missing header on the chunk or the 404 means the headers() source no longer covers
+#         every path.
 ```
 
 Before DNS exists, the same checks run against the production deployment itself. The production
@@ -392,8 +414,9 @@ already `light` when navigation committed, so there was no flash. Claude Code's 
 pane logs React error #418 on these pages while an unmodified Chromium does not, so use a real
 browser or Playwright for the console check.
 
-Then walk the site by hand. The App Router serves nine pages; `sitemap.ts` lists all nine, six
-static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
+Then walk the site by hand. The App Router serves nine pages; `sitemap.ts` lists eight of them,
+five static plus one per entry in `apps/web/src/data/case-studies.ts` (three today). `/blog` is left
+out, and served `noindex`, while it is a Coming Soon placeholder.
 
 - [ ] `/` loads, the hero animation runs, and scrolling does not stall
 - [ ] `/about`
@@ -404,8 +427,10 @@ static plus one per entry in `apps/web/src/data/case-studies.ts` (three today).
 - [ ] `/skills`
 - [ ] `/blog`
 - [ ] `/contact`
-- [ ] `/sitemap.xml` lists exactly those nine URLs, all on the apex origin
-- [ ] `/robots.txt` allows `/`, disallows `/api/` and `/_next/`, and points at the apex sitemap
+- [ ] `/sitemap.xml` lists exactly those URLs except `/blog`, eight, all on the apex origin
+- [ ] `/blog` serves `<meta name="robots" content="noindex, follow">`
+- [ ] `/robots.txt` allows `/`, disallows nothing (`/_next/` holds the CSS, scripts and fonts a
+      crawler renders with), and points at the apex sitemap
 - [ ] `/work/does-not-exist` answers `404` and renders the site not-found page
       (`apps/web/src/app/not-found.tsx`), identically to `/no-such-page`. There is one not-found page,
       not two: the case-study segment has no `not-found.tsx` of its own, because
@@ -445,9 +470,9 @@ five runs interleaved with that baseline on the same machine give `/` 96 in ever
 `/work/self-healing-agent` 98 with TBT 53 to 54 ms; the case-study route also stopped loading the
 27.7 KB FeaturedWork chunk. Before comparing a future run
 with these, check `.environment.benchmarkIndex` and `.runWarnings` in its JSON and discard a flagged
-run. A CLS of 0.03 to 0.06 attributed to the boot loader is Lighthouse re-centering it when it
-changes the emulated viewport at about 0.9 s, which it counts by design within 500 ms of that event;
-visitors never see it.
+run. Until ADR 0022 removed the boot loader, a CLS of 0.03 to 0.06 attributed to it was Lighthouse
+re-centering it when it changes the emulated viewport at about 0.9 s, which it counts by design
+within 500 ms of that event; visitors never saw it.
 
 Accessibility on that same 2026-09-09 baseline was 96 on both pages. The points went to colour
 contrast (the accent used as text, labels dimmed with opacity modifiers, and a scroll reveal that
@@ -709,10 +734,14 @@ This runbook deliberately stops short of the following. None of it is in place; 
     `vercel api /v9/projects/<project-id> --raw | jq .webAnalytics` returns null and this bullet
     becomes simply "no analytics".
   - **On**: `pnpm --filter web add @vercel/analytics` and mount `<Analytics />` in the layout's
-    provider tree. That couples to three other things — a Content-Security-Policy has to allow
-    `/_vercel/insights/`, the first-load JS budget has to be re-measured, and
-    `apps/web/e2e/console-clean.spec.ts` will not see the script at all because it runs against a
-    local `next start`, so the live `/` has to be opened with the console open after the deploy.
+    provider tree. That couples to three other things. The Content-Security-Policy (ADR 0023): in
+    production the script and its beacons are same-origin under `/_vercel/insights/`, so `'self'`
+    covers them, but under `next dev` the package loads
+    `https://va.vercel-scripts.com/v1/script.debug.js` instead, which the development `script-src`
+    has to allow or `apps/web/e2e/console-clean.spec.ts` fails on every local run. The first-load
+    JS budget has to be re-measured. And no local server serves `/_vercel/insights/` (a local
+    `next start` answers it 404, and that spec fails on a 404 for an asset), so no e2e run shows
+    the production script working: open the live `/` with the console open after the deploy.
 - **No Speed Insights data.** See above; the toggle reports `hasData: false`.
 - **No error monitoring.** There is no Sentry or equivalent. `apps/web/src/app/error.tsx` is a client
   component: it renders a friendly error page and calls `console.error` in the visitor's browser,
@@ -748,8 +777,9 @@ all_except_custom_domains`. Observed on 2026-09-09: the per-deployment URL
 
 - **No staging environment and no custom domains for previews.** There is an
   `apps/web/vercel.json`, but it carries Git and build-step configuration only (**Which pushes
-  deploy**); redirects, headers and rewrites are still whatever Next.js does by default, and a
-  response header belongs in `headers()` in `next.config.ts` rather than in that file
+  deploy**); redirects and rewrites are still whatever Next.js does by default, and response
+  headers come from `headers()` in `next.config.ts`, which sends the six security headers on
+  every page and asset (ADR 0023), never from that file
   ([ADR 0005](../adr/0005-hosting-on-vercel.md), [ADR 0016](../adr/0016-vercel-deployment-budget.md)).
 - **No uptime monitoring or alerting.** Nothing will tell you the site is down, and nothing compares
   the production deployment's commit with `main`. The 2026-09-10 rate-limit outage went unnoticed for

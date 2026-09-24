@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { gsap, ScrollTrigger } from './use-gsap-scroll';
+import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
@@ -55,81 +55,97 @@ export function StrategyPhase() {
     // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
     if (prefersReducedMotion) return;
 
-    gsap.registerPlugin(ScrollTrigger);
-
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top center',
-          end: 'bottom center',
-          toggleActions: 'play none none reverse',
-        },
-      });
-
-      // Tech tree items appear
-      const techItems = techTreeRef.current?.querySelectorAll('.tech-item');
-      if (techItems) {
-        tl.fromTo(
-          techItems,
-          { opacity: 0, x: -30, scale: 0.9 },
-          {
-            opacity: 1,
-            x: 0,
-            scale: 1,
-            duration: 0.4,
-            stagger: 0.15,
-            ease: 'power2.out',
+    // GSAP arrives after hydration (load-gsap.ts); until then the section keeps its
+    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // after it reverts. A build that finds the section already in view finishes the entrance at
+    // once rather than hide what the visitor is reading (isAlreadyReached).
+    let ctx: gsap.Context | undefined;
+    const cancelBuild = runWithGsap(({ gsap }) => {
+      // The element, read once, never the ref: a soft navigation away from `/` nulls the ref
+      // before this effect's cleanup runs (runWithGsap).
+      const section = sectionRef.current;
+      if (!section) return;
+      const reached = isAlreadyReached(section);
+      ctx = gsap.context(() => {
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: section,
+            start: 'top center',
+            end: 'bottom center',
+            toggleActions: 'play none none reverse',
           },
-        );
-      }
+        });
 
-      // Synergy bonuses pop in
-      const synergyItems = synergiesRef.current?.querySelectorAll('.synergy-item');
-      if (synergyItems) {
+        // Tech tree items appear
+        const techItems = techTreeRef.current?.querySelectorAll('.tech-reveal');
+        if (techItems) {
+          tl.fromTo(
+            techItems,
+            { opacity: 0, x: -30, scale: 0.9 },
+            {
+              opacity: 1,
+              x: 0,
+              scale: 1,
+              duration: 0.4,
+              stagger: 0.15,
+              ease: 'power2.out',
+            },
+          );
+        }
+
+        // Synergy bonuses pop in
+        const synergyItems = synergiesRef.current?.querySelectorAll('.synergy-item');
+        if (synergyItems) {
+          tl.fromTo(
+            synergyItems,
+            { opacity: 0, scale: 0.8, y: 10 },
+            {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.3,
+              stagger: 0.2,
+              ease: 'back.out(1.7)',
+            },
+            '+=0.2',
+          );
+        }
+
+        // Architecture diagram
         tl.fromTo(
-          synergyItems,
-          { opacity: 0, scale: 0.8, y: 10 },
-          {
-            opacity: 1,
-            scale: 1,
-            y: 0,
-            duration: 0.3,
-            stagger: 0.2,
-            ease: 'back.out(1.7)',
-          },
+          architectureRef.current,
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 0.5 },
           '+=0.2',
         );
-      }
 
-      // Architecture diagram
-      tl.fromTo(
-        architectureRef.current,
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.2',
-      );
+        // SVG lines draw
+        const lines = architectureRef.current?.querySelectorAll('.arch-line');
+        if (lines) {
+          lines.forEach((line) => {
+            const length = (line as SVGPathElement).getTotalLength?.() || 100;
+            gsap.set(line, { strokeDasharray: length, strokeDashoffset: length });
+            tl.to(line, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut' }, '-=0.3');
+          });
+        }
 
-      // SVG lines draw
-      const lines = architectureRef.current?.querySelectorAll('.arch-line');
-      if (lines) {
-        lines.forEach((line) => {
-          const length = (line as SVGPathElement).getTotalLength?.() || 100;
-          gsap.set(line, { strokeDasharray: length, strokeDashoffset: length });
-          tl.to(line, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut' }, '-=0.3');
-        });
-      }
+        // Headline
+        tl.fromTo(
+          headlineRef.current,
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 0.5 },
+          '+=0.2',
+        );
 
-      // Headline
-      tl.fromTo(
-        headlineRef.current,
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.5 },
-        '+=0.2',
-      );
-    }, sectionRef);
+        // The line draws are the timeline's too, so this also undoes the `set` above.
+        if (reached) tl.progress(1);
+      }, section);
+    });
 
-    return () => ctx.revert();
+    return () => {
+      cancelBuild();
+      ctx?.revert();
+    };
   }, [prefersReducedMotion]);
 
   return (
@@ -152,40 +168,42 @@ export function StrategyPhase() {
               TECH TREE
             </h3>
             {techChoices.map((tech) => (
-              <div
-                key={tech.category}
-                className="tech-item group hover-lift relative flex cursor-default items-center gap-4 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4"
-              >
-                {/* Selection indicator */}
-                <div className="absolute top-0 bottom-0 left-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
+              // The timeline animates this wrapper and the card inside it keeps hover-lift: on one
+              // element its transform transition re-eases GSAP's entrance, and GSAP's inline
+              // transform cancels the lift.
+              <div key={tech.category} className="tech-reveal">
+                <div className="tech-item group hover-lift relative flex cursor-default items-center gap-4 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
+                  {/* Selection indicator */}
+                  <div className="absolute top-0 bottom-0 left-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
 
-                <span className="text-2xl transition-transform duration-300 group-hover:scale-125">
-                  {tech.icon}
-                </span>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
-                      {tech.category}
-                    </span>
-                    <span className="text-[var(--accent-text)] transition-transform duration-300 group-hover:translate-x-1">
-                      →
-                    </span>
-                    <span className="font-semibold">{tech.choice}</span>
+                  <span className="text-2xl transition-transform duration-300 group-hover:scale-125">
+                    {tech.icon}
+                  </span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
+                        {tech.category}
+                      </span>
+                      <span className="text-[var(--accent-text)] transition-transform duration-300 group-hover:translate-x-1">
+                        →
+                      </span>
+                      <span className="font-semibold">{tech.choice}</span>
+                    </div>
+                    <p className="text-sm text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
+                      {tech.reason}
+                    </p>
                   </div>
-                  <p className="text-sm text-[var(--muted)] transition-colors group-hover:text-[var(--foreground)]">
-                    {tech.reason}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[var(--status-ok)] transition-transform duration-300 group-hover:scale-110">
-                    ✓
-                  </span>
-                  <span
-                    className="font-mono text-[10px] text-[var(--status-ok)] opacity-0 transition-opacity group-hover:opacity-100"
-                    aria-hidden="true"
-                  >
-                    LOCKED
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[var(--status-ok)] transition-transform duration-300 group-hover:scale-110">
+                      ✓
+                    </span>
+                    <span
+                      className="font-mono text-[10px] text-[var(--status-ok)] opacity-0 transition-opacity group-hover:opacity-100"
+                      aria-hidden="true"
+                    >
+                      LOCKED
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
