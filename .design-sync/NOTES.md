@@ -146,9 +146,14 @@ expects, and what each workaround depends on.
   twelve theme colours `/* @kind color */` and everything else, Tailwind's and the site's own
   `--tmux-*` and `--log-*` alike, `/* @kind other */`, as the design agent suggested and the owner
   asked (only those twelve are meant as tokens). Nothing in the skill or the converter reads the
-  tag; only the check's regenerated `_ds_manifest.json` can show whether it does. Before tagging,
-  the manifest held 289 tokens: 28 `other`, the "couldn't be classified" count, all Tailwind
-  internals; 63 utility-class selectors under `themes`; and `--accent-text` classed as `font`.
+  tag, but the check does: it records each tag as the token's `annotation` and takes the kind from
+  it. Measured on the regenerated `_ds_manifest.json` (2026-09-24, first sync with the tags):
+  before, 289 tokens (140 `color`, 65 `font`, 27 `shadow`, 25 `spacing`, 4 `radius`, 28 `other`
+  that could not be classified), `--accent-text` as a `font`, and 63 utility-class selectors
+  under `themes`; after, 291 tokens, exactly the 24 theme-colour entries (twelve in each theme)
+  as `color` and the other 267 annotated `other`, `--accent-text` a `color`, and 65 `themes`
+  entries. The `themes` list is untouched by the tags: it counts selectors, the Tailwind utility
+  classes that set a `--tw-*` property, and keeping component CSS in designs means keeping them.
   Dropping Tailwind's `@layer properties` fallback was tried as well and reverted: the converter's
   validator then reports nine `--tw-*` variables as undefined, since it does not read `@property`
   initial values.
