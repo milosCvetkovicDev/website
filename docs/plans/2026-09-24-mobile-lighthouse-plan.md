@@ -445,19 +445,25 @@ Commit: `fix(web): fit the hero island to phone widths` (layout item 2).
 **Files:**
 
 - Modify: `apps/web/src/components/animated-hero/hero-content.tsx`
-- Modify: `apps/web/e2e/mobile/layout-overflow.spec.ts`
+- Modify: `apps/web/e2e/mobile/layout-overflow.spec.ts`,
+  `.claude/epics/audit-remediation-2026-09/46.md` (AC 8 ticked)
 
-- [ ] **Step 1:** The island takes `px-5 py-8 sm:px-12 sm:py-10` in place of its inline `padding`
-      (both `backdropFilter` lines stay); the whoami rows are
-      `grid-cols-[56px_minmax(0,1fr)] gap-x-3` with `min-w-0` and `lineHeight: 1.45` on their
-      values; the header margin is `mb-6 sm:mb-8`, the tags margin `mt-5 sm:mt-6`.
-- [ ] **Step 2:** The `h1` gets `text-balance`, and its first line's `whiteSpace: 'nowrap'` becomes
+- [x] **Step 1:** The island takes `px-5 py-8 sm:px-12 sm:py-10` in place of its inline `padding`
+      (both `backdropFilter` lines stay); below `sm` the player-card rows are a
+      `grid-cols-[56px_minmax(0,1fr)] items-baseline gap-x-3` grid with `min-w-0` and a 1.45 line
+      height on their values; the card's margin is `mb-6 sm:mb-8`, the tags' `mt-5 sm:mt-6`. The
+      grid is gated with `max-sm:` rather than replacing the rows' `flex justify-between` at every
+      width as first planned: the layout verifier measured it below `sm` only, and at every width it
+      would move the desktop card's values from the right edge to the left, which nothing measured
+      or approved. From `sm` the card is unchanged.
+- [x] **Step 2:** The `h1` gets `text-balance`, and its first line's `whiteSpace: 'nowrap'` becomes
       `sm:whitespace-nowrap` (an inline style beats the class). The font size stays
       `clamp(30px, 5.5vw, 50px)`; the patch's `8vw` would change tablets (+15 px at 640 px). The
       subtitle is `text-[15px] sm:text-base` with its inline `fontSize` removed.
-- [ ] **Step 3:** #46 AC8's last clause in the phone spec at 320 px: the box of a `Range` over the
-      `h1`'s contents lies inside the hero island's box.
-- [ ] **Step 4:** Verify: `served-html`, `hero-contrast`, both axe gates and the dimmed-text scanner
+- [x] **Step 3:** #46 AC8's last clause in the phone spec at 320 px: the box of a `Range` over the
+      `h1`'s contents lies inside the hero island's box. It failed before this task (the headline
+      started at x = 0.3, the island's content at 16) on both phone projects.
+- [x] **Step 4:** Verify: `served-html`, `hero-contrast`, both axe gates and the dimmed-text scanner
       stay green; screenshots at 320, 375, 412, 640, 768 and 1280 px, light and dark, are part of
       the set under "Last".
 

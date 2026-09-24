@@ -26,7 +26,7 @@ import { expectHydrated } from '../support/hydration';
  *
  * At 320px the story's narrowest parts are checked one by one as well (#46 AC 8), because the
  * document can fit while a panel inside it clips its own text: the code sample, the Execution stats,
- * the Strategy tech cards and the Loop stat cells.
+ * the Strategy tech cards, the Loop stat cells and the hero headline.
  */
 
 // No retries. These were expected failures, and they stay a guard a retry cannot turn into a green
@@ -166,4 +166,31 @@ test("/ fits the story's narrowest parts into 320px", async ({ page }) => {
   expect(measured.techItems.length, 'no Strategy tech card was found').toBeGreaterThan(0);
   expect(measured.techItems.filter((item) => item.overflow > 0)).toEqual([]);
   expect(measured.loopCells.filter((cell) => cell.overflow > 0)).toEqual([]);
+
+  // The headline's text lies inside the hero island. The hero section is `overflow-hidden`, which
+  // hides a headline wider than the island from `scrollWidth`, so the text box is measured instead.
+  const headline = await page.evaluate(() => {
+    const h1 = document.querySelector('h1');
+    const skills = document.querySelector('ul[aria-label="Technical skills"]');
+    if (!h1 || !skills) throw new Error('the hero has no h1 or no skill list');
+    let island = h1.parentElement;
+    while (island && !island.contains(skills)) island = island.parentElement;
+    if (!island) throw new Error('no element holds both the headline and the skill tags');
+    const range = document.createRange();
+    range.selectNodeContents(h1);
+    const text = range.getBoundingClientRect();
+    const box = island.getBoundingClientRect();
+    return {
+      text: { left: text.left, right: text.right, top: text.top, bottom: text.bottom },
+      island: { left: box.left, right: box.right, top: box.top, bottom: box.bottom },
+    };
+  });
+  expect(headline.text.left, 'the headline starts outside the hero island').toBeGreaterThanOrEqual(
+    headline.island.left,
+  );
+  expect(headline.text.right, 'the headline ends outside the hero island').toBeLessThanOrEqual(
+    headline.island.right,
+  );
+  expect(headline.text.top).toBeGreaterThanOrEqual(headline.island.top);
+  expect(headline.text.bottom).toBeLessThanOrEqual(headline.island.bottom);
 });
