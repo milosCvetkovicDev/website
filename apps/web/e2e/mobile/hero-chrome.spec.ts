@@ -6,11 +6,12 @@ import { gotoHydrated } from '../support/hydration';
  *
  * Built for a desktop, the chrome crowded a phone: five tmux panes squeezed into 390 px of width, the
  * section-progress corner brackets and readout on top of the hero card, and a scroll indicator over
- * its skill tags. Below `md` the tmux background now shows its first pane only, and below `lg` the
- * corner layer and the scroll indicator are not displayed, all by CSS breakpoints, so the served
- * markup is the same at every width (ADR 0006). The one pane draws no border at the screen edge, and
- * the status bar keeps to one line down to 320 px. The desktop project keeps the full chrome, which
- * `e2e/hero.spec.ts` covers (five panes, the indicator fading on scroll).
+ * its skill tags. Below `md` the tmux background is not displayed at all, and below `lg` the corner
+ * layer and the scroll indicator are not displayed either, all by CSS breakpoints, so the served
+ * markup is the same at every width (ADR 0006). Below `md` the background's clock and log ticks do
+ * not run either: its effects start them only while `(min-width: 48rem)` matches. The desktop
+ * project keeps the full chrome, which `e2e/hero.spec.ts` covers (five panes, the log lines, the
+ * indicator fading on scroll).
  *
  * Both motion settings are checked, because the reduced-motion snapshot renders its own panes.
  */
@@ -24,6 +25,9 @@ const PANE_TITLES = [
   'prometheus — alerts',
 ];
 
+/** The clock the server renders; it changes only when the background's clock ticks. */
+const SERVED_CLOCK = '03:14:07';
+
 for (const reducedMotion of ['no-preference', 'reduce'] as const) {
   test.describe(`the hero chrome on a phone, reduced motion ${reducedMotion}`, () => {
     test.beforeEach(async ({ page }) => {
@@ -31,35 +35,30 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       await gotoHydrated(page, '/');
     });
 
-    test('shows the first tmux pane only', async ({ page }) => {
-      const shown: string[] = [];
+    test('does not display the tmux background', async ({ page }) => {
+      // The background is the hero's aria-hidden layer that carries the tmux status bar.
+      const background = page
+        .locator('section > div[aria-hidden="true"]')
+        .filter({ has: page.getByText('[0] production-monitor', { exact: true }) });
+      await expect(background, 'the tmux background should still be served').toHaveCount(1);
+      await expect(background).toHaveCSS('display', 'none');
+      await expect(background).toBeHidden();
       for (const title of PANE_TITLES) {
         const pane = page.getByText(title, { exact: true });
-        await expect(pane, `the ${title} pane should be rendered`).toHaveCount(1);
-        if (await pane.isVisible()) shown.push(title);
+        await expect(pane, `the ${title} pane should be served`).toHaveCount(1);
+        await expect(pane, `the ${title} pane should not be displayed`).toBeHidden();
       }
-      expect(shown).toEqual([PANE_TITLES[0]]);
     });
 
-    test('draws no border at the screen edge of the one pane it shows', async ({ page }) => {
-      // The title sits in the pane's title bar, which is the pane's first child.
-      const pane = page.getByText(PANE_TITLES[0], { exact: true }).locator('../..');
-      await expect(pane).toHaveCSS('border-right-width', '0px');
-    });
-
-    test('keeps the tmux status bar on one line down to 320 px', async ({ page }) => {
-      // Wrapped, its spans stand 33 px tall in a 27 px bar and overflow it.
-      const bar = page.getByText('[0] production-monitor', { exact: true }).locator('../..');
-      for (const width of [320, 360, 375]) {
-        await page.setViewportSize({ width, height: 700 });
-        const { scrollHeight, clientHeight } = await bar.evaluate((el) => ({
-          scrollHeight: el.scrollHeight,
-          clientHeight: el.clientHeight,
-        }));
-        expect(scrollHeight, `the status bar wraps at ${width} px`).toBeLessThanOrEqual(
-          clientHeight,
-        );
-      }
+    test('runs neither the tmux clock nor its log lines', async ({ page }) => {
+      // Displayed, the clock ticks every second and the kubectl pane's first line arrives within
+      // an idle callback plus two seconds (`e2e/hero.spec.ts`). Here neither may happen.
+      await page.waitForTimeout(3_500);
+      await expect(page.getByText(SERVED_CLOCK, { exact: true })).toHaveCount(1);
+      // Under reduced motion the static snapshot is served with its lines; with motion allowed the
+      // panes only get lines from their ticks.
+      const firstLine = page.getByText('$ kubectl get pods -n production -w', { exact: true });
+      await expect(firstLine).toHaveCount(reducedMotion === 'reduce' ? 1 : 0);
     });
 
     test('does not display the corner brackets or the scroll indicator', async ({ page }) => {

@@ -23,7 +23,9 @@ export function HeroSection({ children }: { children?: ReactNode }) {
     >
       {/* 1. TmuxBackground -- absolute-positioned background. Imported statically and hydrated
           with the hero: as a lazy chunk it was a request of its own, made only once hydration
-          asked for it, and its Suspense boundary hydrated after the rest of the page. */}
+          asked for it, and its Suspense boundary hydrated after the rest of the page. It is
+          served at every width but displayed from `md` up only: a phone neither lays it out nor
+          paints it, and its ticks do not run there. */}
       <TmuxBackground />
 
       {/* 2. Overlay layers (decorative) */}

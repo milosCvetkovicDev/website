@@ -749,6 +749,11 @@ PLAYWRIGHT_PORT=3212 pnpm --filter web test:e2e --retries=0
 1. **No TmuxBackground on phones.** A visible design change. TBT about 0 (182 vs 178 ms JS-only
    blocking), about −150 ms of rendering CPU per 5 s on phones, and 74 fewer served elements. After
    Task 4 only one pane shows anyway.
+   - **2026-09-25: built** on the branch `perf/phone-hero-and-font-axis`, at Task 4's phone width,
+     below `md`: the background's root is `hidden md:flex`, and its clock and log ticks start only
+     while `(min-width: 48rem)` matches, in effects. The page is prerendered once for every width,
+     so the background is still served and hydrated: the page chunk, the served elements and the
+     hydration work do not shrink. What phones lose is its layout, paint and ticks.
 2. **A smaller hero-card blur below `sm`, or stopping the `hero-breathe` glow.** GPU only: the
    card's blur is about half of the GPU main-thread time at rest. No Lighthouse effect.
 3. **Pausing decorative animations while they are off screen.** This is #47 hero-4; leave it there.

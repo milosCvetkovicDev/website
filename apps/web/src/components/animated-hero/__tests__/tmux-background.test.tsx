@@ -1,6 +1,57 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TmuxBackground } from '../tmux-background';
+import { DISPLAYED_QUERY, TmuxBackground } from '../tmux-background';
+
+/**
+ * A `matchMedia` whose answers the tests set: the reduced-motion preference and whether the viewport
+ * is at least `md`, where the background is displayed. Hoisted so it exists before the component
+ * module is imported; each `beforeEach` installs it afresh. Every list it hands out shares one set
+ * of `change` listeners per query, so a width change reaches every pane.
+ */
+const media = vi.hoisted(() => {
+  const state = { reducedMotion: false, wide: true };
+  const listeners = new Map<string, Set<() => void>>();
+  const matches = (query: string) =>
+    query === '(prefers-reduced-motion: reduce)'
+      ? state.reducedMotion
+      : query === '(min-width: 48rem)'
+        ? state.wide
+        : false;
+  const matchMedia = (query: string) => {
+    let own = listeners.get(query);
+    if (!own) {
+      own = new Set();
+      listeners.set(query, own);
+    }
+    return {
+      get matches() {
+        return matches(query);
+      },
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: (_type: string, listener: () => void) => own.add(listener),
+      removeEventListener: (_type: string, listener: () => void) => own.delete(listener),
+      dispatchEvent: () => false,
+    };
+  };
+  return {
+    state,
+    listenerCount: (query: string) => listeners.get(query)?.size ?? 0,
+    install() {
+      state.reducedMotion = false;
+      state.wide = true;
+      listeners.clear();
+      Object.defineProperty(window, 'matchMedia', { writable: true, value: matchMedia });
+    },
+    /** Moves the viewport across `md`, as a resize or a rotation does, and tells every listener. */
+    setWide(wide: boolean) {
+      state.wide = wide;
+      for (const listener of [...(listeners.get('(min-width: 48rem)') ?? [])]) listener();
+    },
+  };
+});
 
 // Mock IntersectionObserver as a proper class
 const mockObserve = vi.fn();
@@ -28,20 +79,8 @@ beforeEach(() => {
   // Mock IntersectionObserver
   global.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
 
-  // Mock matchMedia -- default: no reduced motion
-  Object.defineProperty(window, 'matchMedia', {
-    writable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  });
+  // Default: no reduced motion, at a width where the background is displayed.
+  media.install();
 });
 
 describe('TmuxBackground', () => {
@@ -98,19 +137,7 @@ describe('TmuxBackground', () => {
   });
 
   it('renders static panes with pre-rendered log lines when prefers-reduced-motion', () => {
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      value: vi.fn().mockImplementation((query: string) => ({
-        matches: query === '(prefers-reduced-motion: reduce)',
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
-    });
+    media.state.reducedMotion = true;
 
     render(<TmuxBackground />);
     // StaticPane renders the first ~15 lines of each pane's seq as static text
@@ -249,5 +276,76 @@ describe('AnimatedPane log slots', () => {
     setVisible(true);
     nextTick();
     expect(slots.lastElementChild?.textContent).toBe(FIRST_LINE);
+  });
+
+  describe('below md, where the background is not displayed', () => {
+    it('asks for the same width as the root class, `md:flex`', () => {
+      const { container } = render(<TmuxBackground />);
+      expect(DISPLAYED_QUERY).toBe('(min-width: 48rem)');
+      expect(container.firstElementChild?.className).toMatch(/(^| )hidden( |$)/);
+      expect(container.firstElementChild?.className).toMatch(/(^| )md:flex( |$)/);
+    });
+
+    it('runs no clock and no log ticks, and starts both once the viewport crosses md', () => {
+      media.setWide(false);
+      const setInterval = vi.spyOn(window, 'setInterval');
+      render(<TmuxBackground />);
+      const slots = kubectlSlots();
+
+      // Not displayed: no interval, no idle callback, no slots, and nothing changes over 10 s.
+      act(() => vi.advanceTimersByTime(10_000));
+      expect(setInterval).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(slots.children).toHaveLength(0);
+      expect(screen.getAllByText('03:14:07').length).toBeGreaterThanOrEqual(1);
+
+      // Rotated or resized to md: the panes fit their slots and tick, and the clock runs.
+      act(() => media.setWide(true));
+      expect(slots.children).toHaveLength(13);
+      firstTick();
+      expect(slots.lastElementChild?.textContent).toBe(FIRST_LINE);
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.queryAllByText('03:14:07')).toHaveLength(0);
+    });
+
+    it('stops every timer when the viewport drops below md, and resumes where it was', () => {
+      render(<TmuxBackground />);
+      const slots = kubectlSlots();
+      firstTick();
+      nextTick();
+      expect(slots.lastElementChild?.textContent).toMatch(/^NAME\s+READY/);
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+      act(() => media.setWide(false));
+      expect(vi.getTimerCount()).toBe(0);
+      const clockText = screen.getAllByText(/^\d{2}:\d{2}:\d{2}$/)[0].textContent;
+      act(() => vi.advanceTimersByTime(10_000));
+      expect(slots.lastElementChild?.textContent).toMatch(/^NAME\s+READY/);
+      expect(screen.getAllByText(/^\d{2}:\d{2}:\d{2}$/)[0].textContent).toBe(clockText);
+
+      act(() => media.setWide(true));
+      firstTick();
+      expect(slots.lastElementChild?.textContent).toMatch(/^api-server-6d7f4c8b9-x2k9p/);
+    });
+
+    it('removes its media listeners on unmount', () => {
+      const { unmount } = render(<TmuxBackground />);
+      // One for the clock and one for each of the five panes.
+      expect(media.listenerCount(DISPLAYED_QUERY)).toBe(6);
+      unmount();
+      expect(media.listenerCount(DISPLAYED_QUERY)).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('under reduced motion runs no timers at any width', () => {
+      media.state.reducedMotion = true;
+      media.setWide(false);
+      render(<TmuxBackground />);
+      expect(screen.getByText('$ kubectl get pods -n production -w')).toBeInTheDocument();
+      act(() => media.setWide(true));
+      act(() => vi.advanceTimersByTime(5000));
+      expect(vi.getTimerCount()).toBe(0);
+      expect(screen.getAllByText('03:14:07').length).toBeGreaterThanOrEqual(1);
+    });
   });
 });
