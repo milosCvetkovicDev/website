@@ -77,8 +77,11 @@ pyftsubset geist-mono/GeistMono-Variable.woff2 --unicodes="$LATIN,$SYMBOLS" \
 for f in geist-latin geist-mono-latin-symbols; do
   fonttools varLib.instancer "$f-full.woff2" wght=400:900 --no-recalc-timestamp --no-recalc-bounds \
     --output="$f.woff2"
+  rm "$f-full.woff2"
 done
 ```
+
+Copy the two results, `geist-latin.woff2` and `geist-mono-latin-symbols.woff2`, into this directory.
 
 The mark font is cut from `geist-mono-latin-symbols.woff2` itself, from this directory, with the
 same fontTools. `SOURCE_DATE_EPOCH` pins the timestamp fontTools writes into the `head` table;
