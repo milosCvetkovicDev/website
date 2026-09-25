@@ -398,6 +398,18 @@ done
 #         cross-origin-opener-policy: same-origin, and Vercel's own strict-transport-security.
 #         A missing header on the chunk or the 404 means the headers() source no longer covers
 #         every path.
+
+# The production alias serves the same pages but tells crawlers not to index them; the apex does
+# not (ADR 0025, whose check covers a case study, a static chunk and a 404 as well).
+for host in portfolio-theta-gold-77.vercel.app miloscvetkovic.dev; do
+  echo "== $host"
+  curl -sSI "https://$host/about" | tr -d '\r' | grep -iE '^(HTTP/|x-robots-tag:)'
+done
+# expect: HTTP/2 200 under both, x-robots-tag: noindex under the alias and no x-robots-tag line
+#         under the apex. A host with no HTTP/ line under it was not answered, and proves
+#         nothing. The alias answering without the header means the deployment predates
+#         ADR 0025 or the Vercel project was renamed (PRODUCTION_ALIAS_HOST in
+#         apps/web/production-alias.ts).
 ```
 
 Before DNS exists, the same checks run against the production deployment itself. The production
