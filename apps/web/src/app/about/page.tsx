@@ -13,9 +13,9 @@ const timeline = [
     year: '2025',
     role: 'AI-Native Engineer',
     company: 'Independent',
-    highlight: 'Built an AI agent that fixes production bugs while I sleep',
+    highlight: 'Built an AI agent that fixed production bugs while I slept',
     description:
-      'Combining a decade of battle scars with cutting-edge AI. My self-healing agent has resolved 73% of production errors autonomously—no human intervention, no 3am pages.',
+      'Combining a decade of battle scars with cutting-edge AI. My self-healing agent resolved 73% of production errors autonomously—no human intervention, no 3am pages.',
   },
   {
     year: '2021',
@@ -107,8 +107,8 @@ export default function AboutPage() {
             </p>
             <p className="text-lg leading-relaxed">
               But here&apos;s what changed: I got tired of being the only one who could fix things.
-              So I started building AI that works the way I do. My self-healing agent monitors
-              production 24/7, diagnoses errors, and opens PRs with fixes—
+              So I started building AI that works the way I do. My self-healing agent monitored
+              production 24/7, diagnosed errors, and opened PRs with fixes—
               <em>without waking anyone up</em>.
             </p>
             <p className="text-lg leading-relaxed text-[var(--foreground)]">
