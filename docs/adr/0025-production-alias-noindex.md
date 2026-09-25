@@ -68,8 +68,9 @@ manifest that `next start` and Vercel serve from.
   ```
 
   `PRODUCTION_ALIAS_HOST` is `'portfolio-theta-gold-77.vercel.app'`, exported from
-  `apps/web/production-alias.ts`. The literal is written once, and the config and both tests read
-  it from there. It has a module of its own because the Playwright spec has to import it, and
+  `apps/web/production-alias.ts`. In code the literal is written once, and the config and both
+  tests read it from there. The records that quote it (this one, `docs/runbooks/deploy.md` and
+  #52's AC 18) do not follow a rename by themselves. It has a module of its own because the Playwright spec has to import it, and
   Playwright loads TypeScript as CommonJS, where the `import.meta.url` in `next.config.ts` is a
   syntax error.
 
@@ -146,21 +147,25 @@ manifest that `next start` and Vercel serve from.
 - Pages already indexed on the alias drop out only when a search engine recrawls them and sees the
   header, and only for crawlers that honour `X-Robots-Tag`.
 - `headers()` is evaluated at build time. Instant Rollback to a deployment older than this record
-  brings back an alias without the header.
+  brings back an alias without the header. `docs/runbooks/deploy.md` checks the alias under
+  **Verify**, and its **Rollback** section re-runs those checks, so a rollback that drops the
+  header shows there. Nothing checks the alias on a schedule.
 - How Vercel applies a host-keyed header to responses from its edge cache is not measured before
   the deploy. Nothing in CI reaches the live alias, so the proof is this check, run once the merge
   has deployed:
 
   ```bash
-  chunk=$(curl -sS https://miloscvetkovic.dev/ | grep -oE '/_next/static/[^"]+\.js' | head -1)
+  chunk=$(curl -fsS https://miloscvetkovic.dev/ | grep -oE '/_next/static/[^"]+\.js' | head -1)
+  echo "chunk: ${chunk:-none found, so the third path below tests / instead of an asset}"
   for p in /about /work/self-healing-agent "$chunk" /no-such-page; do
-    echo "== $p"
-    curl -sSI "https://portfolio-theta-gold-77.vercel.app$p" | tr -d '\r' |
-      grep -iE '^(HTTP/|x-robots-tag:)'
-    curl -sSI "https://miloscvetkovic.dev$p" | grep -ci '^x-robots-tag:'
+    for host in portfolio-theta-gold-77.vercel.app miloscvetkovic.dev; do
+      echo "== $host$p"
+      curl -sSI "https://$host$p" | tr -d '\r' | grep -iE '^(HTTP/|x-robots-tag:)'
+    done
   done
-  # expect: under each path, HTTP/2 200 (404 for /no-such-page) and x-robots-tag: noindex from the
-  #         alias, then 0, the apex's count of x-robots-tag lines.
+  # expect: HTTP/2 200 under every URL (404 under /no-such-page), x-robots-tag: noindex under each
+  #         alias URL, and no x-robots-tag line under any apex URL. A URL with no HTTP/ line under
+  #         it was not answered, and proves nothing either way.
   ```
 
 ## Alternatives considered
