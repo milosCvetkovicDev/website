@@ -2,6 +2,10 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { NextConfig } from 'next';
+// Its own module rather than a constant here, so that the Playwright spec proving the header on
+// the wire can import it: Playwright loads TypeScript as CommonJS, where this file's
+// `import.meta.url` is a syntax error.
+import { PRODUCTION_ALIAS_HOST } from './production-alias';
 
 /**
  * The nearest ancestor of `startDir` that holds a `pnpm-workspace.yaml`, or null if there is none.
@@ -132,6 +136,13 @@ export function securityHeaders(env: HeaderEnv): { key: string; value: string }[
   ];
 }
 
+/**
+ * What the production alias alone sends on top of the security headers (ADR 0025): `noindex`, and
+ * nothing more. Every page's canonical already names the apex, so a crawler that reaches the alias
+ * is pointed at the copy to index as well as told not to index this one.
+ */
+export const PRODUCTION_ALIAS_HEADERS = [{ key: 'X-Robots-Tag', value: 'noindex' }];
+
 const nextConfig: NextConfig = {
   // Outside a pnpm workspace there is no nested-lockfile problem to solve, so leave the root to
   // Next's own inference rather than failing the build or refusing to boot the server.
@@ -142,11 +153,23 @@ const nextConfig: NextConfig = {
   // Unset everywhere else, CI included, where `next build` and `next start` have to agree on it.
   // `||`, not `??`: an empty value (an unset variable expanded by a shell) must fall back too.
   distDir: process.env.NEXT_DIST_DIR || '.next',
-  // One entry for every path, so no surface can be left out by a narrower pattern. `next build`
-  // evaluates this once and bakes the result into the routes manifest that `next start` and Vercel
-  // serve from; `next dev` evaluates it with NODE_ENV=development.
+  // The security headers in one entry for every path, so no surface can be left out by a narrower
+  // pattern (ADR 0023). The second entry adds `X-Robots-Tag: noindex` on every path of the
+  // production alias and on no other host (ADR 0025). It is keyed on the alias being present,
+  // never on the apex being absent (`missing`): a typo in an apex value would noindex production,
+  // where a typo in the alias only fails to noindex the alias, which the check after the deploy in
+  // ADR 0025 finds (the tests read the same constant, so they cannot).
+  // `next build` evaluates this once and bakes the result into the routes manifest that
+  // `next start` and Vercel serve from; `next dev` evaluates it with NODE_ENV=development.
   async headers() {
-    return [{ source: SECURITY_HEADERS_SOURCE, headers: securityHeaders(process.env) }];
+    return [
+      { source: SECURITY_HEADERS_SOURCE, headers: securityHeaders(process.env) },
+      {
+        source: SECURITY_HEADERS_SOURCE,
+        has: [{ type: 'host', value: PRODUCTION_ALIAS_HOST }],
+        headers: PRODUCTION_ALIAS_HEADERS,
+      },
+    ];
   },
 };
 

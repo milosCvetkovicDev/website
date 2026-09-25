@@ -33,12 +33,16 @@ single `alt` cannot; the page points og:image at it through `buildMetadata()`'s 
 prerender at build time.
 `sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
 `NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
-Response headers come from one static `headers()` entry in `apps/web/next.config.ts` whose source,
-`/:path*`, matches every path, `/_next/static` assets and the 404s included:
+The security headers come from one static `headers()` entry in `apps/web/next.config.ts` whose
+source, `/:path*`, matches every path, `/_next/static` assets and the 404s included:
 `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a Content-Security-Policy, a
-`Permissions-Policy` and a `Cross-Origin-Opener-Policy` (ADR 0023). Next's router sends a few
-answers before it applies `headers()`, and those carry none of them: the 308s that strip a trailing
-slash or collapse repeated slashes, and the plain 500 for a malformed percent-encoding.
+`Permissions-Policy` and a `Cross-Origin-Opener-Policy` (ADR 0023). A second entry, over the same
+source and keyed on `has: [{ type: 'host', ... }]`, adds `X-Robots-Tag: noindex` on the public
+production alias and on no other host (ADR 0025); the alias host is `PRODUCTION_ALIAS_HOST` in
+`apps/web/production-alias.ts`, which has to change if the Vercel project is renamed. Never key it
+on `missing` the apex: a typo there would noindex production. Next's router sends a few answers
+before it applies `headers()`, and those carry none of them: the 308s that strip a trailing slash
+or collapse repeated slashes, and the plain 500 for a malformed percent-encoding.
 
 ## Quality gates
 
