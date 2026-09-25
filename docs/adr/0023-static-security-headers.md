@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0025
+
+No longer applies: the sentence of the first Decision bullet saying there is no second `headers()`
+entry; the six headers, their values and the rest of its decision stand. See
+[ADR 0025](0025-production-alias-noindex.md).
 
 ## Date
 
