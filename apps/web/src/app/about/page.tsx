@@ -1,4 +1,10 @@
+import { formatMetric, getCaseStudy } from '@/data/case-studies';
 import { buildMetadata } from '@/lib/metadata';
+
+// The timeline quotes the agent's metric, so it reads it from the study rather than restating it.
+const agentStudy = getCaseStudy('self-healing-agent');
+if (!agentStudy) throw new Error('The About page quotes the "self-healing-agent" case study');
+const agentMetric = agentStudy.highlight.metric;
 
 export const metadata = buildMetadata({
   title: 'About — Senior Full-Stack Engineer',
@@ -14,8 +20,7 @@ const timeline = [
     role: 'AI-Native Engineer',
     company: 'Independent',
     highlight: 'Built an AI agent that fixed production bugs while I slept',
-    description:
-      'Combining a decade of battle scars with cutting-edge AI. My self-healing agent resolved 73% of production errors autonomously—no human intervention, no 3am pages.',
+    description: `Combining a decade of battle scars with cutting-edge AI. My self-healing agent diagnosed production errors and opened pull requests with the fixes, which I reviewed and merged: ${formatMetric(agentMetric)} ${agentMetric.label}, no 3am pages.`,
   },
   {
     year: '2021',
