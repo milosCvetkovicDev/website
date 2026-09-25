@@ -801,6 +801,11 @@ locally over HTTP/1.1, and at 0 (within ±8 ms) over HTTP/2 and on the productio
   by at most 0.4 units), but it replayed at 0 ms of LCP after Tasks 2–3, even at ×0.54 of the bytes.
   A real saving for visitors and a good follow-up; it must regenerate #118's mono mark file. Not
   400–800: that changes 42–80 advance widths.
+  - **2026-09-25: built** on the branch `perf/phone-hero-and-font-axis`: −6,972 bytes on the sans
+    file and −6,312 on the mono file, 13,284 in all. Measured again, U+00A4 moves by up to 0.5
+    units, at 900. The instancer keeps the `maxp` values, because recomputing them changed a few
+    pixels of weight-400 text in Chromium; with them kept, `/` and a case study render with no
+    differing pixel. The mark file regenerates byte for byte, so it is unchanged.
 - **ASCII-only font subsets** (a further −12.2 KB): no LCP effect either, and they narrow future
   glyph coverage.
 - **`content-visibility: auto` on the phases:** with Task 1 it made TBT worse (213 → 267 ms), with
