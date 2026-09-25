@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0024
+
+No longer applies: the clause of the fourth Decision bullet saying `load-gsap.ts` fetches GSAP once
+the browser is idle after hydration; the rest of its decision stands. See
+[ADR 0024](0024-gsap-loads-on-first-intent.md).
 
 ## Date
 

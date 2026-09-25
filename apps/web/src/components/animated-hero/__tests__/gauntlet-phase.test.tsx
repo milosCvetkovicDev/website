@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
-import { loadGsap } from '../load-gsap';
+import { requestGsap } from '../load-gsap';
 import { GauntletPhase } from '../gauntlet-phase';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
@@ -67,11 +67,12 @@ function elapse(seconds: number) {
 }
 
 describe('GauntletPhase', () => {
-  // The phase asks load-gsap.ts for GSAP, which arrives when the browser is idle. Waited for once,
-  // with real timers, before beforeEach fakes setTimeout: from then on the phase builds its trigger
-  // synchronously on mount, as it does in the browser once GSAP has arrived.
+  // The phase asks load-gsap.ts for GSAP, which arrives on the visitor's first scroll, tap or key.
+  // Requested outright and waited for once, with real timers, before beforeEach fakes setTimeout:
+  // from then on the phase builds its trigger synchronously on mount, as it does in the browser once
+  // GSAP has arrived.
   beforeAll(async () => {
-    await loadGsap();
+    await requestGsap();
   });
 
   beforeEach(() => {

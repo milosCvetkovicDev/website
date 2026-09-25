@@ -1,4 +1,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
+import { lazy, Suspense } from 'react';
+import { hydrateRoot, type Root } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type ProviderModule = typeof import('../theme-provider');
@@ -83,6 +86,73 @@ describe('ThemeProvider', () => {
     expect(button).toHaveTextContent('dark:mounted');
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
+  });
+});
+
+describe('ThemeProvider through hydration', () => {
+  let host: HTMLDivElement | undefined;
+  let root: Root | undefined;
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    root = undefined;
+    host?.remove();
+    host = undefined;
+  });
+
+  function Inner() {
+    return <p id="inner">server-rendered</p>;
+  }
+
+  it('leaves a Suspense boundary that is still hydrating on its server markup', async () => {
+    // The stored theme differs from the server snapshot, `dark`, so the theme changes right after
+    // hydration, and `mounted` flips as it always does. When that change reached the boundary
+    // through context, React could no longer hydrate the boundary and rendered it on the client
+    // instead: it deleted the server markup, showed the fallback, and built the content again once
+    // its code arrived. That is what happened to the tmux background on `/` while it was lazy.
+    stubColorScheme(false);
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    // The boundary sits inside an element, as it does on the page. React propagates a context
+    // change lazily, from a parent that bails out of rendering, so a boundary rendered straight
+    // below the provider would not see the change at all.
+    const tree = (inner: React.ReactNode) => (
+      <ThemeProvider>
+        <Probe />
+        <div>
+          <Suspense fallback={null}>{inner}</Suspense>
+        </div>
+      </ThemeProvider>
+    );
+
+    // Exactly the markup the server sends, parsed without running scripts, as in
+    // `hydration-marker.test.tsx`.
+    const served = new DOMParser().parseFromString(renderToString(tree(<Inner />)), 'text/html');
+    host = document.createElement('div');
+    host.append(...served.body.childNodes);
+    document.body.append(host);
+    const serverNode = host.querySelector('#inner');
+    expect(serverNode, 'the server render should contain the boundary content').not.toBeNull();
+    expect(host.querySelector('button')).toHaveTextContent('dark:pending');
+
+    // On the client the boundary's code has not arrived yet, so it stays dehydrated.
+    let arrive: (module: { default: typeof Inner }) => void = () => {};
+    const LazyInner = lazy(
+      () => new Promise<{ default: typeof Inner }>((resolve) => (arrive = resolve)),
+    );
+    await act(async () => {
+      root = hydrateRoot(host!, tree(<LazyInner />), { onRecoverableError: () => {} });
+    });
+
+    // The theme did change above the boundary...
+    expect(host.querySelector('button')).toHaveTextContent('light:mounted');
+    // ...and the boundary kept the node the server rendered.
+    expect(serverNode!.isConnected, 'the server-rendered boundary content was deleted').toBe(true);
+    expect(host.querySelector('#inner')).toBe(serverNode);
+
+    await act(async () => arrive({ default: Inner }));
+
+    expect(serverNode!.isConnected, 'the boundary content was rebuilt when it hydrated').toBe(true);
+    expect(host.querySelector('#inner')).toBe(serverNode);
   });
 });
 

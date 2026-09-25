@@ -268,8 +268,9 @@ async function openPage(
   await expect(page).toHaveTitle(/Milos Cvetkovic/);
   await expectHydrated(page);
   // On `/` the story's timelines, and the `opacity: 0` from-states that decide what axe skips at
-  // rest, are built when GSAP arrives, after hydration (load-gsap.ts). The quiet network above
-  // almost always outlasts that, but a gate waits for the state it measures rather than racing it.
+  // rest, are built when GSAP arrives, on the visitor's first intent (load-gsap.ts). The helper
+  // sends that intent and waits, so this pass measures the page as a visitor who has started to
+  // scroll has it; `gsap-lazy.spec.ts` audits the page before GSAP.
   if (path === '/') await expectGsapLoaded(page);
   // Playwright ignores unknown emulation options silently: prove the scheme reached the page.
   await expect(page.locator('html')).toContainClass(colorScheme);

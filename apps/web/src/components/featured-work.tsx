@@ -61,6 +61,7 @@ const CARD_LINK =
 
 function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }: ProjectCardProps) {
   const descriptionId = `featured-${project.slug}-description`;
+  const retired = project.status === 'RETIRED';
 
   return (
     <div
@@ -95,9 +96,17 @@ function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }:
         <div className="flex items-center gap-2">
           <span
             aria-hidden="true"
-            className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--tmux-status-ok)]"
+            className={`h-1.5 w-1.5 rounded-full ${
+              retired ? 'bg-[var(--tmux-bar-text)]' : 'animate-pulse bg-[var(--tmux-status-ok)]'
+            }`}
           />
-          <span className="font-mono text-xs text-[var(--tmux-status-ok)]">{project.status}</span>
+          <span
+            className={`font-mono text-xs ${
+              retired ? 'text-[var(--tmux-bar-text)]' : 'text-[var(--tmux-status-ok)]'
+            }`}
+          >
+            {project.status}
+          </span>
         </div>
       </div>
 

@@ -17,7 +17,7 @@ export function GameComplete() {
     // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
     if (prefersReducedMotion) return;
 
-    // GSAP arrives after hydration (load-gsap.ts); until then the section keeps its
+    // GSAP arrives on the visitor's first intent (load-gsap.ts); until then the section keeps its
     // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached).
@@ -106,7 +106,10 @@ export function GameComplete() {
   }, [prefersReducedMotion]);
 
   return (
-    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
+    <section
+      ref={sectionRef}
+      className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
+    >
       <div className="w-full max-w-xl text-center">
         <div ref={terminalRef}>
           <Terminal className="text-left">
@@ -118,14 +121,15 @@ export function GameComplete() {
               </div>
 
               <div className="space-y-2 py-4">
-                <div className="flex items-center justify-center gap-2 text-[var(--muted)]">
+                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[var(--muted)]">
                   <span>Ideas</span>
-                  <span className="text-[var(--accent-text)]">→</span>
-                  <span>Architecture</span>
-                  <span className="text-[var(--accent-text)]">→</span>
-                  <span>Code</span>
-                  <span className="text-[var(--accent-text)]">→</span>
-                  <span>Production</span>
+                  {/* Each arrow wraps with the step it points at, never alone at a line's end. */}
+                  {['Architecture', 'Code', 'Production'].map((step) => (
+                    <span key={step} className="flex gap-2">
+                      <span className="text-[var(--accent-text)]">→</span>
+                      <span>{step}</span>
+                    </span>
+                  ))}
                 </div>
                 <div className="text-center text-sm text-[var(--muted)]">
                   Time: <span className="text-[var(--accent-text)]">1 conversation</span>
@@ -154,7 +158,7 @@ export function GameComplete() {
           href="https://www.linkedin.com/in/milos-cvetkovic-dev"
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-8 inline-flex items-center justify-center rounded-lg bg-[var(--accent)] px-8 py-4 text-lg font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+          className="mt-8 inline-flex w-full items-center justify-center rounded-lg bg-[var(--accent)] px-8 py-4 text-lg font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-auto"
         >
           Connect on LinkedIn
         </a>

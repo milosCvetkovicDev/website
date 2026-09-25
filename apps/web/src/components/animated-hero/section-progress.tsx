@@ -14,8 +14,8 @@ export const MEASURE_THROTTLE_MS = 33;
 // rather than a ring, so it survives Windows High Contrast / forced-colors mode, where box-shadow
 // is not painted. `--accent` is the token ADR 0011 assigns to focus, and it clears the 3:1 that
 // WCAG 1.4.11 asks of an indicator in both themes; the browser default was merely probably
-// adequate and varies by browser. (`globals.css` also defines a `.focus-ring` utility that nothing
-// references; consolidating the two idioms is a separate change.)
+// adequate and varies by browser. (`globals.css` also defines a `.focus-ring` utility, used by the
+// Execution code region; consolidating the two idioms is a separate change.)
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]';
 
@@ -235,7 +235,7 @@ export function SectionProgress({
 
       {/* Corner frame elements and the section readout: visual chrome only. The dots above carry
           the accessible navigation, so this layer is hidden from assistive technology. */}
-      <div className="pointer-events-none fixed inset-0 z-40" aria-hidden="true">
+      <div className="pointer-events-none fixed inset-0 z-40 hidden lg:block" aria-hidden="true">
         {/* Top-left corner */}
         <div className="absolute top-4 left-4">
           <svg width="40" height="40" viewBox="0 0 40 40" className="text-[var(--accent)]/30">

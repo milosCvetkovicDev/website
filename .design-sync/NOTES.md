@@ -100,6 +100,13 @@ expects, and what each workaround depends on.
 - **`dtsPropsFor` drifts silently.** It is a copy of the components' props. Run
   `node .design-sync/props-from-source.mjs --check` first; it exits 1 and names every component whose
   source no longer matches.
+- **`FeaturedWork`'s stories are hand copies of `apps/web/src/data/case-studies.ts`.** The component
+  imports only types from `@/data` and takes the projects as a prop, so nothing in the sync compares
+  the inlined description, tags, status and metric with the data file: a copy-only change reaches
+  the site and leaves the design project stale. Diff the three inlined projects against
+  `case-studies.ts` on every re-sync. On 2026-09-25 (#127 retired the agent) the drift surfaced only
+  because the status type and the badge changed too, and `props-from-source.mjs --check` caught the
+  type.
 - **`tsconfig.paths.json` mirrors apps/web's `@/*` alias.** If the app's alias changes, the converter
   resolves the old one.
 - **The `next/` stand-ins cover only `next/link` and `next/navigation`.** A component that starts

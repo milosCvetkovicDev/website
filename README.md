@@ -39,7 +39,7 @@ docs/
   adr/            architecture decision records
   plans/          design documents and step-by-step implementation plans with progress
   runbooks/       operational procedures (deployment)
-.claude/          project-level Claude Code configuration (hooks, agents)
+.claude/          project-level Claude Code configuration (hooks, agents, path-scoped rules)
 .github/          CI and commitlint workflows, nightly flake hunt, Dependabot, pull request template
 ```
 
@@ -84,7 +84,7 @@ Useful extras: `pnpm lint:fix`, `pnpm format`, `pnpm clean`.
 
 ## Testing
 
-- **Unit tests** live next to the code in `__tests__` folders. jsdom is the default environment; a file with no DOM in it opts out with an `@vitest-environment node` docblock at the top, as the three `apps/web/src/data/__tests__` files do, because building a jsdom window costs about two seconds in every worker (see the Testing section of [CLAUDE.md](CLAUDE.md)). Components that read `matchMedia` or `IntersectionObserver` stub them explicitly (see `apps/web/src/components/__tests__/featured-work.test.tsx`); there is no global mock, so a component that forgets to guard those APIs fails loudly.
+- **Unit tests** live next to the code in `__tests__` folders. jsdom is the default environment; a file with no DOM in it opts out with an `@vitest-environment node` docblock at the top, as the three `apps/web/src/data/__tests__` files do, because building a jsdom window costs about two seconds in every worker (see [.claude/rules/unit-tests.md](.claude/rules/unit-tests.md)). Components that read `matchMedia` or `IntersectionObserver` stub them explicitly (see `apps/web/src/components/__tests__/featured-work.test.tsx`); there is no global mock, so a component that forgets to guard those APIs fails loudly.
 - **End-to-end tests** live in `apps/web/e2e`. Playwright always starts the server it tests, on port 3210 by default and 3000 in the CI job, which sets `PLAYWRIGHT_PORT`, so a port that is already taken aborts the run instead of testing whatever is answering on it; under `CI=true` it serves the production build with one worker and two retries. The console and accessibility gates opt out of those retries, because a retry turns an intermittent failure into a green run. Interactions must wait for hydration, because event listeners only exist after React mounts: the root layout renders a hidden `#hydration-marker` on every route that reads `false` in the served HTML and `true` once React has hydrated, and `apps/web/e2e/support/hydration.ts` waits on it.
 - **Visual checks** are done with Playwright screenshots of the affected section in light, dark and mobile viewports before a UI pull request is opened.
 
@@ -112,6 +112,7 @@ This repository is developed with Claude Code and keeps its configuration in the
 | [docs/adr/README.md](docs/adr/README.md)           | Architecture decision records                                  |
 | [docs/runbooks/deploy.md](docs/runbooks/deploy.md) | Deploying to Vercel, DNS, verification, rollback               |
 | [CLAUDE.md](CLAUDE.md)                             | Instructions for AI-assisted development in this repository    |
+| [.claude/rules/](.claude/rules)                    | Instructions Claude Code loads only with the files they cover  |
 
 ## Deployment
 

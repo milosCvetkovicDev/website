@@ -3,7 +3,7 @@ import { useLayoutEffect, type ComponentType } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as gsapRuntime from '../gsap-runtime';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
-import { loadGsap, runWithGsap, type GsapRuntime } from '../load-gsap';
+import { requestGsap, runWithGsap, type GsapRuntime } from '../load-gsap';
 import { DiscoveryPhase } from '../discovery-phase';
 import { StrategyPhase } from '../strategy-phase';
 import { ExecutionPhase } from '../execution-phase';
@@ -55,13 +55,13 @@ vi.mock('../load-gsap', async (importOriginal) => {
   return { ...actual, runWithGsap: vi.fn(actual.runWithGsap) };
 });
 
-// The phases do not import GSAP: they ask load-gsap.ts for it, which fetches it once the browser is
-// idle after hydration. Every test here is about what a phase does with GSAP, so the file waits for
-// that load once, with real timers, before any test installs fake ones. From then on each phase
-// builds its timeline synchronously on mount, as it does in the browser once GSAP has arrived. A
-// phase mounted before the load is lazy-gsap.test.tsx's subject.
+// The phases do not import GSAP: they ask load-gsap.ts for it, which fetches it on the visitor's
+// first scroll, tap or key. Every test here is about what a phase does with GSAP, so the file
+// requests that load outright and waits for it once, with real timers, before any test installs
+// fake ones. From then on each phase builds its timeline synchronously on mount, as it does in the
+// browser once GSAP has arrived. A phase mounted before the load is lazy-gsap.test.tsx's subject.
 beforeAll(async () => {
-  await loadGsap();
+  await requestGsap();
 });
 
 // All six story sections, so the shared lifecycle below covers every one of them. LoopPhase was the
@@ -608,5 +608,51 @@ describe('GameComplete', () => {
     unmount();
 
     expect(gsap.getTweensOf(cta)).toHaveLength(0);
+  });
+});
+
+// #46 AC10. A from-state is drawn the moment its timeline is built, before any trigger fires, so an
+// element that starts to the right of where it belongs widens the page by that much for as long as
+// it waits: the Execution stats panel's `x: 30` measured 774 px at a 768 px viewport (row R11).
+// Every entrance, the timer-driven reveals included, starts in place or from the left.
+describe.each(phases)('$name, its from-states', ({ Phase }) => {
+  beforeEach(() => {
+    media.reduce = false;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom does
+    // not implement.
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    // Asserted last: a throw here must not skip the global restoration above it.
+    expect(media.listenerCount()).toBe(0);
+  });
+
+  it('start no element to the right of where it belongs', () => {
+    const spies = [
+      vi.spyOn(gsap, 'fromTo'),
+      vi.spyOn(gsap, 'from'),
+      vi.spyOn(gsap.core.Timeline.prototype, 'fromTo'),
+      vi.spyOn(gsap.core.Timeline.prototype, 'from'),
+    ];
+    render(<Phase />);
+    // Timeline-bound triggers measure on refresh; the timer-driven sequences then build their reveals.
+    act(() => ScrollTrigger.refresh());
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+
+    // Each spy's second argument is the from-state: `fromTo(targets, from, to)` and
+    // `from(targets, from)`, on gsap and on a timeline alike.
+    const fromStates = spies
+      .flatMap((spy) => spy.mock.calls as unknown[][])
+      .map((call) => call[1] as gsap.TweenVars | undefined);
+    expect(fromStates.length, 'the phase built no entrance at all').toBeGreaterThan(0);
+    const rightward = fromStates.filter(
+      (from) => from !== undefined && Number.parseFloat(String(from.x ?? 0)) > 0,
+    );
+    expect(rightward).toEqual([]);
   });
 });

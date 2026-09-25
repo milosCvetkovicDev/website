@@ -2,7 +2,7 @@ const highlights = [
   {
     title: 'AI That Ships',
     description:
-      '24/7 incident response without the 3am pages. I built an agent that detects production errors, diagnoses root causes, and opens PRs with fixes—while you sleep.',
+      '24/7 incident response without the 3am pages. I built an agent that detected production errors, diagnosed root causes, and opened PRs with fixes—while you slept.',
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"

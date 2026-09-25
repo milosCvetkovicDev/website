@@ -1,17 +1,24 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { GSAP_FAILED_MARK, GSAP_LOADED_MARK } from '../src/components/animated-hero/load-gsap';
 import { HYDRATION_MARKER_ID } from '../src/lib/hydration-marker';
-import { expectGsapLoaded } from './support/gsap';
+import { audit, describeViolations, incompleteNodes, passingNodes, ruleIdsThatRan } from './axe';
+import { expectGsapLoaded, sendIntent } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 
 /**
- * GSAP loads after hydration instead of in the home page's initial chunk
- * (`src/components/animated-hero/load-gsap.ts`). That makes three promises no other spec checks,
- * because every other spec on `/` waits for GSAP before it measures anything:
+ * GSAP loads on the visitor's first intent instead of in the home page's initial chunk
+ * (`src/components/animated-hero/load-gsap.ts`): the first scroll, wheel, touch, pointer press or
+ * key press, or at once on a page that loads already scrolled. That makes promises no other spec
+ * checks, because every other spec on `/` sends that intent and waits for GSAP before it measures
+ * anything:
  *
  * - The served `/` references and preloads no script with GSAP in it, and GSAP arrives in a chunk
  *   of its own, requested after hydration. One static import anywhere the page reaches would undo
  *   that silently; `eslint.config.mjs` refuses the import, and this checks the build.
+ * - Nothing requests GSAP until the visitor does something, and each kind of intent does. The page
+ *   a visitor who only reads sees, and the one Lighthouse scores, is the page before GSAP, so it
+ *   passes the accessibility gate's rule set too. `e2e/mobile/gsap-intent.spec.ts` checks the same
+ *   two things on the phone projects.
  * - A section the visitor has already scrolled into view when GSAP arrives keeps what they see.
  *   Each phase's entrance renders an `opacity: 0` from-state the moment it is built, so a build
  *   that lands late would otherwise blank a section someone is reading, and then replay it or leave
@@ -243,6 +250,7 @@ test('when GSAP cannot be fetched, the story shows its finished state', async ({
 
   await page.goto('/');
   await expectHydrated(page);
+  await sendIntent(page);
   await page.waitForFunction(
     (failedMark) => performance.getEntriesByName(failedMark, 'mark').length > 0,
     GSAP_FAILED_MARK,
@@ -269,4 +277,117 @@ test('when GSAP cannot be fetched, the story shows its finished state', async ({
   // The page stays usable: a hover on an animated heading does nothing, and throws nothing.
   await page.locator('h2').filter({ hasText: "doesn't fly here" }).hover();
   expect(pageErrors).toEqual([]);
+});
+
+/** Every script response carrying GSAP, by path, as the page receives them. */
+function watchGsapScripts(page: Page) {
+  const scripts: string[] = [];
+  page.on('response', async (response) => {
+    if (!response.url().endsWith('.js')) return;
+    const body = await response.text().catch(() => '');
+    if (body.includes(GSAP_SIGNATURE)) scripts.push(new URL(response.url()).pathname);
+  });
+  return scripts;
+}
+
+const marksSet = (page: Page) =>
+  page.evaluate(
+    ([loaded, failed]) =>
+      [loaded, failed].filter((name) => performance.getEntriesByName(name, 'mark').length > 0),
+    [GSAP_LOADED_MARK, GSAP_FAILED_MARK] as const,
+  );
+
+/** Waits for the loaded mark without sending any intent of its own, unlike `expectGsapLoaded`. */
+const waitForGsapLoadedMark = (page: Page) =>
+  page.waitForFunction(
+    (loadedMark) => performance.getEntriesByName(loadedMark, 'mark').length > 0,
+    GSAP_LOADED_MARK,
+  );
+
+test.describe('the first intent', () => {
+  test('nothing requests GSAP while the visitor only reads, and a wheel scroll does', async ({
+    page,
+  }) => {
+    const gsapScripts = watchGsapScripts(page);
+    await page.goto('/');
+    await expectHydrated(page);
+    // Three seconds with no input: long past when the idle load used to land (27-523 ms).
+    await page.waitForTimeout(3_000);
+    expect(gsapScripts, 'GSAP was requested with no input').toEqual([]);
+    expect(await marksSet(page)).toEqual([]);
+
+    await page.mouse.move(640, 360);
+    await page.mouse.wheel(0, 200);
+    await waitForGsapLoadedMark(page);
+    await expect
+      .poll(() => gsapScripts.length, { message: 'no script carrying GSAP' })
+      .toBeGreaterThan(0);
+  });
+
+  test('a key press loads GSAP', async ({ page }) => {
+    await page.goto('/');
+    await expectHydrated(page);
+    expect(await marksSet(page)).toEqual([]);
+    // A key that does not scroll: an arrow key would scroll the document, and the scroll listener
+    // alone would then start the load, so the test could not tell that the key press did.
+    await page.keyboard.press('Shift');
+    await waitForGsapLoadedMark(page);
+    expect(await page.evaluate(() => scrollY), 'the key press scrolled the page').toBe(0);
+  });
+
+  test('a reload at a restored scroll position loads GSAP with no further input', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expectHydrated(page);
+    await page.mouse.move(640, 360);
+    await page.mouse.wheel(0, 1_200);
+    await page.waitForFunction(() => scrollY > 1_000);
+
+    await page.reload();
+    await expectHydrated(page);
+    // Chromium restores the position on a reload; the loader finds the page already scrolled, or
+    // hears the restoring scroll, and needs nothing from the visitor.
+    await waitForGsapLoadedMark(page);
+    expect(
+      await page.evaluate(() => scrollY),
+      'the reload did not restore the scroll position, so this case proves nothing',
+    ).toBeGreaterThan(0);
+  });
+
+  // What a visitor who has not yet scrolled sees, and what Lighthouse's accessibility audit now
+  // scores: the served story, before GSAP has built any from-state. The gate's own rule set, its
+  // at-rest floor for `/` (`AT_REST_CONTRAST_FLOOR` in `accessibility.spec.ts`, 80), and no budget
+  // of its own: the incomplete count is recorded, not gated.
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`/ has no axe violations before any intent in the ${colorScheme} theme`, async ({
+      page,
+    }) => {
+      test.setTimeout(90_000);
+      // Held rather than trusted to stay away: should anything the audit does count as intent, GSAP
+      // still cannot arrive and change the page under it.
+      let release = () => {};
+      const released = new Promise<void>((resolve) => (release = resolve));
+      await routeScripts(page, async (route) => {
+        await released;
+        await route.abort();
+      });
+      await page.emulateMedia({ colorScheme });
+      await page.goto('/', { waitUntil: 'networkidle', timeout: 30_000 });
+      await expectHydrated(page);
+      await expect(page.locator('html')).toContainClass(colorScheme);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+      const results = await audit(page);
+      release();
+      const incomplete = incompleteNodes(results, 'color-contrast');
+      test.info().annotations.push({
+        type: 'colour-contrast incomplete before intent',
+        description: String(incomplete),
+      });
+      expect(describeViolations(results.violations)).toEqual([]);
+      expect(ruleIdsThatRan(results)).toEqual(expect.arrayContaining(['document-title']));
+      expect(passingNodes(results, 'color-contrast')).toBeGreaterThan(80);
+    });
+  }
 });
