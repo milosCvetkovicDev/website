@@ -50,17 +50,6 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       }
     });
 
-    test('runs neither the tmux clock nor its log lines', async ({ page }) => {
-      // Displayed, the clock ticks every second and the kubectl pane's first line arrives within
-      // an idle callback plus two seconds (`e2e/hero.spec.ts`). Here neither may happen.
-      await page.waitForTimeout(3_500);
-      await expect(page.getByText(SERVED_CLOCK, { exact: true })).toHaveCount(1);
-      // Under reduced motion the static snapshot is served with its lines; with motion allowed the
-      // panes only get lines from their ticks.
-      const firstLine = page.getByText('$ kubectl get pods -n production -w', { exact: true });
-      await expect(firstLine).toHaveCount(reducedMotion === 'reduce' ? 1 : 0);
-    });
-
     test('does not display the corner brackets or the scroll indicator', async ({ page }) => {
       // The section readout, `[01/07] …`, sits in the corner-bracket layer.
       const readout = page.getByText(/^\[\d{2}\/\d{2}\]/);
@@ -73,3 +62,65 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     });
   });
 }
+
+/**
+ * Whether the background's ticks run cannot be seen on the page: a root that is not displayed never
+ * intersects, and the ticks already skip their DOM work while it does not, so the clock looks
+ * stopped either way. So this counts what the page starts instead. The clock's one-second interval
+ * is the only `setInterval` in the app, and the background's effects ask for the `md` query before
+ * they start any tick. Motion allowed only: under `reduce` the background starts no ticks at all.
+ */
+test.describe('the tmux ticks on a phone', () => {
+  type Recorded = { intervalDelays?: number[]; displayQueries?: number };
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const recorded = window as Recorded;
+      recorded.intervalDelays = [];
+      recorded.displayQueries = 0;
+      const setInterval = window.setInterval.bind(window);
+      window.setInterval = ((handler: TimerHandler, timeout?: number, ...rest: unknown[]) => {
+        recorded.intervalDelays?.push(timeout ?? 0);
+        return setInterval(handler, timeout, ...rest);
+      }) as typeof window.setInterval;
+      const matchMedia = window.matchMedia.bind(window);
+      window.matchMedia = (query: string) => {
+        if (query === '(min-width: 48rem)')
+          recorded.displayQueries = (recorded.displayQueries ?? 0) + 1;
+        return matchMedia(query);
+      };
+    });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await gotoHydrated(page, '/');
+  });
+
+  test('start only once the viewport reaches md, and then fill the panes', async ({ page }) => {
+    const recorded = () =>
+      page.evaluate(() => {
+        const { intervalDelays = [], displayQueries = 0 } = window as Recorded;
+        return { displayQueries, clocks: intervalDelays.filter((delay) => delay === 1000).length };
+      });
+    // Once one of the background's effects has asked, the effects of that commit have all run, so
+    // every clock they were going to start below md has started.
+    await expect
+      .poll(async () => (await recorded()).displayQueries, {
+        message: 'the tmux background never asked whether it is displayed',
+      })
+      .toBeGreaterThan(0);
+    expect((await recorded()).clocks, 'the tmux clock started below md').toBe(0);
+
+    // Past md, as on a phone turned sideways or a narrow window widened, the clock starts and
+    // ticks, and the panes fill: the way back from `display: none`, with real layout.
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await expect
+      .poll(async () => (await recorded()).clocks, {
+        message: 'the tmux clock did not start at md',
+      })
+      .toBe(1);
+    await expect(page.getByText(SERVED_CLOCK, { exact: true })).toHaveCount(0);
+    // Lines arrive after an idle callback plus up to two seconds, as in `e2e/hero.spec.ts`.
+    await expect(
+      page.getByText('$ kubectl get pods -n production -w', { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+  });
+});

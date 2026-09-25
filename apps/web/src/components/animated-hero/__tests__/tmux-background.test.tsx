@@ -1,6 +1,23 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DISPLAYED_QUERY, TmuxBackground } from '../tmux-background';
+
+/**
+ * The width Tailwind compiles `md:` to: `globals.css`'s own `--breakpoint-md` if it sets one, else
+ * the one in Tailwind's theme, resolved the way the build resolves the package.
+ */
+function tailwindMdWidth(): string | undefined {
+  const breakpoint = (file: string) =>
+    /--breakpoint-md:\s*([^;]+);/.exec(readFileSync(file, 'utf8'))?.[1]?.trim();
+  return (
+    breakpoint(join(dirname(fileURLToPath(import.meta.url)), '../../../app/globals.css')) ??
+    breakpoint(createRequire(import.meta.url).resolve('tailwindcss/theme.css'))
+  );
+}
 
 /**
  * A `matchMedia` whose answers the tests set: the reduced-motion preference and whether the viewport
@@ -281,7 +298,9 @@ describe('AnimatedPane log slots', () => {
   describe('below md, where the background is not displayed', () => {
     it('asks for the same width as the root class, `md:flex`', () => {
       const { container } = render(<TmuxBackground />);
-      expect(DISPLAYED_QUERY).toBe('(min-width: 48rem)');
+      // Read from the stylesheets, so a changed `md` breakpoint fails here rather than showing the
+      // background at one width and starting its ticks at another.
+      expect(DISPLAYED_QUERY).toBe(`(min-width: ${tailwindMdWidth()})`);
       expect(container.firstElementChild?.className).toMatch(/(^| )hidden( |$)/);
       expect(container.firstElementChild?.className).toMatch(/(^| )md:flex( |$)/);
     });
