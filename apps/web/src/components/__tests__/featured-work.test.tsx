@@ -105,6 +105,26 @@ describe('FeaturedWork', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('shows a retired project with a still, neutral badge and a running one pulsing', () => {
+    stubMatchMedia(true);
+    const [template] = featuredProjects;
+    const probe = (status: 'LIVE' | 'RETIRED') => ({
+      ...template,
+      slug: `probe-${status.toLowerCase()}`,
+      title: `Probe ${status}`,
+      status,
+    });
+    render(<FeaturedWork projects={[probe('RETIRED'), probe('LIVE')]} />);
+
+    const retired = screen.getByText('RETIRED', { exact: true });
+    expect(retired).toHaveClass('text-[var(--tmux-bar-text)]');
+    expect(retired.previousElementSibling).not.toHaveClass('animate-pulse');
+
+    const live = screen.getByText('LIVE', { exact: true });
+    expect(live).toHaveClass('text-[var(--tmux-status-ok)]');
+    expect(live.previousElementSibling).toHaveClass('animate-pulse');
+  });
+
   it('activates a project and its architecture nodes on keyboard focus', () => {
     stubMatchMedia(true);
     const { container, linkFor } = renderFeaturedWork();
