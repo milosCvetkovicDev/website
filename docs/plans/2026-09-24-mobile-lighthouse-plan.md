@@ -747,8 +747,23 @@ PLAYWRIGHT_PORT=3212 pnpm --filter web test:e2e --retries=0
 ## Owner decisions (not in this plan)
 
 1. **No TmuxBackground on phones.** A visible design change. TBT about 0 (182 vs 178 ms JS-only
-   blocking), about −150 ms of rendering CPU per 5 s on phones, and 74 fewer served elements. After
-   Task 4 only one pane shows anyway.
+   blocking), about −150 ms of rendering CPU per 5 s on phones, and 74 fewer served elements (these
+   estimates assumed phones would not be served the background; the note below says what the built
+   change delivers). After Task 4 only one pane shows anyway.
+   - **2026-09-25: built** on the branch `perf/phone-hero-and-font-axis`, at Task 4's phone width,
+     below `md`: the background's root is `hidden md:flex`, and its clock and log ticks start only
+     while `(min-width: 48rem)` matches, in effects. The page is prerendered once for every width,
+     so the background is still served and hydrated: the page chunk, the served elements and the
+     hydration work do not shrink. What phones lose is its layout, paint and ticks.
+   - **2026-09-25: measured** with the font cut of the next section, both on the one branch, in 12
+     interleaved mobile Lighthouse pairs against `main` at `0781e6d` (medians, `main` then branch):
+     LCP 2,907 → 2,757 ms, lower in every pair; FCP 1,024 → 984.5 ms; main-thread work 1,550 →
+     1,364.5 ms; long-task time 517.5 → 531.5 ms; bytes requested before first paint 258.3 →
+     245.3 KB; CLS 0 on both. TBT rose from 145.5 to 217 ms, and the score fell from 94 to 92.
+     TBT is bimodal on both sides, about 145 or about 220 ms: the high runs are the ones where the
+     first long task on `/` splits in two, 4 of 12 on `main` and 7 of 12 on the branch, while the
+     long tasks themselves stay the same size. Why the branch splits it more often is not
+     established.
 2. **A smaller hero-card blur below `sm`, or stopping the `hero-breathe` glow.** GPU only: the
    card's blur is about half of the GPU main-thread time at rest. No Lighthouse effect.
 3. **Pausing decorative animations while they are off screen.** This is #47 hero-4; leave it there.
@@ -796,6 +811,11 @@ locally over HTTP/1.1, and at 0 (within ±8 ms) over HTTP/2 and on the productio
   by at most 0.4 units), but it replayed at 0 ms of LCP after Tasks 2–3, even at ×0.54 of the bytes.
   A real saving for visitors and a good follow-up; it must regenerate #118's mono mark file. Not
   400–800: that changes 42–80 advance widths.
+  - **2026-09-25: built** on the branch `perf/phone-hero-and-font-axis`: −6,972 bytes on the sans
+    file and −6,312 on the mono file, 13,284 in all. Measured again, U+00A4 moves by up to 0.5
+    units, at 900. The instancer keeps the `maxp` values, because recomputing them changed a few
+    pixels of weight-400 text in Chromium; with them kept, `/` and a case study render with no
+    differing pixel. The mark file regenerates byte for byte, so it is unchanged.
 - **ASCII-only font subsets** (a further −12.2 KB): no LCP effect either, and they narrow future
   glyph coverage.
 - **`content-visibility: auto` on the phases:** with Task 1 it made TBT worse (213 → 267 ms), with

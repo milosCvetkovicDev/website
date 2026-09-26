@@ -23,7 +23,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev'
 const geistSans = localFont({
   src: './fonts/geist-latin.woff2',
   variable: '--font-geist-sans',
-  weight: '100 900',
+  weight: '400 900',
   adjustFontFallback: false,
   fallback: ['Geist Fallback'],
 });
@@ -31,7 +31,7 @@ const geistSans = localFont({
 const geistMono = localFont({
   src: './fonts/geist-mono-latin-symbols.woff2',
   variable: '--font-geist-mono',
-  weight: '100 900',
+  weight: '400 900',
   adjustFontFallback: false,
   fallback: ['Geist Mono Fallback'],
 });
