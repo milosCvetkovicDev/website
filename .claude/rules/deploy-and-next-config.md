@@ -53,6 +53,8 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
   `same-origin` to `same-origin-allow-popups` (VERCEL_ENV=preview). `turbo.json` declares
   `VERCEL_ENV` in the `build` task's `env` so that it splits the cache key: Turborepo's strict mode
   passes `VERCEL_*` through to `next build` anyway, but leaves an undeclared one out of the hash.
+  It declares `VERCEL` for the same reason: `<WebAnalytics />` in the root layout renders Vercel's
+  tracker only when `VERCEL=1`, because nowhere else serves `/_vercel/insights/` (ADR 0026).
   Never add `upgrade-insecure-requests`: WebKit applies it to `http://localhost`, which breaks the
   `mobile-safari` project.
 - `.next-e2e` is known to seven places, not one: both `.gitignore` files, `.prettierignore`,

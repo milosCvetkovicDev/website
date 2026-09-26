@@ -14,6 +14,7 @@ import { HydrationMarker } from '@/components/hydration-marker';
 import { Navigation } from '@/components/navigation';
 import { Footer } from '@/components/footer';
 import { PersonJsonLd, WebsiteJsonLd } from '@/components/json-ld';
+import { WebAnalytics } from '@/components/web-analytics';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
 
@@ -101,6 +102,7 @@ export default function RootLayout({
           <Footer />
         </ThemeProvider>
         <HydrationMarker />
+        <WebAnalytics />
       </body>
     </html>
   );

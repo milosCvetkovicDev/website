@@ -733,28 +733,14 @@ This runbook deliberately stops short of the following. None of it is in place; 
 
 - **`apps/playground` is not deployed.** It is a local Vite sandbox (`pnpm dev:playground`) with no
   Vercel project and no public URL. Only `apps/web` ships.
-- **No analytics reaches anyone, although the Vercel toggle is on.** These are two switches and only
-  one of them is flipped. The project has Web Analytics enabled server-side (`webAnalytics.enabledAt`
-  is `2026-09-09T08:20:48Z` in the project API, and
-  `curl -s https://miloscvetkovic.dev/_vercel/insights/script.js` answers `200`
-  `application/javascript`), but nothing loads that script: `apps/web/package.json` does not depend on
-  `@vercel/analytics`, no `<Analytics />` is mounted in `apps/web/src/app/layout.tsx`, and
-  `curl -s https://miloscvetkovic.dev/ | grep -c '_vercel'` prints `0`. So Speed Insights reports
-  `hasData: false` and there are no traffic numbers anywhere. Pick one state rather than leaving both
-  half-on:
-  - **Off** (smaller change): turn Web Analytics off under **Project Settings → Analytics**, then
-    `vercel api /v9/projects/<project-id> --raw | jq .webAnalytics` returns null and this bullet
-    becomes simply "no analytics".
-  - **On**: `pnpm --filter web add @vercel/analytics` and mount `<Analytics />` in the layout's
-    provider tree. That couples to three other things. The Content-Security-Policy (ADR 0023): in
-    production the script and its beacons are same-origin under `/_vercel/insights/`, so `'self'`
-    covers them, but under `next dev` the package loads
-    `https://va.vercel-scripts.com/v1/script.debug.js` instead, which the development `script-src`
-    has to allow or `apps/web/e2e/console-clean.spec.ts` fails on every local run. The first-load
-    JS budget has to be re-measured. And no local server serves `/_vercel/insights/` (a local
-    `next start` answers it 404, and that spec fails on a 404 for an asset), so no e2e run shows
-    the production script working: open the live `/` with the console open after the deploy.
-- **No Speed Insights data.** See above; the toggle reports `hasData: false`.
+- **Web Analytics is tested only by hand.** Since ADR 0026, `apps/web/src/components/web-analytics.tsx`
+  mounts Vercel's `<Analytics />` in Vercel builds only (`VERCEL=1`, production and preview), so
+  no local or CI server loads it and no e2e run shows the tracker working. After a deploy, open the
+  live `/` with DevTools open: it requests `/_vercel/insights/script.js` (`200`), then
+  `/_vercel/insights/view`, and the console stays clean. Page views show on the project's
+  **Analytics** tab.
+- **No Speed Insights.** `@vercel/speed-insights` is not installed, so there are no field Core Web
+  Vitals.
 - **No error monitoring.** There is no Sentry or equivalent. `apps/web/src/app/error.tsx` is a client
   component: it renders a friendly error page and calls `console.error` in the visitor's browser,
   which goes nowhere you can see. The site is fully prerendered, so there is little server runtime
