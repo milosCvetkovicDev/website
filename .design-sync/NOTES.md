@@ -123,6 +123,18 @@ expects, and what each workaround depends on.
 - **The preview `matchMedia` stub depends on components honouring reduced motion.** A component that
   stops checking it will animate under capture again, and its cells will grade on a mid-animation
   frame.
+- **The tmux panes render only because their cards are wide.** Since #131 `TmuxBackground` is
+  `hidden md:flex` and starts its clock only while `DISPLAYED_QUERY` (`min-width: 48rem`) matches,
+  which the preview stub hands to the real `matchMedia`. Its card (1200x700) and the two that render
+  it, `HeroSection` and `AnimatedHero` (1200x900), show the panes because those viewports are 768px
+  or wider; a narrower `viewport` override would capture an empty background and could still grade
+  as a clean render.
+- **A sync from another worktree leaves this one's grade cache behind.** Grades live in the
+  gitignored `.design-sync/.cache/review/`, per checkout. On 2026-09-26 the anchor already matched
+  #124's `Logo`, synced from another worktree, but this worktree's cache had no `Logo` grades and
+  older `Footer` and `Navigation` ones, so a full capture cleared them. When a `grade cleared` line
+  names a component whose preview this branch did not change, check whether another checkout synced
+  it last before suspecting a regression, then read the fresh sheets and regrade those cells.
 - **Nothing outside the sync itself checks these files.** `.design-sync/` is covered by no tsconfig
   and no ESLint config, and the two `.mjs` scripts have no test suite, so a broken preview or a wrong
   type surfaces when the converter runs, not in CI: `preview-rebuild` prints
@@ -136,7 +148,8 @@ expects, and what each workaround depends on.
   `@tailwindcss/postcss`, chromium 1243 via `playwright@1.63.0` in `.ds-sync/`, and the skill files
   from Claude Code 2.1.275 (the 2026-09-23 re-sync ran 2.1.280 with no config change beyond the two
   exclusions above). Nothing is fetched from the network at build time; the fonts are the
-  repository's own woff2 files.
+  repository's own woff2 files, cut to weights 400 to 900 since #131 (`conventions.md` tells the
+  design agent a lighter weight renders at 400).
 
 ## Claude Design's report
 
