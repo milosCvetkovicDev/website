@@ -6255,24 +6255,24 @@
       "anchor": "| 0023 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0023's record carries the status line \"Accepted\".",
+      "claim": "ADR 0023's record carries the status line \"Superseded by ADR-0025\".",
       "check": {
         "file": "docs/adr/0023-static-security-headers.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0025"
       }
     },
     {
       "id": "adr-index-0023-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0023 |",
-      "claim": "The index row for ADR 0023 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0023 gives the record's status line, \"Superseded by ADR-0025\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0023 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0025"
       }
     },
     {
@@ -6437,6 +6437,169 @@
       ],
       "check": {
         "path": "docs/adr/0022-no-boot-loader.md"
+      }
+    },
+    {
+      "id": "adr-readme-link-0025-production-alias-noindex",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0025-production-alias-noindex.md)",
+      "claim": "The link to 0025-production-alias-noindex.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0025-production-alias-noindex.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0025-production-alias-noindex.md"
+      }
+    },
+    {
+      "id": "adr-index-0025-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0025 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0025's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0025-production-alias-noindex.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0025-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0025 |",
+      "claim": "The index row for ADR 0025 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0025 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0025-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0025 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0025's record carries the Date \"2026-09-25\".",
+      "check": {
+        "file": "docs/adr/0025-production-alias-noindex.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-25"
+      }
+    },
+    {
+      "id": "adr-index-0025-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0025 |",
+      "claim": "The index row for ADR 0025 gives the record's Date, \"2026-09-25\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0025 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-25"
+      }
+    },
+    {
+      "id": "adr-index-0025-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0025 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0025's record carries the H1 title \"The public `vercel.app` production alias answers `X-Robots-Tag: noindex`\".",
+      "check": {
+        "file": "docs/adr/0025-production-alias-noindex.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "The public `vercel.app` production alias answers `X-Robots-Tag: noindex`"
+      }
+    },
+    {
+      "id": "adr-index-0025-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0025 |",
+      "claim": "The index row for ADR 0025 gives the record's H1 title, \"The public `vercel.app` production alias answers `X-Robots-Tag: noindex`\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0025 \\| \\[(.+?)\\]\\(0025-",
+        "equals": "The public `vercel.app` production alias answers `X-Robots-Tag: noindex`"
+      }
+    },
+    {
+      "id": "adr-0023-link-0025-production-alias-noindex",
+      "doc": "docs/adr/0023-static-security-headers.md",
+      "anchor": "](0025-production-alias-noindex.md)",
+      "claim": "The link to 0025-production-alias-noindex.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0025-production-alias-noindex.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0025-production-alias-noindex.md"
+      }
+    },
+    {
+      "id": "adr-0025-link-runbooks-deploy",
+      "doc": "docs/adr/0025-production-alias-noindex.md",
+      "anchor": "](../runbooks/deploy.md)",
+      "claim": "The link to ../runbooks/deploy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../runbooks/deploy.md"
+        }
+      ],
+      "check": {
+        "path": "docs/runbooks/deploy.md"
+      }
+    },
+    {
+      "id": "adr-0025-link-0017-ai-discoverability-policy",
+      "doc": "docs/adr/0025-production-alias-noindex.md",
+      "anchor": "](0017-ai-discoverability-policy.md)",
+      "claim": "The link to 0017-ai-discoverability-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0017-ai-discoverability-policy.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0017-ai-discoverability-policy.md"
+      }
+    },
+    {
+      "id": "adr-0025-link-0023-static-security-headers",
+      "doc": "docs/adr/0025-production-alias-noindex.md",
+      "anchor": "](0023-static-security-headers.md)",
+      "claim": "The link to 0023-static-security-headers.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0023-static-security-headers.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0023-static-security-headers.md"
       }
     },
     {

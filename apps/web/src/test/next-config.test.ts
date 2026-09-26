@@ -2,15 +2,18 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { unstable_getResponseFromNextConfig } from 'next/experimental/testing/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import nextConfig, {
   contentSecurityPolicy,
   crossOriginOpenerPolicy,
   findWorkspaceRoot,
+  PRODUCTION_ALIAS_HEADERS,
   SECURITY_HEADERS_SOURCE,
   securityHeaders,
   type HeaderEnv,
 } from '../../next.config';
+import { PRODUCTION_ALIAS_HOST } from '../../production-alias';
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.resolve(testDir, '../..');
@@ -124,17 +127,21 @@ describe('security headers', () => {
     expect(contentSecurityPolicy({ NODE_ENV: 'test' })).toBe(PRODUCTION_POLICY);
   });
 
-  it('declares one headers() entry whose source covers every path', async () => {
+  it('declares the security headers in one entry whose source covers every path', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_ENV', '');
 
     // `:path*` is zero or more segments, so `/` matches as well as `/_next/static/...` and any 404.
     // `/(.*)` would do the same; a narrower pattern is how a surface gets left out, and the e2e
     // spec (e2e/security-headers.spec.ts) is what proves all four surfaces under both servers.
+    // The second entry is the production alias's noindex (ADR 0025), pinned below.
     expect(SECURITY_HEADERS_SOURCE).toBe('/:path*');
-    expect(await nextConfig.headers?.()).toEqual([
-      { source: SECURITY_HEADERS_SOURCE, headers: securityHeaders(production) },
-    ]);
+    const [security, ...rest] = (await nextConfig.headers?.()) ?? [];
+    expect(security).toEqual({
+      source: SECURITY_HEADERS_SOURCE,
+      headers: securityHeaders(production),
+    });
+    expect(rest).toHaveLength(1);
   });
 
   it('reads the environment when Next calls headers(), not when the config loads', async () => {
@@ -230,5 +237,79 @@ describe('security headers', () => {
         if (sources.includes("'none'")) expect(sources, `${name} ${directive}`).toHaveLength(1);
       }
     }
+  });
+});
+
+// live-3 and pages-7 (#48), #52's AC 18, and ADR 0025. The public production alias serves the same
+// bytes as the apex, so it answers `X-Robots-Tag: noindex`, and no other host may. The e2e spec
+// (e2e/production-alias.spec.ts) proves the header on four surfaces under both servers; these pin
+// the entry, and run it through Next's own route matcher.
+describe('the production alias', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const entries = async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', '');
+    return (await nextConfig.headers?.()) ?? [];
+  };
+
+  it('is a bare vercel.app host name, and not the apex', () => {
+    // No scheme, port, path or capital letter: Next compares the value with the request's host,
+    // lower-cased and without its port, as an anchored regular expression.
+    expect(PRODUCTION_ALIAS_HOST).toMatch(/^[a-z0-9-]+\.vercel\.app$/);
+    expect(PRODUCTION_ALIAS_HOST).not.toContain('miloscvetkovic');
+  });
+
+  it('declares a second entry: every path, keyed on the alias host, sending noindex alone', async () => {
+    const [, alias] = await entries();
+    expect(alias).toEqual({
+      source: SECURITY_HEADERS_SOURCE,
+      has: [{ type: 'host', value: PRODUCTION_ALIAS_HOST }],
+      headers: [{ key: 'X-Robots-Tag', value: 'noindex' }],
+    });
+    expect(PRODUCTION_ALIAS_HEADERS).toEqual([{ key: 'X-Robots-Tag', value: 'noindex' }]);
+  });
+
+  // A rule keyed on the apex being absent would noindex production the day that value had a typo,
+  // or the day a new host (www, a second custom domain) answered for the site.
+  it('keys no entry on a missing condition', async () => {
+    for (const entry of await entries()) {
+      expect(entry, entry.source).not.toHaveProperty('missing');
+    }
+  });
+
+  it('leaves the six ADR 0023 headers as they were, on every host', async () => {
+    const [security, alias] = await entries();
+    expect(security).not.toHaveProperty('has');
+    expect(security?.headers).toEqual(securityHeaders({ NODE_ENV: 'production' }));
+    expect(security?.headers.map(({ key }) => key.toLowerCase())).not.toContain('x-robots-tag');
+    // The alias entry adds a header and overrides none of the six: a later entry that sets the
+    // same key wins, so a shared key here would change the security headers on the alias.
+    const securityKeys = new Set(security?.headers.map(({ key }) => key.toLowerCase()));
+    for (const { key } of alias?.headers ?? [])
+      expect(securityKeys.has(key.toLowerCase())).toBe(false);
+  });
+
+  // Next's own matcher (the one `next start` uses) on the config as declared, so the regular
+  // expression semantics of a `has` value, and the port that the matcher strips, are exercised
+  // rather than assumed.
+  it("sends noindex to the alias host alone, through Next's route matcher", async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', '');
+    const robotsTag = async (url: string) =>
+      (await unstable_getResponseFromNextConfig({ url, nextConfig })).headers.get('x-robots-tag');
+
+    for (const path of ['/', '/about', '/work/self-healing-agent', '/_next/static/x.js', '/nope']) {
+      expect(await robotsTag(`https://${PRODUCTION_ALIAS_HOST}${path}`), path).toBe('noindex');
+      expect(await robotsTag(`http://${PRODUCTION_ALIAS_HOST}:3000${path}`), path).toBe('noindex');
+      for (const host of ['miloscvetkovic.dev', 'www.miloscvetkovic.dev', 'localhost:3210']) {
+        expect(await robotsTag(`https://${host}${path}`), `${host}${path}`).toBeNull();
+      }
+    }
+    // Anchored: a host that merely contains the alias, or that the alias merely prefixes, misses.
+    expect(await robotsTag(`https://x${PRODUCTION_ALIAS_HOST}/`)).toBeNull();
+    expect(await robotsTag(`https://${PRODUCTION_ALIAS_HOST}.example/`)).toBeNull();
   });
 });
