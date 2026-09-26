@@ -6496,6 +6496,62 @@
       }
     },
     {
+      "id": "adr-readme-link-0026-vercel-web-analytics",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0026-vercel-web-analytics.md)",
+      "claim": "The link to 0026-vercel-web-analytics.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0026-vercel-web-analytics.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0026-vercel-web-analytics.md"
+      }
+    },
+    {
+      "id": "adr-index-0026-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0026 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0026's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0026-vercel-web-analytics.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0026-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0026 |",
+      "claim": "The index row for ADR 0026 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0026 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0026-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0026 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0026's record carries the Date \"2026-09-26\".",
+      "check": {
+        "file": "docs/adr/0026-vercel-web-analytics.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-26"
+      }
+    },
+    {
       "id": "adr-index-0025-cell-date",
       "doc": "docs/adr/README.md",
       "anchor": "| 0025 |",
