@@ -36,6 +36,7 @@ CSS variables, light values in `:root` and dark ones in `.dark`:
 
 - `font-sans` is Geist, the body font; `font-mono` is Geist Mono. HUD labels are
   `font-mono text-xs uppercase tracking-wider text-[var(--muted)]`.
+- Both fonts carry weights 400 to 900 only: a lighter font weight renders at 400.
 - Section: `<section className="border-t border-[var(--border)] py-20">` around
   `<div className="mx-auto max-w-5xl px-6">`; heading `text-3xl font-bold md:text-4xl`; lead
   `text-lg text-[var(--muted)]`.
@@ -57,6 +58,9 @@ CSS variables, light values in `:root` and dark ones in `.dark`:
 - Groups: `hud` (panels, terminal, stats and status rows: the site's signature look and the parts to
   build new UI from), `sections` (whole page sections), `featured-work`, and `animated-hero` (the
   home page's scroll story: decorative set pieces, not building blocks).
+- `TmuxBackground`, and the `HeroSection` and `AnimatedHero` that render it, show the tmux panes
+  only from Tailwind's `md` breakpoint (768px) up, as the site does: in a narrower frame that
+  background renders nothing.
 - `<CTA />`, the closing "Let's Connect" section with the LinkedIn, GitHub and X buttons, takes no
   props. It is on `window.Portfolio` but has no card of its own.
 
