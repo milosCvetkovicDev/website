@@ -1,4 +1,4 @@
-# 0026. Vercel Web Analytics loads in Vercel builds only
+# 0026. Vercel Web Analytics loads in Vercel deployments only
 
 ## Status
 
@@ -25,17 +25,17 @@ Three things constrain how it is mounted:
   refuses.
 - Only Vercel's edge serves `/_vercel/insights/`. A local or CI `next start` answers it `404`, and
   Chromium logs that as a console error, which `apps/web/e2e/console-clean.spec.ts` fails on.
-- The tracker needs no cookie and stores no identifier on the visitor's device, so the site needs no
-  consent banner for it.
+- `VERCEL=1` does not mean a Vercel deployment: `vercel env pull` writes it into a local
+  `.env.local`, which `next dev` loads, beside `VERCEL_ENV="development"`.
 
 ## Decision
 
 `apps/web/src/components/web-analytics.tsx` renders `<Analytics />` from `@vercel/analytics/next`
-at the end of the root layout's `<body>`, and only when `process.env.VERCEL` is `1`, which Vercel
-sets in its builds, production and preview alike. Everywhere else, `next dev`, CI and a local
-`next start`, it renders nothing, so neither the CSP nor the console gate changes. `turbo.json`
-declares `VERCEL` in the `build` task's `env` so that a build made with it and one made without it
-never share a cache entry.
+at the end of the root layout's `<body>`, and only when `process.env.VERCEL_ENV` is `production` or
+`preview`, which Vercel sets in a deployment's build. Everywhere else, `next dev` (pulled env
+included), CI and a local `next start`, it renders nothing, so neither the CSP nor the console gate
+changes. `turbo.json` already declares `VERCEL_ENV` in the `build` task's `env` (for the CSP), so a
+build made with it and one made without it never share a cache entry.
 
 ## Consequences
 
@@ -47,6 +47,10 @@ never share a cache entry.
   `/_vercel/insights/script.js` with a clean console.
 - The package's client code ships in the layout's shared chunk on every build, rendered or not,
   because Next bundles a client module by import rather than by render.
+- Vercel documents the tracker as cookieless: it stores no identifier on the visitor's device. It
+  still sends the page URL, referrer and request metadata to Vercel. No route reads a query string
+  today, so no `beforeSend` redacts one; whether the site needs a privacy notice is the owner's call
+  and is not settled here.
 - An ad blocker that drops `/_vercel/insights/` makes the tracker log one `console.log` line and
   count nothing; the site is unaffected.
 

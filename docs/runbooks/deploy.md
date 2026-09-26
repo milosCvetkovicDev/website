@@ -734,7 +734,7 @@ This runbook deliberately stops short of the following. None of it is in place; 
 - **`apps/playground` is not deployed.** It is a local Vite sandbox (`pnpm dev:playground`) with no
   Vercel project and no public URL. Only `apps/web` ships.
 - **Web Analytics is tested only by hand.** Since ADR 0026, `apps/web/src/components/web-analytics.tsx`
-  mounts Vercel's `<Analytics />` in Vercel builds only (`VERCEL=1`, production and preview), so
+  mounts Vercel's `<Analytics />` in deployment builds only (`VERCEL_ENV` `production` or `preview`), so
   no local or CI server loads it and no e2e run shows the tracker working. After a deploy, open the
   live `/` with DevTools open: it requests `/_vercel/insights/script.js` (`200`), then
   `/_vercel/insights/view`, and the console stays clean. Page views show on the project's

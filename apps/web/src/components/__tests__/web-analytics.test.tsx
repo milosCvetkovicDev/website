@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebAnalytics } from '../web-analytics';
 
@@ -9,34 +9,48 @@ vi.mock('next/navigation.js', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-const insightScripts = () =>
-  [...document.head.querySelectorAll('script')].filter((script) => script.src.includes('insights'));
+// The production script is /_vercel/insights/script.js; the debug one is on va.vercel-scripts.com.
+const trackerScripts = () =>
+  [...document.head.querySelectorAll('script')].filter(
+    (script) => script.src.includes('insights') || script.src.includes('vercel-scripts'),
+  );
+
+/** Renders the component and lets its Suspense boundary and effects settle. */
+async function renderSettled() {
+  await act(async () => {
+    render(<WebAnalytics />);
+  });
+}
 
 afterEach(() => {
   vi.unstubAllEnvs();
-  insightScripts().forEach((script) => script.remove());
+  trackerScripts().forEach((script) => script.remove());
 });
 
 describe('WebAnalytics', () => {
-  it('loads the tracker from this origin in a production build on Vercel', async () => {
-    vi.stubEnv('VERCEL', '1');
-    vi.stubEnv('NODE_ENV', 'production');
-    render(<WebAnalytics />);
+  it.each(['production', 'preview'])(
+    'loads the tracker from this origin in a %s deployment',
+    async (deployment) => {
+      vi.stubEnv('VERCEL_ENV', deployment);
+      vi.stubEnv('NODE_ENV', 'production');
+      await renderSettled();
 
-    // The Suspense boundary around the tracker resolves on a later tick.
-    await vi.waitFor(() => expect(insightScripts()).toHaveLength(1));
-    // Same origin, so the CSP's script-src and connect-src 'self' cover it.
-    expect(new URL(insightScripts()[0].src).pathname).toBe('/_vercel/insights/script.js');
-    expect(new URL(insightScripts()[0].src).origin).toBe(window.location.origin);
-  });
+      await vi.waitFor(() => expect(trackerScripts()).toHaveLength(1));
+      // A path on this origin, so the CSP's script-src and connect-src 'self' cover it.
+      expect(trackerScripts()[0].getAttribute('src')).toBe('/_vercel/insights/script.js');
+    },
+  );
 
-  it('renders nothing outside Vercel, where /_vercel/insights does not exist', async () => {
-    vi.stubEnv('VERCEL', '');
-    vi.stubEnv('NODE_ENV', 'production');
-    const { container } = render(<WebAnalytics />);
+  // Unset in CI and a local `next start`; `development` is what `vercel env pull` writes.
+  it.each([undefined, 'development'])(
+    'renders nothing when VERCEL_ENV is %s, where /_vercel/insights does not exist',
+    async (deployment) => {
+      vi.stubEnv('VERCEL_ENV', deployment);
+      vi.stubEnv('VERCEL', '1');
+      vi.stubEnv('NODE_ENV', 'production');
+      await renderSettled();
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(container).toBeEmptyDOMElement();
-    expect(insightScripts()).toHaveLength(0);
-  });
+      expect(trackerScripts()).toHaveLength(0);
+    },
+  );
 });

@@ -50,7 +50,7 @@ perform an operation.
 | 0023 | [Six static security headers on every page and asset](0023-static-security-headers.md)                                                   | Superseded by ADR-0025                        | 2026-09-23 |
 | 0024 | [GSAP loads on the visitor's first intent](0024-gsap-loads-on-first-intent.md)                                                           | Accepted                                      | 2026-09-24 |
 | 0025 | [The public `vercel.app` production alias answers `X-Robots-Tag: noindex`](0025-production-alias-noindex.md)                             | Accepted                                      | 2026-09-25 |
-| 0026 | [Vercel Web Analytics loads in Vercel builds only](0026-vercel-web-analytics.md)                                                         | Accepted                                      | 2026-09-26 |
+| 0026 | [Vercel Web Analytics loads in Vercel deployments only](0026-vercel-web-analytics.md)                                                    | Accepted                                      | 2026-09-26 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
