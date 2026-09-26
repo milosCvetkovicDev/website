@@ -10,6 +10,8 @@ vi.mock('next/navigation.js', () => ({
 }));
 
 // The production script is /_vercel/insights/script.js; the debug one is on va.vercel-scripts.com.
+// The package picks the debug one at runtime when NODE_ENV is `test` or `development`, which is why
+// every case stubs NODE_ENV to `production`.
 const trackerScripts = () =>
   [...document.head.querySelectorAll('script')].filter(
     (script) => script.src.includes('insights') || script.src.includes('vercel-scripts'),
