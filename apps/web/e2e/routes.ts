@@ -5,7 +5,7 @@ import { caseStudies } from '../src/data/case-studies';
  *
  * Before this file, `console-clean.spec.ts` kept its own array and `accessibility.spec.ts` audited a
  * hand-picked two, while `src/app/sitemap.ts` restated the static six a third time. Three copies of
- * one fact: a route added to the app reached at most one of them. The static six are still written
+ * one fact: a route added to the app reached at most one of them. The static routes are still written
  * out by hand here — they are the App Router's own directory layout and nothing exports them — but
  * they are written out *once*, and the case studies are derived from the data file, so a new case
  * study reaches every gate without touching a spec.
@@ -15,8 +15,19 @@ import { caseStudies } from '../src/data/case-studies';
  * spec directory into the build. `src/app/__tests__/sitemap.test.ts` asserts the two agree.
  */
 
-/** The six routes backed by a `page.tsx` under `src/app`, in navigation order. */
-export const STATIC_ROUTES = ['/', '/about', '/work', '/skills', '/blog', '/contact'] as const;
+/**
+ * The seven routes backed by a `page.tsx` under `src/app`: the six in navigation order, then
+ * /privacy, which only the footer links to.
+ */
+export const STATIC_ROUTES = [
+  '/',
+  '/about',
+  '/work',
+  '/skills',
+  '/blog',
+  '/contact',
+  '/privacy',
+] as const;
 
 /** `/work/<slug>` for every case study in the data file. */
 export const CASE_STUDY_ROUTES = caseStudies.map(({ slug }) => `/work/${slug}`);
@@ -30,9 +41,9 @@ export const CASE_STUDY_ROUTES = caseStudies.map(({ slug }) => `/work/${slug}`);
 export const NOT_FOUND_ROUTE = '/no-such-page';
 
 /**
- * Every page a visitor can land on: the static six, the case studies, and a 404. Ten entries today.
- * This is the list the axe and console gates walk, which is what "all ten page routes" in the
- * acceptance criteria refers to.
+ * Every page a visitor can land on: the static seven, the case studies, and a 404. Eleven entries
+ * today. This is the list the axe and console gates walk; the acceptance criteria's "all ten page
+ * routes" was written before /privacy made it eleven.
  */
 export const PAGE_ROUTES = [...STATIC_ROUTES, ...CASE_STUDY_ROUTES, NOT_FOUND_ROUTE];
 

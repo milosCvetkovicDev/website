@@ -20,13 +20,14 @@ import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 // in their shell gets the assertions they should rather than a failure about an origin nobody is testing.
 const BASE = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
 
-/** The routes that belong in a sitemap: the static six minus /blog, plus every case study. */
+/** The routes that belong in a sitemap: the static seven minus /blog, plus every case study. */
 const EXPECTED_URLS = [
   BASE,
   `${BASE}/about`,
   `${BASE}/work`,
   `${BASE}/skills`,
   `${BASE}/contact`,
+  `${BASE}/privacy`,
   ...caseStudies.map(({ slug }) => `${BASE}/work/${slug}`),
 ];
 

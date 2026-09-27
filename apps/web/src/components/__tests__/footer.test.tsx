@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Footer } from '../footer';
 
 /**
- * The footer's three social links and its copyright line.
+ * The footer's three social links, its link to /privacy and its copyright line.
  *
  * Row R38 of the RED manifest, fixed by #49, plus the green assertions that are the floor under it. The
  * footer's links were asserted nowhere before this file.
@@ -23,11 +23,15 @@ const PROFILES = [
   { what: 'the X profile', href: 'https://x.com/milos_dev', name: undefined },
 ];
 
+/** The social links: every footer link that leaves the site. The only other one is /privacy. */
+const socialLinks = () =>
+  screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('https://'));
+
 describe('Footer', () => {
   it('renders exactly three social links, one per profile', () => {
     render(<Footer />);
 
-    const links = screen.getAllByRole('link');
+    const links = socialLinks();
     expect(links).toHaveLength(PROFILES.length);
     // By href, so a renamed label cannot make this fail and a *missing profile* still does.
     expect(links.map((link) => link.getAttribute('href')).sort()).toEqual(
@@ -41,7 +45,7 @@ describe('Footer', () => {
     // Each link's only content is an `<svg>`, so without a label it is an unnamed link — the exact
     // failure `label-content-name-mismatch` and `link-name` exist for. The name is read here rather
     // than queried by, so a rename cannot turn this into a false failure.
-    for (const link of screen.getAllByRole('link')) {
+    for (const link of socialLinks()) {
       const name = link.getAttribute('aria-label') ?? link.textContent ?? '';
       expect(name.trim(), `${link.getAttribute('href')} must have an accessible name`).not.toBe('');
     }
@@ -62,10 +66,22 @@ describe('Footer', () => {
 
     // `target="_blank"` without `rel="noopener"` hands the opened page a live `window.opener`. Both
     // attributes are on every link today; this is the floor that keeps them there through the rename.
-    for (const link of screen.getAllByRole('link')) {
+    for (const link of socialLinks()) {
       expect(link).toHaveAttribute('target', '_blank');
       expect(link.getAttribute('rel')).toBe('noopener noreferrer');
     }
+  });
+
+  it('links to the privacy notice in the same tab, and to nothing else on the site', () => {
+    render(<Footer />);
+
+    // Every page carries the footer, so this is how a visitor finds the notice. An internal link
+    // opening a new tab would be surprising, and would slip past the social-link scoping above.
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(PROFILES.length + 1);
+    const privacy = screen.getByRole('link', { name: 'Privacy' });
+    expect(privacy).toHaveAttribute('href', '/privacy');
+    expect(privacy).not.toHaveAttribute('target');
   });
 
   it.fails('R38 (#49): the copyright line carries a © mark and the X link is named for X', () => {

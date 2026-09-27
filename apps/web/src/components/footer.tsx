@@ -74,6 +74,12 @@ export function Footer() {
             <p className="text-sm text-[var(--muted)]">
               {new Date().getFullYear()} Milos Cvetkovic. Built with Next.js.
             </p>
+            <Link
+              href="/privacy"
+              className="text-sm text-[var(--muted)] underline underline-offset-4 transition-colors hover:text-[var(--foreground)]"
+            >
+              Privacy
+            </Link>
           </div>
           <div className="flex items-center gap-4">
             {socialLinks.map((link) => (

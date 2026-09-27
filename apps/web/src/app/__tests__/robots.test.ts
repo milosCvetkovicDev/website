@@ -69,7 +69,7 @@ describe('robots()', () => {
     // R25 in e2e/seo-surface.spec.ts is the specific `/_next/` and `/api/` mistake #48 removes. A rule
     // matching a page route would delist it, which is a category worse than blocking an asset.
     const disallowed = asArray(onlyRule().disallow);
-    for (const path of ['/', '/about', '/work', '/skills', '/contact', '/blog']) {
+    for (const path of ['/', '/about', '/work', '/skills', '/contact', '/blog', '/privacy']) {
       expect(disallowed, `robots.txt must not disallow the page route ${path}`).not.toContain(path);
     }
   });
