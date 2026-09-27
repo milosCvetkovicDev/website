@@ -54,7 +54,9 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
   `VERCEL_ENV` in the `build` task's `env` so that it splits the cache key: Turborepo's strict mode
   passes `VERCEL_*` through to `next build` anyway, but leaves an undeclared one out of the hash.
   `VERCEL_ENV` also gates `<WebAnalytics />` in the root layout: Vercel's tracker renders only when
-  it is `production` or `preview`, because nowhere else serves `/_vercel/insights/` (ADR 0026).
+  it is `production` or `preview`, because only a Vercel deployment serves its script (ADR 0026).
+  There it loads from `/<seed>/script.js`, a seed Vercel generates at random for each build and
+  inlines, not from the package's `/_vercel/insights/` default.
   `app/global-error.tsx` renders it too, and is a client component, where only `NEXT_PUBLIC_*`
   variables reach, so the config's `env` inlines `VERCEL_ENV` into client bundles at build time;
   it is not a secret, and dropping that entry silently turns the tracker off on that page.

@@ -6,7 +6,7 @@ import { expectHydrated } from '../support/hydration';
 /**
  * The accessibility gate at a phone viewport.
  *
- * The desktop gate (`e2e/accessibility.spec.ts`) audits ten routes in two schemes, and every one of
+ * The desktop gate (`e2e/accessibility.spec.ts`) audits eleven routes in two schemes, and every one of
  * those passes runs at 1280x720. Lighthouse emulates a phone by default, so the score in
  * `docs/runbooks/deploy.md` was being read against a viewport nothing in the suite tested — and a
  * phone is where the layout actually differs: the header swaps to its `md:hidden` half, every

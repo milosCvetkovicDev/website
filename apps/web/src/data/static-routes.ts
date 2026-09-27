@@ -8,7 +8,7 @@
  * 2026-09-25 (the self-healing agent's RETIRED badge and past-tense copy), /skills and /contact
  * 2026-09-23 (d1da60f, #116, which changed the hero subtitle and the eyebrows) and /blog 2026-01-27
  * (696c2ef). The later commits to /blog changed only formatting, colour tokens, metadata or Open
- * Graph images.
+ * Graph images. /privacy was added on 2026-09-27.
  */
 export const STATIC_ROUTE_UPDATED = {
   '/': '2026-09-25',
@@ -17,6 +17,7 @@ export const STATIC_ROUTE_UPDATED = {
   '/skills': '2026-09-23',
   '/blog': '2026-01-27',
   '/contact': '2026-09-23',
+  '/privacy': '2026-09-27',
 } as const satisfies Record<string, string>;
 
 export type StaticRoute = keyof typeof STATIC_ROUTE_UPDATED;

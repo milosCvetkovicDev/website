@@ -92,7 +92,7 @@ import {
  */
 
 /**
- * Every page route, from the one shared list in `e2e/routes.ts`: the six static routes, the three case
+ * Every page route, from the one shared list in `e2e/routes.ts`: the seven static routes, the three case
  * studies and a 404. This used to be `['/', '/work/self-healing-agent']` — two of ten — which is why
  * every defect the audit found on `/about`, `/skills`, `/contact`, `/blog` or a 404 was invisible to a
  * green gate. `console-clean.spec.ts` reads the same module, so a new route reaches both gates at once.
@@ -113,7 +113,7 @@ const pages = PAGE_ROUTES;
  *   /  103 → 80      /about  61 → 45     /work  8 → 5        /skills  88 → 65
  *   /blog  11 → 8    /contact  21 → 15   /no-such-page  12 → 8
  *   /work/self-healing-agent  48 → 40    /work/enterprise-b2b-platform  59 → 40
- *   /work/nx-remote-cache  43 → 35
+ *   /work/nx-remote-cache  43 → 35      /privacy  30 → 22 (measured 2026-09-27, when the page was added)
  *
  * `/work` measuring 8 is not a mistake and is worth knowing: its cards are `backdrop-blur-sm`
  * (`work/page.tsx:51`), so axe cannot resolve what is behind their text and puts 55 of its 63 nodes in
@@ -127,6 +127,7 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
   '/skills': 65,
   '/blog': 8,
   '/contact': 15,
+  '/privacy': 22,
   '/work/self-healing-agent': 40,
   '/work/enterprise-b2b-platform': 40,
   '/work/nx-remote-cache': 35,
@@ -160,7 +161,7 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * the same day. The node #48 added is the hero's line naming who the site is about, which was
  * sr-only and is now visible text on the island; `e2e/hero-contrast.spec.ts` measures its colour.
  *
- * Eight of the ten routes have a budget of **zero**, which is the strongest form this can take: on those
+ * Nine of the eleven routes have a budget of **zero**, which is the strongest form this can take: on those
  * pages axe decides every text node, and the first blurred panel or gradient put behind text fails here.
  * The two that are not zero are the two surfaces the audit already found, and between them they account
  * for every undecidable node on the site — 167 of them, against 103 and 8 decided.
@@ -168,7 +169,7 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * `/` gets a margin of a few nodes and the others do not, for a measured reason rather than out of
  * caution: the hero's tmux chrome animates its tab labels and status line through `opacity`, and axe
  * skips a node at `opacity: 0`, so the count depends on which frame the audit samples. Two consecutive
- * dark-theme runs gave 111 and 112. `/work` and the eight zeroes are static and were identical across
+ * dark-theme runs gave 111 and 112. `/work` and the nine zeroes are static and were identical across
  * every run. Never widen a margin to quieten a failure: read the nodes the message names first, because
  * a genuinely new blurred surface looks exactly like this.
  *
@@ -181,6 +182,7 @@ const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }
   '/skills': { light: 0, dark: 0 },
   '/blog': { light: 0, dark: 0 },
   '/contact': { light: 0, dark: 0 },
+  '/privacy': { light: 0, dark: 0 },
   '/work/self-healing-agent': { light: 0, dark: 0 },
   '/work/enterprise-b2b-platform': { light: 0, dark: 0 },
   '/work/nx-remote-cache': { light: 0, dark: 0 },
