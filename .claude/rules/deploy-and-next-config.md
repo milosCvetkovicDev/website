@@ -71,7 +71,9 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
   a tracked file and `pnpm format:check` fails on the result. A different `NEXT_DIST_DIR` value would
   need all seven.
 - To point the site at a non-default origin locally, copy the root `.env.example` to
-  `apps/web/.env.local` yourself; the PreToolUse guard blocks agent writes to `.env*`.
+  `apps/web/.env.local` yourself. The PreToolUse guards block an agent's `Edit` or `Write` of that
+  file and the usual shell writes to it, though not every shell write (see the hooks bullet in
+  `claude-code-config.md`).
 - The site is live at `https://miloscvetkovic.dev` since 2026-09-09: Vercel project `portfolio`,
   production from `main`, DNS at Namecheap (`docs/runbooks/deploy.md` has the records and the
   rollback). Merging to `main` deploys; there is no manual step.

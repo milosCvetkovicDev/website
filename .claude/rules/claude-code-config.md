@@ -7,6 +7,7 @@ paths:
   - '.mcp.json'
   - 'scripts/agent-resume.sh'
   - 'scripts/agent-state.schema.json'
+  - 'scripts/claude-guards.test.mjs'
   - 'scripts/claude-hooks.test.mjs'
 ---
 
@@ -17,13 +18,59 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 
 ## Working with this repo in Claude Code
 
-- `.claude/settings.json` wires two PreToolUse guards, and they are not equivalent. The `Edit|Write`
-  guard blocks writes to `.env*` (except `.env.example`), `pnpm-lock.yaml`, `node_modules/`,
-  `.next/` and `dist/`, and fails closed (`exit 2`) when `jq` is missing. The `Bash` guard is
-  narrower: it blocks only shell commands that redirect into or rewrite `.env*` or
-  `pnpm-lock.yaml`, and it exits 0, allowing the command, when `jq` is missing. Nothing stops a
-  shell command from writing into `node_modules/`, `.next/` or `dist/`. Treat the Gotchas list in `CLAUDE.md`
-  as the rule; the hooks are a partial backstop, not the boundary.
+- `.claude/settings.json` wires two PreToolUse guards, and they are not equivalent.
+  `scripts/claude-guards.test.mjs` runs both through `/bin/sh -c`, as Claude Code runs a command
+  hook on macOS and Linux, on a table of JSON payloads. Each row pins the exit status and that
+  nothing is printed to stdout: 2 blocks the tool call, 0 leaves it to the usual permission check.
+  A guard change that alters a row's result fails that row; one that only reaches inputs no row
+  sends, such as a new protected path or command word, needs a row of its own. This bullet
+  describes the rows, gaps and false positives included. The test also checks that no other
+  PreToolUse entry in `.claude/settings.json` reaches `Bash`, `Edit` or `Write`, but Claude Code
+  adds the hooks of user settings and of the gitignored `.claude/settings.local.json`, which it
+  cannot see. Treat the Gotchas list in `CLAUDE.md` as the rule; the hooks are a partial backstop,
+  not the boundary.
+  - The `Edit|Write` guard runs for exactly those two tools, never for `NotebookEdit`. It reads the
+    `file_path` Claude Code sends, an absolute path, and blocks `.env` and `.env.*` other than
+    `.env.example`, `pnpm-lock.yaml`, and anything under `node_modules/`, `.next/` or `dist/`. The
+    `.env.example` exemption is the exact name and is checked first, so
+    `apps/web/.env.example.local` is blocked and `node_modules/pkg/.env.example` is allowed. It
+    allows `.envrc`, `.env-staging` and `.next-e2e/`. The patterns are case-sensitive, so `.ENV`,
+    `PNPM-LOCK.YAML` and `Node_Modules/...` are allowed although a default (case-insensitive) macOS
+    volume resolves them to the protected files. They also block more than they mean to: any name
+    ending in `pnpm-lock.yaml` (`docs/not-pnpm-lock.yaml`) and a `dist/` directory at any depth
+    (`apps/web/src/dist/util.ts`). Every pattern but the lockfile's needs a `/` before the name, so
+    a bare relative `.env`, `.env.example` or `node_modules/...` is allowed, while a relative
+    `apps/web/.env.local` or `apps/web/.next/...` is blocked. A payload with no `file_path` is
+    allowed. Without `jq` it fails closed and blocks every path, `.env.example` and source files
+    included.
+  - The `Bash` guard reads the command's text one line at a time, after deleting every
+    `.env.example` from it. It blocks a line where `rm`, `mv`, `cp`, `tee` or `truncate`, `sed`
+    whose first argument starts with `-i` (`sed -i`, `sed -i.bak`), or `perl` whose first argument
+    is a flag cluster containing `i` (`perl -pi`, `perl -i`), stands as a word anywhere before a
+    name that contains `.env` (`.envrc` included) or `pnpm-lock.yaml`, or where a `>` (so also
+    `>>`, `2>`, `&>` and `>|`) is followed, after optional spaces, by a word containing such a name.
+    So `git rm .env`, `echo x>.env` and `cp .env.example apps/web/.env.local` are blocked.
+    "Anywhere before" crosses `;`, `&&`, `|` and quotes, and the word may be an argument,
+    so `rm -f build.log; grep NEXT_PUBLIC apps/web/.env.local`, `grep -e rm apps/web/.env.local` and
+    `git commit -m "chore: rm stale dep, refresh pnpm-lock.yaml"` are blocked although none of them
+    writes. These are known false positives, accepted when the owner kept the guard as it is (task
+    50). A newline ends the match, and a word inside a longer word (`confirm`) does not count. It
+    allows reads (`sed` without `-i` among them), a redirect into an unprotected file such as
+    `/dev/null`, and `git restore pnpm-lock.yaml`, `git checkout -- pnpm-lock.yaml` and
+    `git checkout origin/main -- pnpm-lock.yaml`, git's own ways to undo a lockfile change, which do
+    write it. It allows every write it cannot see, and the rows are examples, not a complete list:
+    `node -e`, `ln -sf`, `dd of=`, `install`, `rsync`, `git checkout stash -- .env`,
+    `sed --in-place`, `sed -E -i`, `perl -p -i`, `echo x >| .env` (a space after `>|`), a name that
+    is quoted (`.en''v`), globbed (`.en?`), held in a variable or moved to the next line by a `\`
+    continuation, `.env.example.local` (the deletion leaves `.local`), and upper-case `.ENV` or
+    `PNPM-LOCK.YAML`. Nothing stops a shell command writing into `node_modules/`, `.next/` or
+    `dist/`: `rm -rf node_modules` and `echo x > apps/web/.next/x` are allowed. Without `jq` it
+    fails open and allows every command, `rm .env` included.
+  - Both guards put `/usr/local/bin` and `/opt/homebrew/bin` in front of `PATH`, so the tools they
+    run are looked up there first and no `PATH` hides a Homebrew `jq` from them. Where one of those
+    directories holds `jq`, the test runs its jq-less rows on the command after that assignment and
+    prints a diagnostic saying so. On GitHub Actions it requires them to run the command verbatim,
+    which the ubuntu runner allows because its `jq` is an apt package in `/usr/bin`.
 - A SessionStart hook (`.claude/hooks/session-start.sh`) prints the first 20 lines of
   `git status -sb`, your open pull requests with their checks counted by conclusion (by status
   while a check is still running), giving `gh` 8 s, up to 4,000 bytes of the resume briefing from
