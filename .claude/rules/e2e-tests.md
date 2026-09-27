@@ -47,13 +47,13 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
   React hydration mismatches included, so a stray `console.warn` fails the `e2e` job. Its routes come
-  from `apps/web/e2e/routes.ts`, the one list the accessibility gate reads too: the six static
+  from `apps/web/e2e/routes.ts`, the one list the accessibility gate reads too: the seven static
   routes, every case study derived from `src/data/case-studies.ts`, and a 404. `/` is also walked
   down through the story and back up (light scheme only), so the scroll-driven GSAP callbacks and the
   timers they schedule are watched too. The reduced-motion pass cannot cover those: every phase
   effect returns early under `reduce`.
 - Accessibility is gated. `apps/web/e2e/accessibility.spec.ts` runs axe-core with the rule set
-  behind Lighthouse's accessibility category (kept in `e2e/axe.ts`) on all ten routes in
+  behind Lighthouse's accessibility category (kept in `e2e/axe.ts`) on all eleven routes in
   `e2e/routes.ts`, in both colour schemes at the desktop viewport, at rest; again on `/` after the
   whole story has been scrolled; and again on `/` with a header nav link hovered and with one focused.
   `e2e/mobile/accessibility.spec.ts` runs the at-rest pass on `/` and `/work/self-healing-agent`
@@ -62,7 +62,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   desktop at-rest pass also holds a per-route, per-scheme budget of `incomplete` colour-contrast
   nodes (`INCOMPLETE_CONTRAST_BUDGET`): axe cannot decide text over a `backdrop-filter` or a
   gradient and does not count it as a violation, so that undecidable region may shrink but never
-  grow. The budget is zero on eight of the ten routes, so the first blurred panel put behind text
+  grow. The budget is zero on nine of the eleven routes, so the first blurred panel put behind text
   there fails; never widen a budget or lower a floor to quieten a failure. A new
   `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
   Conventions in `ui-components.md` and ADR 0011, which superseded 0008.

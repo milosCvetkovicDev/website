@@ -78,7 +78,7 @@ const SERVED_MARKERS = [
  *   one; `/` served one while its tmux background was lazy). The space keeps the words either side
  *   apart, as the regular expressions did for script and style.
  * - `noscript` is kept. With scripting disabled the parser reads its content as ordinary markup, which
- *   is exactly what a crawler that runs no JavaScript does with it. None of the ten routes serves one
+ *   is exactly what a crawler that runs no JavaScript does with it. None of the eleven routes serves one
  *   today, but a fallback added later is copy written for that very reader, so it has to count.
  * - Text nodes are joined with nothing, because an element boundary is not a word boundary: that is how
  *   the `AnimatedText` spans read back as `EXECUTION`. Whitespace runs then collapse to a single space;

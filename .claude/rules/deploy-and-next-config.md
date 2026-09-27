@@ -57,6 +57,9 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
   it is `production` or `preview`, because only a Vercel deployment serves its script (ADR 0026).
   There it loads from `/<seed>/script.js`, a seed Vercel generates at random for each build and
   inlines, not from the package's `/_vercel/insights/` default.
+  `app/global-error.tsx` renders it too, and is a client component, where only `NEXT_PUBLIC_*`
+  variables reach, so the config's `env` inlines `VERCEL_ENV` into client bundles at build time;
+  it is not a secret, and dropping that entry silently turns the tracker off on that page.
   Never gate on `VERCEL`: `vercel env pull` writes `VERCEL="1"` into a local `.env.local`.
   Never add `upgrade-insecure-requests`: WebKit applies it to `http://localhost`, which breaks the
   `mobile-safari` project.
