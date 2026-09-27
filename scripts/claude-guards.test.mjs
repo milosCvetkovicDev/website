@@ -45,7 +45,11 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const sh = '/bin/sh';
 
 /** @typedef {{ matcher?: string, hooks?: { type?: string, command?: string }[] }} HookEntry */
-/** @typedef {{ status: number | null, stdout: string, stderr: string }} GuardResult */
+/**
+ * `unread` is true when writing the payload failed with EPIPE, because the guard exited first.
+ *
+ * @typedef {{ status: number | null, stdout: string, stderr: string, unread: boolean }} GuardResult
+ */
 
 /**
  * The PreToolUse entries of .claude/settings.json. Read inside a hook rather than at load time, so
@@ -196,9 +200,16 @@ function utf8Locale() {
  * @param {string} stdin
  * @param {string | undefined} [path] the PATH to run with, in place of this process's
  * @param {string} [locale]
+ * @param {boolean} [mayExitUnread] whether the guard may exit before it reads its payload
  * @returns {GuardResult}
  */
-function runGuardOnStdin(command, stdin, path = process.env.PATH, locale = 'C') {
+function runGuardOnStdin(
+  command,
+  stdin,
+  path = process.env.PATH,
+  locale = 'C',
+  mayExitUnread = false,
+) {
   const result = spawnSync(sh, ['-c', command], {
     input: stdin,
     encoding: 'utf8',
@@ -206,9 +217,15 @@ function runGuardOnStdin(command, stdin, path = process.env.PATH, locale = 'C') 
     env: guardEnv(path, locale),
     timeout: 30_000,
   });
-  assert.equal(result.error, undefined, String(result.error));
+  // A guard that exits before it reads its payload, as both do without jq, makes the write fail
+  // with EPIPE whenever it wins the race; its status and stderr are still its own. Anywhere else an
+  // unread payload is a guard deciding without its input, so it fails.
+  const unread = /** @type {NodeJS.ErrnoException | undefined} */ (result.error)?.code === 'EPIPE';
+  if (!(unread && mayExitUnread)) {
+    assert.equal(result.error, undefined, String(result.error));
+  }
   assert.equal(result.signal, null, `the guard was killed by ${result.signal}`);
-  return { status: result.status, stdout: result.stdout, stderr: result.stderr.trim() };
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr.trim(), unread };
 }
 
 /**
@@ -219,16 +236,24 @@ function runGuardOnStdin(command, stdin, path = process.env.PATH, locale = 'C') 
  * @param {Record<string, unknown>} toolInput
  * @param {string | undefined} [path] the PATH to run with, in place of this process's
  * @param {string} [locale]
+ * @param {boolean} [mayExitUnread] whether the guard may exit before it reads its payload
  * @returns {GuardResult}
  */
-function runGuard(command, toolName, toolInput, path = process.env.PATH, locale = 'C') {
+function runGuard(
+  command,
+  toolName,
+  toolInput,
+  path = process.env.PATH,
+  locale = 'C',
+  mayExitUnread = false,
+) {
   const payload = {
     hook_event_name: 'PreToolUse',
     tool_name: toolName,
     tool_input: toolInput,
     cwd: repoRoot,
   };
-  return runGuardOnStdin(command, JSON.stringify(payload), path, locale);
+  return runGuardOnStdin(command, JSON.stringify(payload), path, locale, mayExitUnread);
 }
 
 /**
@@ -629,6 +654,35 @@ describe('the Edit|Write PreToolUse guard', () => {
   });
 });
 
+// The jq-less rows below race their guard: it exits before reading, and writing the payload fails
+// with EPIPE only when the guard wins. These payloads outlast the buffer Node writes the child's
+// stdin into, so the guard always wins, and each test checks that it did.
+describe('the guard runner', () => {
+  const payload = 'x'.repeat(4 << 20);
+  const exitsUnread = "echo 'BLOCK: unread' >&2; exit 2";
+
+  it('reports the status and message of a guard that may exit without reading', () => {
+    const result = runGuardOnStdin(exitsUnread, payload, process.env.PATH, 'C', true);
+    assert.ok(result.unread, 'the payload fit in the buffer, so the guard did not win the race');
+    assertRow(result, 2, 'BLOCK: unread');
+  });
+
+  it('fails a guard that exits without reading where it must read', () => {
+    assert.throws(() => runGuardOnStdin(exitsUnread, payload), /EPIPE/);
+  });
+
+  it('fails a guard killed before reading, even where it may exit without reading', () => {
+    const killed = () => runGuardOnStdin('kill -9 $$', payload, process.env.PATH, 'C', true);
+    assert.throws(killed, /killed by SIGKILL/);
+  });
+
+  it('does not report a payload the guard read as unread', () => {
+    const result = runGuardOnStdin('cat >/dev/null', payload, process.env.PATH, 'C', true);
+    assert.equal(result.unread, false);
+    assertRow(result, 0, '');
+  });
+});
+
 // Without jq the two guards part ways: the Edit|Write guard fails closed, the Bash guard allows
 // everything. jq is hidden by a PATH of one temporary directory that holds only sed and grep, the
 // other tools the guards call. Each guard first puts /usr/local/bin and /opt/homebrew/bin in front
@@ -687,7 +741,7 @@ describe('the PreToolUse guards without jq', () => {
         ? 'ran the guard verbatim'
         : `ran the guard after its PATH assignment: ${shadowing.join(', ')} holds jq`,
     );
-    return runGuard(shadowing.length === 0 ? command : body, toolName, toolInput, bin);
+    return runGuard(shadowing.length === 0 ? command : body, toolName, toolInput, bin, 'C', true);
   }
 
   it('the Bash guard exits 0 for "rm .env", which it blocks with jq', (t) => {
