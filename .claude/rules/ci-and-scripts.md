@@ -26,8 +26,9 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   those ten plus `docs-drift-workflow.test.mjs`, `ai-refusals.test.mjs`,
   `commitlint-config.test.mjs`, `claude-hooks.test.mjs` (the session hooks in `.claude/hooks`),
   `claude-guards.test.mjs` (the PreToolUse guards in `.claude/settings.json`; it needs `jq` on
-  `PATH` and fails without it, which the CI runner meets with its preinstalled `/usr/bin/jq`) and
-  `claude-md-budget.test.mjs` (the byte budget of `CLAUDE.md` and the `paths` of every rule).
+  `PATH` and fails without it, which the CI runner meets with its preinstalled `/usr/bin/jq`),
+  `claude-md-budget.test.mjs` (the byte budget of `CLAUDE.md` and the `paths` of every rule) and
+  `vitest-coverage-pair.test.mjs` (the lockfile installs `@vitest/*` at vitest's exact version).
   It is a private workspace package, `@repo/scripts`, whose only task is `typecheck` (`tsc -p .`
   against `scripts/tsconfig.json`, which covers the `.mjs` and `.ts` files), so `turbo typecheck`
   type-checks it alongside the apps. It ships no source anyone imports: nothing depends on it, and
