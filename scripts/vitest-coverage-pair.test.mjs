@@ -72,6 +72,12 @@ function mismatches(versions) {
 // Parsed at module level for the same reason: a parse that throws fails the file.
 const webVersions = importerVersions(lockfile, 'apps/web');
 
+/**
+ * A lockfile with two importers, apps/web's pair at the given versions.
+ *
+ * @param {string} vitest
+ * @param {string} coverage
+ */
 const fixture = (vitest, coverage) => `lockfileVersion: '9.0'
 
 importers:
