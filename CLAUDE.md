@@ -215,6 +215,9 @@ Always finish with `pnpm lint`.
 - `apps/web/README.md` is untouched `create-next-app` boilerplate: it says `npm run dev` and
   `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
   authoritative documents.
+- `next dev` writes no agent files (`agentRules: false`, ADR 0019): delete a stray
+  `apps/web/AGENTS.md` or `CLAUDE.md`, never commit it. Version-matched Next.js docs are in
+  `apps/web/node_modules/next/dist/docs`.
 - `gh` intermittently fails on writes while reads keep working: `gh pr create` and `gh pr edit`
   return a GraphQL "Something went wrong" or a REST 502. Retry at most three times with a pause,
   and run `gh pr list --head <branch>` before each retry, because the pull request may have been
