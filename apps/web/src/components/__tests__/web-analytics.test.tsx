@@ -10,7 +10,7 @@ vi.mock('next/navigation.js', () => ({
 }));
 
 // Without Vercel's build-time client config the production script is the package's default,
-// /_vercel/insights/script.js (on Vercel it is a per-project path); the debug one is on
+// /_vercel/insights/script.js (on Vercel it is a path built from a per-build random seed); the debug one is on
 // va.vercel-scripts.com.
 // The package picks the debug one at runtime when NODE_ENV is `test` or `development`, which is why
 // every case stubs NODE_ENV to `production`.

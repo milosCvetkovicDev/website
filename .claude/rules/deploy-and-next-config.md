@@ -55,8 +55,8 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
   passes `VERCEL_*` through to `next build` anyway, but leaves an undeclared one out of the hash.
   `VERCEL_ENV` also gates `<WebAnalytics />` in the root layout: Vercel's tracker renders only when
   it is `production` or `preview`, because only a Vercel deployment serves its script (ADR 0026).
-  There it loads from a per-project path Vercel inlines at build time,
-  `/5f4b0333522bed46/script.js`, not the package's `/_vercel/insights/` default.
+  There it loads from `/<seed>/script.js`, a seed Vercel generates at random for each build and
+  inlines, not from the package's `/_vercel/insights/` default.
   Never gate on `VERCEL`: `vercel env pull` writes `VERCEL="1"` into a local `.env.local`.
   Never add `upgrade-insecure-requests`: WebKit applies it to `http://localhost`, which breaks the
   `mobile-safari` project.

@@ -19,9 +19,9 @@ The owner asked for the tracker.
 Three things constrain how it is mounted:
 
 - The Content-Security-Policy (ADR 0023) allows this origin only. In a production build on Vercel
-  the `@vercel/analytics` package loads its script and sends its page views under a per-project
-  path on this origin, `/5f4b0333522bed46/`, that Vercel inlines at build time through
-  `NEXT_PUBLIC_VERCEL_OBSERVABILITY_CLIENT_CONFIG`, so `'self'` covers them. Under `NODE_ENV` `development`
+  the `@vercel/analytics` package loads its script and sends its page views under a path on
+  this origin built from a random seed Vercel generates at build time and inlines through
+  `NEXT_PUBLIC_VERCEL_OBSERVABILITY_CLIENT_CONFIG` (the build of `7411024` got `/5f4b0333522bed46/`), so `'self'` covers them. Under `NODE_ENV` `development`
   or `test` it loads `https://va.vercel-scripts.com/v1/script.debug.js` instead, which the CSP
   refuses.
 - Only Vercel's edge serves `/_vercel/insights/`. A local or CI `next start` answers it `404`, and
@@ -45,7 +45,8 @@ build made with it and one made without it never share a cache entry.
 - No automated test exercises the live script: the e2e suites run where the component renders
   nothing. The unit test in `apps/web/src/components/__tests__/web-analytics.test.tsx` pins the gate
   and the same-origin script path; after a deploy, the live `/` should request
-  `/5f4b0333522bed46/script.js` with a clean console.
+  the script its tracker `<script data-sdkn="@vercel/analytics/next">` names (`/<seed>/script.js`,
+  new with each build) with a clean console.
 - The package's client code ships in the layout's shared chunk on every build, rendered or not,
   because Next bundles a client module by import rather than by render.
 - Vercel documents the tracker as cookieless: it stores no identifier on the visitor's device. It
@@ -75,10 +76,11 @@ so the deployed site has never used it.
 
 - Context, the CSP bullet, said: "In a production build the `@vercel/analytics` package loads
   `/_vercel/insights/script.js` and sends its page views to `/_vercel/insights/*`, both
-  same-origin". It now names the per-project path `/5f4b0333522bed46/` and where it comes from. The
+  same-origin". It now says the path is built from a random seed Vercel generates at build time, names
+  where it comes from, and gives `/5f4b0333522bed46/` as the one the build of `7411024` got. The
   conclusion, same-origin and covered by `'self'`, was true and stands.
 - Consequences, the manual check, said the live `/` "should request `/_vercel/insights/script.js`".
-  It now says `/5f4b0333522bed46/script.js`.
+  It now says the script the tracker's `<script data-sdkn>` names, `/<seed>/script.js`.
 - Consequences, the ad-blocker bullet, said "An ad blocker that drops `/_vercel/insights/`". It now
   says "An ad blocker that drops the tracker's script".
 
