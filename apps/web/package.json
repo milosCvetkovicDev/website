@@ -13,7 +13,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "clean": "rm -rf .next .next-e2e .turbo node_modules"
+    "clean": "rm -rf .next .next-e2e .turbo coverage node_modules"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
