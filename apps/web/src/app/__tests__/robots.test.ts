@@ -12,6 +12,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import robots from '../robots';
+import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
 // The same expression the module uses (`robots.ts:4`), so a developer who has NEXT_PUBLIC_SITE_URL set in
 // their shell gets the assertions they should rather than a failure about an origin nobody is testing.
@@ -69,7 +70,7 @@ describe('robots()', () => {
     // R25 in e2e/seo-surface.spec.ts is the specific `/_next/` and `/api/` mistake #48 removes. A rule
     // matching a page route would delist it, which is a category worse than blocking an asset.
     const disallowed = asArray(onlyRule().disallow);
-    for (const path of ['/', '/about', '/work', '/skills', '/contact', '/blog', '/privacy']) {
+    for (const path of Object.keys(STATIC_ROUTE_UPDATED)) {
       expect(disallowed, `robots.txt must not disallow the page route ${path}`).not.toContain(path);
     }
   });

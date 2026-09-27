@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { STATIC_ROUTES } from '../routes';
+import { NAV_ROUTES } from '../routes';
 import { servesProductionBuild } from '../support/build-mode';
 import { gotoHydrated } from '../support/hydration';
 import { warmRoutes } from '../support/warm-routes';
@@ -87,7 +87,7 @@ test.describe('the mobile header', () => {
 
     await openMenu(page);
     // All six links, including Home, which the desktop nav drops (`navLinks.slice(1)`).
-    await expect(drawer(page).getByRole('link')).toHaveCount(STATIC_ROUTES.length);
+    await expect(drawer(page).getByRole('link')).toHaveCount(NAV_ROUTES.length);
 
     await closeButton(page).tap();
     await expect(closeButton(page)).toBeHidden();
@@ -214,7 +214,7 @@ test.describe('the mobile header', () => {
     // Resolved once and iterated, rather than a `getByRole(..., { name })` per link: the accessible
     // name of every candidate is recomputed on each such call.
     const links = await drawer(page).getByRole('link').all();
-    expect(links.length).toBe(STATIC_ROUTES.length);
+    expect(links.length).toBe(NAV_ROUTES.length);
 
     const outside: string[] = [];
     for (const link of links) {

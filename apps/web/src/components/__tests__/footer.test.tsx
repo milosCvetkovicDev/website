@@ -23,9 +23,13 @@ const PROFILES = [
   { what: 'the X profile', href: 'https://x.com/milos_dev', name: undefined },
 ];
 
-/** The social links: every footer link that leaves the site. The only other one is /privacy. */
+/**
+ * The social links: every footer link except the one to /privacy. Excluding the known internal link,
+ * rather than selecting `https://` hrefs, keeps an `http://` or protocol-relative profile link in scope
+ * of the target and rel checks below.
+ */
 const socialLinks = () =>
-  screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('https://'));
+  screen.getAllByRole('link').filter((link) => link.getAttribute('href') !== '/privacy');
 
 describe('Footer', () => {
   it('renders exactly three social links, one per profile', () => {

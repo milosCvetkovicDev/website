@@ -15,19 +15,14 @@ import { caseStudies } from '../src/data/case-studies';
  * spec directory into the build. `src/app/__tests__/sitemap.test.ts` asserts the two agree.
  */
 
+/** The six routes the header navigation links to, in its order (`components/navigation.tsx`). */
+export const NAV_ROUTES = ['/', '/about', '/work', '/skills', '/blog', '/contact'] as const;
+
 /**
- * The seven routes backed by a `page.tsx` under `src/app`: the six in navigation order, then
- * /privacy, which only the footer links to.
+ * The seven routes backed by a `page.tsx` under `src/app`: the navigation's six, then /privacy, which
+ * only the footer links to. A spec about the menu counts `NAV_ROUTES`, not this.
  */
-export const STATIC_ROUTES = [
-  '/',
-  '/about',
-  '/work',
-  '/skills',
-  '/blog',
-  '/contact',
-  '/privacy',
-] as const;
+export const STATIC_ROUTES = [...NAV_ROUTES, '/privacy'] as const;
 
 /** `/work/<slug>` for every case study in the data file. */
 export const CASE_STUDY_ROUTES = caseStudies.map(({ slug }) => `/work/${slug}`);

@@ -5,21 +5,22 @@ import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 export const metadata = buildMetadata({
   title: 'Privacy',
   description:
-    'Anonymous page-view statistics through Vercel Web Analytics, and nothing else: no cookies, accounts, forms, ads or cross-site tracking.',
+    'What this site collects: page-view statistics through Vercel Web Analytics, with no cookies, accounts, forms, ads or cross-site tracking.',
   path: '/privacy',
 });
 
-// Each claim here is sourced: the analytics ones from Vercel's "Privacy and Compliance" page for Web
-// Analytics (https://vercel.com/docs/analytics/privacy-policy, read 2026-09-27), the rest from this
-// repository (ADR 0026 for the tracker, ADR 0023 for the same-origin CSP, `components/theme-provider.tsx`
-// for the one thing stored in the browser). The tracker itself writes local storage only when a site
-// calls its identify API with a user or group ID, which this one never does (read from the served
-// script on 2026-09-27). Change the copy with them, and bump STATIC_ROUTE_UPDATED['/privacy'] in the same commit.
+// Each claim here is sourced: the analytics ones from Vercel's "Privacy and Compliance" page for
+// Web Analytics (https://vercel.com/docs/analytics/privacy-policy, read 2026-09-27), the rest from
+// this repository: ADR 0026 for the tracker, ADR 0023 for the CSP that refuses every other origin,
+// and `components/theme-provider.tsx` for the one thing stored in the browser. The tracker writes
+// local storage only when a site calls its identify API with a user or group ID, which this one
+// never does (read from the served script on 2026-09-27). Change the copy with its sources, and bump
+// STATIC_ROUTE_UPDATED['/privacy'] in the same commit.
 const COLLECTED = [
-  'the page you viewed, the route it belongs to, and its query string, filtered',
+  'the page you viewed, the route it belongs to, and query parameters in its address',
   'the site that linked you here, if your browser sends one',
   'your approximate location: country, region and city',
-  'your operating system, browser and device type',
+  'your operating system and browser, with their versions, and your device type',
   'the time of the visit',
   'the version of the analytics script',
 ];
@@ -31,7 +32,7 @@ export default function PrivacyPage() {
         <h1 className="mb-6 text-4xl font-bold md:text-5xl">Privacy</h1>
         <p className="mb-12 text-xl text-[var(--muted)]">
           This site sets no cookies, has no accounts, forms or ads, and does not follow you to other
-          sites. It counts page views anonymously, and that is all.
+          sites. Beyond what any web host receives, it counts page views, and that is all.
         </p>
 
         <section className="mb-10">
@@ -46,8 +47,8 @@ export default function PrivacyPage() {
           </ul>
           <p className="text-[var(--muted)]">
             Vercel tells visitors apart with a hash of the request instead of a cookie, and discards
-            the session after 24 hours. The page views are recorded anonymously, not tied to you or
-            your IP address, and the site sees only aggregated numbers. Vercel describes this in its{' '}
+            the session after 24 hours. Vercel says it does not tie the page views to you or your IP
+            address, and the site sees only aggregated numbers. Vercel describes this in its{' '}
             <a
               href="https://vercel.com/docs/analytics/privacy-policy"
               className="text-[var(--accent-text)] underline underline-offset-4"
@@ -64,8 +65,8 @@ export default function PrivacyPage() {
           <p className="text-[var(--muted)]">
             Vercel hosts the site. Like any web server, it receives your IP address and browser
             details with each request in order to deliver the page. Everything the site loads, fonts
-            included, comes from this domain, so no company other than Vercel receives a request
-            from your browser when you visit.
+            included, comes from this domain: the site’s security policy tells your browser to
+            refuse anything from another one, so your browser contacts no other site when you visit.
           </p>
         </section>
 
@@ -80,7 +81,7 @@ export default function PrivacyPage() {
         <section className="mb-10">
           <h2 className="mb-3 text-2xl font-semibold">Questions</h2>
           <p className="text-[var(--muted)]">
-            Ask me through the{' '}
+            This site is run by Milos Cvetkovic. Ask me about any of this through the{' '}
             <Link
               href="/contact"
               className="text-[var(--accent-text)] underline underline-offset-4"
