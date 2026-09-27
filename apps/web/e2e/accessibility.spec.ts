@@ -312,7 +312,8 @@ test.describe('Accessibility', () => {
         expect(
           describeViolations(results.violations),
           `${path} in the ${colorScheme} theme must have no axe violations. For a colour contrast ` +
-            'failure, read the token roles in docs/adr/0008-accent-colour-roles.md first.',
+            'failure, read the token roles in ' +
+            'docs/adr/0011-colour-roles-on-scoped-surfaces.md first.',
         ).toEqual([]);
         // Prove the options took effect and that real content was measured: a rule that is switched
         // off appears in none of the four result lists, axe only logs an unknown tag instead of
@@ -417,12 +418,14 @@ test.describe('Accessibility', () => {
   }
 
   test.describe('the whole story', () => {
-    // A scrolled `/` gives axe over 400 text nodes to measure against the at-rest pass's 30. It
-    // takes 2.7 s on a CI runner and 4.5 to 6.4 s locally, so 120 s is roughly twenty times the
-    // measured cost. It is deliberately not larger: the e2e job has 20 minutes, of which the build
-    // and the browser install take about a third, and two of these tests hanging to a five-minute
-    // budget would end the job before the report is uploaded. Still no retries: the reduced-motion
-    // path makes the result deterministic, so a failure here is real and a retry could only hide it.
+    // A scrolled `/` gives axe several times as many text nodes to measure as the at-rest pass
+    // does; both counts are recorded where their floors are set, at AT_REST_CONTRAST_FLOOR and in
+    // the test below. It takes 2.7 s on a CI runner and 4.5 to 6.4 s locally, so 120 s is roughly
+    // twenty times the measured cost. It is deliberately not larger: the e2e job has 20 minutes, of
+    // which the build and the browser install take about a third, and two of these tests hanging to
+    // a five-minute budget would end the job before the report is uploaded. Still no retries: the
+    // reduced-motion path makes the result deterministic, so a failure here is real and a retry
+    // could only hide it.
     test.describe.configure({ retries: 0, timeout: 120_000 });
 
     for (const colorScheme of colorSchemes) {
