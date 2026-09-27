@@ -40,6 +40,19 @@ const media = vi.hoisted(() => {
   return state;
 });
 
+// mount() calls ScrollTrigger.refresh(), which restores the scroll position through
+// window.scrollTo, and jsdom does not implement it: every call builds an Error and prints its stack
+// through the virtual console, twelve of them per run of this file. The no-op is defined once, for
+// the file's whole lifetime, rather than spied in each test: vi.restoreAllMocks() in afterEach does
+// not undo a property definition, so a refresh that lands between tests finds the no-op too.
+vi.hoisted(() => {
+  Object.defineProperty(window, 'scrollTo', {
+    configurable: true,
+    writable: true,
+    value: () => {},
+  });
+});
+
 const STAGE_COUNT = 6;
 // The six stages run back to back with a 0.2s gap; deployment starts once the last one ends.
 const PIPELINE_MS = 5300;
