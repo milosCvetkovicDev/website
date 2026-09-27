@@ -1,4 +1,6 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -333,5 +335,51 @@ describe('env', () => {
   it('inlines an empty string when VERCEL_ENV is unset, which the gate reads as off', async () => {
     vi.stubEnv('VERCEL_ENV', undefined);
     expect((await freshConfig()).env).toEqual({ VERCEL_ENV: '' });
+  });
+});
+
+describe('agent instruction files', () => {
+  // `next dev` writes apps/web/AGENTS.md and apps/web/CLAUDE.md when @vercel/detect-agent finds
+  // an agent shell, and Claude Code then loads the nested CLAUDE.md as project instructions.
+  // Generation is off (ADR 0019).
+  it('disables the agent instruction files Next would write in dev', () => {
+    expect(nextConfig.agentRules).toBe(false);
+  });
+
+  // A pair written before ADR 0019 stays behind, untracked, until someone deletes it. This keeps
+  // a `git add -A` in such a checkout from committing it. Ignoring the pair instead would only
+  // hide it: Claude Code loads an ignored CLAUDE.md all the same.
+  it('tracks neither generated file', () => {
+    const tracked = execFileSync('git', ['ls-files', '--', 'AGENTS.md', 'CLAUDE.md'], {
+      cwd: appDir,
+      encoding: 'utf8',
+    });
+    expect(tracked).toBe('');
+  });
+});
+
+// The value above matters only while the installed Next.js still reads it. A Next.js that
+// dropped the option would fail `pnpm typecheck` on the typed config object, but one that kept
+// the option and stopped passing it to the dev server, or stopped checking it, would not, and
+// generation would resume unnoticed. These read the compiled dev server to catch that. When one
+// fails after a Next.js bump, find where the new version decides to write the files, check
+// ADR 0019 against it, and then update the pattern.
+describe('the installed Next.js honours agentRules', () => {
+  const nextServerLib = (file: string) =>
+    readFileSync(createRequire(import.meta.url).resolve(`next/dist/server/lib/${file}`), 'utf8');
+
+  it('passes agentRules from the config to the dev server', () => {
+    expect(nextServerLib('router-server.js')).toMatch(/\bagentRules:\s*config\.agentRules\b/);
+  });
+
+  it('generates the agent files only behind an agentRules !== false check', () => {
+    const source = nextServerLib('start-server.js');
+    const calls = [...source.matchAll(/\bensureAgentRulesForDev\b/g)];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      expect(source.slice(Math.max(0, call.index - 200), call.index)).toMatch(
+        /\.agentRules\s*!==\s*false\s*\)/,
+      );
+    }
   });
 });
