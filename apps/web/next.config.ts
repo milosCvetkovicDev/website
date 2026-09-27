@@ -155,7 +155,9 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   // Inlined into client bundles too, where only NEXT_PUBLIC_* reaches otherwise: `global-error.tsx`
   // is a client component and renders `<WebAnalytics />`, whose gate reads VERCEL_ENV (ADR 0026).
-  // The value is fixed at build time, which is when the server component reads it as well.
+  // This fixes the value at build time in server bundles too, which changes nothing here: every
+  // route is prerendered, so the layout's gate was already read then. `turbo.json` keys the build
+  // cache on it, so a preview bundle is never restored for production.
   env: { VERCEL_ENV: process.env.VERCEL_ENV ?? '' },
   // The security headers in one entry for every path, so no surface can be left out by a narrower
   // pattern (ADR 0023). The second entry adds `X-Robots-Tag: noindex` on every path of the

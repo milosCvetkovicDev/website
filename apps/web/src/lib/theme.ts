@@ -22,7 +22,8 @@ export interface ThemeEnvironment {
  * The theme THEME_INIT_SCRIPT picks, as a function, for code that runs after React has taken over
  * the document: `app/global-error.tsx` replaces the root layout on the client, where a rendered
  * `<script>` never runs and React reports one as an error. The branches are the script's, guard for
- * guard, and `lib/__tests__/theme.test.ts` holds the two to the same answer in every case.
+ * guard, and `lib/__tests__/theme.test.ts` holds the two to the same answer in every case. Browser
+ * only: on a server, where neither global exists, it answers `'light'` like the script's fallbacks.
  */
 export function preferredTheme(env: ThemeEnvironment = globalThis): 'dark' | 'light' {
   const prefersDark = () => {

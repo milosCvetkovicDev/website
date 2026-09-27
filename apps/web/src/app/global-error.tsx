@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import './globals.css';
 import { preferredTheme } from '@/lib/theme';
 import { WebAnalytics } from '@/components/web-analytics';
@@ -14,9 +14,13 @@ import { WebAnalytics } from '@/components/web-analytics';
  * `<body>` class, so it sets a system font stack. No state: it renders once and offers a retry and
  * a way home.
  *
- * The theme is applied in a layout effect, before paint, rather than by the layout's inline script:
- * rendered on the client, where this page usually is, React never runs a `<script>` and reports one
- * as an error, and swapping the document shell drops the class the layout's script had set.
+ * It renders on the client only. Every route is prerendered, so a layout that throws on the server
+ * fails the build, and the 500 document Next prerenders (`_global-error` in the build output) is its
+ * own built-in page, which follows the OS scheme. Rendered on the client, React never runs a `<script>`
+ * and reports one as an error, and swapping the document shell drops the class the layout's script
+ * had set, so the theme is applied in a layout effect, before paint, instead. The same effect moves
+ * focus to the heading: the whole document was replaced, and focus would otherwise fall to `<body>`
+ * with nothing announced.
  */
 export default function GlobalError({
   error,
@@ -25,12 +29,20 @@ export default function GlobalError({
   error: Error & { digest?: string };
   retry: () => void;
 }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+
   useLayoutEffect(() => {
     const root = document.documentElement;
     const theme = preferredTheme();
     root.classList.toggle('dark', theme === 'dark');
     root.classList.toggle('light', theme === 'light');
+    heading.current?.focus();
   }, []);
+
+  useEffect(() => {
+    // Logged to the browser console only, like error.tsx; nothing collects it.
+    console.error('Global error:', error);
+  }, [error]);
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -43,7 +55,9 @@ export default function GlobalError({
         suppressHydrationWarning
       >
         <main className="max-w-md text-center">
-          <h1 className="mb-4 text-2xl font-bold">Something went wrong</h1>
+          <h1 ref={heading} tabIndex={-1} className="mb-4 text-2xl font-bold outline-none">
+            Something went wrong
+          </h1>
           <p className="mb-8 text-[var(--muted)]">
             The page failed to load. Trying again usually works; if it does not, start from the home
             page.
@@ -52,19 +66,20 @@ export default function GlobalError({
             <button
               type="button"
               onClick={() => retry()}
-              className="rounded-lg bg-[var(--accent)] px-6 py-3 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+              className="focus-ring rounded-lg bg-[var(--accent)] px-6 py-3 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
             >
               Try again
             </button>
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- the router is what failed, so leave by a full load, not a client navigation. */}
             <a
               href="/"
-              className="rounded-lg border border-[var(--border)] px-6 py-3 transition-colors hover:border-[var(--accent)]/50"
+              className="focus-ring rounded-lg border border-[var(--border)] px-6 py-3 transition-colors hover:border-[var(--accent)]/50"
             >
               Go home
             </a>
           </div>
-          {error.digest && (
+          {/* Next passes whatever was thrown, which need not be an Error, or even an object. */}
+          {error?.digest && (
             <p className="mt-8 font-mono text-xs text-[var(--muted)]">Error ID: {error.digest}</p>
           )}
         </main>

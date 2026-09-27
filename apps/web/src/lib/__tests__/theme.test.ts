@@ -209,6 +209,16 @@ describe('preferredTheme', () => {
     ['matchMedia missing', { localStorage: storageReturning(null) }],
     ['both throw', { localStorage: storageThrowing(), matchMedia: throwingMedia }],
     ['nothing available', {}],
+    // The short-circuits: a stored choice has to win without the media query being able to answer.
+    [
+      'stored dark, matchMedia throws',
+      { localStorage: storageReturning('dark'), matchMedia: throwingMedia },
+    ],
+    ['stored light, matchMedia missing', { localStorage: storageReturning('light') }],
+    [
+      'empty string stored, OS dark',
+      { localStorage: storageReturning(''), matchMedia: mediaMatching(true) },
+    ],
   ];
 
   it.each(environments)('agrees with THEME_INIT_SCRIPT: %s', (_, env) => {

@@ -76,9 +76,9 @@ describe('error.tsx', () => {
   });
 
   it('R37 (#49): a global-error module exists and renders its own <html> and <body>', () => {
-    // Kept as a check over the source as well as the render below: it names the row, and it fails
-    // with a readable message if the file is ever deleted, where a missing import would fail at
-    // transform time and take the whole suite down.
+    // A check over the source, beside the render in `global-error.test.tsx`: it names the row, and it
+    // says why the file matters if it is ever deleted, where that render file would only fail to
+    // resolve its import.
     const files = readdirSync(APP_DIR);
     const globalError = files.find((file) => /^global-error\.(tsx|jsx|ts|js)$/.test(file));
     expect(
@@ -95,7 +95,7 @@ describe('error.tsx', () => {
     expect(source, 'global-error must render its own <html>').toMatch(/<html[\s>]/);
     expect(source, 'global-error must render its own <body>').toMatch(/<body[\s>]/);
     expect(source, 'global-error must bring the global stylesheet').toMatch(
-      /import '\.\/globals\.css'/,
+      /^import ['"]\.\/globals\.css['"];?$/m,
     );
   });
 });
