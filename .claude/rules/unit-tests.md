@@ -31,6 +31,11 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   timeout as `it`'s third argument, with a comment saying why, as the phase lifecycle test in
   `src/components/animated-hero/__tests__/story-phases.test.tsx` does. Raising the global default
   hides the next slow test instead.
+- `pnpm --filter web test:coverage` runs the same suite with `@vitest/coverage-v8` and prints a
+  text summary over `src/**/*.{ts,tsx}`. It is report-only: no threshold, and CI does not run it;
+  adding either is a decision of its own. The provider must match vitest's version exactly, so the
+  pull request that bumps `vitest` bumps `@vitest/coverage-v8` to the same version (see
+  `dependencies.md` for how to add or bump it without flipping unrelated lockfile peer suffixes).
 - Verified defects that an open task will fix are recorded as expected failures, `test.fail()` in
   Playwright and `it.fails` in Vitest, each naming its manifest row and fixing issue (see
   `.claude/epics/audit-remediation-2026-09/43.md`). An expected failure that passes fails the run, so
