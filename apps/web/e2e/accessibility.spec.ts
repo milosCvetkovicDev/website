@@ -44,10 +44,10 @@ import {
  * `INCOMPLETE_CONTRAST_BUDGET`: a per-route, per-scheme ceiling on the undecidable region, so it can
  * shrink but never grow.
  *
- * Two axe behaviours worth knowing before touching a failure (ADR 0008): `aria-hidden` does not
- * exempt an element from `color-contrast`, because axe measures what is on screen, not what a
- * screen reader gets; `opacity: 0` does, which is why GSAP reveals must start from 0 and never
- * from a partial value.
+ * Two axe behaviours worth knowing before touching a failure, recorded in ADR 0008, whose rules
+ * carry over into ADR 0011, the record that supersedes it: `aria-hidden` does not exempt an element
+ * from `color-contrast`, because axe measures what is on screen, not what a screen reader gets;
+ * `opacity: 0` does, which is why GSAP reveals must start from 0 and never from a partial value.
  *
  * Each page is audited twice. At rest, which is what Lighthouse scores and what the original
  * findings were about. Then, for `/`, again after scrolling the whole story.

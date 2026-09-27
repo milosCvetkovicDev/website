@@ -24,14 +24,19 @@ describe('formatMetric', () => {
   });
 
   // `not.toThrow()` alone would also pass for a formatMetric that returned the empty string, so the
-  // rendered strings are asserted. The clamp is to 0..20, the range `toFixed` accepts.
+  // rendered strings are asserted. The clamp is to 0..20, a cap chosen inside the 0..100 that
+  // `toFixed` accepts: past 20 digits a double shows only rounding noise.
   it('clamps an out-of-range decimals value instead of throwing', () => {
     expect(formatMetric({ value: 5, decimals: -1, label: 'x' })).toBe('5');
     expect(formatMetric({ value: 5, decimals: -1000, label: 'x' })).toBe('5');
     expect(formatMetric({ value: 5, decimals: 500, label: 'x' })).toBe(`5.${'0'.repeat(20)}`);
-    // A fractional count is truncated towards zero before it is clamped.
+    expect(formatMetric({ value: 5, decimals: Infinity, label: 'x' })).toBe(`5.${'0'.repeat(20)}`);
+    expect(formatMetric({ value: 5, decimals: -Infinity, label: 'x' })).toBe('5');
+    // The sign of the value survives a clamped count.
+    expect(formatMetric({ value: -5, decimals: 500, label: 'x' })).toBe(`-5.${'0'.repeat(20)}`);
+    // A fractional count renders its whole digits: 2.9 gives two, not the three rounding would.
     expect(formatMetric({ value: 5, decimals: 2.9, label: 'x' })).toBe('5.00');
-    // NaN survives Math.trunc, Math.max and Math.min, and `toFixed` then reads it as 0 digits.
+    // A NaN count renders no decimals rather than throwing: `toFixed` reads NaN as 0 digits.
     expect(formatMetric({ value: 5, decimals: Number.NaN, label: 'x' })).toBe('5');
   });
 
