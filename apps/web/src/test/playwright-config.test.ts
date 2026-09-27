@@ -4,6 +4,8 @@
  *
  * @vitest-environment node
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import type { PlaywrightTestConfig } from '@playwright/test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import config, { MOBILE_SPECS, resolvePort } from '../../playwright.config';
@@ -125,11 +127,12 @@ describe('the Playwright projects', () => {
  * Loads playwright.config.ts fresh under the current environment. The module reads `process.env`
  * while it is evaluated, so each mode needs its own module instance.
  */
-async function loadConfig(ci: string | undefined): Promise<PlaywrightTestConfig> {
+async function loadConfig(ci: string | undefined, port = ''): Promise<PlaywrightTestConfig> {
   vi.stubEnv('CI', ci);
   // The suite's own port must not leak into the assertions: a developer or CI runner that exported
-  // PLAYWRIGHT_PORT would otherwise change what `webServer` and `baseURL` come out as.
-  vi.stubEnv('PLAYWRIGHT_PORT', '');
+  // PLAYWRIGHT_PORT would otherwise change what `webServer` and `baseURL` come out as. A test that
+  // wants an override passes it; everything else gets the fallback.
+  vi.stubEnv('PLAYWRIGHT_PORT', port);
   vi.resetModules();
   return (await import('../../playwright.config')).default;
 }
@@ -162,6 +165,17 @@ function webServerOf(loaded: PlaywrightTestConfig) {
   return webServer as Exclude<typeof webServer, readonly unknown[] | undefined>;
 }
 
+// Every spelling of CI the config tells apart, with the server each one must get: `CI=true` and
+// `CI=1` run the production build, anything else (a stray `false` or `0` included) the dev server,
+// exactly as `servesProductionBuild` in e2e/support/build-mode.ts decides.
+const MODES: [ci: string | undefined, command: string, distDir: string][] = [
+  ['true', 'pnpm start', '.next'],
+  ['1', 'pnpm start', '.next'],
+  [undefined, 'pnpm dev', '.next-e2e'],
+  ['false', 'pnpm dev', '.next-e2e'],
+  ['0', 'pnpm dev', '.next-e2e'],
+];
+
 describe('playwright.config.ts webServer (ADR 0014)', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -170,32 +184,50 @@ describe('playwright.config.ts webServer (ADR 0014)', () => {
 
   // Reuse was on locally until ADR 0014: a `next start` from another checkout of this same site
   // answered every request convincingly, so the suite passed against a build that was not the
-  // working tree. False in both modes, so a taken port aborts the run instead.
-  it.each([
-    ['CI', 'true'],
-    ['local', undefined],
-  ])('never attaches to a server it did not start (%s)', async (_mode, ci) => {
+  // working tree. False in every mode, so a taken port aborts the run instead.
+  it.each(MODES)('never attaches to a server it did not start (CI=%s)', async (ci) => {
     expect(webServerOf(await loadConfig(ci)).reuseExistingServer).toBe(false);
   });
 
-  it('serves the production build under CI and the dev server locally', async () => {
-    expect(webServerOf(await loadConfig('true')).command).toBe('pnpm start');
-    expect(webServerOf(await loadConfig(undefined)).command).toBe('pnpm dev');
+  // No `cwd`, so Playwright starts the server in the config file's directory, apps/web, where
+  // `pnpm start` and `pnpm dev` are the site's own scripts rather than the workspace root's.
+  it.each(MODES)('runs the right server under CI=%s: %s', async (ci, command) => {
+    const webServer = webServerOf(await loadConfig(ci));
+    expect(webServer.command).toBe(command);
+    expect(webServer.cwd).toBeUndefined();
   });
 
-  // Set in both modes rather than omitted under CI: Playwright merges `env` over process.env, so an
-  // omitted key would inherit an ambient NEXT_DIST_DIR and point `pnpm start` at a directory
-  // `next build` never wrote. Locally the dev server gets a directory of its own, so it never
-  // races a `pnpm dev` from the same checkout over apps/web/.next.
-  it('pins NEXT_DIST_DIR in both modes', async () => {
-    expect(webServerOf(await loadConfig('true')).env?.NEXT_DIST_DIR).toBe('.next');
-    expect(webServerOf(await loadConfig(undefined)).env?.NEXT_DIST_DIR).toBe('.next-e2e');
+  // Set in both modes rather than omitted under CI. Locally the dev server gets a directory of its
+  // own, so it never races a `pnpm dev` from the same checkout over apps/web/.next. Under CI the pin
+  // is `.next` because that is where the job's `pnpm --filter web build` step writes, and it writes
+  // there only because nothing sets NEXT_DIST_DIR for it: a value exported for the whole job would
+  // reach that step too, and `next start` would then look in `.next` for a build that went
+  // elsewhere. The last test here holds ci.yml to that.
+  it.each(MODES)('pins NEXT_DIST_DIR under CI=%s', async (ci, _command, distDir) => {
+    expect(webServerOf(await loadConfig(ci)).env?.NEXT_DIST_DIR).toBe(distDir);
   });
 
-  it('serves the port it tests', async () => {
-    const loaded = await loadConfig(undefined);
-    expect(webServerOf(loaded).port).toBe(FALLBACK);
-    expect(webServerOf(loaded).env?.PORT).toBe(String(FALLBACK));
-    expect(loaded.use?.baseURL).toBe(`http://localhost:${FALLBACK}`);
+  // The server's port, the PORT Next reads and the URL the specs visit all come from one value, with
+  // or without the override CI sets (PLAYWRIGHT_PORT=3000 in ci.yml). 3000 is not the fallback, so a
+  // config that hard-coded the fallback in any of the three fails the override rows.
+  it.each(
+    MODES.flatMap(([ci]) => [
+      [ci, '', FALLBACK],
+      [ci, '3000', 3000],
+    ]) as [string | undefined, string, number][],
+  )('serves the port it tests (CI=%s, PLAYWRIGHT_PORT=%j)', async (ci, override, port) => {
+    const loaded = await loadConfig(ci, override);
+    expect(webServerOf(loaded).port).toBe(port);
+    expect(webServerOf(loaded).env?.PORT).toBe(String(port));
+    expect(loaded.use?.baseURL).toBe(`http://localhost:${port}`);
+  });
+
+  it('leaves the CI build step writing the directory the CI server reads', () => {
+    const workflow = readFileSync(
+      fileURLToPath(new URL('../../../../.github/workflows/ci.yml', import.meta.url)),
+      'utf8',
+    );
+    expect(workflow).toContain('pnpm --filter web build');
+    expect(workflow).not.toContain('NEXT_DIST_DIR');
   });
 });
