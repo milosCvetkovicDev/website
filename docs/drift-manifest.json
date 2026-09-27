@@ -6114,6 +6114,19 @@
       }
     },
     {
+      "id": "adr-0019-agent-rules-false",
+      "doc": "docs/adr/0019-next-agent-rules-disabled.md",
+      "anchor": "`apps/web/next.config.ts` sets `agentRules: false`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "next.config.ts sets agentRules to false, so next dev writes no agent instruction files.",
+      "check": {
+        "file": "apps/web/next.config.ts",
+        "regex": "^  agentRules: (.+),$",
+        "equals": "false"
+      }
+    },
+    {
       "id": "adr-index-0020-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0020 |",

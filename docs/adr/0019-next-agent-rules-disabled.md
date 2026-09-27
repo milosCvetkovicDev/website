@@ -21,6 +21,8 @@ finds an agent and neither file already holds Next's current managed block, and
 `dist/server/lib/generate-agent-files.js` (lines 112 and 113) then writes `AGENTS.md` and
 `CLAUDE.md`. Claude Code sets `CLAUDECODE` and `AI_AGENT` in the shells it runs, so every
 agent-run `next dev` in this repository left `apps/web/AGENTS.md` and `apps/web/CLAUDE.md` behind.
+The line numbers are 16.3.5's and will move with the next release; the tests below match code
+patterns, not lines.
 
 That reaches further than `pnpm dev`. `apps/web/playwright.config.ts` merges its `webServer.env`
 over `process.env`, so a local e2e run started from a Claude Code session hands both variables to
@@ -53,37 +55,43 @@ disable generation.
 `apps/web/next.config.ts` sets `agentRules: false`, and Next.js writes no agent instruction files.
 
 - `apps/web/src/test/next-config.test.ts` asserts the default export's `agentRules` is `false`. It
-  also reads the installed Next.js's compiled dev server, and fails if
-  `dist/server/lib/router-server.js` stops passing `agentRules` on or if
-  `dist/server/lib/start-server.js` calls `ensureAgentRulesForDev` without the
-  `agentRules !== false` check.
+  also reads the installed Next.js's compiled dev server, in both the CommonJS and the ESM build,
+  and fails if `router-server.js`'s `initialize` stops returning `agentRules` from the config, if
+  `start-server.js` calls `ensureAgentRulesForDev` anywhere but as the first statement of an
+  `if (<result>.agentRules !== false)` block on that returned object, if `app-info-log.js` calls
+  `writeAgentFiles` outside `ensureAgentRulesForDev`, or if any other file under `dist` (bar the
+  vendored bundles in `dist/compiled`) calls either function. It also checks that the bundled
+  `dist/docs` the root `CLAUDE.md` points at still ships.
 - The repository's own reviewed files, the root `CLAUDE.md` and the scoped rules in
   `.claude/rules/`, stay the only instructions for this project. The root `CLAUDE.md`'s Gotchas
   list points agents at `apps/web/node_modules/next/dist/docs`, the version-matched documentation
   the generated file used to reference, so that pointer is kept without the file.
 - Copies already written into local checkouts are untracked and are deleted by hand, not ignored:
   ignoring them would hide them while Claude Code still loads them. Nothing in the repository
-  removes them, and `next-config.test.ts` fails if either path is ever tracked, so a `git add -A`
-  in such a checkout cannot commit them unnoticed.
+  removes them. `next-config.test.ts` fails if either path is ever tracked, so a branch that
+  commits them fails the unit tests in CI; nothing stops the commit itself.
 
 ## Consequences
 
 ### Positive
 
-- An agent-run `next dev` or local e2e run leaves `git status --porcelain apps/web` empty, so an
-  untracked instruction file can no longer be committed by accident or loaded unreviewed.
+- An agent-run `next dev` or local e2e run writes neither `apps/web/AGENTS.md` nor
+  `apps/web/CLAUDE.md`, so an untracked instruction file can no longer be committed by accident
+  or loaded unreviewed.
 - Every instruction an agent reads about this repository is in a file a person wrote and reviewed.
 - A Next.js upgrade cannot change agent behaviour in this repository by rewriting a managed block.
 
 ### Trade-offs
 
 - A later Next.js that drops the option fails `pnpm typecheck`, because the config is a typed
-  `NextConfig` object literal. One that keeps the option but stops passing it on or checking it
-  fails the source checks in `next-config.test.ts`. Those match compiled code, so a release that
-  only restructures that code fails them as well, and whoever bumps Next.js checks this record
+  `NextConfig` object literal and `NextConfig` has no index signature. One that keeps the option
+  but stops passing it on or checking it fails the source checks in `next-config.test.ts`, and so
+  does a new call of either function elsewhere in Next.js. Those match compiled code, so a release
+  that only restructures that code fails them as well, and whoever bumps Next.js checks this record
   against the new code before updating the pattern. Nothing automated notices generation moving
-  behind a different option or into another module: the behavioural check is
-  `git status --porcelain apps/web` after an agent-run `next dev` or local e2e, and it is manual.
+  behind a different option or a renamed function: the behavioural check is that
+  `git status --porcelain --ignored -- apps/web/AGENTS.md apps/web/CLAUDE.md` prints nothing after
+  an agent-run `next dev` or local e2e, and it is manual.
 - Agents lose the automatic pointer to the bundled docs and have to find it in `CLAUDE.md`. This
   goes against the default Next.js recommends; the pointer it rests on is kept, in a reviewed file.
 - Copies written before this change stay in other checkouts until someone deletes them. Next.js no
