@@ -80,6 +80,8 @@ CodeQL default setup is on as well. GitHub manages it outside `.github/workflows
 
 `.github/workflows/flake-hunt.yml` is not a check: every night it runs the e2e suite 30 times with `scripts/flake-hunt.sh` and opens an issue for flaky tests no open `flake-hunt` issue tracks yet.
 
+`.github/workflows/live-check.yml` is not a check either: after each production deployment it loads every page of the live site with `apps/web/playwright.live.config.ts` and fails when a page does not load the Web Analytics tracker, logs to the console or sets a cookie.
+
 Useful extras: `pnpm lint:fix`, `pnpm format`, `pnpm clean`.
 
 ## Testing

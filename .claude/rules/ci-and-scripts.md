@@ -96,6 +96,16 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   also posted as a review thread, though, and the resolved-threads rule below blocks the merge until
   that thread is resolved: GitHub resolves it once the flagged code changes, and a writer can
   resolve it by hand or dismiss the alert.
+- `.github/workflows/live-check.yml` runs on Vercel's `deployment_status` events and on manual
+  dispatch, and none of its jobs is a required check. Its one job, `Live site`, is skipped unless
+  the status is a successful `Production` one; then it checks out the deployed commit and runs
+  `apps/web/e2e-live/` against `https://miloscvetkovic.dev` with `playwright.live.config.ts`, which
+  starts no server and shares no spec with `playwright.config.ts`. It targets the apex because a
+  deployment's own URL is behind Vercel Authentication. It asserts the tracker tag, its script's
+  200, a clean console and no cookies, never a page-view beacon: the tracker sends none when
+  `navigator.webdriver` is true. Locally:
+  `pnpm --filter web exec playwright test --config playwright.live.config.ts`, with `LIVE_URL` for
+  another target.
 - `.github/workflows/flake-hunt.yml` hunts flaky e2e tests every night at 02:17 UTC and on manual
   dispatch, never on a pull request, and none of its jobs is a required check. Six shards each run
   the whole suite five times against the production build with `scripts/flake-hunt.sh`; a report

@@ -1,0 +1,68 @@
+name: Live check
+
+# After Vercel reports a production deployment ready, loads every page of the live site and checks
+# what only a Vercel deployment can show: each page loads the Web Analytics tracker, that script
+# answers 200, the console stays clean and no cookie is set (apps/web/e2e-live, ADR 0026).
+#
+# Nothing here is a required check, and it never runs on a pull request's code as a gate. Vercel
+# reports a deployment_status for every deployment, previews included; the job runs only for a
+# successful Production one and is skipped for the rest. A manual dispatch runs it on demand against
+# the live site, from whichever branch is chosen.
+on:
+  deployment_status:
+  workflow_dispatch:
+
+# One check at a time; a newer deployment's check waits rather than cancelling the one running.
+concurrency:
+  group: live-check
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: '1'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  live:
+    name: Live site
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        # On deployment_status this is the deployed commit, so the spec matches the code it checks.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm (version from package.json#packageManager)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright's Chromium
+        run: pnpm --filter web exec playwright install --with-deps chromium
+
+      - name: Check the live site
+        # The apex, not the deployment's own URL: that one sits behind Vercel Authentication.
+        env:
+          LIVE_URL: https://miloscvetkovic.dev
+        run: pnpm --filter web exec playwright test --config playwright.live.config.ts
+
+      - name: Upload the report
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: live-check-report
+          path: apps/web/playwright-report
+          retention-days: 14
