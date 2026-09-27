@@ -1,21 +1,21 @@
 name: Live check
 
-# After Vercel reports a production deployment ready, loads every page of the live site and checks
-# what only a Vercel deployment can show: each page loads the Web Analytics tracker, that script
-# answers 200, the console stays clean and no cookie is set (apps/web/e2e-live, ADR 0026).
+# Loads every route of the live site and checks what only a Vercel deployment can show: each page
+# loads the Web Analytics tracker, the page's request for that script answers 200, the console logs
+# no error or warning, and nothing is stored (apps/web/e2e-live, ADR 0026). It runs after Vercel
+# reports a production deployment ready, every morning (an Instant Rollback, a promotion or a CLI
+# deploy can change what the apex serves without a status reaching GitHub), and on dispatch.
 #
-# Nothing here is a required check, and it never runs on a pull request's code as a gate. Vercel
-# reports a deployment_status for every deployment, previews included; the job runs only for a
-# successful Production one and is skipped for the rest. A manual dispatch runs it on demand against
-# the live site, from whichever branch is chosen.
+# None of it is a required check. Vercel reports a deployment_status for every deployment, previews
+# included, and GitHub runs this file as it stands at the deployed commit, a pull request branch's
+# copy for a preview; the job is skipped unless the status is a successful Production one, so a
+# pull request's commits list it as skipped. It holds no secret. It tests the public apex, not the
+# deployment that triggered it, whose own URL sits behind Vercel Authentication.
 on:
   deployment_status:
+  schedule:
+    - cron: '23 6 * * *'
   workflow_dispatch:
-
-# One check at a time; a newer deployment's check waits rather than cancelling the one running.
-concurrency:
-  group: live-check
-  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -28,15 +28,27 @@ jobs:
   live:
     name: Live site
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      github.event_name != 'deployment_status' ||
       (github.event.deployment_status.state == 'success' &&
       github.event.deployment.environment == 'Production')
+    # On the job, not the workflow, so the skipped runs every preview status starts never take the
+    # slot: a check still waiting would otherwise be replaced by one of them. A running check is
+    # never cancelled.
+    concurrency:
+      group: live-check
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
     steps:
       - name: Checkout
-        # On deployment_status this is the deployed commit, so the spec matches the code it checks.
+        # On deployment_status this is the deployed commit, so the routes are the ones it deployed;
+        # the apex can still serve the previous deployment for a moment (the daily run covers that).
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up pnpm (version from package.json#packageManager)
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -54,9 +66,7 @@ jobs:
         run: pnpm --filter web exec playwright install --with-deps chromium
 
       - name: Check the live site
-        # The apex, not the deployment's own URL: that one sits behind Vercel Authentication.
-        env:
-          LIVE_URL: https://miloscvetkovic.dev
+        # The target is DEFAULT_LIVE_URL in apps/web/playwright.live.config.ts.
         run: pnpm --filter web exec playwright test --config playwright.live.config.ts
 
       - name: Upload the report
@@ -66,3 +76,22 @@ jobs:
           name: live-check-report
           path: apps/web/playwright-report
           retention-days: 14
+
+      - name: Open or update an issue
+        # A deployment_status or scheduled run has no human actor to notify, so a failure files an
+        # issue, or comments on the open one. A dispatch reports to whoever started it.
+        if: ${{ failure() && github.event_name != 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title='Live check failed on the production site'
+          open=$(gh issue list --state open --search "\"$title\" in:title" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          body="The live check failed on $GITHUB_SHA: $RUN_URL"
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

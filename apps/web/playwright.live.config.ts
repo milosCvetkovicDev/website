@@ -21,6 +21,8 @@ export default defineConfig({
   // The network between a runner and the site is the one thing here that can fail by itself.
   retries: 2,
   workers: 1,
+  // A live round trip, the tracker and the wait for the network to settle, over a runner's network.
+  timeout: 60_000,
   expect: { timeout: 15_000 },
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
