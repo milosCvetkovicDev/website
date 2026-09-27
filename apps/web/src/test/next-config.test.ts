@@ -313,3 +313,25 @@ describe('the production alias', () => {
     expect(await robotsTag(`https://${PRODUCTION_ALIAS_HOST}.example/`)).toBeNull();
   });
 });
+
+describe('env', () => {
+  // The config reads VERCEL_ENV when it is evaluated, so each case imports a fresh copy.
+  const freshConfig = async () => {
+    vi.resetModules();
+    return (await import('../../next.config')).default;
+  };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('inlines VERCEL_ENV, so the client-side global error page gates analytics like the layout', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+    expect((await freshConfig()).env).toEqual({ VERCEL_ENV: 'production' });
+  });
+
+  it('inlines an empty string when VERCEL_ENV is unset, which the gate reads as off', async () => {
+    vi.stubEnv('VERCEL_ENV', undefined);
+    expect((await freshConfig()).env).toEqual({ VERCEL_ENV: '' });
+  });
+});
