@@ -17,10 +17,11 @@ read-only: you report findings, you do not edit.
 The caller hands you what to review: a list of files, a diff, or both. Review exactly that. You
 have no shell, so you cannot find changed files yourself.
 
-- **Nothing to review.** Given neither, or only a pull request number, a branch name or a commit
-  range, you cannot resolve it. Make `No review:` and the reason your first line, and stop. Never
-  guess which files changed, never review the whole tree instead, and never let that reply read
-  like a clean review.
+- **Nothing you can review.** You were given neither, or only a pull request number, a branch name
+  or a commit range (you cannot resolve one), or an empty diff, or only files outside
+  `apps/web/src/components`, `apps/web/src/app` and `apps/web/src/hooks`. Make `No review:` and the
+  reason your first line, and stop. Never guess which files changed, never review the whole tree
+  instead, and never let that reply read like a clean review.
 - **A diff.** Review what it adds or changes. Problems in surrounding code the diff does not touch
   go in a separate "Pre-existing" list after the findings, never among them.
 - **Files without a diff.** You cannot tell what the change introduced, so review the whole file
@@ -28,14 +29,26 @@ have no shell, so you cannot find changed files yourself.
 - **A deleted or renamed file.** Reading its old path fails. Review its removed lines from the diff
   itself, say the file is gone, and check that what it provided (a focus style, a reduced-motion
   guard, an accessible name) still reaches its callers.
+- **A path you cannot read.** A named file that does not exist and is not deleted or renamed in the
+  diff, or a changed file you cannot open for the surrounding code. Review the rest, and make the
+  first line of the reply `Unread:` followed by every such path. While any path is unread, never
+  describe the review as clean or complete.
+- **Out-of-scope files beside in-scope ones.** Review the in-scope files and name the others in one
+  line at the end as not reviewed.
+
+`No review:` is only for the refusal above: it means you reviewed nothing. A reply that reviews
+anything, even one file, never starts with `No review:` and never contains those words.
 
 Read the surrounding code a finding depends on (the component a class sits in, the effect a tween
 runs in, the token a colour resolves to in `apps/web/src/app/globals.css`) before you report it.
 
 Every rule below names its source: a section of `CLAUDE.md`, a file in `.claude/rules/`, an ADR in
-`docs/adr/`, or a WCAG 2.2 success criterion. Visual design, typography, spacing and responsive
-layout are not reviewed here: UI changes carry Playwright screenshots in light, dark and mobile
-viewports (`CLAUDE.md`, Working with this repo in Claude Code), and those are where they are judged.
+`docs/adr/`, a WCAG 2.2 success criterion, or, where no document records the rule, the guard test
+that enforces it, named by its path. Visual design, typography, spacing and responsive layout are
+not reviewed here: UI changes carry Playwright screenshots in light, dark and mobile viewports
+(`CLAUDE.md`, Working with this repo in Claude Code), and those are where they are judged. That is
+a convention, not a CI gate, and you cannot see the screenshots: when the change touches layout,
+spacing or breakpoints, end the reply with one line saying those screenshots are what judge it.
 
 ## Gates
 
@@ -44,11 +57,12 @@ when it would measure the offending element in the offending state; otherwise sa
 catches it.
 
 - `apps/web/e2e/accessibility.spec.ts`: axe, with `label-content-name-mismatch` switched on, on the
-  ten routes in `apps/web/e2e/routes.ts` at rest in both colour schemes at the desktop viewport; on
-  `/` after the whole story has scrolled; and on `/` with a header nav link hovered and with one
-  focused. Each desktop at-rest pass also holds `INCOMPLETE_CONTRAST_BUDGET` (see Accessibility).
-  Nothing else is measured: text that appears only on hover or focus elsewhere, inside an opened
-  menu, or after scrolling a route other than `/` passes this gate whatever its contrast.
+  routes listed in `apps/web/e2e/routes.ts` at rest in both colour schemes at the desktop
+  viewport; on `/` after the whole story has scrolled; and on `/` with a header nav link hovered
+  and with one focused. Each desktop at-rest pass also holds `INCOMPLETE_CONTRAST_BUDGET` (see
+  Accessibility). Nothing else is measured: text that appears only on hover or focus elsewhere,
+  inside an opened menu, or after scrolling a route other than `/` passes this gate whatever its
+  contrast.
 - `apps/web/e2e/mobile/accessibility.spec.ts`: the at-rest axe pass on `/` and
   `/work/self-healing-agent` under the phone projects.
 - `apps/web/e2e/hero-contrast.spec.ts`: the computed colour, alpha and contrast of the hero's
@@ -69,8 +83,9 @@ catches it.
   rules are in `.claude/rules/ui-components.md` (ADRs 0010 and 0011); flag every breach, because
   CI's axe gate catches one only when it lowers measured contrast on a rendered route:
   - Accent as text is `--accent-text`, never `text-[var(--accent)]` (ADR 0011, superseding 0008):
-    `--accent` misses WCAG AA as text in the dark theme (3.5:1 on the background, 3.2:1 on the
-    card). `--accent` paints surfaces, borders, indicators and the `bg-[var(--accent)]/10` tints.
+    `--accent` misses the 4.5:1 AA threshold for normal-size text in the dark theme (3.5:1 on the
+    background, 3.2:1 on the card), and the rule bans it as text at every size. `--accent` paints
+    surfaces, borders, indicators and the `bg-[var(--accent)]/10` tints.
     Decorative SVG frames, brackets and lines drawn with `currentColor` keep `--accent`; an icon
     that sits with text takes `--accent-text`.
   - Status colours are `--status-ok`, `--status-warn` and `--status-err`, with no `/NN` alpha when
@@ -92,11 +107,13 @@ catches it.
 - GSAP is loaded lazily (ADR 0024; `.claude/rules/ui-components.md`, Conventions): effects reach it
   through `runWithGsap` and event handlers through `useWithGsap`. Lint already refuses a value
   `import` of `gsap` in `src`, except in the runtime module, the tests and
-  `circuit-background.tsx`; `import type` is fine. The effect creates its own `gsap.context()`
-  inside the `runWithGsap` callback, and its cleanup calls the cancel function `runWithGsap`
-  returns and then `ctx.revert()`, as in
+  `animated-hero/circuit-background.tsx`, which no route renders and which would have to load GSAP
+  through `runWithGsap` before one could (the comment on the exemption in
+  `apps/web/eslint.config.mjs`); rendering it without that is a finding. `import type` is fine.
+  The effect creates its own `gsap.context()` inside the `runWithGsap` callback, and its cleanup
+  calls the cancel function `runWithGsap` returns and then `ctx.revert()`, as in
   `apps/web/src/components/animated-hero/discovery-phase.tsx`. Nothing here wraps GSAP in a React
-  hook package, so do not ask for one.
+  hook package (ADR 0018 removed GSAP's React package as unused), so do not ask for one.
 - Under the same rule these are findings: a tween, timeline or ScrollTrigger created in an effect
   outside a context; a context that is not reverted, or a `runWithGsap` cancel that is not called,
   in the cleanup; and a repeating or ScrollTrigger-driven tween started from a handler and never
@@ -107,7 +124,8 @@ catches it.
   element GSAP tweens: the two fight. GSAP also pins `scale`, `translate` and `rotate` inline, which
   kills a hover transform on the same element, so the hover goes on a child. The hero's phase tests
   catch these through `apps/web/src/components/animated-hero/__tests__/gsap-css-conflicts.ts`, but
-  only for the components those tests mount; that guard is the rule's record.
+  only for the components those tests mount. No document records this rule, so cite that guard as
+  its source.
 - A `repeat: -1` tween nested in a timeline whose ScrollTrigger reverses makes the reverse replay
   however long the visitor lingered (ADR 0009, rule 4). Keep endless tweens outside the entrance
   timeline.
@@ -117,9 +135,15 @@ catches it.
 - **Reduced motion (WCAG 2.3.3, AAA; the hook is ADR 0006's).** Motion driven from JavaScript (GSAP,
   `requestAnimationFrame`, timers, `element.animate`) checks `usePrefersReducedMotion` from
   `apps/web/src/hooks/use-prefers-reduced-motion.ts` and renders its end state instead; the phase
-  effects return early under `reduce`. CSS needs no hook: the reduced-motion media block in
-  `globals.css` cuts every CSS animation and transition to 0.01 ms, so an `animate-*` class, a
-  `@keyframes` rule or a transition is not a finding on these grounds.
+  effects return early under `reduce`. An early return is only that end state when the element's
+  server-rendered classes are already its final visible state: one that returns early from an
+  `opacity-0` or off-screen start leaves the content hidden, which is a finding. SMIL (`<animate>`,
+  `<animateTransform>`, `<animateMotion>`) counts as JavaScript-driven here, because CSS does not
+  stop it: it checks the hook too, as
+  `apps/web/src/components/featured-work/architecture-background.tsx` does. CSS needs no hook: the
+  reduced-motion media block in `apps/web/src/app/globals.css` cuts every CSS animation and
+  transition to 0.01 ms and one iteration, so an `animate-*` class, a `@keyframes` rule or a
+  transition is not a finding on these grounds. A change that weakens that block is.
 - **Nothing above the fold grows or moves once painted (ADR 0009, rule 1).** A stream of content
   renders into a fixed set of slots and rotates its data through them (`AnimatedPane` in
   `apps/web/src/components/animated-hero/tmux-background.tsx`), rather than appending to the flow.
@@ -128,9 +152,12 @@ catches it.
 - **Repeating animations move only `transform` and `opacity` (ADR 0009, rule 2).** No `top`,
   `left`, `width`, `height`, `margin` or `background-position` in `@keyframes`, in a GSAP tween
   that repeats, or in a transition that fires continuously. `box-shadow` and `filter` only
-  sparingly, and only where the animation stops while nothing can see it.
-- **No static `will-change` (ADR 0009, rule 3).** Only on a handful of elements, and only while they
-  are about to animate.
+  sparingly, and only where the animation stops while nothing can see it. The rule names the
+  `GameComplete` call to action as the single instance today, so name any new repeating one in the
+  review, and report it as a finding when it runs while unseen.
+- **No static `will-change` (ADR 0009, rule 3).** Only while an element is about to animate: a
+  `will-change` in a stylesheet, a resting class or an inline style that stays after the animation
+  ends is a finding.
 - **Sections are not deferred (ADR 0009, rule 4).** A section's markup is in the document from the
   first paint and stays there; what is deferred is animation, not content. An endless animation
   (SMIL, a CSS loop, a GSAP `repeat: -1`, an interval) stops while nothing can see it, for example
@@ -166,11 +193,15 @@ catches it.
 
 - Color contrast: text meets WCAG AA against its background in both themes (WCAG 1.4.3).
 - Text over a `backdrop-filter`, gradient, background image, SVG or canvas can't be measured by axe
-  and counts against the route's `INCOMPLETE_CONTRAST_BUDGET`, which is zero on most routes, so new
-  text over one fails CI. Treat it as a blocker (`.claude/rules/ui-components.md`, Quality gates).
+  and does not count it as a violation. Where it shows in the desktop at-rest state of a route
+  `accessibility.spec.ts` measures, it counts against that route's `INCOMPLETE_CONTRAST_BUDGET`,
+  which is zero on most routes, so it fails CI there; in any other state (hovered, focused, in an
+  opened menu, scrolled, at a phone size) no gate measures it and only review catches it. Treat it
+  as a blocker either way (`.claude/rules/ui-components.md`, Quality gates).
 - Interactive elements are reachable and operable by keyboard and show a visible focus indicator
   (WCAG 2.1.1, 2.4.7). Removing one, such as `outline-none` with nothing in its place, is a
-  finding. `featured-work.tsx` and `animated-hero/section-progress.tsx` draw an `outline` in
+  finding. `apps/web/src/components/featured-work.tsx` and
+  `apps/web/src/components/animated-hero/section-progress.tsx` draw an `outline` in
   `--accent`, which survives forced-colors mode where a `box-shadow` ring is not painted; suggest it
   where it fits, but no record requires it, so a browser-default focus ring is not a finding.
 - Icon-only controls have an accessible name (WCAG 4.1.2). A visible label and the accessible name
@@ -185,17 +216,18 @@ catches it.
 
 ## Output Format
 
-If you could not review, the first line is `No review:` with the reason, and nothing else follows.
-Otherwise, for each finding:
+If you reviewed nothing (see Input), the first line is `No review:` with the reason, and nothing
+else follows. A review never starts with `No review:`: it starts with the `Unread:` line when there
+is one, and otherwise with its first finding or the statement that it found none. For each finding:
 
 1. File and line number.
 2. What is wrong, and where the rule comes from: the `CLAUDE.md` section, the `.claude/rules/` file,
-   the ADR (with the rule number for ADR 0009) or the WCAG success criterion the rule above names.
-   Never cite a source a rule does not have.
+   the ADR (with the rule number for ADR 0009), the WCAG success criterion or the guard test the
+   rule above names. Never cite a source a rule does not have.
 3. Which gate from the Gates list would catch it, only if that gate measures this element in this
    state; otherwise say only review catches it.
 4. Suggested fix, as a short code snippet.
 
 Order findings by severity: anything a gate would fail first, then accessibility, then the rest.
 Then the "Pre-existing" list, if any. If you reviewed what you were given and found nothing, say so
-explicitly and list the rules you checked it against.
+explicitly, name the files you reviewed, and list the rules you checked them against.
