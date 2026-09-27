@@ -7,9 +7,11 @@
 // inputs no row sends, such as a new protected path or command word, passes until a row is added for
 // it, so a PR that changes a guard adds its rows and updates that bullet in the same change.
 //
-// The owner kept both guards as they are, false positives included (task 50, decision D4). Every
-// row pins today's result, and a row whose status differs from what task 50's AC 22 asks for says
-// so beside it.
+// Task 50 is .claude/epics/audit-remediation-2026-09/50.md: its finding tooling-11 and its
+// acceptance criterion AC 22 ask for this table. The owner's decision D4 (2026-09-17) kept both
+// guards as they are, false positives included, instead of making the narrowing that 50.md's
+// Technical Details prescribe; 50.md does not record D4 yet. Every row pins today's result, and a
+// row whose status differs from what AC 22 asks for says so beside it.
 //
 // What Claude Code does with a hook, per https://code.claude.com/docs/en/hooks: a command hook runs
 // through `sh -c` on macOS and Linux with CLAUDE_PROJECT_DIR exported; a PreToolUse hook that exits
@@ -29,6 +31,7 @@ import {
   rmSync,
   statSync,
   symlinkSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
@@ -123,7 +126,7 @@ function which(name) {
  * @returns {{ dirs: string[], body: string }}
  */
 function splitPathAssignment(command) {
-  const match = /^PATH="((?:[^":$]+:)*)\$PATH"; /.exec(command);
+  const match = /^PATH="((?:[^":$]+:)*)\$PATH";\s*/.exec(command);
   assert.ok(
     match,
     `expected the guard to start with PATH="<dirs>:$PATH"; (${command.slice(0, 60)})`,
@@ -146,47 +149,86 @@ function assertFindsJq(command) {
 }
 
 /**
- * The environment a guard runs in. Only PATH and HOME are inherited, so a developer's GREP_OPTIONS,
- * locale or other variables cannot change a row, and the C locale makes the Bash guard's bracket
- * expressions plain byte ranges on every machine.
+ * The environment a guard runs in. Only PATH and HOME are inherited, so a developer's GREP_OPTIONS
+ * or other variables cannot change a row. PATH still decides which jq, grep and sed the guard runs
+ * (after the guard's own PATH assignment), so the rows are pinned against whatever this machine has:
+ * BSD grep and sed on macOS, GNU on GitHub's ubuntu runner. Claude Code passes on the user's own
+ * locale, so every row of the two tables runs twice, under the C locale and under a UTF-8 one.
  *
  * @param {string | undefined} path
+ * @param {string} [locale]
  * @returns {NodeJS.ProcessEnv}
  */
-const guardEnv = (path) => ({
+const guardEnv = (path, locale = 'C') => ({
   PATH: path,
   HOME: process.env.HOME,
-  LC_ALL: 'C',
+  LC_ALL: locale,
   CLAUDE_PROJECT_DIR: repoRoot,
 });
 
+/** @type {string | undefined} */
+let utf8LocaleName;
+
 /**
- * Runs a guard the way Claude Code runs a command hook: through `sh -c`, with the hook's JSON
- * payload on stdin and CLAUDE_PROJECT_DIR set to the repository root.
+ * The name this machine gives the UTF-8 locale the rows run under a second time: `C.UTF-8` where it
+ * exists (`C.utf8` on Linux), else `en_US.UTF-8`. Fails the suite when neither is installed, since
+ * a missing locale would silently fall back to C and the second run would repeat the first.
+ */
+function utf8Locale() {
+  if (utf8LocaleName !== undefined) return utf8LocaleName;
+  const listed = spawnSync('locale', ['-a'], { encoding: 'utf8', timeout: 30_000 });
+  assert.equal(listed.status, 0, `locale -a failed: ${listed.stderr}`);
+  const installed = listed.stdout.split('\n').map((name) => name.trim());
+  /** @param {string} name */
+  const normalise = (name) => name.toLowerCase().replace('-', '');
+  for (const wanted of ['c.utf8', 'en_us.utf8']) {
+    const found = installed.find((name) => normalise(name) === wanted);
+    if (found !== undefined) return (utf8LocaleName = found);
+  }
+  assert.fail('neither C.UTF-8 nor en_US.UTF-8 is installed (locale -a)');
+}
+
+/**
+ * Runs a guard the way Claude Code runs a command hook: through `sh -c`, with `stdin` as the hook's
+ * payload and CLAUDE_PROJECT_DIR set to the repository root.
+ *
+ * @param {string} command
+ * @param {string} stdin
+ * @param {string | undefined} [path] the PATH to run with, in place of this process's
+ * @param {string} [locale]
+ * @returns {GuardResult}
+ */
+function runGuardOnStdin(command, stdin, path = process.env.PATH, locale = 'C') {
+  const result = spawnSync(sh, ['-c', command], {
+    input: stdin,
+    encoding: 'utf8',
+    cwd: repoRoot,
+    env: guardEnv(path, locale),
+    timeout: 30_000,
+  });
+  assert.equal(result.error, undefined, String(result.error));
+  assert.equal(result.signal, null, `the guard was killed by ${result.signal}`);
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr.trim() };
+}
+
+/**
+ * Runs a guard on the JSON payload Claude Code sends for one tool call.
  *
  * @param {string} command
  * @param {'Bash' | 'Edit' | 'Write'} toolName
- * @param {Record<string, string>} toolInput
+ * @param {Record<string, unknown>} toolInput
  * @param {string | undefined} [path] the PATH to run with, in place of this process's
+ * @param {string} [locale]
  * @returns {GuardResult}
  */
-function runGuard(command, toolName, toolInput, path = process.env.PATH) {
+function runGuard(command, toolName, toolInput, path = process.env.PATH, locale = 'C') {
   const payload = {
     hook_event_name: 'PreToolUse',
     tool_name: toolName,
     tool_input: toolInput,
     cwd: repoRoot,
   };
-  const result = spawnSync(sh, ['-c', command], {
-    input: JSON.stringify(payload),
-    encoding: 'utf8',
-    cwd: repoRoot,
-    env: guardEnv(path),
-    timeout: 30_000,
-  });
-  assert.equal(result.error, undefined, String(result.error));
-  assert.equal(result.signal, null, `the guard was killed by ${result.signal}`);
-  return { status: result.status, stdout: result.stdout, stderr: result.stderr.trim() };
+  return runGuardOnStdin(command, JSON.stringify(payload), path, locale);
 }
 
 /**
@@ -207,13 +249,36 @@ const blockedByBash =
  * @param {GuardResult} result
  * @param {0 | 2} expected
  * @param {string} blockMessage
+ * @param {string} [label] the conditions the row ran under, for the failure message
  */
-function assertRow({ status, stdout, stderr }, expected, blockMessage) {
-  assert.equal(status, expected, `expected exit ${expected}, got ${status} (stderr: ${stderr})`);
+function assertRow({ status, stdout, stderr }, expected, blockMessage, label = '') {
+  const where = label === '' ? '' : ` under ${label}`;
+  assert.equal(
+    status,
+    expected,
+    `expected exit ${expected}, got ${status}${where} (stderr: ${stderr})`,
+  );
   // Output shaped like JSON can allow or deny the call whatever an exit 0 says; neither guard
   // prints any.
-  assert.equal(stdout, '', 'the guard printed to stdout, which Claude Code may read as a decision');
-  assert.equal(stderr, expected === 2 ? blockMessage : '');
+  assert.equal(
+    stdout,
+    '',
+    `the guard printed to stdout${where}, which Claude Code may read as a decision`,
+  );
+  assert.equal(stderr, expected === 2 ? blockMessage : '', `stderr${where}`);
+}
+
+/**
+ * Asserts one row under the C locale and again under a UTF-8 one.
+ *
+ * @param {(locale: string) => GuardResult} run
+ * @param {0 | 2} expected
+ * @param {string} blockMessage
+ */
+function assertRowInBothLocales(run, expected, blockMessage) {
+  for (const locale of ['C', utf8Locale()]) {
+    assertRow(run(locale), expected, blockMessage, `LC_ALL=${locale}`);
+  }
 }
 
 describe('the PreToolUse entries in .claude/settings.json', () => {
@@ -224,7 +289,9 @@ describe('the PreToolUse entries in .claude/settings.json', () => {
     ['Bash', ['Bash']],
     ['Edit', ['Edit|Write']],
     ['Write', ['Edit|Write']],
+    // Tools that also write files, which no entry reaches. The tools reference lists no MultiEdit.
     ['NotebookEdit', []],
+    ['PowerShell', []],
   ];
 
   for (const [toolName, expected] of reach) {
@@ -243,11 +310,13 @@ describe('the Bash PreToolUse guard', () => {
   before(() => {
     guard = guardCommand('Bash');
     assertFindsJq(guard);
+    utf8Locale();
   });
 
   /** @type {[command: string, status: 0 | 2][]} */
   const rows = [
-    // AC 22's five payloads, spelled as it spells them.
+    // AC 22's five payloads, spelled as it spells them
+    // (.claude/epics/audit-remediation-2026-09/50.md).
     //
     // Known false positive, accepted under D4: AC 22 expects 0 here. The `.*` between the command
     // word and the protected name runs across `;`, so removing an unrelated file first turns a read
@@ -266,8 +335,20 @@ describe('the Bash PreToolUse guard', () => {
     ['mv a b; grep X apps/web/.env.local', 2],
     ['grep -e rm apps/web/.env.local', 2],
     ['git commit -m "chore: rm stale dep, refresh pnpm-lock.yaml"', 2],
-    // A command word inside a longer word does not count.
+    // A command word inside a longer word does not count, at either end, but any other character
+    // before or after it does: a path, a backslash, a `-`.
     ['grep confirm apps/web/.env.local', 0],
+    ['rmdir .envdir', 0],
+    ['mvn -f .env', 0],
+    ['/bin/rm .env', 2],
+    ['\\rm .env', 2],
+    ['rm-x .env', 2],
+    // The name is matched as text, not as a file name, so `process.env` and `import.meta.env` count
+    // too, and so does a line inside a heredoc.
+    ["sed -i '' s/process.env.FOO/BAR/ apps/web/src/lib/site.ts", 2],
+    ['rm -rf .next && grep -rn process.env apps/web/src', 2],
+    ['cp a b && grep -rn import.meta.env apps/web/src', 2],
+    ["cat <<'EOF' > notes.txt\nthen sed -i the pnpm-lock.yaml\nEOF", 2],
 
     // grep matches line by line: a write on a line of its own is caught, and the false positive
     // stops at a newline.
@@ -315,10 +396,16 @@ describe('the Bash PreToolUse guard', () => {
     ['install -m 644 x apps/web/.env.local', 0],
     ['rsync x apps/web/.env.local', 0],
     ['git checkout stash -- .env', 0],
-    // `-i` counts only in sed's or perl's first argument.
+    ['unlink .env', 0],
+    ['touch pnpm-lock.yaml', 0],
+    ['curl -o .env https://example.com', 0],
+    // `-i` counts only in sed's or perl's first argument, and only after letters; Homebrew's
+    // `gsed` is not `sed`.
     ['sed --in-place s/a/b/ .env', 0],
     ['sed -E -i s/a/b/ .env', 0],
     ['perl -p -i -e s/a/b/ .env', 0],
+    ['perl -0pi -e s/a/b/ .env', 0],
+    ['gsed -i s/a/b/ .env', 0],
     // A space after `>|` leaves the target word empty.
     ['echo x >| .env', 0],
     // The name has to appear literally, on the command word's line.
@@ -347,9 +434,36 @@ describe('the Bash PreToolUse guard', () => {
 
   for (const [command, expected] of rows) {
     it(`exits ${expected} for ${JSON.stringify(command)}`, () => {
-      assertRow(runGuard(guard, 'Bash', { command }), expected, blockedByBash);
+      assertRowInBothLocales(
+        (locale) => runGuard(guard, 'Bash', { command }, undefined, locale),
+        expected,
+        blockedByBash,
+      );
     });
   }
+
+  // Payloads Claude Code does not send. With jq present, anything jq cannot read as a string
+  // command leaves nothing to match, so the guard allows it; stdin that is not JSON also gets jq's
+  // parse error on stderr.
+  /** @type {[label: string, stdin: string][]} */
+  const unreadable = [
+    ['no tool_input', JSON.stringify({ tool_name: 'Bash' })],
+    ['no command', JSON.stringify({ tool_name: 'Bash', tool_input: {} })],
+    ['a number as the command', JSON.stringify({ tool_name: 'Bash', tool_input: { command: 5 } })],
+    ['empty stdin', ''],
+  ];
+  for (const [label, stdin] of unreadable) {
+    it(`exits 0 for ${label}`, () => {
+      assertRow(runGuardOnStdin(guard, stdin), 0, '');
+    });
+  }
+
+  it('exits 0 for stdin that is not JSON, with only jq on stderr', () => {
+    const { status, stdout, stderr } = runGuardOnStdin(guard, '{bad');
+    assert.equal(status, 0);
+    assert.equal(stdout, '');
+    assert.match(stderr, /parse error/);
+  });
 });
 
 describe('the Edit|Write PreToolUse guard', () => {
@@ -358,6 +472,7 @@ describe('the Edit|Write PreToolUse guard', () => {
   before(() => {
     guard = guardCommand('Edit|Write');
     assertFindsJq(guard);
+    utf8Locale();
     // The patterns match anywhere in the absolute path, so inside a directory they name every
     // allowed absolute row, like every real edit in that checkout, would be blocked.
     assert.doesNotMatch(
@@ -372,9 +487,11 @@ describe('the Edit|Write PreToolUse guard', () => {
     // AC 22's three payloads, spelled as it spells them: relative paths.
     ['apps/web/.env.local', 2],
     ['pnpm-lock.yaml', 2],
-    // 0 as AC 22 expects, though not through the `.env.example` exemption, which needs a `/` before
-    // the name: a bare `.env.example` matches no pattern at all. The absolute rows take the exemption.
+    // 0 as AC 22 expects. The next row shows that no pattern blocks a bare `.env.*` name, so this
+    // row would be 0 without the `.env.example` exemption too (which, read from the guard, also
+    // needs a `/` before the name). The absolute rows below are the ones that exercise it.
     ['.env.example', 0],
+    ['.env.example.local', 0],
 
     // Absolute paths, which is what the guard sees in practice.
     ['$CLAUDE_PROJECT_DIR/apps/web/.env.local', 2],
@@ -414,18 +531,56 @@ describe('the Edit|Write PreToolUse guard', () => {
     ['.env', 0],
     ['node_modules/x/index.js', 0],
     ['apps/web/.next/x.json', 2],
+
+    // The path is matched as text and never normalised: `..`, `//` and `.` segments in front of a
+    // protected name still end in it, a trailing `/` does not, and a protected directory name
+    // anywhere in the path blocks it even when `..` leaves that directory again.
+    ['$CLAUDE_PROJECT_DIR/apps/web/../.env', 2],
+    ['$CLAUDE_PROJECT_DIR//.env', 2],
+    ['$CLAUDE_PROJECT_DIR/./.env', 2],
+    ['$CLAUDE_PROJECT_DIR/.env/', 0],
+    ['$CLAUDE_PROJECT_DIR/apps/web/.env.local/../page.tsx', 2],
+    ['$CLAUDE_PROJECT_DIR/node_modules/../README.md', 2],
   ];
 
   for (const [spelled, expected] of rows) {
     it(`exits ${expected} for ${spelled}`, () => {
       const filePath = expandProjectDir(spelled);
-      assertRow(
-        runGuard(guard, 'Edit', { file_path: filePath, old_string: 'a', new_string: 'b' }),
+      assertRowInBothLocales(
+        (locale) =>
+          runGuard(
+            guard,
+            'Edit',
+            { file_path: filePath, old_string: 'a', new_string: 'b' },
+            undefined,
+            locale,
+          ),
         expected,
         `BLOCK: ${filePath} is a protected file`,
       );
     });
   }
+
+  // Nor does the guard resolve symlinks: an unprotected name that links to a `.env` file passes,
+  // while the file it points at is blocked.
+  it('exits 0 for a symlink to a .env file, and 2 for the file itself', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'claude-guards-link-'));
+    try {
+      assert.doesNotMatch(`${dir}/`, /\/(node_modules|\.next|dist)\/|\/\.env\./);
+      const target = join(dir, '.env');
+      const link = join(dir, 'settings.json');
+      writeFileSync(target, 'X=1\n');
+      symlinkSync(target, link);
+      assertRow(runGuard(guard, 'Edit', { file_path: link }), 0, '');
+      assertRow(
+        runGuard(guard, 'Edit', { file_path: target }),
+        2,
+        `BLOCK: ${target} is a protected file`,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
   // The Write tool sends `content` where Edit sends `old_string` and `new_string`; the guard reads
   // only `file_path`.
@@ -446,8 +601,31 @@ describe('the Edit|Write PreToolUse guard', () => {
     });
   }
 
-  it('exits 0 for a payload with no file_path', () => {
-    assertRow(runGuard(guard, 'Edit', {}), 0, '');
+  // Payloads Claude Code does not send. The guard fails closed only when jq is missing: with jq
+  // present, a file_path that is absent, null, empty or not a string, empty stdin, and stdin that is
+  // not JSON all leave nothing to match, so the guard allows them.
+  /** @type {[label: string, toolInput: Record<string, unknown>][]} */
+  const unreadable = [
+    ['no file_path', {}],
+    ['a null file_path', { file_path: null }],
+    ['an empty file_path', { file_path: '' }],
+    ['a number as the file_path', { file_path: 5 }],
+  ];
+  for (const [label, toolInput] of unreadable) {
+    it(`exits 0 for a payload with ${label}`, () => {
+      assertRow(runGuard(guard, 'Edit', toolInput), 0, '');
+    });
+  }
+
+  it('exits 0 for empty stdin', () => {
+    assertRow(runGuardOnStdin(guard, ''), 0, '');
+  });
+
+  it('exits 0 for stdin that is not JSON, with only jq on stderr', () => {
+    const { status, stdout, stderr } = runGuardOnStdin(guard, '{bad');
+    assert.equal(status, 0);
+    assert.equal(stdout, '');
+    assert.match(stderr, /parse error/);
   });
 });
 
@@ -497,7 +675,12 @@ describe('the PreToolUse guards without jq', () => {
     const { dirs, body } = splitPathAssignment(command);
     const shadowing = dirs.filter((dir) => isExecutableFile(join(dir, 'jq')));
     if (process.env.GITHUB_ACTIONS === 'true') {
-      assert.deepEqual(shadowing, [], 'on GitHub Actions the guard must run verbatim without jq');
+      assert.deepEqual(
+        shadowing,
+        [],
+        'on GitHub Actions the guard must run verbatim without jq: a jq in these directories is a ' +
+          'change to the runner image, not to the guard',
+      );
     }
     t.diagnostic(
       shadowing.length === 0
