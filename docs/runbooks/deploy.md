@@ -739,9 +739,12 @@ This runbook deliberately stops short of the following. None of it is in place; 
 
 - **`apps/playground` is not deployed.** It is a local Vite sandbox (`pnpm dev:playground`) with no
   Vercel project and no public URL. Only `apps/web` ships.
-- **Web Analytics is tested only by hand.** Since ADR 0026, `apps/web/src/components/web-analytics.tsx`
-  mounts Vercel's `<Analytics />` in deployment builds only (`VERCEL_ENV` `production` or `preview`), so
-  no local or CI server loads it and no e2e run shows the tracker working. After a deploy, open the
+- **A Web Analytics page view is checked only by hand.** Since ADR 0026,
+  `apps/web/src/components/web-analytics.tsx` mounts Vercel's `<Analytics />` in deployment builds
+  only (`VERCEL_ENV` `production` or `preview`), so no local or CI server loads it. After each
+  production deployment and daily, `.github/workflows/live-check.yml` checks on the live site that
+  every page loads the tracker's script, logs nothing and stores nothing, but no automated check
+  sees a view reach Vercel or the policy let it through. After a deploy, open the
   live `/` in an ordinary browser with DevTools open: it requests `/<seed>/script.js` (`200`),
   then `/<seed>/view`, and the console stays clean. The seed is random and new with each build
   (`/5f4b0333522bed46/` for `7411024`), inlined through
