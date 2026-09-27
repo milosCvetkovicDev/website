@@ -68,11 +68,12 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
   and that includes the `next dev` a local e2e run boots. `agentRules: false` in
   `apps/web/next.config.ts` turns that off (ADR 0019, `docs/adr/0019-next-agent-rules-disabled.md`).
   `apps/web/src/test/next-config.test.ts` pins the value, fails if either file is tracked, and
-  reads the installed Next.js to check it still honours the option; when that last check fails
-  after a Next.js bump, re-read ADR 0019 against the new code before updating the pattern. For
-  Next.js documentation that matches the installed version, read
-  `apps/web/node_modules/next/dist/docs` rather than the online docs. A pair written before the
-  change is untracked leftover that Claude Code still loads: delete it, never commit or ignore it.
+  reads the installed Next.js to check it still honours the option and generates the files from
+  nowhere else; when one of those checks fails after a Next.js bump, re-read ADR 0019 against the
+  new code before updating the pattern. For Next.js documentation that matches the installed
+  version, read `apps/web/node_modules/next/dist/docs` rather than the online docs. An
+  `apps/web/AGENTS.md` or `apps/web/CLAUDE.md` written before the change is untracked leftover
+  that Claude Code still loads: delete it (never the root `CLAUDE.md`), never commit or ignore it.
 - `.next-e2e` is known to seven places, not one: both `.gitignore` files, `.prettierignore`,
   `globalIgnores` in `apps/web/eslint.config.mjs`, the `include` list in `apps/web/tsconfig.json`,
   `.vercelignore` (the Vercel CLI never reads `.gitignore`, and the directory runs to ~150 MB) and

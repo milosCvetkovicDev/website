@@ -147,9 +147,10 @@ const nextConfig: NextConfig = {
   // Outside a pnpm workspace there is no nested-lockfile problem to solve, so leave the root to
   // Next's own inference rather than failing the build or refusing to boot the server.
   ...(workspaceRoot ? { turbopack: { root: workspaceRoot } } : {}),
-  // `next dev` writes apps/web/AGENTS.md and apps/web/CLAUDE.md whenever it detects an agent shell,
-  // and this repository neither commits nor ignores them: an untracked, Next-controlled instruction
-  // file that Claude Code then loads as project instructions. Off, per ADR 0019. The docs the
+  // `next dev` writes apps/web/AGENTS.md and apps/web/CLAUDE.md when it detects an agent shell and
+  // neither file holds Next's current managed block, and this repository neither commits nor
+  // ignores them: an untracked, Next-controlled instruction file that Claude Code then loads as
+  // project instructions. Off, per ADR 0019. The docs the
   // generated file pointed at are still there, version-matched, in
   // apps/web/node_modules/next/dist/docs.
   agentRules: false,
