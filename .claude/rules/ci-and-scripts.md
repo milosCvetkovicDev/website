@@ -68,6 +68,18 @@ Their `node_modules` survive it and have to be deleted by hand before a truly co
 has a `build` task today (`@repo/prettier-config` is config only), so this is currently a no-op. It
 is there so that a future buildable package is compiled before the apps typecheck against it.
 
+The `build` task keys its hash on `"inputs": ["$TURBO_DEFAULT$", ".env*"]` as well as its `env`
+list. `$TURBO_DEFAULT$` is the package's git-tracked files, so a gitignored `apps/web/.env.local`
+counts only through the `.env*` glob (relative to the package, so a repository-root `.env.local` is
+not an input): without it, editing that file left the hash unchanged and replayed a cached build
+that baked in the old origin. Its `outputs` exclude `.next/dev/**`: without that, a cached web build
+also carried whatever `next dev` had left in `apps/web/.next/dev` (424 MB of one 435 MB artifact)
+and a cache hit wrote it back there. A git worktree has no `.turbo/cache` of its own: turbo writes
+and reads the main checkout's, so clearing the cache means clearing that one directory, and a
+`turbo run` in a worktree without `--force` can replay another checkout's result, down to the
+absolute paths that checkout wrote into `apps/web/.next/required-server-files.json`. Pass `--force`
+when the run is evidence.
+
 `pnpm typecheck` stays the plain `turbo typecheck`, and `scripts/` is type-checked as one of its
 tasks: `@repo/scripts` runs `tsc -p .`, which checks every `scripts/**/*.mjs` with `checkJs`, and
 `check-docs-drift.ts` as TypeScript, with `strict` against `scripts/tsconfig.json`. That type-check
