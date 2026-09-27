@@ -9,6 +9,16 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    // Report-only: `pnpm --filter web test:coverage` prints a summary and fails on nothing. A
+    // threshold, and running it in CI, would each need a decision of their own. Source files only:
+    // `src/**` would also hand the provider `src/app/fonts/README.md`, which it fails to parse as
+    // code and logs a stack trace for. The text-summary reporter leaves no `coverage/` behind, and
+    // both .gitignore files and .vercelignore exclude it in case another reporter is added.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary'],
+      include: ['src/**/*.{ts,tsx}'],
+    },
   },
   resolve: {
     alias: {
