@@ -154,9 +154,9 @@ Always finish with `pnpm lint`.
   those. Other extensions, `.mdx` and `.svg` among them, are left exactly as written. The
   Prettier call ends in `|| true`, so a formatting failure is silent and only surfaces at
   `pnpm format:check`.
-- `.claude/agents/ui-reviewer.md` is a read-only review agent for `apps/web/src/components`: visual
-  quality, GSAP cleanup and reduced motion, accessibility, component structure. Run it after
-  changing a component, and name the changed files in its task: it has no shell to find them.
+- `.claude/agents/ui-reviewer.md` is a read-only review agent for `apps/web/src/components`, `app`
+  and `hooks`: colour, GSAP, motion, hydration and accessibility rules, each cited. Pass it the diff
+  or the files after changing one: it has no shell, and without them it answers `No review:`.
 - Every change ships as a pull request, because `main`'s protection refuses direct pushes: branch,
   commit with a Conventional Commit title (Quality gates describes how the squash title is linted),
   open it with `gh pr create`, and poll CI until every check on the head commit is green before
