@@ -736,9 +736,12 @@ This runbook deliberately stops short of the following. None of it is in place; 
 - **Web Analytics is tested only by hand.** Since ADR 0026, `apps/web/src/components/web-analytics.tsx`
   mounts Vercel's `<Analytics />` in deployment builds only (`VERCEL_ENV` `production` or `preview`), so
   no local or CI server loads it and no e2e run shows the tracker working. After a deploy, open the
-  live `/` with DevTools open: it requests `/_vercel/insights/script.js` (`200`), then
-  `/_vercel/insights/view`, and the console stays clean. Page views show on the project's
-  **Analytics** tab.
+  live `/` in an ordinary browser with DevTools open: it requests `/5f4b0333522bed46/script.js`
+  (`200`), then `/5f4b0333522bed46/view`, and the console stays clean. That path is per project,
+  inlined at build time through `NEXT_PUBLIC_VERCEL_OBSERVABILITY_CLIENT_CONFIG`; the package's
+  default, `/_vercel/insights/`, is not used on Vercel (ADR 0026, corrected 2026-09-27). A browser
+  driven by automation (`navigator.webdriver` true: Playwright, Chrome DevTools MCP) loads the
+  script but never sends the view. Page views show on the project's **Analytics** tab.
 - **No Speed Insights.** `@vercel/speed-insights` is not installed, so there are no field Core Web
   Vitals.
 - **No error monitoring.** There is no Sentry or equivalent. `apps/web/src/app/error.tsx` is a client
