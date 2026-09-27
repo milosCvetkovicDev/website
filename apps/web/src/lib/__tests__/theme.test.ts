@@ -1,6 +1,12 @@
 import { createContext, runInContext } from 'node:vm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DARK_COLOR_SCHEME_QUERY, THEME_INIT_SCRIPT, THEME_STORAGE_KEY } from '../theme';
+import {
+  DARK_COLOR_SCHEME_QUERY,
+  preferredTheme,
+  THEME_INIT_SCRIPT,
+  THEME_STORAGE_KEY,
+  type ThemeEnvironment,
+} from '../theme';
 
 /**
  * The pre-paint init script's branches.
@@ -160,5 +166,56 @@ describe('THEME_INIT_SCRIPT', () => {
     runWith({ localStorage: storageReturning('dark'), matchMedia: mediaMatching(false) });
 
     expect(classes()).toEqual(['js-enabled', 'dark']);
+  });
+});
+
+describe('preferredTheme', () => {
+  // The function global-error.tsx applies, where the inline script cannot run. It is only worth
+  // having if it answers exactly as the script does, so every environment the script's tests above
+  // exercise is run through both, and the answers compared.
+  const throwingMedia = () => {
+    throw new TypeError('matchMedia is not supported');
+  };
+  const environments: [string, ThemeEnvironment][] = [
+    [
+      'stored dark, OS light',
+      { localStorage: storageReturning('dark'), matchMedia: mediaMatching(false) },
+    ],
+    [
+      'stored light, OS dark',
+      { localStorage: storageReturning('light'), matchMedia: mediaMatching(true) },
+    ],
+    [
+      'nothing stored, OS dark',
+      { localStorage: storageReturning(null), matchMedia: mediaMatching(true) },
+    ],
+    [
+      'nothing stored, OS light',
+      { localStorage: storageReturning(null), matchMedia: mediaMatching(false) },
+    ],
+    [
+      'junk stored, OS dark',
+      { localStorage: storageReturning('system'), matchMedia: mediaMatching(true) },
+    ],
+    [
+      'storage throws, OS dark',
+      { localStorage: storageThrowing(), matchMedia: mediaMatching(true) },
+    ],
+    [
+      'storage throws, OS light',
+      { localStorage: storageThrowing(), matchMedia: mediaMatching(false) },
+    ],
+    ['matchMedia throws', { localStorage: storageReturning(null), matchMedia: throwingMedia }],
+    ['matchMedia missing', { localStorage: storageReturning(null) }],
+    ['both throw', { localStorage: storageThrowing(), matchMedia: throwingMedia }],
+    ['nothing available', {}],
+  ];
+
+  it.each(environments)('agrees with THEME_INIT_SCRIPT: %s', (_, env) => {
+    runWith(env);
+    const fromScript = classes();
+
+    expect(fromScript).toHaveLength(1);
+    expect([preferredTheme(env)]).toEqual(fromScript);
   });
 });
