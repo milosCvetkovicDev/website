@@ -2,12 +2,12 @@
  * The self-hosted Geist faces (apps/web/src/app/fonts/README.md), declared for the Claude Design sync.
  * config.json lists this file under extraFonts, so the converter copies both woff2 files into the
  * bundle's fonts/ and ships these rules. The families are the ones styles.css puts in
- * --font-geist-sans and --font-geist-mono. Both files are variable fonts covering weights 100 to 900.
+ * --font-geist-sans and --font-geist-mono. Both files are variable fonts covering weights 400 to 900.
  */
 @font-face {
   font-family: 'Geist';
   src: url('../apps/web/src/app/fonts/geist-latin.woff2') format('woff2');
-  font-weight: 100 900;
+  font-weight: 400 900;
   font-style: normal;
   font-display: swap;
 }
@@ -15,7 +15,7 @@
 @font-face {
   font-family: 'Geist Mono';
   src: url('../apps/web/src/app/fonts/geist-mono-latin-symbols.woff2') format('woff2');
-  font-weight: 100 900;
+  font-weight: 400 900;
   font-style: normal;
   font-display: swap;
 }

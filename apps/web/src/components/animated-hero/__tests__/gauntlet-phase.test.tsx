@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
-import { loadGsap } from '../load-gsap';
+import { requestGsap } from '../load-gsap';
 import { GauntletPhase } from '../gauntlet-phase';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
@@ -40,6 +40,19 @@ const media = vi.hoisted(() => {
   return state;
 });
 
+// mount() calls ScrollTrigger.refresh(), which restores the scroll position through
+// window.scrollTo, and jsdom does not implement it: every call builds an Error and prints its stack
+// through the virtual console. The no-op is defined once, for the file's whole lifetime, as in
+// story-phases.test.tsx, so no test has to know whether what it mounts refreshes; no test here
+// asserts on the calls. vi.restoreAllMocks() in afterEach does not undo a property definition.
+vi.hoisted(() => {
+  Object.defineProperty(window, 'scrollTo', {
+    configurable: true,
+    writable: true,
+    value: () => {},
+  });
+});
+
 const STAGE_COUNT = 6;
 // The six stages run back to back with a 0.2s gap; deployment starts once the last one ends.
 const PIPELINE_MS = 5300;
@@ -67,11 +80,12 @@ function elapse(seconds: number) {
 }
 
 describe('GauntletPhase', () => {
-  // The phase asks load-gsap.ts for GSAP, which arrives when the browser is idle. Waited for once,
-  // with real timers, before beforeEach fakes setTimeout: from then on the phase builds its trigger
-  // synchronously on mount, as it does in the browser once GSAP has arrived.
+  // The phase asks load-gsap.ts for GSAP, which arrives on the visitor's first scroll, tap or key.
+  // Requested outright and waited for once, with real timers, before beforeEach fakes setTimeout:
+  // from then on the phase builds its trigger synchronously on mount, as it does in the browser once
+  // GSAP has arrived.
   beforeAll(async () => {
-    await loadGsap();
+    await requestGsap();
   });
 
   beforeEach(() => {

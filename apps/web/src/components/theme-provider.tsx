@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useSyncExternalStore,
-} from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { useIsHydrated } from '@/hooks/use-is-hydrated';
 import { DARK_COLOR_SCHEME_QUERY, THEME_STORAGE_KEY } from '@/lib/theme';
 
@@ -15,18 +8,6 @@ type Theme = 'light' | 'dark';
 
 export { THEME_STORAGE_KEY };
 const DARK_QUERY = DARK_COLOR_SCHEME_QUERY;
-
-interface ThemeContextType {
-  theme: Theme;
-  toggleTheme: () => void;
-  mounted: boolean;
-}
-
-const ThemeContext = createContext<ThemeContextType>({
-  theme: 'dark',
-  toggleTheme: () => {},
-  mounted: false,
-});
 
 // The theme lives outside React (localStorage + OS preference); React subscribes to it.
 const listeners = new Set<() => void>();
@@ -79,6 +60,17 @@ function writeTheme(next: Theme) {
   listeners.forEach((listener) => listener());
 }
 
+function toggleTheme() {
+  writeTheme(readTheme() === 'dark' ? 'light' : 'dark');
+}
+
+/**
+ * Mirrors the theme onto `<html>`. It deliberately provides no React context: the theme and
+ * `mounted` both change right after hydration, and a context value that changes then reaches every
+ * Suspense boundary below it that has not hydrated yet, which React can then no longer hydrate. It
+ * deletes the server-rendered markup and renders the boundary again on the client. `useTheme` reads
+ * the same external store instead, so only the components that show the theme render again.
+ */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useSyncExternalStore(subscribe, readTheme, getServerTheme);
   const mounted = useIsHydrated();
@@ -91,15 +83,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle('light', theme === 'light');
   }, [theme, mounted]);
 
-  const toggleTheme = useCallback(() => {
-    writeTheme(readTheme() === 'dark' ? 'light' : 'dark');
-  }, []);
-
-  const value = useMemo(() => ({ theme, toggleTheme, mounted }), [theme, toggleTheme, mounted]);
-
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return children;
 }
 
-export function useTheme() {
-  return useContext(ThemeContext);
+/**
+ * The theme, a stable `toggleTheme`, and `mounted`, which is `false` while server-rendering and
+ * hydrating: both `theme` and `mounted` read their server values until then, so the served markup
+ * and the hydration render agree.
+ */
+export function useTheme(): { theme: Theme; toggleTheme: () => void; mounted: boolean } {
+  const theme = useSyncExternalStore(subscribe, readTheme, getServerTheme);
+  const mounted = useIsHydrated();
+  return { theme, toggleTheme, mounted };
 }

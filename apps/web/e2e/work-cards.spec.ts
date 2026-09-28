@@ -42,6 +42,16 @@ const MAX_LINK_NAME = 80;
 const cardFor = (page: Page, slug: string) => page.locator(`a[href="/work/${slug}"]`).first();
 
 /**
+ * The first study whose badge carries a status colour. R39 compares `--tmux-status-ok` with
+ * `--status-ok`, and a retired study's badge is neutral on both routes, so it cannot answer for them.
+ */
+function runningStudy() {
+  const study = caseStudies.find(({ highlight }) => highlight.status !== 'RETIRED');
+  if (!study) throw new Error('every case study is retired: R39 has no status colour to measure');
+  return study;
+}
+
+/**
  * One element's `color`, normalised to sRGB.
  *
  * Comparing the computed strings directly does not work and would leave R39 unsatisfiable: Chromium
@@ -52,9 +62,10 @@ const cardFor = (page: Page, slug: string) => page.locator(`a[href="/work/${slug
  * canvas and reading the pixel back normalises both to sRGB, which is the question the row is actually
  * asking. The same instrument is used in `e2e/hero-contrast.spec.ts`.
  *
- * Measured through it: `LIVE` is `rgba(21, 128, 61)` on `/` and `rgba(1, 102, 48)` on `/work` in light,
- * `rgba(185, 232, 122)` and `rgba(5, 223, 114)` in dark. The clipped red channels are real — green-800 and
- * green-400 in OKLCH sit outside sRGB, so the conversion gamut-clips — and they are what a visitor sees.
+ * Measured through it: a running status is `rgba(21, 128, 61)` on `/` and `rgba(1, 102, 48)` on
+ * `/work` in light, `rgba(185, 232, 122)` and `rgba(5, 223, 114)` in dark. The clipped red channels are
+ * real — green-800 and green-400 in OKLCH sit outside sRGB, so the conversion gamut-clips — and they are
+ * what a visitor sees.
  *
  * Equality is exact, not within a tolerance, which assumes #49 settles this by making the two cards read
  * the *same token* rather than by writing the same colour twice in two different colour spaces. That is
@@ -156,7 +167,7 @@ test('a case study status reads as one colour on / and on /work, in both themes'
   // dev-server runs under load (2026-09-13).
   test.setTimeout(90_000);
 
-  const [study] = caseStudies;
+  const study = runningStudy();
   const status = study.highlight.status;
   const disagreements: string[] = [];
 
@@ -209,7 +220,7 @@ test('both routes render the same status string for the same case study', async 
   // 30 s on its own, so the test gets room past that wait, and a page that never hydrates still
   // fails on its own assertion.
   test.setTimeout(60_000);
-  const [study] = caseStudies;
+  const study = runningStudy();
   const status = study.highlight.status;
 
   await gotoHydrated(page, '/');

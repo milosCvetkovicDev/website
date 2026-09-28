@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ErrorPage from '../error';
 
 /**
- * The route error boundary, and the global one that does not exist yet.
+ * The route error boundary, and the global one that replaces the root layout when that throws.
  *
  * Row R37 of the RED manifest, fixed by #49, plus the green assertions for `error.tsx` — which had no
  * test at all, despite holding the only `console.error` in shipped source.
@@ -75,13 +75,10 @@ describe('error.tsx', () => {
     expect(console.error).toHaveBeenCalledWith('Application error:', expect.any(Error));
   });
 
-  it.fails('R37 (#49): a global-error module exists and renders its own <html> and <body>', () => {
-    // Asserted over the file rather than by rendering it, and the reason is the row itself: the module
-    // does not exist, and a static `import('../global-error')` for a file that is not there fails at
-    // transform time and takes the whole suite down instead of this one test. A variable import is
-    // worse — it only produces a Vite warning today and a resolution surprise later. So the instrument
-    // is the source text, which is enough to tell a module that renders the document shell from one
-    // that does not. Once #49 adds the file, that pull request can strengthen this to a real render.
+  it('R37 (#49): a global-error module exists and renders its own <html> and <body>', () => {
+    // A check over the source, beside the render in `global-error.test.tsx`: it names the row, and it
+    // says why the file matters if it is ever deleted, where that render file would only fail to
+    // resolve its import.
     const files = readdirSync(APP_DIR);
     const globalError = files.find((file) => /^global-error\.(tsx|jsx|ts|js)$/.test(file));
     expect(
@@ -97,5 +94,8 @@ describe('error.tsx', () => {
     const source = readFileSync(join(APP_DIR, globalError as string), 'utf8');
     expect(source, 'global-error must render its own <html>').toMatch(/<html[\s>]/);
     expect(source, 'global-error must render its own <body>').toMatch(/<body[\s>]/);
+    expect(source, 'global-error must bring the global stylesheet').toMatch(
+      /^import ['"]\.\/globals\.css['"];?$/m,
+    );
   });
 });

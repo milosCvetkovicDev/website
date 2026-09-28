@@ -200,3 +200,23 @@ describe('the lazy GSAP import rule', () => {
     expect(rules).toContain(GSAP_RULE);
   });
 });
+
+// Generated output is not linted: flat config does not read .gitignore, and a bundled report under
+// `--max-warnings 0` fails `pnpm lint`. The source row keeps the ignored rows from passing because
+// every path is ignored.
+describe('the global ignores', () => {
+  beforeAll(() => {
+    eslint ??= new ESLint({ cwd: appDir });
+  });
+
+  it.each([
+    ['coverage/prettify.js', true],
+    ['coverage/lcov-report/sorter.js', true],
+    ['playwright-report/trace/index.js', true],
+    ['test-results/results.js', true],
+    ['.next/server/app/page.js', true],
+    ['src/app/page.tsx', false],
+  ])('treats %s as ignored: %s', async (filePath, ignored) => {
+    expect(await eslint.isPathIgnored(path.join(appDir, filePath))).toBe(ignored);
+  });
+});

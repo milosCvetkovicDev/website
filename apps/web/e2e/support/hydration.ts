@@ -14,9 +14,9 @@ import { HYDRATION_MARKER_ID } from '../../src/lib/hydration-marker';
  * marker times out here instead of passing at once.
  *
  * The marker hydrates with the layout. Content a page wraps in `<Suspense>`, or puts under a
- * `loading.tsx`, hydrates in a later pass, after the marker flips. No route puts `<main>` inside a
- * boundary today. The one boundary with content, the decorative `TmuxBackground` on `/`, may
- * hydrate after the marker, and no spec interacts with it.
+ * `loading.tsx`, hydrates in a later pass, after the marker flips. No route puts content inside a
+ * boundary today; the last one, the decorative `TmuxBackground` on `/`, is imported statically and
+ * hydrates with the hero.
  */
 
 /**

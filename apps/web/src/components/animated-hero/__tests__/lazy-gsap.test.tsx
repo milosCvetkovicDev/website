@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
-import { loadGsap, NO_IDLE_CALLBACK_DELAY_MS } from '../load-gsap';
+import { GSAP_LOADED_MARK, loadGsap } from '../load-gsap';
 import { DiscoveryPhase } from '../discovery-phase';
 import { StrategyPhase } from '../strategy-phase';
 import { ExecutionPhase } from '../execution-phase';
@@ -15,9 +15,10 @@ import { AnimatedText } from '../animated-text';
  * The story between hydration and GSAP's arrival.
  *
  * The phases and the hover effects no longer import GSAP; they ask `load-gsap.ts`, which fetches it
- * once the browser is idle. Until then a phase must build nothing and keep its server-rendered
- * state, a phase that unmounts must never build, and a hover that is still there when GSAP arrives
- * must play then, in the order the events came. A hover whose pointer has already left, or whose
+ * on the visitor's first scroll, wheel, touch, pointer press or key press. A hover is intent too:
+ * the first one starts the load. Until GSAP arrives a phase must build nothing and keep its
+ * server-rendered state, however long nobody scrolls; a phase that unmounts must never build; and a
+ * hover that is still there when GSAP arrives must play then, in the order the events came. A hover whose pointer has already left, or whose
  * component has gone, must not play at all. The first part is what a visitor who hovers before GSAP
  * arrives, and keeps the pointer there, sees; the e2e specs that measure a hover (R17, R19) wait for
  * GSAP with expectGsapLoaded instead, so they never depend on it.
@@ -56,9 +57,8 @@ const glitchCopies = (target: HTMLElement) => target.querySelectorAll('[aria-hid
 
 describe('before GSAP has loaded', () => {
   beforeEach(() => {
-    // jsdom has no requestIdleCallback and its document has loaded, so the loader waits on its
-    // timer fallback, as in Safari after the load event, and faking setTimeout is what holds the
-    // page in the window before the load.
+    // Fake timers, so the walk can pass ten seconds without anything that a timer could start: the
+    // load waits for intent, not for time.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     // Drive GSAP by hand, so nothing a queued hover built can finish on its own.
     gsap.ticker.remove(gsap.updateRoot);
@@ -75,7 +75,8 @@ describe('before GSAP has loaded', () => {
   });
 
   it('builds nothing and plays only the hovers still in place, then builds and replays in order', async () => {
-    expect(window.requestIdleCallback).toBeUndefined();
+    // At the top of the page, where a load waits for intent rather than starting at once.
+    expect(window.scrollY).toBe(0);
     // GSAP warns about a tween whose target is null, and a hover replayed into an unmounted
     // component would be exactly that: React has already cleared the ref it animates.
     const warn = vi.spyOn(console, 'warn');
@@ -107,12 +108,20 @@ describe('before GSAP has loaded', () => {
     const unmounted = render(<AnimatedText animation="glitch">PHASE 9</AnimatedText>);
     const later = render(<AnimatedText animation="glitch">PHASE 4</AnimatedText>);
 
-    // Nothing is built yet, and the sections are exactly as the server rendered them.
+    // Nothing is built yet, and the sections are exactly as the server rendered them, however long
+    // the visitor only reads: the phases have asked for GSAP, but nobody has scrolled, tapped, pressed
+    // a key or hovered.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+      await vi.dynamicImportSettled();
+    });
+    expect(performance.getEntriesByName(GSAP_LOADED_MARK, 'mark')).toHaveLength(0);
     expect(ScrollTrigger.getAll()).toHaveLength(0);
     const [discoverySection, strategySection] = phases.container.querySelectorAll('section');
     expect(phases.container.querySelectorAll('[style*="opacity"]')).toHaveLength(0);
 
-    // A hover that lands before the load and stays: nothing plays yet, and nothing is lost.
+    // A hover that lands before the load and stays: it starts the load, being the visitor's first
+    // intent, but nothing plays yet, and nothing is lost.
     const glitchTarget = hoverTarget(glitch);
     fireEvent.mouseEnter(glitchTarget);
     expect(glitchCopies(glitchTarget)).toHaveLength(0);
@@ -144,9 +153,18 @@ describe('before GSAP has loaded', () => {
     unmounted.unmount();
     early.unmount();
 
+    // The load the first hover started arrives. No scroll, wheel, touch or key was ever sent: the
+    // hover alone brought GSAP in, so a hover before any scroll still plays. GSAP is handed to the
+    // waiting callbacks one task at a time, on the timers this file fakes, so they are advanced until
+    // the load's promise, which follows the last callback, has settled.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(NO_IDLE_CALLBACK_DELAY_MS);
-      await loadGsap();
+      let settled = false;
+      void loadGsap().finally(() => (settled = true));
+      // The chunk itself arrives on real time, not on the faked timers. A zero-delay timer set while
+      // the fake clock is ticking is due 1 ms later, so each step advances by that.
+      await vi.dynamicImportSettled();
+      for (let task = 0; task < 100 && !settled; task += 1) await vi.advanceTimersByTimeAsync(1);
+      expect(settled, 'the waiting callbacks never finished').toBe(true);
     });
 
     // One trigger each for the two phases still mounted, on their own sections: StrictMode's

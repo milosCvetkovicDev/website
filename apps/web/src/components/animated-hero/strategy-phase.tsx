@@ -55,7 +55,7 @@ export function StrategyPhase() {
     // Reduced motion: the section is shown as it is, with no scroll-driven timeline.
     if (prefersReducedMotion) return;
 
-    // GSAP arrives after hydration (load-gsap.ts); until then the section keeps its
+    // GSAP arrives on the visitor's first intent (load-gsap.ts); until then the section keeps its
     // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached).
@@ -149,7 +149,10 @@ export function StrategyPhase() {
   }, [prefersReducedMotion]);
 
   return (
-    <section ref={sectionRef} className="flex min-h-screen items-center justify-center px-6 py-24">
+    <section
+      ref={sectionRef}
+      className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
+    >
       <div className="w-full max-w-5xl">
         {/* Phase Header */}
         <div className="mb-8 flex items-center gap-3">
@@ -161,7 +164,7 @@ export function StrategyPhase() {
           </AnimatedText>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Tech Tree */}
           <div ref={techTreeRef} className="space-y-3">
             <h3 className="mb-4 font-mono text-xs tracking-wider text-[var(--muted)] uppercase">
@@ -172,15 +175,15 @@ export function StrategyPhase() {
               // element its transform transition re-eases GSAP's entrance, and GSAP's inline
               // transform cancels the lift.
               <div key={tech.category} className="tech-reveal">
-                <div className="tech-item group hover-lift relative flex cursor-default items-center gap-4 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-4">
+                <div className="tech-item group hover-lift relative flex cursor-default items-center gap-3 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3 sm:gap-4 sm:p-4">
                   {/* Selection indicator */}
                   <div className="absolute top-0 bottom-0 left-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
 
                   <span className="text-2xl transition-transform duration-300 group-hover:scale-125">
                     {tech.icon}
                   </span>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <span className="font-mono text-[10px] tracking-wider text-[var(--muted)] uppercase">
                         {tech.category}
                       </span>
@@ -232,7 +235,7 @@ export function StrategyPhase() {
             {/* Simple Architecture Diagram */}
             <div ref={architectureRef}>
               <HudPanel title="ARCHITECTURE">
-                <div className="relative h-48">
+                <div className="relative h-40 sm:h-48">
                   <svg
                     viewBox="0 0 300 180"
                     className="h-full w-full"

@@ -4,8 +4,8 @@ import { CASE_STUDY_ROUTES, NOT_FOUND_ROUTE } from './routes';
 /**
  * The six static security headers every page, asset and 404 should carry.
  *
- * Row R30 of the RED manifest, fixed by #48: `next.config.ts` declares one `headers()` entry whose
- * `source` is `/:path*`, so every path gets the same headers from one place: R30's five, plus the
+ * Row R30 of the RED manifest, fixed by #48: `next.config.ts` declares these in one `headers()` entry
+ * whose `source` is `/:path*`, so every path gets the same headers from one place: R30's five, plus the
  * `Cross-Origin-Opener-Policy` that #48's live-8 asks for as well. The values
  * themselves, the CSP above all, are pinned by `src/test/next-config.test.ts` and explained in
  * `docs/adr/0023-static-security-headers.md`; this spec proves they reach the wire, under `next start`
@@ -24,8 +24,9 @@ import { CASE_STUDY_ROUTES, NOT_FOUND_ROUTE } from './routes';
  * Deliberately excluded, and recorded here so the next reader does not go looking: HSTS itself.
  * `Strict-Transport-Security` is meaningless over the plain HTTP this suite serves and is set by the
  * platform in production, and its `includeSubDomains` / `preload` attributes are a hosting-level
- * decision that #48 verifies against the deployment and #52 re-checks. The same applies to the
- * `X-Robots-Tag` on the public `vercel.app` alias: it cannot be observed from localhost.
+ * decision that #48 verifies against the deployment and #52 re-checks. The `X-Robots-Tag: noindex`
+ * that the second entry sends on the public `vercel.app` alias alone is proved by
+ * `production-alias.spec.ts`, which sends the alias as the Host header (ADR 0025).
  */
 
 test.describe.configure({ retries: 0, timeout: 60_000 });

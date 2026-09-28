@@ -1,20 +1,64 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+/**
+ * These assertions read a configuration module and the filesystem and run git, with no DOM in
+ * them, and building a jsdom window is the most expensive thing in a test file that does not need
+ * one.
+ *
+ * @vitest-environment node
+ */
+import { execFileSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { unstable_getResponseFromNextConfig } from 'next/experimental/testing/server';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import nextConfig, {
   contentSecurityPolicy,
   crossOriginOpenerPolicy,
   findWorkspaceRoot,
+  PRODUCTION_ALIAS_HEADERS,
   SECURITY_HEADERS_SOURCE,
   securityHeaders,
   type HeaderEnv,
 } from '../../next.config';
+import { PRODUCTION_ALIAS_HOST } from '../../production-alias';
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.resolve(testDir, '../..');
 const repoRoot = path.resolve(appDir, '../..');
+
+/** Every temp tree this file builds, removed in afterAll so a run leaves the OS temp dir as is. */
+const tempDirs: string[] = [];
+
+function makeTempDir(prefix: string): string {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
+
+afterAll(() => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+});
+
+/**
+ * Loads next.config.ts fresh under the current environment. The module reads variables such as
+ * VERCEL_ENV and NEXT_DIST_DIR from `process.env` while it is evaluated, so each case that stubs
+ * one needs its own module instance.
+ */
+async function loadFreshConfig() {
+  vi.resetModules();
+  return (await import('../../next.config')).default;
+}
 
 describe('findWorkspaceRoot', () => {
   it('finds the repository root from the app directory', () => {
@@ -34,7 +78,7 @@ describe('findWorkspaceRoot', () => {
   });
 
   it('takes the innermost workspace when checkouts are nested, as in a git worktree', () => {
-    const outer = mkdtempSync(path.join(tmpdir(), 'workspace-root-'));
+    const outer = makeTempDir('workspace-root-');
     const inner = path.join(outer, '.claude', 'worktrees', 'nested');
     const innerApp = path.join(inner, 'apps', 'web');
     mkdirSync(innerApp, { recursive: true });
@@ -46,7 +90,17 @@ describe('findWorkspaceRoot', () => {
   });
 
   it('returns null when no workspace file is above the starting directory', () => {
-    const orphan = mkdtempSync(path.join(tmpdir(), 'no-workspace-'));
+    const orphan = makeTempDir('no-workspace-');
+    // The walk stops at the filesystem root, so the null case means something only while no
+    // ancestor of the OS temp directory holds a workspace file. Assert that rather than assume it.
+    for (let dir = orphan; ; dir = path.dirname(dir)) {
+      expect(
+        existsSync(path.join(dir, 'pnpm-workspace.yaml')),
+        `${dir} holds a pnpm-workspace.yaml, so ${orphan} is not workspace-free`,
+      ).toBe(false);
+      if (path.dirname(dir) === dir) break;
+    }
+
     expect(findWorkspaceRoot(orphan)).toBeNull();
   });
 });
@@ -124,17 +178,21 @@ describe('security headers', () => {
     expect(contentSecurityPolicy({ NODE_ENV: 'test' })).toBe(PRODUCTION_POLICY);
   });
 
-  it('declares one headers() entry whose source covers every path', async () => {
+  it('declares the security headers in one entry whose source covers every path', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_ENV', '');
 
     // `:path*` is zero or more segments, so `/` matches as well as `/_next/static/...` and any 404.
     // `/(.*)` would do the same; a narrower pattern is how a surface gets left out, and the e2e
     // spec (e2e/security-headers.spec.ts) is what proves all four surfaces under both servers.
+    // The second entry is the production alias's noindex (ADR 0025), pinned below.
     expect(SECURITY_HEADERS_SOURCE).toBe('/:path*');
-    expect(await nextConfig.headers?.()).toEqual([
-      { source: SECURITY_HEADERS_SOURCE, headers: securityHeaders(production) },
-    ]);
+    const [security, ...rest] = (await nextConfig.headers?.()) ?? [];
+    expect(security).toEqual({
+      source: SECURITY_HEADERS_SOURCE,
+      headers: securityHeaders(production),
+    });
+    expect(rest).toHaveLength(1);
   });
 
   it('reads the environment when Next calls headers(), not when the config loads', async () => {
@@ -230,5 +288,266 @@ describe('security headers', () => {
         if (sources.includes("'none'")) expect(sources, `${name} ${directive}`).toHaveLength(1);
       }
     }
+  });
+});
+
+// live-3 and pages-7 (#48), #52's AC 18, and ADR 0025. The public production alias serves the same
+// bytes as the apex, so it answers `X-Robots-Tag: noindex`, and no other host may. The e2e spec
+// (e2e/production-alias.spec.ts) proves the header on four surfaces under both servers; these pin
+// the entry, and run it through Next's own route matcher.
+describe('the production alias', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const entries = async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', '');
+    return (await nextConfig.headers?.()) ?? [];
+  };
+
+  it('is a bare vercel.app host name, and not the apex', () => {
+    // No scheme, port, path or capital letter: Next compares the value with the request's host,
+    // lower-cased and without its port, as an anchored regular expression.
+    expect(PRODUCTION_ALIAS_HOST).toMatch(/^[a-z0-9-]+\.vercel\.app$/);
+    expect(PRODUCTION_ALIAS_HOST).not.toContain('miloscvetkovic');
+  });
+
+  it('declares a second entry: every path, keyed on the alias host, sending noindex alone', async () => {
+    const [, alias] = await entries();
+    expect(alias).toEqual({
+      source: SECURITY_HEADERS_SOURCE,
+      has: [{ type: 'host', value: PRODUCTION_ALIAS_HOST }],
+      headers: [{ key: 'X-Robots-Tag', value: 'noindex' }],
+    });
+    expect(PRODUCTION_ALIAS_HEADERS).toEqual([{ key: 'X-Robots-Tag', value: 'noindex' }]);
+  });
+
+  // A rule keyed on the apex being absent would noindex production the day that value had a typo,
+  // or the day a new host (www, a second custom domain) answered for the site.
+  it('keys no entry on a missing condition', async () => {
+    for (const entry of await entries()) {
+      expect(entry, entry.source).not.toHaveProperty('missing');
+    }
+  });
+
+  it('leaves the six ADR 0023 headers as they were, on every host', async () => {
+    const [security, alias] = await entries();
+    expect(security).not.toHaveProperty('has');
+    expect(security?.headers).toEqual(securityHeaders({ NODE_ENV: 'production' }));
+    expect(security?.headers.map(({ key }) => key.toLowerCase())).not.toContain('x-robots-tag');
+    // The alias entry adds a header and overrides none of the six: a later entry that sets the
+    // same key wins, so a shared key here would change the security headers on the alias.
+    const securityKeys = new Set(security?.headers.map(({ key }) => key.toLowerCase()));
+    for (const { key } of alias?.headers ?? [])
+      expect(securityKeys.has(key.toLowerCase())).toBe(false);
+  });
+
+  // Next's own matcher (the one `next start` uses) on the config as declared, so the regular
+  // expression semantics of a `has` value, and the port that the matcher strips, are exercised
+  // rather than assumed.
+  it("sends noindex to the alias host alone, through Next's route matcher", async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_ENV', '');
+    const robotsTag = async (url: string) =>
+      (await unstable_getResponseFromNextConfig({ url, nextConfig })).headers.get('x-robots-tag');
+
+    for (const path of ['/', '/about', '/work/self-healing-agent', '/_next/static/x.js', '/nope']) {
+      expect(await robotsTag(`https://${PRODUCTION_ALIAS_HOST}${path}`), path).toBe('noindex');
+      expect(await robotsTag(`http://${PRODUCTION_ALIAS_HOST}:3000${path}`), path).toBe('noindex');
+      for (const host of ['miloscvetkovic.dev', 'www.miloscvetkovic.dev', 'localhost:3210']) {
+        expect(await robotsTag(`https://${host}${path}`), `${host}${path}`).toBeNull();
+      }
+    }
+    // Anchored: a host that merely contains the alias, or that the alias merely prefixes, misses.
+    expect(await robotsTag(`https://x${PRODUCTION_ALIAS_HOST}/`)).toBeNull();
+    expect(await robotsTag(`https://${PRODUCTION_ALIAS_HOST}.example/`)).toBeNull();
+  });
+});
+
+describe('env', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('inlines VERCEL_ENV, so the client-side global error page gates analytics like the layout', async () => {
+    vi.stubEnv('VERCEL_ENV', 'production');
+    expect((await loadFreshConfig()).env).toEqual({ VERCEL_ENV: 'production' });
+  });
+
+  it('inlines an empty string when VERCEL_ENV is unset, which the gate reads as off', async () => {
+    vi.stubEnv('VERCEL_ENV', undefined);
+    expect((await loadFreshConfig()).env).toEqual({ VERCEL_ENV: '' });
+  });
+});
+
+describe('agent instruction files', () => {
+  // `next dev` writes apps/web/AGENTS.md and apps/web/CLAUDE.md when @vercel/detect-agent finds
+  // an agent shell, and Claude Code then loads the nested CLAUDE.md as project instructions.
+  // Generation is off (ADR 0019).
+  it('disables the agent instruction files Next would write in dev', () => {
+    expect(nextConfig.agentRules).toBe(false);
+  });
+
+  // A pair written before ADR 0019 stays behind, untracked, until someone deletes it. This check
+  // cannot stop a `git add -A` from committing it, but it fails the unit suite, and so CI, on any
+  // branch that tracks either file. Ignoring the pair instead would only hide it: Claude Code
+  // loads an ignored CLAUDE.md all the same.
+  it('tracks neither generated file', () => {
+    let tracked: string;
+    try {
+      tracked = execFileSync('git', ['ls-files', '--', 'AGENTS.md', 'CLAUDE.md'], {
+        cwd: appDir,
+        encoding: 'utf8',
+        timeout: 4000,
+      });
+    } catch (error) {
+      throw new Error(
+        'This check runs `git ls-files` and needs git and a clone of the repository',
+        {
+          cause: error,
+        },
+      );
+    }
+    expect(tracked).toBe('');
+  });
+});
+
+// The value above matters only while the installed Next.js still reads it. A Next.js that
+// dropped the option would fail `pnpm typecheck` on the typed config object, but one that kept
+// the option and stopped passing it to the dev server, or stopped checking it, would not, and
+// generation would resume unnoticed. These read the compiled dev server, in both module formats
+// Next.js ships, to catch that. When one fails after a Next.js bump, find where the new version
+// decides to write the files, check ADR 0019 against it, and then update the patterns.
+describe('the installed Next.js honours agentRules', () => {
+  const nextDir = path.dirname(createRequire(import.meta.url).resolve('next/package.json'));
+  const readNext = (file: string) => {
+    try {
+      return readFileSync(path.join(nextDir, file), 'utf8');
+    } catch (error) {
+      throw new Error(
+        `next/${file} could not be read: find where this Next.js writes AGENTS.md and CLAUDE.md and check ADR 0019 against it`,
+        { cause: error },
+      );
+    }
+  };
+  const serverLibs = ['dist/server/lib', 'dist/esm/server/lib'];
+  // Call sites only: the name followed by `(`, or by `)(` as in the CommonJS build's
+  // `(0, _mod.name)(...)`, and never the function's own declaration.
+  const callSites = (source: string, name: string) => [
+    ...source.matchAll(new RegExp(`(?<!function\\s+)\\b${name}\\)?\\s*\\(`, 'g')),
+  ];
+  // The object literal whose `{` sits at `open`, found by counting braces.
+  const objectLiteral = (source: string, open: number) => {
+    let depth = 0;
+    for (let i = open; i < source.length; i++) {
+      if (source[i] === '{') depth++;
+      else if (source[i] === '}' && --depth === 0) return source.slice(open, i + 1);
+    }
+    return '';
+  };
+
+  it('returns agentRules from the config in the object initialize hands the dev server', () => {
+    for (const lib of serverLibs) {
+      const source = readNext(`${lib}/router-server.js`);
+      const start = source.search(/\basync function initialize\(/);
+      expect(start, lib).toBeGreaterThanOrEqual(0);
+      const rest = source.slice(start + 1);
+      const end = rest.search(/\n(?:export\s+)?(?:async\s+)?function\s/);
+      const body = end < 0 ? rest : rest.slice(0, end);
+      const returned = body.lastIndexOf('return {');
+      expect(returned, lib).toBeGreaterThanOrEqual(0);
+      expect(objectLiteral(body, returned + 'return '.length), lib).toMatch(
+        /\bagentRules:\s*config\.agentRules\b/,
+      );
+    }
+  });
+
+  it('generates the agent files only as the first statement of an agentRules !== false block', () => {
+    for (const lib of serverLibs) {
+      const source = readNext(`${lib}/start-server.js`);
+      // getRequestHandlers hands back what the router server's initialize returns.
+      expect(source, lib).toMatch(
+        /async function getRequestHandlers\([^)]*\)\s*\{\s*return\s+(?:\(0,\s*[\w$]+\.)?initialize\)?\(/,
+      );
+      const calls = callSites(source, 'ensureAgentRulesForDev');
+      expect(calls.length, lib).toBeGreaterThan(0);
+      for (const call of calls) {
+        const guard = source
+          .slice(0, call.index)
+          .match(
+            /if\s*\(\s*([\w$]+)\.agentRules\s*!==\s*false\s*\)\s*\{\s*(?:(?:const|let|var)\s+[\w$]+\s*=\s*)?(?:await\s+)?(?:\(0,\s*[\w$]+\.)?$/,
+          );
+        expect(guard, lib).not.toBeNull();
+        expect(source, lib).toContain(`const ${guard?.[1]} = await getRequestHandlers(`);
+      }
+    }
+  });
+
+  it('writes the files only from ensureAgentRulesForDev', () => {
+    for (const lib of serverLibs) {
+      expect(readNext(`${lib}/app-info-log.js`), lib).toMatch(
+        /async function ensureAgentRulesForDev\([^)]*\)\s*\{[^}]*\bwriteAgentFiles\)?\s*\(/,
+      );
+    }
+  });
+
+  // A second caller anywhere else in Next.js would bypass the gate above. dist/compiled holds
+  // vendored, minified third-party bundles and dist/docs holds Markdown, so neither is read. The
+  // walk reads about 2,700 files, just under a second at a load average of 90, so it takes a
+  // longer timeout than the 5s default rather than failing on a busy machine.
+  it('calls the generator from nowhere else in Next.js', () => {
+    const found: Record<string, number> = {};
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(path.join(nextDir, dir), { withFileTypes: true })) {
+        const file = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          if (file !== 'dist/compiled' && file !== 'dist/docs') walk(file);
+        } else if (/\.[cm]?js$/.test(entry.name)) {
+          const source = readNext(file);
+          for (const name of ['ensureAgentRulesForDev', 'writeAgentFiles']) {
+            const count = source.includes(name) ? callSites(source, name).length : 0;
+            if (count > 0) found[`${file} ${name}`] = count;
+          }
+        }
+      }
+    };
+    walk('dist');
+    expect(found).toEqual({
+      'dist/esm/server/lib/app-info-log.js writeAgentFiles': 1,
+      'dist/esm/server/lib/start-server.js ensureAgentRulesForDev': 1,
+      'dist/server/lib/app-info-log.js writeAgentFiles': 1,
+      'dist/server/lib/start-server.js ensureAgentRulesForDev': 1,
+    });
+  }, 20_000);
+
+  // The root CLAUDE.md points agents at these docs in place of the generated AGENTS.md.
+  it('ships the version-matched docs the root CLAUDE.md points agents at', () => {
+    expect(statSync(path.join(nextDir, 'dist/docs')).isDirectory()).toBe(true);
+    expect(readNext('dist/docs/01-app/02-guides/ai-agents.md')).toMatch(/\bagentRules: false\b/);
+  });
+});
+
+describe('distDir', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('is .next when NEXT_DIST_DIR is unset, as when Playwright did not start Next', async () => {
+    vi.stubEnv('NEXT_DIST_DIR', undefined);
+    expect((await loadFreshConfig()).distDir).toBe('.next');
+  });
+
+  // `||`, not `??`: a shell that expands an unset variable into the environment hands Next an
+  // empty string, which is not a usable distDir and must fall back the way an absent one does.
+  it('falls back to .next when NEXT_DIST_DIR is present but empty', async () => {
+    vi.stubEnv('NEXT_DIST_DIR', '');
+    expect((await loadFreshConfig()).distDir).toBe('.next');
+  });
+
+  it("takes NEXT_DIST_DIR when Playwright's web server sets it", async () => {
+    vi.stubEnv('NEXT_DIST_DIR', '.next-e2e');
+    expect((await loadFreshConfig()).distDir).toBe('.next-e2e');
   });
 });

@@ -7,7 +7,7 @@ import { renderToString } from 'react-dom/server';
 import type { ComponentProps } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap } from '../gsap-runtime';
-import { loadGsap } from '../load-gsap';
+import { requestGsap } from '../load-gsap';
 import { DataStream, PipelineStage, StatDisplay } from '../hud-elements';
 import { cssTransitions } from './gsap-css-conflicts';
 
@@ -46,11 +46,12 @@ const media = vi.hoisted(() => {
   return state;
 });
 
-// StatDisplay asks load-gsap.ts for GSAP, which arrives once the browser is idle after hydration.
-// Its glitch tests are about what it does with GSAP, so the file waits for that load once, with real
-// timers; from then on the timeline is built synchronously on mount, as it is in the browser.
+// StatDisplay asks load-gsap.ts for GSAP, which arrives on the visitor's first scroll, tap or key.
+// Its glitch tests are about what it does with GSAP, so the file requests that load outright and
+// waits for it once, with real timers; from then on the timeline is built synchronously on mount,
+// as it is in the browser.
 beforeAll(async () => {
-  await loadGsap();
+  await requestGsap();
 });
 
 /** The generator DataStream used when it rendered its texture as 50 lines of 80 characters. */

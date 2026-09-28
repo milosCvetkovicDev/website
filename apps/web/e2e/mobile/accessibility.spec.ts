@@ -6,7 +6,7 @@ import { expectHydrated } from '../support/hydration';
 /**
  * The accessibility gate at a phone viewport.
  *
- * The desktop gate (`e2e/accessibility.spec.ts`) audits ten routes in two schemes, and every one of
+ * The desktop gate (`e2e/accessibility.spec.ts`) audits eleven routes in two schemes, and every one of
  * those passes runs at 1280x720. Lighthouse emulates a phone by default, so the score in
  * `docs/runbooks/deploy.md` was being read against a viewport nothing in the suite tested — and a
  * phone is where the layout actually differs: the header swaps to its `md:hidden` half, every
@@ -42,7 +42,8 @@ async function openPage(page: Page, path: string) {
   expect(new URL(page.url()).pathname, `${path} should not redirect`).toBe(path);
   await expectHydrated(page);
   // On `/` the story's `opacity: 0` from-states, which decide what axe skips at rest, are built
-  // when GSAP arrives after hydration (load-gsap.ts). Waited for rather than raced, as on desktop.
+  // when GSAP arrives on the first intent (load-gsap.ts), which the helper sends, as on desktop.
+  // `gsap-intent.spec.ts` beside this file audits the page before GSAP.
   if (path === '/') await expectGsapLoaded(page);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 }

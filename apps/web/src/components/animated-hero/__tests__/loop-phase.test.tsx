@@ -1,7 +1,7 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
-import { loadGsap } from '../load-gsap';
+import { requestGsap } from '../load-gsap';
 import { LoopPhase } from '../loop-phase';
 
 /**
@@ -90,12 +90,13 @@ function enterAgain() {
 }
 
 describe('LoopPhase', () => {
-  // The phase asks load-gsap.ts for GSAP, which arrives when the browser is idle. Waited for once,
-  // with real timers, before beforeEach fakes setTimeout: from then on the phase builds its trigger
-  // synchronously on mount, as it does in the browser once GSAP has arrived, and R20 and R21 below
-  // describe the same component they did when GSAP was imported statically.
+  // The phase asks load-gsap.ts for GSAP, which arrives on the visitor's first scroll, tap or key.
+  // Requested outright and waited for once, with real timers, before beforeEach fakes setTimeout:
+  // from then on the phase builds its trigger synchronously on mount, as it does in the browser once
+  // GSAP has arrived, and R20 and R21 below describe the same component they did when GSAP was
+  // imported statically.
   beforeAll(async () => {
-    await loadGsap();
+    await requestGsap();
   });
 
   beforeEach(() => {

@@ -119,10 +119,10 @@ async function expectCleanConsole(
   // the same reason the three checks above are soft.
   let afterLoadError: unknown;
   try {
-    // On `/` GSAP arrives after hydration, once the browser is idle (load-gsap.ts), and the story
-    // builds its timelines then. Waiting for it keeps whatever that logs inside the window this
-    // collector listens to, and has the walk below scroll through built timelines rather than past
-    // server-rendered sections that GSAP has not reached yet.
+    // On `/` GSAP arrives on the visitor's first intent (load-gsap.ts), which the helper sends, and
+    // the story builds its timelines then. Waiting for it keeps whatever that logs inside the window
+    // this collector listens to, and has the walk below scroll through built timelines rather than
+    // past server-rendered sections that GSAP has not reached yet.
     if (route.path === '/') await expectGsapLoaded(page);
     if (afterLoad) await afterLoad(page);
   } catch (error) {

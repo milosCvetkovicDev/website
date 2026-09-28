@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { runWithGsap, type Gsap } from './load-gsap';
+import { requestGsap, runWithGsap, type Gsap } from './load-gsap';
 
 const noop = () => {};
 
@@ -9,6 +9,10 @@ const noop = () => {};
  * Returns a stable `withGsap(callback)` and `cancelPending()`. Once GSAP has loaded, the callback
  * runs synchronously inside the handler, as it did when GSAP was imported statically, and neither
  * function changes anything else.
+ *
+ * An event handler asking for GSAP is the visitor's intent, so the first call starts the load if
+ * nothing has yet (`requestGsap`): a hover before any scroll still plays, once GSAP has arrived.
+ * Effects do not do this; they wait, through `runWithGsap`, for the first scroll, tap or key.
  *
  * Before the load a callback waits for it, and at most one waits per component: each call replaces
  * the one still waiting, and `cancelPending` drops it. So a hover that lands before GSAP and is
@@ -35,6 +39,7 @@ export function useWithGsap(): {
   const withGsap = useCallback(
     (callback: (gsap: Gsap) => void) => {
       cancelPending();
+      void requestGsap();
       cancelRef.current = runWithGsap(({ gsap }) => callback(gsap));
     },
     [cancelPending],

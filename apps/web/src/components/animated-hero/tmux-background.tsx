@@ -42,6 +42,43 @@ const STATUS_COLORS: Record<StatusColor, string> = {
   's-wrn': 'var(--tmux-status-wrn)',
 };
 
+// ─── Display ─────────────────────────────────────────────────────────────────
+
+/**
+ * The widths the background is displayed at: Tailwind's `md` breakpoint, the same `48rem` as the
+ * root's `hidden md:flex`. Below it, on a phone, the page has one HTML for every viewport, so the
+ * background is still served and hydrated, but CSS keeps it out of layout and paint, and
+ * `whileDisplayed` keeps its clock and log ticks from running. The two must name the same width.
+ */
+export const DISPLAYED_QUERY = '(min-width: 48rem)';
+
+/**
+ * Runs `start` while the background is displayed, and the stop function it returns once it is not,
+ * following a resize or a rotation across the breakpoint. Called from effects only, never in render
+ * (ADR 0006): the served markup is the same at every width. Returns the teardown for the effect.
+ * Without `matchMedia` it assumes a display, as before this existed.
+ */
+function whileDisplayed(start: () => () => void): () => void {
+  if (typeof window.matchMedia !== 'function') return start();
+  const query = window.matchMedia(DISPLAYED_QUERY);
+  let stop: (() => void) | undefined;
+  const sync = () => {
+    if (query.matches && !stop) {
+      stop = start();
+    } else if (!query.matches && stop) {
+      stop();
+      stop = undefined;
+    }
+  };
+  sync();
+  query.addEventListener('change', sync);
+  return () => {
+    query.removeEventListener('change', sync);
+    stop?.();
+    stop = undefined;
+  };
+}
+
 // ─── Pane Data ───────────────────────────────────────────────────────────────
 
 const PANE_CONFIG: PaneConfig[] = [
@@ -458,8 +495,8 @@ function StaticPane({ config }: { config: PaneConfig }) {
   const lines = config.seq.slice(0, 15);
   return (
     <div
-      className="flex min-w-0 flex-1 flex-col overflow-hidden border-r last:border-r-0"
-      style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
+      className="flex min-w-0 flex-1 flex-col overflow-hidden border-r-2 last:border-r-0"
+      style={{ borderColor: 'var(--tmux-border)' }}
     >
       <PaneTitle title={config.title} host={config.host} />
       <div className="relative flex-1 overflow-hidden">
@@ -571,58 +608,61 @@ function AnimatedPane({
       }
     };
 
-    let resizeObserver: ResizeObserver | undefined;
-    let onWindowResize: (() => void) | undefined;
-    if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver((entries) => {
-        const latest = entries[entries.length - 1];
-        if (latest) fit(latest.contentRect.height);
-      });
-      resizeObserver.observe(viewport);
-    } else {
-      onWindowResize = () => fit(viewport.clientHeight);
-      onWindowResize();
-      window.addEventListener('resize', onWindowResize);
-    }
-
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    function tick() {
-      if (isVisibleRef.current) addLine();
-      const jitter = config.speed * 0.3;
-      const delay = config.speed + (Math.random() - 0.5) * jitter;
-      timer = setTimeout(tick, delay);
-    }
-
-    // Defer animation start until the browser is idle so we don't
-    // compete with initial render, hydration, and boot animation
-    let idleHandle: number | undefined;
-    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
-
-    if (typeof window.requestIdleCallback === 'function') {
-      idleHandle = window.requestIdleCallback(() => {
-        timer = setTimeout(tick, Math.random() * 2000);
-      });
-    } else {
-      fallbackTimer = setTimeout(() => {
-        timer = setTimeout(tick, Math.random() * 2000);
-      }, 1200);
-    }
-
-    return () => {
-      resizeObserver?.disconnect();
-      if (onWindowResize) window.removeEventListener('resize', onWindowResize);
-      if (idleHandle !== undefined && typeof window.cancelIdleCallback === 'function') {
-        window.cancelIdleCallback(idleHandle);
+    // The history survives a stop, so a pane shown again after a rotation carries on where it was.
+    return whileDisplayed(() => {
+      let resizeObserver: ResizeObserver | undefined;
+      let onWindowResize: (() => void) | undefined;
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver((entries) => {
+          const latest = entries[entries.length - 1];
+          if (latest) fit(latest.contentRect.height);
+        });
+        resizeObserver.observe(viewport);
+      } else {
+        onWindowResize = () => fit(viewport.clientHeight);
+        onWindowResize();
+        window.addEventListener('resize', onWindowResize);
       }
-      if (fallbackTimer !== undefined) clearTimeout(fallbackTimer);
-      clearTimeout(timer);
-    };
+
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      function tick() {
+        if (isVisibleRef.current) addLine();
+        const jitter = config.speed * 0.3;
+        const delay = config.speed + (Math.random() - 0.5) * jitter;
+        timer = setTimeout(tick, delay);
+      }
+
+      // Defer animation start until the browser is idle so we don't
+      // compete with initial render, hydration, and boot animation
+      let idleHandle: number | undefined;
+      let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+
+      if (typeof window.requestIdleCallback === 'function') {
+        idleHandle = window.requestIdleCallback(() => {
+          timer = setTimeout(tick, Math.random() * 2000);
+        });
+      } else {
+        fallbackTimer = setTimeout(() => {
+          timer = setTimeout(tick, Math.random() * 2000);
+        }, 1200);
+      }
+
+      return () => {
+        resizeObserver?.disconnect();
+        if (onWindowResize) window.removeEventListener('resize', onWindowResize);
+        if (idleHandle !== undefined && typeof window.cancelIdleCallback === 'function') {
+          window.cancelIdleCallback(idleHandle);
+        }
+        if (fallbackTimer !== undefined) clearTimeout(fallbackTimer);
+        clearTimeout(timer);
+      };
+    });
   }, [config, isVisibleRef]);
 
   return (
     <div
-      className="flex min-w-0 flex-1 flex-col overflow-hidden border-r last:border-r-0"
-      style={{ borderColor: 'var(--tmux-border)', borderRightWidth: '2px' }}
+      className="flex min-w-0 flex-1 flex-col overflow-hidden border-r-2 last:border-r-0"
+      style={{ borderColor: 'var(--tmux-border)' }}
     >
       <PaneTitle title={config.title} host={config.host} />
       <div ref={viewportRef} className="relative flex-1 overflow-hidden">
@@ -667,28 +707,30 @@ export function TmuxBackground() {
     return () => observer.disconnect();
   }, []);
 
-  // Tick clock every second (pauses when off-screen)
+  // Tick clock every second (pauses when off-screen, and never runs while not displayed)
   useEffect(() => {
     if (prefersReducedMotion) return;
 
     let seconds = 7;
-    const interval = setInterval(() => {
-      if (!isVisibleRef.current) return;
-      seconds++;
-      const s = String(seconds % 60).padStart(2, '0');
-      const totalMinutes = 14 + Math.floor(seconds / 60);
-      const h = String(3 + Math.floor(totalMinutes / 60)).padStart(2, '0');
-      const m = String(totalMinutes % 60).padStart(2, '0');
-      setClocks({ clock: `${h}:${m}:${s}`, status: `Sat Feb 22 ${h}:${m}` });
-    }, 1000);
-
-    return () => clearInterval(interval);
+    return whileDisplayed(() => {
+      const interval = setInterval(() => {
+        if (!isVisibleRef.current) return;
+        seconds++;
+        const s = String(seconds % 60).padStart(2, '0');
+        const totalMinutes = 14 + Math.floor(seconds / 60);
+        const h = String(3 + Math.floor(totalMinutes / 60)).padStart(2, '0');
+        const m = String(totalMinutes % 60).padStart(2, '0');
+        setClocks({ clock: `${h}:${m}:${s}`, status: `Sat Feb 22 ${h}:${m}` });
+      }, 1000);
+      return () => clearInterval(interval);
+    });
   }, [prefersReducedMotion]);
 
   return (
     <div
       ref={containerRef}
-      className="pointer-events-none absolute inset-0 z-0 flex flex-col overflow-hidden"
+      // Not displayed on a phone, below `md` (DISPLAYED_QUERY): no layout, no paint, no ticks.
+      className="pointer-events-none absolute inset-0 z-0 hidden flex-col overflow-hidden md:flex"
       aria-hidden="true"
       style={{ background: 'var(--tmux-bg)' }}
     >
