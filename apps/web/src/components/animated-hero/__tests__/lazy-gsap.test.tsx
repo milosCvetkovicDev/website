@@ -31,7 +31,7 @@ import { AnimatedText } from '../animated-text';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it at
 // import time, so the stub must exist before the imports above are evaluated. Motion is allowed
-// throughout: under `reduce` the phases never ask for GSAP at all.
+// throughout: under `reduce` the phases never ask for GSAP at all, and neither does a hover.
 vi.hoisted(() => {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
@@ -52,8 +52,15 @@ const hoverTarget = (view: ReturnType<typeof render>) => {
   return target;
 };
 
-/** The glitch variant's two `aria-hidden` copies, which exist only while it plays. */
-const glitchCopies = (target: HTMLElement) => target.querySelectorAll('[aria-hidden="true"]');
+/** Whether the glitch variant is drawing its offsets, a `text-shadow` it sets only while it plays. */
+const isGlitching = (target: HTMLElement) =>
+  target.querySelector('[style*="text-shadow"]') !== null;
+
+/**
+ * The copy of the text a sighted visitor reads. The scramble variant rewrites it while it plays,
+ * beside an `sr-only` copy that keeps the text whole for assistive technology.
+ */
+const visibleCopy = (target: HTMLElement) => target.querySelector('[aria-hidden="true"]');
 
 describe('before GSAP has loaded', () => {
   beforeEach(() => {
@@ -124,7 +131,7 @@ describe('before GSAP has loaded', () => {
     // intent, but nothing plays yet, and nothing is lost.
     const glitchTarget = hoverTarget(glitch);
     fireEvent.mouseEnter(glitchTarget);
-    expect(glitchCopies(glitchTarget)).toHaveLength(0);
+    expect(isGlitching(glitchTarget)).toBe(false);
 
     // A hover whose pointer leaves before the load: by the time GSAP arrives nobody is pointing at
     // it, so it must not play then.
@@ -173,14 +180,14 @@ describe('before GSAP has loaded', () => {
     expect(triggers.map((trigger) => trigger.trigger)).toEqual([discoverySection, strategySection]);
 
     // The glitch still hovered played once GSAP arrived; the one already left did not.
-    expect(glitchCopies(glitchTarget)).toHaveLength(2);
+    expect(isGlitching(glitchTarget)).toBe(true);
     expect(gsap.getTweensOf(glitchTarget).length).toBeGreaterThan(0);
-    expect(glitchCopies(leftTarget)).toHaveLength(0);
+    expect(isGlitching(leftTarget)).toBe(false);
     expect(gsap.getTweensOf(leftTarget)).toHaveLength(0);
 
     // The scramble is not running and stays that way.
     act(() => gsap.updateRoot(gsap.globalTimeline.time() + 0.2));
-    expect(scrambleTarget).toHaveTextContent(/^SESSION COMPLETE$/);
+    expect(visibleCopy(scrambleTarget)).toHaveTextContent(/^SESSION COMPLETE$/);
 
     // One tween for the three moves, aimed from the box as it was: 300 * 0.15.
     const magneticTweens = to.mock.calls.filter(([target]) => target === magneticText);
@@ -195,7 +202,7 @@ describe('before GSAP has loaded', () => {
     act(() => {
       fireEvent.mouseEnter(laterTarget);
     });
-    expect(glitchCopies(laterTarget)).toHaveLength(2);
+    expect(isGlitching(laterTarget)).toBe(true);
 
     phases.unmount();
     expect(ScrollTrigger.getAll()).toHaveLength(0);

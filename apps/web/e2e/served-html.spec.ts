@@ -54,11 +54,12 @@ const SERVED_MARKERS = [
 /**
  * The text a crawler would read out of the served markup.
  *
- * A plain `html.includes('EXECUTION')` does not work on this page and never will: `AnimatedText` wraps
- * every character in its own `<span>`, so the label arrives as `E</span><span …>X</span>…` and no
- * contiguous substring of the response contains the word. That is R14's mechanism showing up in a
- * second place. Reading the text nodes recovers the text, which is the right question anyway — the row
- * is about the content being served, not about how it is marked up.
+ * A plain `html.includes('EXECUTION')` did not work on this page until #47's slice 47d: `AnimatedText`
+ * wraps every character in its own `<span>`, so the label arrives as `E</span><span …>X</span>…` and,
+ * before the visually hidden copy of the whole text was added beside that split, no contiguous
+ * substring of the response contained the word. That was R14's mechanism showing up in a second
+ * place. Reading the text nodes recovers the text whatever the markup, which is the right question
+ * anyway — the row is about the content being served, not about how it is marked up.
  *
  * The browser parses the markup; regular expressions do not. The hand-rolled stripper this replaces
  * produced wrong text for inputs that are legal HTML, which is the one thing a measuring instrument

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap } from '../gsap-runtime';
@@ -26,13 +26,18 @@ import { AnimatedText } from '../animated-text';
  *   hover had finished or was still in flight. `magnetic` has no unmount cleanup today, so its
  *   mid-hover row is an expected failure until #47's shared hover hook (slice 47k) kills on unmount.
  *
+ * Two more tables pin what #47's slice 47d added (AC 3 and AC 4): a heading around any variant is
+ * named for its sentence, at rest and mid-hover, and under `prefers-reduced-motion: reduce` the
+ * markup is the same while a hover or a pointer move starts nothing and moves nothing.
+ *
  * Each row walks one mount through its lifecycle, because every tween reads its start value through
  * jsdom's `getComputedStyle` and a mount per assertion would multiply that cost.
  */
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it at
-// import time, so the stub must exist before the imports above are evaluated. Motion is allowed:
-// what the variants do under `reduce` belongs to the rows that make them inert there. Every
+// import time, so the stub must exist before the imports above are evaluated. Motion is allowed
+// unless a row turns the preference on, before its mount (`media.reduce`) or after it
+// (`media.set`, which notifies the listeners `usePrefersReducedMotion` subscribed). Every
 // subscription is recorded with its query and type, through either API, and only an exact match
 // removes one, so a listener leaked on any query is counted. ScrollTrigger holds one for the page's
 // lifetime, on `(orientation: portrait)` through the legacy `addListener`, so each test checks the
@@ -50,7 +55,18 @@ const media = vi.hoisted(() => {
     const index = find(query, type, listener);
     if (index !== -1) subscriptions.splice(index, 1);
   };
-  const state = { reduce: false, listenerCount: () => subscriptions.length };
+  const state = {
+    reduce: false,
+    listenerCount: () => subscriptions.length,
+    /** Changes the reduced-motion preference and tells every listener, as the browser would. */
+    set(reduce: boolean) {
+      state.reduce = reduce;
+      const query = '(prefers-reduced-motion: reduce)';
+      subscriptions
+        .filter((s) => s.query === query && s.type === 'change')
+        .forEach((s) => s.listener({ matches: reduce, media: query } as MediaQueryListEvent));
+    },
+  };
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     writable: true,
@@ -93,7 +109,7 @@ const VARIANTS: Record<Animation, string> = {
   wave: 'bobs each letter up and down in turn',
   magnetic: 'pulls the text towards the pointer, then springs back',
   scatter: 'throws the letters outward, then pulls them back',
-  glitch: 'shakes the text with offset copies',
+  glitch: 'shakes the text with token-coloured offsets',
   typewriter: 'retypes the text one character at a time',
   elastic: 'squashes and stretches the text',
   'stagger-up': 'slides each letter out and back in',
@@ -134,12 +150,13 @@ const POINTER = { clientX: 160, clientY: 30 };
 const RANDOM_SEQUENCE = [0, 0.75, 0.9999999, 0.5, 0.25];
 
 /**
- * The text a sighted visitor reads, which is every text node under the hover target today. When the
- * split variants gain a visually hidden copy for assistive technology, this is the one place that
- * learns to skip it.
+ * The text a sighted visitor reads: every text node under the hover target except the visually
+ * hidden copy (`sr-only`) the split, scramble and typewriter variants carry for assistive technology.
  */
 function visibleText(root: Element): string {
-  return root.textContent ?? '';
+  const copy = root.cloneNode(true) as Element;
+  copy.querySelectorAll('.sr-only').forEach((hidden) => hidden.remove());
+  return copy.textContent ?? '';
 }
 
 /**
@@ -237,8 +254,8 @@ function residue(root: HTMLElement, resting: Map<string, string>[]): string[] {
 
 /**
  * The rendered markup without inline styles, which `residue` judges instead: what the hover adds for
- * its duration, such as the typewriter's cursor and hidden remainder, the glitch's copies or the
- * highlight's sweep, has to be gone again once it has finished.
+ * its duration, such as the typewriter's cursor and hidden remainder or the highlight's sweep, has
+ * to be gone again once it has finished.
  */
 function markup(root: Element): string {
   const copy = root.cloneNode(true) as Element;
@@ -267,17 +284,21 @@ function elapse(seconds: number) {
 
 /**
  * Mounts one variant and returns what a walk needs: the hover target, with a real box, and checks
- * that remember everything the walk has seen and everything GSAP was already running.
+ * that remember everything the walk has seen and everything GSAP was already running. With
+ * `inHeading` the variant sits inside an `<h2>`, as the story's closing headlines do.
  */
-function mount(animation: Animation) {
+function mount(animation: Animation, { inHeading = false } = {}) {
   // Whatever GSAP is already running belongs to something else; the checks below look past it.
   const running = new Set(liveAnimations());
   const startedHere = () => liveAnimations().filter((live) => !running.has(live));
 
-  const view = render(<AnimatedText animation={animation}>{TEXT}</AnimatedText>);
+  const text = <AnimatedText animation={animation}>{TEXT}</AnimatedText>;
+  const view = render(inHeading ? <h2>{text}</h2> : text);
   // The element carrying the hover handlers is the one the component renders; found by position,
   // not by a class or tag, both of which #47 changes.
-  const root = view.container.firstElementChild;
+  const root = inHeading
+    ? view.container.firstElementChild?.firstElementChild
+    : view.container.firstElementChild;
   if (!(root instanceof HTMLElement)) throw new Error(`${animation}: rendered no element`);
   vi.spyOn(root, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect(BOX));
 
@@ -292,6 +313,7 @@ function mount(animation: Animation) {
 
   return {
     root,
+    restingMarkup,
     startedHere,
     collect,
     enter() {
@@ -438,5 +460,121 @@ describe('AnimatedText', () => {
   // owns kill-on-unmount; the change that gives magnetic one deletes `.fails` here.
   it.fails('magnetic (#47, 47k): an unmount mid-hover leaves no tween', () => {
     unmountMidHover('magnetic');
+  });
+
+  describe('accessible names (#47, AC 3)', () => {
+    // jsdom has no Tailwind, so it would lay every letter span out inline and name a heading from the
+    // letters run together, which happens to read as the sentence. A browser lays each letter out as
+    // an `inline-block`, and the accessible name computation puts a space around every box that is
+    // not inline: Chromium named the story's split h2s `M o s t b u g s …` (#43, R14). These are
+    // Tailwind's rules for the two classes the name depends on, so jsdom computes the same `display`.
+    let tailwind: HTMLStyleElement;
+    beforeAll(() => {
+      tailwind = document.createElement('style');
+      tailwind.textContent =
+        '.inline-block { display: inline-block; } ' +
+        '.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; ' +
+        'overflow: hidden; clip-path: inset(50%); white-space: nowrap; border-width: 0; }';
+      document.head.append(tailwind);
+    });
+    afterAll(() => tailwind.remove());
+
+    it.each(ANIMATIONS)(
+      '%s: a heading around it is named for its sentence, at rest and mid-hover',
+      (animation) => {
+        const walk = mount(animation, { inHeading: true });
+        const heading = walk.root.parentElement;
+        // By name, on purpose: the accessible name is what this row is about.
+        expect(screen.getByRole('heading', { level: 2, name: TEXT }), 'at rest').toBe(heading);
+
+        walk.enter();
+        elapse(MID_HOVER_SECONDS);
+        expect(walk.startedHere(), 'the hover had already finished').not.toEqual([]);
+        expect(screen.getByRole('heading', { level: 2, name: TEXT }), 'mid-hover').toBe(heading);
+
+        walk.leave();
+        walk.expectBackAtRest('the hover');
+        walk.expectNothingLiveAfterUnmount();
+      },
+    );
+  });
+
+  describe('under prefers-reduced-motion: reduce (#47, AC 4)', () => {
+    /** What a mount renders with motion allowed, for the mount under `reduce` to match. */
+    function markupWithMotion(animation: Animation): string {
+      const view = render(<AnimatedText animation={animation}>{TEXT}</AnimatedText>);
+      const html = view.container.innerHTML;
+      view.unmount();
+      return html;
+    }
+
+    /**
+     * Enters, moves over and leaves the text, and checks that none of it started an animation or
+     * changed anything drawn: no transform, opacity, colour, text or node, inline styles included.
+     */
+    function expectInert(walk: ReturnType<typeof mount>, when: string) {
+      const before = walk.root.outerHTML;
+      walk.enter();
+      elapse(MID_HOVER_SECONDS);
+      expect(walk.startedHere(), `a hover ${when} started an animation`).toEqual([]);
+      expect(walk.root.outerHTML, `a hover ${when} changed what is drawn`).toBe(before);
+      walk.leave();
+      elapse(SETTLE_SECONDS);
+      expect(walk.startedHere(), `a leave ${when} started an animation`).toEqual([]);
+      expect(walk.root.outerHTML, `a leave ${when} changed what is drawn`).toBe(before);
+    }
+
+    it.each(ANIMATIONS)(
+      '%s: renders the same markup, and a hover or a pointer move starts nothing',
+      (animation) => {
+        const withMotion = markupWithMotion(animation);
+        media.reduce = true;
+        const walk = mount(animation);
+        // The preference reads `false` during hydration (ADR 0006), so markup that depended on it
+        // would be rewritten right after hydration, and the scrolled axe pass would count less.
+        expect(walk.root.parentElement?.innerHTML, 'the markup depends on the preference').toBe(
+          withMotion,
+        );
+        expectInert(walk, 'under reduce');
+        walk.expectNothingLiveAfterUnmount();
+      },
+    );
+
+    it.each(ANIMATIONS)(
+      '%s: a preference switched on after mount makes the next hover inert',
+      (animation) => {
+        const walk = mount(animation);
+        act(() => media.set(true));
+        expect(markup(walk.root), 'the markup changed with the preference').toBe(
+          walk.restingMarkup,
+        );
+        expectInert(walk, 'after the preference was switched on');
+        walk.expectNothingLiveAfterUnmount();
+      },
+    );
+
+    // The one variant whose rest depends on a later event: its leave is what brings the text back.
+    // Gated under `reduce` like every other handler, it would strand text the pointer had pulled
+    // before the preference changed, so the change itself puts the text back.
+    it('magnetic: a preference switched on mid-pull puts the text back, and the leave starts nothing', () => {
+      const walk = mount('magnetic');
+      walk.enter();
+      elapse(SETTLE_SECONDS);
+      const text = walk.root.firstElementChild;
+      if (!(text instanceof HTMLElement)) throw new Error('magnetic: no text span');
+      expect(isIdentityTransform(text.style.transform), 'the pointer did not pull the text').toBe(
+        false,
+      );
+
+      act(() => media.set(true));
+      walk.leave();
+      expect(walk.startedHere(), 'the leave started an animation under reduce').toEqual([]);
+      expect(
+        isIdentityTransform(text.style.transform),
+        `the text was left at ${text.style.transform}`,
+      ).toBe(true);
+      walk.expectBackAtRest('the preference switched on mid-pull');
+      walk.expectNothingLiveAfterUnmount();
+    });
   });
 });

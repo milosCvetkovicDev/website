@@ -170,8 +170,18 @@ test.describe('Hero Section', () => {
   test('story sections are server-rendered', async ({ page }) => {
     const response = await page.goto('/');
     const html = (await response?.text()) ?? '';
-    // Plain text from four of the six sections (the headlines are split into per-character spans).
-    for (const copy of ['TECH TREE', 'CI/CD PIPELINE', 'SELF-HEALING LOG', 'Connect on LinkedIn']) {
+    // Plain text from four of the six sections, and the three closing headlines that `AnimatedText`
+    // splits into one span per letter: beside the split copy each carries a visually hidden one with
+    // the sentence whole, so the sentence is in the response as a crawler or a screen reader reads it.
+    for (const copy of [
+      'TECH TREE',
+      'CI/CD PIPELINE',
+      'SELF-HEALING LOG',
+      'Connect on LinkedIn',
+      'Most bugs live in the gap between what you asked for and what you meant.',
+      'The bottleneck was never my typing speed.',
+      'This happened at 3:14am. Nobody got paged.',
+    ]) {
       expect(html).toContain(copy);
     }
   });

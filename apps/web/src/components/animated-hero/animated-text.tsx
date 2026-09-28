@@ -1,6 +1,8 @@
 'use client';
 
-import { useRef, useCallback, useState, memo, useMemo, useEffect } from 'react';
+import { useRef, useCallback, useState, memo, useMemo, useEffect, type RefObject } from 'react';
+import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { runWithGsap, type Gsap } from './load-gsap';
 import { useWithGsap } from './use-with-gsap';
 
 // Every handler below runs its GSAP work through `withGsap` (use-with-gsap.ts): GSAP loads after
@@ -8,7 +10,34 @@ import { useWithGsap } from './use-with-gsap';
 // is still there. So each enter-only effect also cancels on leave (`cancelPending`), which does
 // nothing once GSAP has loaded, and an enter still waiting when the pointer leaves never plays.
 // The checks that decide whether to start (`isActive()`, the busy flags) sit inside the callback
-// so that they are read when the tween is built.
+// so that they are read when the tween is built. Under `prefers-reduced-motion: reduce` every
+// handler is inert (`useHoverGsap`), and the markup is the same either way.
+
+/**
+ * `useWithGsap` behind the visitor's reduced-motion preference, read here once for every variant.
+ * Under `reduce` the returned `withGsap` returns before it asks for GSAP, so a hover or a pointer
+ * move creates no tween and changes nothing drawn (WCAG 2.3.3), and a callback still waiting for
+ * GSAP when the preference is switched on is dropped. Nothing rendered may depend on the value: it
+ * is `false` during hydration (ADR 0006), so markup that did would be rewritten right after it.
+ */
+function useHoverGsap() {
+  const reduceMotion = usePrefersReducedMotion();
+  const { withGsap, cancelPending } = useWithGsap();
+
+  useEffect(() => {
+    if (reduceMotion) cancelPending();
+  }, [reduceMotion, cancelPending]);
+
+  const withMotion = useCallback(
+    (callback: (gsap: Gsap) => void) => {
+      if (reduceMotion) return;
+      withGsap(callback);
+    },
+    [reduceMotion, withGsap],
+  );
+
+  return { withGsap: withMotion, cancelPending, reduceMotion };
+}
 
 type AnimationType =
   | 'scramble'
@@ -54,7 +83,7 @@ const ScrambleText = memo(function ScrambleText({
   const [displayText, setDisplayText] = useState(text);
   const animationRef = useRef<gsap.core.Tween | null>(null);
   const originalText = useRef(text);
-  const { withGsap } = useWithGsap();
+  const { withGsap } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -108,7 +137,10 @@ const ScrambleText = memo(function ScrambleText({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <span className="font-mono">{displayText}</span>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true" className="font-mono">
+        {displayText}
+      </span>
     </Tag>
   );
 });
@@ -116,6 +148,57 @@ const ScrambleText = memo(function ScrambleText({
 // Helper to split text into words while keeping characters animatable
 function splitIntoWords(text: string) {
   return text.split(/(\s+)/).filter(Boolean);
+}
+
+/**
+ * The text of the six variants that animate letter by letter. Each letter is its own `inline-block`
+ * span for GSAP to move, grouped by word so that a line never breaks inside one. Accessible-name
+ * computation puts a space around every such box, which named the story's headlines
+ * `M o s t b u g s …`, so that copy is `aria-hidden` and assistive technology reads the visually
+ * hidden one beside it, with the text whole. Not `aria-label`: it is prohibited on a generic span.
+ */
+function SplitText({
+  text,
+  charsRef,
+  wordClassName = 'inline-block whitespace-nowrap',
+}: {
+  text: string;
+  charsRef: RefObject<(HTMLSpanElement | null)[]>;
+  wordClassName?: string;
+}) {
+  const words = useMemo(() => splitIntoWords(text), [text]);
+  let charIndex = 0;
+
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {words.map((word, wordIdx) => {
+          if (/^\s+$/.test(word)) {
+            return <span key={wordIdx}>{word}</span>;
+          }
+          return (
+            <span key={wordIdx} className={wordClassName}>
+              {word.split('').map((char) => {
+                const idx = charIndex++;
+                return (
+                  <span
+                    key={idx}
+                    ref={(el) => {
+                      charsRef.current[idx] = el;
+                    }}
+                    className="inline-block"
+                  >
+                    {char}
+                  </span>
+                );
+              })}
+            </span>
+          );
+        })}
+      </span>
+    </>
+  );
 }
 
 // Wave effect - characters bob up and down in sequence
@@ -130,7 +213,7 @@ const WaveText = memo(function WaveText({
 }) {
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -170,38 +253,13 @@ const WaveText = memo(function WaveText({
     });
   }, [withGsap]);
 
-  const words = useMemo(() => splitIntoWords(text), [text]);
-  let charIndex = 0;
-
   return (
     <Tag
       className={`inline cursor-pointer ${className || ''}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={cancelPending}
     >
-      {words.map((word, wordIdx) => {
-        if (/^\s+$/.test(word)) {
-          return <span key={wordIdx}>{word}</span>;
-        }
-        return (
-          <span key={wordIdx} className="inline-block whitespace-nowrap">
-            {word.split('').map((char) => {
-              const idx = charIndex++;
-              return (
-                <span
-                  key={idx}
-                  ref={(el) => {
-                    charsRef.current[idx] = el;
-                  }}
-                  className="inline-block"
-                >
-                  {char}
-                </span>
-              );
-            })}
-          </span>
-        );
-      })}
+      <SplitText text={text} charsRef={charsRef} />
     </Tag>
   );
 });
@@ -218,7 +276,20 @@ const MagneticText = memo(function MagneticText({
 }) {
   const containerRef = useRef<HTMLElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
-  const { withGsap } = useWithGsap();
+  const { withGsap, reduceMotion } = useHoverGsap();
+
+  // The pull stays until the leave springs it back, and under `reduce` the leave does nothing. So a
+  // preference switched on while the text is pulled puts it back at once, with no spring.
+  useEffect(() => {
+    if (!reduceMotion) return;
+    return runWithGsap(({ gsap }) => {
+      const el = textRef.current;
+      // Untouched text is left alone, so a mount under `reduce` renders exactly what it would without.
+      if (!el || (!el.style.transform && gsap.getTweensOf(el).length === 0)) return;
+      gsap.killTweensOf(el);
+      gsap.set(el, { clearProps: 'transform' });
+    });
+  }, [reduceMotion]);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -289,7 +360,7 @@ const ScatterText = memo(function ScatterText({
   const timelinesRef = useRef<gsap.core.Timeline[]>([]);
   const isAnimatingRef = useRef(false);
   const totalChars = useMemo(() => text.replace(/\s/g, '').length, [text]);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -332,41 +403,23 @@ const ScatterText = memo(function ScatterText({
     });
   }, [totalChars, withGsap]);
 
-  const words = useMemo(() => splitIntoWords(text), [text]);
-  let charIndex = 0;
-
   return (
     <Tag
       className={`inline cursor-pointer ${className || ''}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={cancelPending}
     >
-      {words.map((word, wordIdx) => {
-        if (/^\s+$/.test(word)) {
-          return <span key={wordIdx}>{word}</span>;
-        }
-        return (
-          <span key={wordIdx} className="inline-block whitespace-nowrap">
-            {word.split('').map((char) => {
-              const idx = charIndex++;
-              return (
-                <span
-                  key={idx}
-                  ref={(el) => {
-                    charsRef.current[idx] = el;
-                  }}
-                  className="inline-block"
-                >
-                  {char}
-                </span>
-              );
-            })}
-          </span>
-        );
-      })}
+      <SplitText text={text} charsRef={charsRef} />
     </Tag>
   );
 });
+
+/**
+ * The glitch's split, drawn while it plays as two offset shadows of the text itself rather than as
+ * copies of it: decoration, like the SVG frames, and in theme tokens that reach AA as text on the
+ * accent pill and on the page in both themes (ADR 0010, 0011; hero-contrast.spec.ts measures them).
+ */
+const GLITCH_OFFSETS = { textShadow: '-2px 0 var(--accent-text), 2px 0 var(--status-err)' };
 
 // Glitch effect - RGB split and shake
 const GlitchText = memo(function GlitchText({
@@ -381,7 +434,7 @@ const GlitchText = memo(function GlitchText({
   const containerRef = useRef<HTMLElement>(null);
   const [isGlitching, setIsGlitching] = useState(false);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -423,33 +476,7 @@ const GlitchText = memo(function GlitchText({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={cancelPending}
     >
-      <span className="relative">
-        {text}
-        {isGlitching && (
-          <>
-            <span
-              className="absolute inset-0 text-cyan-400 opacity-70"
-              style={{
-                transform: 'translateX(-2px)',
-                clipPath: 'inset(0 0 50% 0)',
-              }}
-              aria-hidden="true"
-            >
-              {text}
-            </span>
-            <span
-              className="absolute inset-0 text-red-400 opacity-70"
-              style={{
-                transform: 'translateX(2px)',
-                clipPath: 'inset(50% 0 0 0)',
-              }}
-              aria-hidden="true"
-            >
-              {text}
-            </span>
-          </>
-        )}
-      </span>
+      <span style={isGlitching ? GLITCH_OFFSETS : undefined}>{text}</span>
     </Tag>
   );
 });
@@ -466,7 +493,7 @@ const TypewriterText = memo(function TypewriterText({
 }) {
   const [visibleCount, setVisibleCount] = useState(text.length);
   const tweenRef = useRef<gsap.core.Tween | null>(null);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -501,16 +528,14 @@ const TypewriterText = memo(function TypewriterText({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={cancelPending}
     >
-      <span>{text.slice(0, visibleCount)}</span>
-      <span className="opacity-0" aria-hidden="true">
-        {text.slice(visibleCount)}
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        <span>{text.slice(0, visibleCount)}</span>
+        <span className="opacity-0">{text.slice(visibleCount)}</span>
+        {visibleCount < text.length && (
+          <span className="ml-0.5 inline-block h-[1em] w-[2px] animate-pulse bg-[var(--accent)]" />
+        )}
       </span>
-      {visibleCount < text.length && (
-        <span
-          className="ml-0.5 inline-block h-[1em] w-[2px] animate-pulse bg-[var(--accent)]"
-          aria-hidden="true"
-        />
-      )}
     </Tag>
   );
 });
@@ -527,7 +552,7 @@ const ElasticText = memo(function ElasticText({
 }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -588,7 +613,7 @@ const StaggerUpText = memo(function StaggerUpText({
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
   const timelinesRef = useRef<gsap.core.Timeline[]>([]);
   const isAnimatingRef = useRef(false);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -636,41 +661,28 @@ const StaggerUpText = memo(function StaggerUpText({
     });
   }, [withGsap]);
 
-  const words = useMemo(() => splitIntoWords(text), [text]);
-  let charIndex = 0;
-
   return (
     <Tag
       className={`inline cursor-pointer overflow-hidden ${className || ''}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={cancelPending}
     >
-      {words.map((word, wordIdx) => {
-        if (/^\s+$/.test(word)) {
-          return <span key={wordIdx}>{word}</span>;
-        }
-        return (
-          <span key={wordIdx} className="inline-block overflow-hidden whitespace-nowrap">
-            {word.split('').map((char) => {
-              const idx = charIndex++;
-              return (
-                <span
-                  key={idx}
-                  ref={(el) => {
-                    charsRef.current[idx] = el;
-                  }}
-                  className="inline-block"
-                >
-                  {char}
-                </span>
-              );
-            })}
-          </span>
-        );
-      })}
+      <SplitText
+        text={text}
+        charsRef={charsRef}
+        wordClassName="inline-block overflow-hidden whitespace-nowrap"
+      />
     </Tag>
   );
 });
+
+/**
+ * The rainbow's letter colours: theme tokens that reach AA as text on the accent pill in both themes
+ * (hero-contrast.spec.ts measures them). Each is set and cleared at a point on the timeline rather
+ * than tweened: GSAP interpolates rgb, hsl, hex and named colours, and the status tokens compute to
+ * `lab()` in the browsers that support it.
+ */
+const RAINBOW_TOKENS = ['--status-err', '--status-warn', '--status-ok', '--accent-text'];
 
 // Rainbow color cycle effect
 const RainbowText = memo(function RainbowText({
@@ -684,7 +696,7 @@ const RainbowText = memo(function RainbowText({
 }) {
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -697,37 +709,21 @@ const RainbowText = memo(function RainbowText({
       if (timelineRef.current?.isActive()) return;
       timelineRef.current?.kill();
 
-      const colors = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#9b59b6', '#e74c3c'];
       timelineRef.current = gsap.timeline();
 
       charsRef.current.forEach((char, i) => {
         if (char) {
+          const start = i * 0.02;
+          const token = RAINBOW_TOKENS[i % RAINBOW_TOKENS.length];
           timelineRef
-            .current!.to(
-              char,
-              {
-                color: colors[i % colors.length],
-                scale: 1.2,
-                duration: 0.1,
-              },
-              i * 0.02,
-            )
-            .to(
-              char,
-              {
-                color: 'inherit',
-                scale: 1,
-                duration: 0.3,
-              },
-              i * 0.02 + 0.2,
-            );
+            .current!.call(() => char.style.setProperty('color', `var(${token})`), undefined, start)
+            .to(char, { scale: 1.2, duration: 0.1 }, start)
+            .to(char, { scale: 1, duration: 0.3 }, start + 0.2)
+            .call(() => char.style.removeProperty('color'), undefined, start + 0.5);
         }
       });
     });
   }, [withGsap]);
-
-  const words = useMemo(() => splitIntoWords(text), [text]);
-  let charIndex = 0;
 
   return (
     <Tag
@@ -735,29 +731,7 @@ const RainbowText = memo(function RainbowText({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={cancelPending}
     >
-      {words.map((word, wordIdx) => {
-        if (/^\s+$/.test(word)) {
-          return <span key={wordIdx}>{word}</span>;
-        }
-        return (
-          <span key={wordIdx} className="inline-block whitespace-nowrap">
-            {word.split('').map((char) => {
-              const idx = charIndex++;
-              return (
-                <span
-                  key={idx}
-                  ref={(el) => {
-                    charsRef.current[idx] = el;
-                  }}
-                  className="inline-block"
-                >
-                  {char}
-                </span>
-              );
-            })}
-          </span>
-        );
-      })}
+      <SplitText text={text} charsRef={charsRef} />
     </Tag>
   );
 });
@@ -774,7 +748,7 @@ const PerspectiveText = memo(function PerspectiveText({
 }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -831,7 +805,7 @@ const GravityText = memo(function GravityText({
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
   const timelinesRef = useRef<gsap.core.Timeline[]>([]);
   const isAnimatingRef = useRef(false);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -875,38 +849,13 @@ const GravityText = memo(function GravityText({
     });
   }, [withGsap]);
 
-  const words = useMemo(() => splitIntoWords(text), [text]);
-  let charIndex = 0;
-
   return (
     <Tag
       className={`inline cursor-pointer ${className || ''}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={cancelPending}
     >
-      {words.map((word, wordIdx) => {
-        if (/^\s+$/.test(word)) {
-          return <span key={wordIdx}>{word}</span>;
-        }
-        return (
-          <span key={wordIdx} className="inline-block whitespace-nowrap">
-            {word.split('').map((char) => {
-              const idx = charIndex++;
-              return (
-                <span
-                  key={idx}
-                  ref={(el) => {
-                    charsRef.current[idx] = el;
-                  }}
-                  className="inline-block"
-                >
-                  {char}
-                </span>
-              );
-            })}
-          </span>
-        );
-      })}
+      <SplitText text={text} charsRef={charsRef} />
     </Tag>
   );
 });
@@ -923,7 +872,7 @@ const BlurRevealText = memo(function BlurRevealText({
 }) {
   const textRef = useRef<HTMLSpanElement>(null);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -979,7 +928,7 @@ const HighlightText = memo(function HighlightText({
   const [isAnimating, setIsAnimating] = useState(false);
   const animatingRef = useRef(false);
   const tweenRef = useRef<gsap.core.Tween | null>(null);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -1036,7 +985,7 @@ const MorseText = memo(function MorseText({
   const charsRef = useRef<(HTMLSpanElement | null)[]>([]);
   const timelinesRef = useRef<gsap.core.Timeline[]>([]);
   const isAnimatingRef = useRef(false);
-  const { withGsap, cancelPending } = useWithGsap();
+  const { withGsap, cancelPending } = useHoverGsap();
 
   useEffect(() => {
     return () => {
@@ -1086,38 +1035,13 @@ const MorseText = memo(function MorseText({
     });
   }, [withGsap]);
 
-  const words = useMemo(() => splitIntoWords(text), [text]);
-  let charIndex = 0;
-
   return (
     <Tag
       className={`inline cursor-pointer ${className || ''}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={cancelPending}
     >
-      {words.map((word, wordIdx) => {
-        if (/^\s+$/.test(word)) {
-          return <span key={wordIdx}>{word}</span>;
-        }
-        return (
-          <span key={wordIdx} className="inline-block whitespace-nowrap">
-            {word.split('').map((char) => {
-              const idx = charIndex++;
-              return (
-                <span
-                  key={idx}
-                  ref={(el) => {
-                    charsRef.current[idx] = el;
-                  }}
-                  className="inline-block"
-                >
-                  {char}
-                </span>
-              );
-            })}
-          </span>
-        );
-      })}
+      <SplitText text={text} charsRef={charsRef} />
     </Tag>
   );
 });
