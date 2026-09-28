@@ -2,7 +2,12 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0018
+
+No longer applies: what its decision says about `apps/playground`, which ADR 0018 retired (that it
+inherits the root `prettier.config.mjs`, that it lints with `eslint . --max-warnings 0`, and the
+sentence naming `web` and `playground` as the only workspaces with a `lint` script beside three
+config packages); the rest of its decision stands. See [ADR 0018](0018-dependency-update-policy.md).
 
 ## Date
 
