@@ -2,6 +2,8 @@
 paths:
   - 'apps/web/e2e/**'
   - 'apps/web/playwright.config.ts'
+  - 'apps/web/e2e-live/**'
+  - 'apps/web/playwright.live.config.ts'
   - 'scripts/flake-*.sh'
   - 'scripts/verify-flake.sh'
   - 'scripts/check-webserver-log.mjs'

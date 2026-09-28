@@ -96,6 +96,23 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   also posted as a review thread, though, and the resolved-threads rule below blocks the merge until
   that thread is resolved: GitHub resolves it once the flagged code changes, and a writer can
   resolve it by hand or dismiss the alert.
+- `.github/workflows/live-check.yml` runs on Vercel's `deployment_status` events, daily at 06:23
+  UTC and on manual dispatch, and none of its jobs is a required check. Its one job, `Live site`,
+  is skipped unless the event is a successful `Production` status (GitHub's environment name,
+  exactly; `production_environment` is false on Vercel's deployments), a schedule or a dispatch, so
+  every preview deployment leaves a skipped `Live site` entry on its commit. It checks out the
+  triggering commit and runs `apps/web/e2e-live/` against `https://miloscvetkovic.dev` with
+  `playwright.live.config.ts`, which starts no server and shares no spec with
+  `playwright.config.ts`. It targets the apex because a deployment's own URL is behind Vercel
+  Authentication, so it can test the previous deployment when the alias has not moved yet; the
+  daily run covers that race and changes that reach the apex without a status (rollback,
+  promotion). It asserts the tracker tag and its script's 200, a console without errors or
+  warnings, no `Set-Cookie`, cookie or storage entry, on desktop Chromium only; never a page-view
+  beacon or the intake's CSP `connect-src`: the tracker sends nothing when `navigator.webdriver`
+  is true. A failed deployment or scheduled run opens the issue "Live check failed on the
+  production site", or comments on the open one; the job holds `issues: write` for that step alone.
+  Locally: `pnpm --filter web exec playwright test --config playwright.live.config.ts`, with
+  `LIVE_URL` for another target.
 - `.github/workflows/flake-hunt.yml` hunts flaky e2e tests every night at 02:17 UTC and on manual
   dispatch, never on a pull request, and none of its jobs is a required check. Six shards each run
   the whole suite five times against the production build with `scripts/flake-hunt.sh`; a report
