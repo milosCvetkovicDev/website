@@ -44,10 +44,10 @@ import {
  * `INCOMPLETE_CONTRAST_BUDGET`: a per-route, per-scheme ceiling on the undecidable region, so it can
  * shrink but never grow.
  *
- * Two axe behaviours worth knowing before touching a failure (ADR 0008): `aria-hidden` does not
- * exempt an element from `color-contrast`, because axe measures what is on screen, not what a
- * screen reader gets; `opacity: 0` does, which is why GSAP reveals must start from 0 and never
- * from a partial value.
+ * Two axe behaviours worth knowing before touching a failure, recorded in ADR 0008, whose rules
+ * carry over into ADR 0011, the record that supersedes it: `aria-hidden` does not exempt an element
+ * from `color-contrast`, because axe measures what is on screen, not what a screen reader gets;
+ * `opacity: 0` does, which is why GSAP reveals must start from 0 and never from a partial value.
  *
  * Each page is audited twice. At rest, which is what Lighthouse scores and what the original
  * findings were about. Then, for `/`, again after scrolling the whole story.
@@ -92,7 +92,7 @@ import {
  */
 
 /**
- * Every page route, from the one shared list in `e2e/routes.ts`: the six static routes, the three case
+ * Every page route, from the one shared list in `e2e/routes.ts`: the seven static routes, the three case
  * studies and a 404. This used to be `['/', '/work/self-healing-agent']` — two of ten — which is why
  * every defect the audit found on `/about`, `/skills`, `/contact`, `/blog` or a 404 was invisible to a
  * green gate. `console-clean.spec.ts` reads the same module, so a new route reaches both gates at once.
@@ -113,7 +113,7 @@ const pages = PAGE_ROUTES;
  *   /  103 → 80      /about  61 → 45     /work  8 → 5        /skills  88 → 65
  *   /blog  11 → 8    /contact  21 → 15   /no-such-page  12 → 8
  *   /work/self-healing-agent  48 → 40    /work/enterprise-b2b-platform  59 → 40
- *   /work/nx-remote-cache  43 → 35
+ *   /work/nx-remote-cache  43 → 35      /privacy  30 → 22 (measured 2026-09-27, when the page was added)
  *
  * `/work` measuring 8 is not a mistake and is worth knowing: its cards are `backdrop-blur-sm`
  * (`work/page.tsx:51`), so axe cannot resolve what is behind their text and puts 55 of its 63 nodes in
@@ -127,6 +127,7 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
   '/skills': 65,
   '/blog': 8,
   '/contact': 15,
+  '/privacy': 22,
   '/work/self-healing-agent': 40,
   '/work/enterprise-b2b-platform': 40,
   '/work/nx-remote-cache': 35,
@@ -160,7 +161,7 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * the same day. The node #48 added is the hero's line naming who the site is about, which was
  * sr-only and is now visible text on the island; `e2e/hero-contrast.spec.ts` measures its colour.
  *
- * Eight of the ten routes have a budget of **zero**, which is the strongest form this can take: on those
+ * Nine of the eleven routes have a budget of **zero**, which is the strongest form this can take: on those
  * pages axe decides every text node, and the first blurred panel or gradient put behind text fails here.
  * The two that are not zero are the two surfaces the audit already found, and between them they account
  * for every undecidable node on the site — 167 of them, against 103 and 8 decided.
@@ -168,7 +169,7 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * `/` gets a margin of a few nodes and the others do not, for a measured reason rather than out of
  * caution: the hero's tmux chrome animates its tab labels and status line through `opacity`, and axe
  * skips a node at `opacity: 0`, so the count depends on which frame the audit samples. Two consecutive
- * dark-theme runs gave 111 and 112. `/work` and the eight zeroes are static and were identical across
+ * dark-theme runs gave 111 and 112. `/work` and the nine zeroes are static and were identical across
  * every run. Never widen a margin to quieten a failure: read the nodes the message names first, because
  * a genuinely new blurred surface looks exactly like this.
  *
@@ -181,6 +182,7 @@ const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }
   '/skills': { light: 0, dark: 0 },
   '/blog': { light: 0, dark: 0 },
   '/contact': { light: 0, dark: 0 },
+  '/privacy': { light: 0, dark: 0 },
   '/work/self-healing-agent': { light: 0, dark: 0 },
   '/work/enterprise-b2b-platform': { light: 0, dark: 0 },
   '/work/nx-remote-cache': { light: 0, dark: 0 },
@@ -268,8 +270,9 @@ async function openPage(
   await expect(page).toHaveTitle(/Milos Cvetkovic/);
   await expectHydrated(page);
   // On `/` the story's timelines, and the `opacity: 0` from-states that decide what axe skips at
-  // rest, are built when GSAP arrives, after hydration (load-gsap.ts). The quiet network above
-  // almost always outlasts that, but a gate waits for the state it measures rather than racing it.
+  // rest, are built when GSAP arrives, on the visitor's first intent (load-gsap.ts). The helper
+  // sends that intent and waits, so this pass measures the page as a visitor who has started to
+  // scroll has it; `gsap-lazy.spec.ts` audits the page before GSAP.
   if (path === '/') await expectGsapLoaded(page);
   // Playwright ignores unknown emulation options silently: prove the scheme reached the page.
   await expect(page.locator('html')).toContainClass(colorScheme);
@@ -309,7 +312,8 @@ test.describe('Accessibility', () => {
         expect(
           describeViolations(results.violations),
           `${path} in the ${colorScheme} theme must have no axe violations. For a colour contrast ` +
-            'failure, read the token roles in docs/adr/0008-accent-colour-roles.md first.',
+            'failure, read the token roles in ' +
+            'docs/adr/0011-colour-roles-on-scoped-surfaces.md first.',
         ).toEqual([]);
         // Prove the options took effect and that real content was measured: a rule that is switched
         // off appears in none of the four result lists, axe only logs an unknown tag instead of
@@ -414,12 +418,14 @@ test.describe('Accessibility', () => {
   }
 
   test.describe('the whole story', () => {
-    // A scrolled `/` gives axe over 400 text nodes to measure against the at-rest pass's 30. It
-    // takes 2.7 s on a CI runner and 4.5 to 6.4 s locally, so 120 s is roughly twenty times the
-    // measured cost. It is deliberately not larger: the e2e job has 20 minutes, of which the build
-    // and the browser install take about a third, and two of these tests hanging to a five-minute
-    // budget would end the job before the report is uploaded. Still no retries: the reduced-motion
-    // path makes the result deterministic, so a failure here is real and a retry could only hide it.
+    // A scrolled `/` gives axe several times as many text nodes to measure as the at-rest pass
+    // does; both counts are recorded where their floors are set, at AT_REST_CONTRAST_FLOOR and in
+    // the test below. It takes 2.7 s on a CI runner and 4.5 to 6.4 s locally, so 120 s is roughly
+    // twenty times the measured cost. It is deliberately not larger: the e2e job has 20 minutes, of
+    // which the build and the browser install take about a third, and two of these tests hanging to
+    // a five-minute budget would end the job before the report is uploaded. Still no retries: the
+    // reduced-motion path makes the result deterministic, so a failure here is real and a retry
+    // could only hide it.
     test.describe.configure({ retries: 0, timeout: 120_000 });
 
     for (const colorScheme of colorSchemes) {

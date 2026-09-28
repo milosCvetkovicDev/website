@@ -16,6 +16,7 @@ import { metadata as home } from '../page';
 import { metadata as about } from '../about/page';
 import { metadata as blog } from '../blog/page';
 import { metadata as contact } from '../contact/page';
+import { metadata as privacy } from '../privacy/page';
 import { metadata as skills } from '../skills/page';
 import { metadata as work } from '../work/page';
 import { generateMetadata } from '../work/[slug]/page';
@@ -35,6 +36,7 @@ const routes: [string, Metadata][] = [
   ['/about', about],
   ['/blog', blog],
   ['/contact', contact],
+  ['/privacy', privacy],
   ['/skills', skills],
   ['/work', work],
 ];

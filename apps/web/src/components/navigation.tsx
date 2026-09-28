@@ -94,10 +94,13 @@ function MobileMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
           </svg>
         </button>
         <nav className="mt-12 flex flex-col gap-4">
+          {/* Opening the menu on a page would otherwise prefetch that page from its own link, as
+              the header logo would on `/`. */}
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
+              prefetch={pathname === link.href ? false : undefined}
               onClick={onClose}
               aria-current={pathname === link.href ? 'page' : undefined}
               className={`text-lg transition-colors ${
@@ -123,10 +126,13 @@ export function Navigation() {
     <header className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
         {/* The mark is aria-hidden, so the link carries the name. "MC" keeps the visible "mc" in
-            the accessible name (WCAG 2.5.3), and e2e/client-navigation.spec.ts finds the link by it. */}
+            the accessible name (WCAG 2.5.3), and e2e/client-navigation.spec.ts finds the link by it.
+            On a phone this is the only link in view at load, and on `/` it would prefetch the
+            page it is on: three requests racing the page's own for no navigation it can make. */}
         <Link
           href="/"
           aria-label="MC"
+          prefetch={pathname === '/' ? false : undefined}
           className="transition-colors hover:text-[var(--accent-text)]"
         >
           <Logo size={20} />

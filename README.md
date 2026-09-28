@@ -39,7 +39,7 @@ docs/
   adr/            architecture decision records
   plans/          design documents and step-by-step implementation plans with progress
   runbooks/       operational procedures (deployment)
-.claude/          project-level Claude Code configuration (hooks, agents)
+.claude/          project-level Claude Code configuration (hooks, agents, path-scoped rules)
 .github/          CI and commitlint workflows, nightly flake hunt, Dependabot, pull request template
 ```
 
@@ -80,11 +80,13 @@ CodeQL default setup is on as well. GitHub manages it outside `.github/workflows
 
 `.github/workflows/flake-hunt.yml` is not a check: every night it runs the e2e suite 30 times with `scripts/flake-hunt.sh` and opens an issue for flaky tests no open `flake-hunt` issue tracks yet.
 
+`.github/workflows/live-check.yml` is not a check either: after each production deployment and every morning it loads every page of the live site with `apps/web/playwright.live.config.ts`, fails when a page does not load the Web Analytics tracker, logs an error or warning to the console, or stores a cookie or a storage entry, and opens an issue when it fails. It cannot see a page view reach Vercel: the tracker sends none to an automated browser.
+
 Useful extras: `pnpm lint:fix`, `pnpm format`, `pnpm clean`.
 
 ## Testing
 
-- **Unit tests** live next to the code in `__tests__` folders. jsdom is the default environment; a file with no DOM in it opts out with an `@vitest-environment node` docblock at the top, as the three `apps/web/src/data/__tests__` files do, because building a jsdom window costs about two seconds in every worker (see the Testing section of [CLAUDE.md](CLAUDE.md)). Components that read `matchMedia` or `IntersectionObserver` stub them explicitly (see `apps/web/src/components/__tests__/featured-work.test.tsx`); there is no global mock, so a component that forgets to guard those APIs fails loudly.
+- **Unit tests** live next to the code in `__tests__` folders. jsdom is the default environment; a file with no DOM in it opts out with an `@vitest-environment node` docblock at the top, as the three `apps/web/src/data/__tests__` files do, because building a jsdom window costs about two seconds in every worker (see [.claude/rules/unit-tests.md](.claude/rules/unit-tests.md)). Components that read `matchMedia` or `IntersectionObserver` stub them explicitly (see `apps/web/src/components/__tests__/featured-work.test.tsx`); there is no global mock, so a component that forgets to guard those APIs fails loudly. `pnpm --filter web test:coverage` prints a v8 coverage summary of the same suite; it is report-only, with no threshold, and CI does not run it.
 - **End-to-end tests** live in `apps/web/e2e`. Playwright always starts the server it tests, on port 3210 by default and 3000 in the CI job, which sets `PLAYWRIGHT_PORT`, so a port that is already taken aborts the run instead of testing whatever is answering on it; under `CI=true` it serves the production build with one worker and two retries. The console and accessibility gates opt out of those retries, because a retry turns an intermittent failure into a green run. Interactions must wait for hydration, because event listeners only exist after React mounts: the root layout renders a hidden `#hydration-marker` on every route that reads `false` in the served HTML and `true` once React has hydrated, and `apps/web/e2e/support/hydration.ts` waits on it.
 - **Visual checks** are done with Playwright screenshots of the affected section in light, dark and mobile viewports before a UI pull request is opened.
 
@@ -100,8 +102,9 @@ Useful extras: `pnpm lint:fix`, `pnpm format`, `pnpm clean`.
 
 This repository is developed with Claude Code and keeps its configuration in the repo:
 
-- `.claude/settings.json` wires two `PreToolUse` guards, and they do not cover the same ground. The file-tool guard blocks writes to `.env*` (except `.env.example`), `pnpm-lock.yaml`, `node_modules`, `.next` and `dist`. The shell guard is narrower: it blocks only commands that would write `.env*` or `pnpm-lock.yaml`, so nothing stops a shell command writing into `node_modules`, `.next` or `dist`. Treat the full list as the rule and the hooks as a partial backstop; [CLAUDE.md](CLAUDE.md) states the same split. A `PostToolUse` hook formats every written file with Prettier.
-- `.claude/agents/ui-reviewer.md` reviews components for visual quality, accessibility and the project's patterns. Reviews by an agent other than the author are part of the definition of done.
+- `.claude/settings.json` wires two `PreToolUse` guards, and they do not cover the same ground. The file-tool guard blocks `Edit` and `Write` on the absolute paths Claude Code sends for `.env` and `.env.*` files (except `.env.example`), `pnpm-lock.yaml`, `node_modules`, `.next` and `dist`. The shell guard only reads the command's text: it blocks commands that look like writes to a name containing `.env` or to `pnpm-lock.yaml` (after dropping every `.env.example` from the text, so `.env.example.local` gets through), never looks at `node_modules`, `.next` or `dist`, and misses writes it does not recognise. It also blocks some commands that write nothing, as known false positives: any mention of `.env` (even in `process.env`) or of the lockfile that follows a word such as `rm` or `mv` on the same line, even when that word is an argument or sits in a commit message. `scripts/claude-guards.test.mjs` pins what both guards do, row by row. Treat the full list as the rule and the hooks as a partial backstop; [.claude/rules/claude-code-config.md](.claude/rules/claude-code-config.md) has the details. A `PostToolUse` hook formats every written file with Prettier.
+- `.claude/agents/ui-reviewer.md` reviews the UI files or diff it is handed against the project's colour, motion, hydration and accessibility rules, citing the ADR, rule file or WCAG criterion behind each finding. Reviews by an agent other than the author are part of the definition of done.
+- `next dev` writes no `AGENTS.md` or `CLAUDE.md` into `apps/web`, although Next.js generates that pair by default when an AI agent runs it: `agentRules: false` in `apps/web/next.config.ts` turns it off, so the root [CLAUDE.md](CLAUDE.md) and the scoped rules in `.claude/rules/` stay the only instruction files ([ADR 0019](docs/adr/0019-next-agent-rules-disabled.md)). The version-matched Next.js documentation the pair pointed at is in `apps/web/node_modules/next/dist/docs`.
 - Work is planned before it is built: design documents and step-by-step plans with checkboxes live in [docs/plans](docs/plans/README.md), and decisions that outlive a pull request are recorded in [docs/adr](docs/adr/README.md).
 
 ## Documentation map
@@ -112,6 +115,7 @@ This repository is developed with Claude Code and keeps its configuration in the
 | [docs/adr/README.md](docs/adr/README.md)           | Architecture decision records                                  |
 | [docs/runbooks/deploy.md](docs/runbooks/deploy.md) | Deploying to Vercel, DNS, verification, rollback               |
 | [CLAUDE.md](CLAUDE.md)                             | Instructions for AI-assisted development in this repository    |
+| [.claude/rules/](.claude/rules)                    | Instructions Claude Code loads only with the files they cover  |
 
 ## Deployment
 

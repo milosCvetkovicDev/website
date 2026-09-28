@@ -33,7 +33,7 @@
     "DataStream": "  className?: string;",
     "DiscoveryPhase": "  // Takes no props.",
     "ExecutionPhase": "  // Takes no props.",
-    "FeaturedWork": "  projects: ReadonlyArray<{ slug: string; title: string; description: string; tags: Array<string>; activeNodes: Array<'client' | 'gateway' | 'auth' | 'backend' | 'worker' | 'db' | 'cache' | 'ai' | 'storage'>; category: string; status: 'LIVE' | 'PRODUCTION'; metric: { value: number; label: string; prefix?: string; suffix?: string; decimals?: number } }>;",
+    "FeaturedWork": "  projects: ReadonlyArray<{ slug: string; title: string; description: string; tags: Array<string>; activeNodes: Array<'client' | 'gateway' | 'auth' | 'backend' | 'worker' | 'db' | 'cache' | 'ai' | 'storage'>; category: string; status: 'LIVE' | 'PRODUCTION' | 'RETIRED'; metric: { value: number; label: string; prefix?: string; suffix?: string; decimals?: number } }>;",
     "Footer": "  // Takes no props.",
     "GameComplete": "  // Takes no props.",
     "GauntletPhase": "  // Takes no props.",

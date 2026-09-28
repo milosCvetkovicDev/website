@@ -21,7 +21,7 @@ const PLAYER_STATS = [
 
 function PlayerCard() {
   return (
-    <div className="mb-8 w-full max-w-[420px] overflow-hidden rounded-lg border border-black/[0.08] bg-white/95 font-mono text-xs transition-all duration-300 hover:border-[rgba(139,92,246,0.35)] hover:shadow-[0_0_30px_rgba(139,92,246,0.06)] dark:border-[rgba(90,97,144,0.25)] dark:bg-[rgba(22,27,34,0.9)]">
+    <div className="mb-6 w-full max-w-[420px] overflow-hidden rounded-lg border border-black/[0.08] bg-white/95 font-mono text-xs transition-all duration-300 hover:border-[rgba(139,92,246,0.35)] hover:shadow-[0_0_30px_rgba(139,92,246,0.06)] sm:mb-8 dark:border-[rgba(90,97,144,0.25)] dark:bg-[rgba(22,27,34,0.9)]">
       {/* Header with dots */}
       <div
         className="flex items-center gap-[7px] border-b border-black/[0.06] bg-[#f5f5f8]/95 px-3 py-1.5 dark:border-[rgba(90,97,144,0.2)] dark:bg-[rgba(30,34,48,0.9)]"
@@ -37,7 +37,7 @@ function PlayerCard() {
         {PLAYER_STATS.map((stat) => (
           <div
             key={stat.label}
-            className="-mx-1.5 flex items-center justify-between rounded px-1.5 py-[3px] transition-colors hover:bg-[rgba(139,92,246,0.05)]"
+            className="-mx-1.5 flex items-center justify-between rounded px-1.5 py-[3px] transition-colors hover:bg-[rgba(139,92,246,0.05)] max-sm:grid max-sm:grid-cols-[56px_minmax(0,1fr)] max-sm:items-baseline max-sm:gap-x-3"
           >
             <dt
               className="font-mono text-[#6b7280] uppercase dark:text-[#8890a8]"
@@ -48,7 +48,10 @@ function PlayerCard() {
             >
               {stat.label}
             </dt>
-            <dd className="font-mono" style={{ fontSize: '12px', color: 'var(--accent-text)' }}>
+            <dd
+              className="min-w-0 font-mono max-sm:leading-[1.45]"
+              style={{ fontSize: '12px', color: 'var(--accent-text)' }}
+            >
               {stat.value}
             </dd>
           </div>
@@ -56,7 +59,7 @@ function PlayerCard() {
 
         {/* Status row with divider */}
         <div
-          className="-mx-1.5 flex items-center justify-between rounded border-t border-black/[0.06] px-1.5 py-[3px] transition-colors hover:bg-[rgba(139,92,246,0.05)] dark:border-[rgba(90,97,144,0.2)]"
+          className="-mx-1.5 flex items-center justify-between rounded border-t border-black/[0.06] px-1.5 py-[3px] transition-colors hover:bg-[rgba(139,92,246,0.05)] max-sm:grid max-sm:grid-cols-[56px_minmax(0,1fr)] max-sm:items-baseline max-sm:gap-x-3 dark:border-[rgba(90,97,144,0.2)]"
           style={{
             marginTop: '3px',
             paddingTop: '3px',
@@ -71,7 +74,10 @@ function PlayerCard() {
           >
             STATUS
           </dt>
-          <dd className="font-mono text-[var(--status-ok)]" style={{ fontSize: '12px' }}>
+          <dd
+            className="min-w-0 font-mono text-[var(--status-ok)] max-sm:leading-[1.45]"
+            style={{ fontSize: '12px' }}
+          >
             <span
               className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-[var(--status-ok)]"
               style={{
@@ -90,7 +96,7 @@ function PlayerCard() {
 function SkillTags() {
   return (
     <ul
-      className="mx-0 mt-6 mb-0 flex max-w-[520px] list-none flex-wrap justify-center gap-1.5 p-0"
+      className="mx-0 mt-5 mb-0 flex max-w-[520px] list-none flex-wrap justify-center gap-1.5 p-0 sm:mt-6"
       aria-label="Technical skills"
     >
       {SKILL_TAGS.map((tag) => (
@@ -111,9 +117,8 @@ function SkillTags() {
 export function HeroContent() {
   return (
     <div
-      className="relative z-10 flex w-full max-w-[600px] flex-col items-center rounded-2xl border border-black/[0.08] bg-white/80 shadow-[0_0_80px_rgba(0,0,0,0.08)] dark:border-[rgba(90,97,144,0.12)] dark:bg-[rgba(10,10,14,0.75)] dark:shadow-[0_0_80px_rgba(0,0,0,0.5)]"
+      className="relative z-10 flex w-full max-w-[600px] flex-col items-center rounded-2xl border border-black/[0.08] bg-white/80 px-5 py-8 shadow-[0_0_80px_rgba(0,0,0,0.08)] sm:px-12 sm:py-10 dark:border-[rgba(90,97,144,0.12)] dark:bg-[rgba(10,10,14,0.75)] dark:shadow-[0_0_80px_rgba(0,0,0,0.5)]"
       style={{
-        padding: '2.5rem 3rem',
         backdropFilter: 'blur(28px)',
         WebkitBackdropFilter: 'blur(28px)',
       }}
@@ -124,14 +129,15 @@ export function HeroContent() {
       {/* Headline */}
       <div className="max-w-[540px] text-center">
         <h1
-          className="mb-3.5 font-extrabold text-[#1e1e2e] dark:text-white"
+          className="mb-3.5 font-extrabold text-balance text-[#1e1e2e] dark:text-white"
           style={{
             fontSize: 'clamp(30px, 5.5vw, 50px)',
             lineHeight: 1.12,
             letterSpacing: '-0.025em',
           }}
         >
-          <span style={{ whiteSpace: 'nowrap' }}>This happened at 3am.</span>
+          {/* One line from `sm`; below it the line may wrap, or it runs out of the island at 320 px. */}
+          <span className="sm:whitespace-nowrap">This happened at 3am.</span>
           <br />
           Nobody woke up.
         </h1>
@@ -147,8 +153,8 @@ export function HeroContent() {
 
         {/* Subtitle */}
         <p
-          className="text-[#6b7280] dark:text-[#b0b4c4]"
-          style={{ fontSize: '16px', lineHeight: 1.6 }}
+          className="text-[15px] text-[#6b7280] sm:text-base dark:text-[#b0b4c4]"
+          style={{ lineHeight: 1.6 }}
         >
           I build systems that inherit chaos and ship clarity.
           <br />

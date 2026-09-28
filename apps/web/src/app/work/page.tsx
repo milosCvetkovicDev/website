@@ -44,6 +44,7 @@ function CornerBrackets() {
 function ProjectCard({ project, index }: { project: CaseStudy; index: number }) {
   const meta = project.highlight;
   const isFirst = index === 0;
+  const retired = meta.status === 'RETIRED';
 
   return (
     <Link
@@ -72,8 +73,18 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
         </div>
         {meta && (
           <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--status-ok)]" />
-            <span className="font-mono text-[10px] text-[var(--status-ok)]">{meta.status}</span>
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                retired ? 'bg-[var(--muted)]' : 'animate-pulse bg-[var(--status-ok)]'
+              }`}
+            />
+            <span
+              className={`font-mono text-[10px] ${
+                retired ? 'text-[var(--muted)]' : 'text-[var(--status-ok)]'
+              }`}
+            >
+              {meta.status}
+            </span>
           </div>
         )}
       </div>

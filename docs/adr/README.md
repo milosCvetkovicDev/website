@@ -44,10 +44,14 @@ perform an operation.
 | 0016 | [Dependabot branches never deploy, and commits that change nothing the site is built from never build](0016-vercel-deployment-budget.md) | Accepted                                      | 2026-09-12 |
 | 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)                                       | Accepted                                      | 2026-09-12 |
 | 0018 | [Dependency update policy](0018-dependency-update-policy.md)                                                                             | Accepted                                      | 2026-09-12 |
+| 0019 | [Next.js does not generate agent instruction files](0019-next-agent-rules-disabled.md)                                                   | Accepted                                      | 2026-09-27 |
 | 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)                                   | Superseded by ADR-0021                        | 2026-09-12 |
 | 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)                   | Accepted                                      | 2026-09-13 |
-| 0022 | [The home page renders no boot loader](0022-no-boot-loader.md)                                                                           | Accepted                                      | 2026-09-23 |
-| 0023 | [Six static security headers on every page and asset](0023-static-security-headers.md)                                                   | Accepted                                      | 2026-09-23 |
+| 0022 | [The home page renders no boot loader](0022-no-boot-loader.md)                                                                           | Superseded by ADR-0024                        | 2026-09-23 |
+| 0023 | [Six static security headers on every page and asset](0023-static-security-headers.md)                                                   | Superseded by ADR-0025                        | 2026-09-23 |
+| 0024 | [GSAP loads on the visitor's first intent](0024-gsap-loads-on-first-intent.md)                                                           | Accepted                                      | 2026-09-24 |
+| 0025 | [The public `vercel.app` production alias answers `X-Robots-Tag: noindex`](0025-production-alias-noindex.md)                             | Accepted                                      | 2026-09-25 |
+| 0026 | [Vercel Web Analytics loads in Vercel deployments only](0026-vercel-web-analytics.md)                                                    | Accepted (corrected 2026-09-27)               | 2026-09-26 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
@@ -60,6 +64,13 @@ monorepo toolchain decision stands. ADR 0004 is superseded in part too:
 [ADR 0021](0021-squash-only-merges-and-required-checks.md) replaces the paragraph of its decision
 that opens "CI is not yet a merge gate", a role ADR 0021 took over when it superseded
 [ADR 0020](0020-branch-protection-on-main.md) in full, while the rest of 0004's decision stands.
+ADR 0022 is superseded in part as well: [ADR 0024](0024-gsap-loads-on-first-intent.md) replaces the
+clause of its fourth Decision bullet saying `load-gsap.ts` fetches GSAP once the browser is idle
+after hydration, and the rest of 0022's decision stands.
+ADR 0023 is superseded in part too: [ADR 0025](0025-production-alias-noindex.md) replaces the
+sentence of its first Decision bullet saying there is no second `headers()` entry, since a second
+one now sends `X-Robots-Tag: noindex` on the production alias alone, and the six security headers
+and the rest of 0023's decision stand.
 The bodies of 0002, 0004 and 0005 still describe the state on 2026-09-08, when they were accepted.
 A record's decision is never edited afterwards, and its other sections only to correct a claim
 that is untrue, which [ADR 0007](0007-dependency-build-scripts.md) carries an example of.

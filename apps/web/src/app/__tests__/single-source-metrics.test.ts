@@ -103,8 +103,8 @@ describe('metrics and biography live in one place', () => {
       const restated = findLiterals(rendered);
       expect(
         restated.map(describeHit),
-        'about/page.tsx:20 and :26 hard-code 73% and 40%, and the module imports no case-study data ' +
-          'at all, so the About page can contradict /work and the home page without anything failing.',
+        'about/page.tsx hard-codes 40% in its timeline, so the About page can contradict /work and ' +
+          'the home page without anything failing. Its 73% is already read from the study.',
       ).toEqual([]);
 
       // The other half of the same row: the page has to read the figures from somewhere. Forbidding the
