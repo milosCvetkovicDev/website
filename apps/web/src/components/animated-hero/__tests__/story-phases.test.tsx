@@ -1,6 +1,10 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { useLayoutEffect, type ComponentType } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { homePage, storyClosings } from '@/data/pages/home';
 import * as gsapRuntime from '../gsap-runtime';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
 import { requestGsap, runWithGsap, type GsapRuntime } from '../load-gsap';
@@ -654,4 +658,113 @@ describe.each(phases)('$name, its from-states', ({ Phase }) => {
     );
     expect(rightward).toEqual([]);
   });
+});
+
+// #59 AC 10. Each story section closes on a headline and the line under it, and both are read from
+// the home page record, which the page's Markdown twin renders too: what a visitor reads and what the
+// twin carries are one pair of strings. Each pair is found by its place in the markup rather than by
+// its text, so a phase that rendered anything but its record's strings would fail here.
+const closings = [
+  {
+    name: 'DiscoveryPhase',
+    Phase: DiscoveryPhase,
+    module: 'discovery-phase.tsx',
+    closing: storyClosings.discovery,
+    headline: 'h2',
+  },
+  {
+    name: 'StrategyPhase',
+    Phase: StrategyPhase,
+    module: 'strategy-phase.tsx',
+    closing: storyClosings.strategy,
+    headline: 'h2',
+  },
+  {
+    name: 'ExecutionPhase',
+    Phase: ExecutionPhase,
+    module: 'execution-phase.tsx',
+    closing: storyClosings.execution,
+    headline: 'h2',
+  },
+  {
+    name: 'GauntletPhase',
+    Phase: GauntletPhase,
+    module: 'gauntlet-phase.tsx',
+    closing: storyClosings.gauntlet,
+    headline: 'h2',
+  },
+  {
+    name: 'LoopPhase',
+    Phase: LoopPhase,
+    module: 'loop-phase.tsx',
+    closing: storyClosings.loop,
+    headline: 'h2',
+  },
+  // The last section closes inside its terminal, on a paragraph rather than a heading.
+  {
+    name: 'GameComplete',
+    Phase: GameComplete,
+    module: 'game-complete.tsx',
+    closing: storyClosings.complete,
+    headline: 'p.text-xl',
+  },
+];
+
+describe.each(closings)('$name, its closing lines', ({ Phase, module, closing, headline }) => {
+  beforeEach(() => {
+    // Reduced motion builds no scroll animation, and every gated block renders shown: only the
+    // markup is under test here.
+    media.reduce = true;
+  });
+
+  afterEach(() => {
+    cleanup();
+    // Asserted last: a throw here must not skip the cleanup above it.
+    expect(media.listenerCount()).toBe(0);
+  });
+
+  it('renders its headline and the line under it from the home page record', () => {
+    const { container } = render(<Phase />);
+    const headlines = container.querySelectorAll(headline);
+    expect(headlines, `exactly one ${headline} closes the section`).toHaveLength(1);
+    const line = headlines[0].nextElementSibling;
+    expect(line?.tagName, 'the line under the headline').toBe('P');
+
+    expect(headlines[0].textContent).toBe(closing.heading);
+    expect(line?.textContent).toBe(closing.paragraphs[0]);
+  });
+
+  it('does not declare either line itself', () => {
+    // Read as JSX renders it, entities decoded and line breaks collapsed, so a copy written back
+    // into the component is found in any spelling.
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', module), 'utf8')
+      .replaceAll('&apos;', "'")
+      .replaceAll('&quot;', '"')
+      .replace(/\s+/g, ' ');
+    for (const text of [closing.heading, ...closing.paragraphs]) {
+      // A boolean, so a failure names the sentence rather than printing the whole module.
+      expect(source.includes(text), `${module} restates "${text}"`).toBe(false);
+    }
+  });
+});
+
+it('the home page record holds the six closing pairs in the order the story tells them', () => {
+  expect(homePage.sections).toEqual(closings.map(({ closing }) => closing));
+});
+
+it('the home page record imports nothing at runtime, because the client sections import it', () => {
+  // Whatever the record imports ships in the home page's client chunk with it. Type imports are
+  // erased; any other import, re-export or dynamic import is not.
+  const source = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '../../../data/pages/home.ts'),
+    'utf8',
+  );
+  const runtimeImports =
+    source.match(
+      /^(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s*['"][^'"]+['"]|^import\s*['"][^'"]+['"]/gm,
+    ) ?? [];
+  expect(runtimeImports).toEqual([]);
+  expect(source).not.toMatch(/\b(?:import|require)\s*\(/);
+  // And the check reads the module it means to: the type import it does have is there.
+  expect(source).toMatch(/^import type \{[^}]*\} from '\.\/types';$/m);
 });
