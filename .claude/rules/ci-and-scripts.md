@@ -26,8 +26,9 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   those ten plus `docs-drift-workflow.test.mjs`, `ai-refusals.test.mjs`,
   `commitlint-config.test.mjs`, `claude-hooks.test.mjs` (the session hooks in `.claude/hooks`),
   `claude-guards.test.mjs` (the PreToolUse guards in `.claude/settings.json`; it needs `jq` on
-  `PATH` and fails without it, which the CI runner meets with its preinstalled `/usr/bin/jq`) and
-  `claude-md-budget.test.mjs` (the byte budget of `CLAUDE.md` and the `paths` of every rule).
+  `PATH` and fails without it, which the CI runner meets with its preinstalled `/usr/bin/jq`),
+  `claude-md-budget.test.mjs` (the byte budget of `CLAUDE.md` and the `paths` of every rule) and
+  `vitest-coverage-pair.test.mjs` (the lockfile installs `@vitest/*` at vitest's exact version).
   It is a private workspace package, `@repo/scripts`, whose only task is `typecheck` (`tsc -p .`
   against `scripts/tsconfig.json`, which covers the `.mjs` and `.ts` files), so `turbo typecheck`
   type-checks it alongside the apps. It ships no source anyone imports: nothing depends on it, and
@@ -58,6 +59,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `pnpm --filter web test:e2e`                                            | Playwright without going through Turborepo                                                                                                                                           |
 | `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`                       | Playwright on a port other than the default 3210                                                                                                                                     |
 | `pnpm --filter web test:watch`                                          | Vitest in watch mode                                                                                                                                                                 |
+| `pnpm --filter web test:coverage`                                       | Vitest with a v8 coverage text summary; report-only, no threshold, not run in CI                                                                                                     |
 | `pnpm --filter web exec vitest run <path>`                              | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx`                                                                                                              |
 | `pnpm --filter web exec playwright install --with-deps chromium webkit` | Needed once before the first e2e run; the phone projects need webkit                                                                                                                 |
 | `scripts/agent-resume.sh [task-id ...]`                                 | Briefs each `.agent-state/<task-id>.json` checkpoint and checks it against git and gh; exits 1 when one is invalid or cannot be briefed                                              |
