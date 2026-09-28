@@ -70,6 +70,37 @@ Their `node_modules` survive it and have to be deleted by hand before a truly co
 has a `build` task today (`@repo/prettier-config` is config only), so this is currently a no-op. It
 is there so that a future buildable package is compiled before the apps typecheck against it.
 
+The `build` task keys its hash on `"inputs": ["$TURBO_DEFAULT$", ".env*"]` as well as its `env`
+list. `$TURBO_DEFAULT$` is turbo's default input set: the package's files that git does not ignore,
+tracked or untracked (an untracked, unignored file in `apps/web` moves the web#build hash in
+`turbo run build --dry=json`, turbo 2.10.13). A gitignored `apps/web/.env.local` therefore counts
+only through the `.env*` glob: without it, editing that file left the hash unchanged and replayed a
+cached build that baked in the old origin. The glob sits on the shared task, so it also covers the
+playground's Vite build, which reads the same file names, and it is relative to each package, so
+the repository-root `.env.example` is not an input; nothing in the repository loads a root env file
+(Next.js reads them from `apps/web`, Vite from `apps/playground`). It deliberately matches more
+than a build reads (`.env.example`, `.env.test`, an editor backup): an edit to one of those costs a
+rebuild, where a list of names would miss the file a later mode reads and replay a stale build. Only
+`build` carries it: no other cached task's result depends on an env file (the web tests use no
+`import.meta.env`, the only place Vitest puts env-file values).
+
+Its `outputs` exclude `.next/dev/**`: without that, a cached web build also carried whatever
+`next dev` had left in `apps/web/.next/dev`, and a cache hit wrote it back there. On 2026-09-27 the
+manifests of two web#build artifacts in the local cache (`jq` summing `size` under
+`apps/web/.next/dev/` in `.turbo/cache/<hash>-manifest.json`) held 424 MB of `.next/dev` in a
+435 MB artifact built without the exclusion, and none in an 11 MB one built with it. The rest of
+`.next` (`server`, `static`, `types`, `trace`, the manifests) is what `next build` writes, so the
+outputs stay `.next/**` minus two exclusions rather than a list a Next.js upgrade could leave short.
+
+A git worktree shares the main checkout's `.turbo/cache`: with no `cacheDir` in `turbo.json`,
+turbo (2.10.13 here; its `cacheDir` reference documents the behaviour) reads and writes the main
+worktree's cache and restores artifacts without rewriting them. Clearing the cache therefore means
+clearing that one directory, and a `turbo run` in a worktree without `--force` can replay another
+checkout's result, down to the absolute paths that checkout wrote into
+`apps/web/.next/required-server-files.json`. Pass `--force` when the run is evidence. Setting
+`"cacheDir": ".turbo/cache"` would give each worktree its own cache and lose the cross-worktree
+hits; `turbo.json` does not set it.
+
 `pnpm typecheck` stays the plain `turbo typecheck`, and `scripts/` is type-checked as one of its
 tasks: `@repo/scripts` runs `tsc -p .`, which checks every `scripts/**/*.mjs` with `checkJs`, and
 `check-docs-drift.ts` as TypeScript, with `strict` against `scripts/tsconfig.json`. That type-check
@@ -80,6 +111,12 @@ resolves the root's own packages' peer dependencies to: a root `@types/node` wou
 `@types/node` peer root commitlint reaches through `cosmiconfig-typescript-loader`, in place of the
 version pnpm installed for it. The measurement behind the choice is in PR 2's entry in
 `.claude/epics/audit-remediation-2026-09/50.md`.
+
+The root has no `typescript` at all, so `.vscode/settings.json` points `typescript.tsdk` at
+`apps/web/node_modules/typescript/lib`, the shipping app's own compiler (`^6` in its
+`package.json`; 6.0.3 on 2026-09-27, which the playground resolves too). `@repo/scripts` resolves
+5.9.3 from its `^5`, so the editor can report a `scripts/` file differently from `pnpm typecheck`,
+which is the reference there.
 
 ## Quality gates
 
