@@ -11,7 +11,7 @@ import { GauntletPhase } from '../gauntlet-phase';
 import { LoopPhase } from '../loop-phase';
 import { GameComplete } from '../game-complete';
 import { cssTransitions, gsapCssConflicts, tweenedElements } from './gsap-css-conflicts';
-import { pickTween, progressDriver } from './gsap-tweens';
+import { countTweens, pickTween, progressDriver } from './gsap-tweens';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
 // at import time, so the stub must exist before the imports above are evaluated.
@@ -337,7 +337,7 @@ const tweenedTargets = [
   {
     name: 'LoopPhase',
     Phase: LoopPhase,
-    targets: () => [screen.getByText(/^(ERROR DETECTED|RESOLVED)$/).closest('[data-loop-alert]')],
+    targets: () => [screen.getByText(/^(ERROR DETECTED|RESOLVED)$/).closest('[data-loop="alert"]')],
     count: 1,
     tweens: ['opacity', 'transform'],
   },
@@ -512,7 +512,7 @@ describe('ExecutionPhase', () => {
 
     act(() => enterAgain());
 
-    expect(toSpy).toHaveBeenCalledTimes(2);
+    expect(countTweens(toSpy, statsCount), 'one count per entry').toBe(2);
     expect(gsap.getTweensOf(statsTarget)).toHaveLength(0);
   });
 
@@ -526,6 +526,7 @@ describe('ExecutionPhase', () => {
 
     // Entering again restarts the count, which writes its own numbers back over the totals.
     act(() => enterAgain());
+    expect(countTweens(toSpy, statsCount), 'one count per entry').toBe(2);
     const { tween: secondCount } = pickTween(toSpy, statsCount, { latest: true });
     expect(secondCount, 'the re-entry started a count of its own').not.toBe(statsTween);
     act(() => {

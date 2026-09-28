@@ -58,6 +58,8 @@ const STAGE_COUNT = 6;
 // The six stages run back to back with a 0.2s gap; deployment starts once the last one ends.
 const PIPELINE_MS = 5300;
 // LINT, the first stage, runs its progress tween for 0.5 s (`pipelineStages` in gauntlet-phase.tsx).
+// SECURITY runs for 0.5 s too, so this picks LINT only before SECURITY starts, about 3.7 s in: a
+// later pick finds two matches and throws, and { latest: true } would return SECURITY's tween.
 const lintProgress = progressDriver(0.5);
 
 const achievement = () =>

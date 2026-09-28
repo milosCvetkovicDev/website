@@ -254,7 +254,7 @@ export function GauntletPhase() {
           </HudPanel>
         </div>
 
-        {/* Deployment Status. data-gauntlet names the panels GSAP reveals, for the tests. */}
+        {/* Deployment Status. data-gauntlet marks the panels the tests look up. */}
         <div ref={deployRef} data-gauntlet="deploy" className="mt-6">
           {shownDeploymentStatus !== 'idle' && (
             <div
