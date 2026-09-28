@@ -1,4 +1,13 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -333,5 +342,152 @@ describe('env', () => {
   it('inlines an empty string when VERCEL_ENV is unset, which the gate reads as off', async () => {
     vi.stubEnv('VERCEL_ENV', undefined);
     expect((await freshConfig()).env).toEqual({ VERCEL_ENV: '' });
+  });
+});
+
+describe('agent instruction files', () => {
+  // `next dev` writes apps/web/AGENTS.md and apps/web/CLAUDE.md when @vercel/detect-agent finds
+  // an agent shell, and Claude Code then loads the nested CLAUDE.md as project instructions.
+  // Generation is off (ADR 0019).
+  it('disables the agent instruction files Next would write in dev', () => {
+    expect(nextConfig.agentRules).toBe(false);
+  });
+
+  // A pair written before ADR 0019 stays behind, untracked, until someone deletes it. This check
+  // cannot stop a `git add -A` from committing it, but it fails the unit suite, and so CI, on any
+  // branch that tracks either file. Ignoring the pair instead would only hide it: Claude Code
+  // loads an ignored CLAUDE.md all the same.
+  it('tracks neither generated file', () => {
+    let tracked: string;
+    try {
+      tracked = execFileSync('git', ['ls-files', '--', 'AGENTS.md', 'CLAUDE.md'], {
+        cwd: appDir,
+        encoding: 'utf8',
+        timeout: 4000,
+      });
+    } catch (error) {
+      throw new Error(
+        'This check runs `git ls-files` and needs git and a clone of the repository',
+        {
+          cause: error,
+        },
+      );
+    }
+    expect(tracked).toBe('');
+  });
+});
+
+// The value above matters only while the installed Next.js still reads it. A Next.js that
+// dropped the option would fail `pnpm typecheck` on the typed config object, but one that kept
+// the option and stopped passing it to the dev server, or stopped checking it, would not, and
+// generation would resume unnoticed. These read the compiled dev server, in both module formats
+// Next.js ships, to catch that. When one fails after a Next.js bump, find where the new version
+// decides to write the files, check ADR 0019 against it, and then update the patterns.
+describe('the installed Next.js honours agentRules', () => {
+  const nextDir = path.dirname(createRequire(import.meta.url).resolve('next/package.json'));
+  const readNext = (file: string) => {
+    try {
+      return readFileSync(path.join(nextDir, file), 'utf8');
+    } catch (error) {
+      throw new Error(
+        `next/${file} could not be read: find where this Next.js writes AGENTS.md and CLAUDE.md and check ADR 0019 against it`,
+        { cause: error },
+      );
+    }
+  };
+  const serverLibs = ['dist/server/lib', 'dist/esm/server/lib'];
+  // Call sites only: the name followed by `(`, or by `)(` as in the CommonJS build's
+  // `(0, _mod.name)(...)`, and never the function's own declaration.
+  const callSites = (source: string, name: string) => [
+    ...source.matchAll(new RegExp(`(?<!function\\s+)\\b${name}\\)?\\s*\\(`, 'g')),
+  ];
+  // The object literal whose `{` sits at `open`, found by counting braces.
+  const objectLiteral = (source: string, open: number) => {
+    let depth = 0;
+    for (let i = open; i < source.length; i++) {
+      if (source[i] === '{') depth++;
+      else if (source[i] === '}' && --depth === 0) return source.slice(open, i + 1);
+    }
+    return '';
+  };
+
+  it('returns agentRules from the config in the object initialize hands the dev server', () => {
+    for (const lib of serverLibs) {
+      const source = readNext(`${lib}/router-server.js`);
+      const start = source.search(/\basync function initialize\(/);
+      expect(start, lib).toBeGreaterThanOrEqual(0);
+      const rest = source.slice(start + 1);
+      const end = rest.search(/\n(?:export\s+)?(?:async\s+)?function\s/);
+      const body = end < 0 ? rest : rest.slice(0, end);
+      const returned = body.lastIndexOf('return {');
+      expect(returned, lib).toBeGreaterThanOrEqual(0);
+      expect(objectLiteral(body, returned + 'return '.length), lib).toMatch(
+        /\bagentRules:\s*config\.agentRules\b/,
+      );
+    }
+  });
+
+  it('generates the agent files only as the first statement of an agentRules !== false block', () => {
+    for (const lib of serverLibs) {
+      const source = readNext(`${lib}/start-server.js`);
+      // getRequestHandlers hands back what the router server's initialize returns.
+      expect(source, lib).toMatch(
+        /async function getRequestHandlers\([^)]*\)\s*\{\s*return\s+(?:\(0,\s*[\w$]+\.)?initialize\)?\(/,
+      );
+      const calls = callSites(source, 'ensureAgentRulesForDev');
+      expect(calls.length, lib).toBeGreaterThan(0);
+      for (const call of calls) {
+        const guard = source
+          .slice(0, call.index)
+          .match(
+            /if\s*\(\s*([\w$]+)\.agentRules\s*!==\s*false\s*\)\s*\{\s*(?:(?:const|let|var)\s+[\w$]+\s*=\s*)?(?:await\s+)?(?:\(0,\s*[\w$]+\.)?$/,
+          );
+        expect(guard, lib).not.toBeNull();
+        expect(source, lib).toContain(`const ${guard?.[1]} = await getRequestHandlers(`);
+      }
+    }
+  });
+
+  it('writes the files only from ensureAgentRulesForDev', () => {
+    for (const lib of serverLibs) {
+      expect(readNext(`${lib}/app-info-log.js`), lib).toMatch(
+        /async function ensureAgentRulesForDev\([^)]*\)\s*\{[^}]*\bwriteAgentFiles\)?\s*\(/,
+      );
+    }
+  });
+
+  // A second caller anywhere else in Next.js would bypass the gate above. dist/compiled holds
+  // vendored, minified third-party bundles and dist/docs holds Markdown, so neither is read. The
+  // walk reads about 2,700 files, just under a second at a load average of 90, so it takes a
+  // longer timeout than the 5s default rather than failing on a busy machine.
+  it('calls the generator from nowhere else in Next.js', () => {
+    const found: Record<string, number> = {};
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(path.join(nextDir, dir), { withFileTypes: true })) {
+        const file = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+          if (file !== 'dist/compiled' && file !== 'dist/docs') walk(file);
+        } else if (/\.[cm]?js$/.test(entry.name)) {
+          const source = readNext(file);
+          for (const name of ['ensureAgentRulesForDev', 'writeAgentFiles']) {
+            const count = source.includes(name) ? callSites(source, name).length : 0;
+            if (count > 0) found[`${file} ${name}`] = count;
+          }
+        }
+      }
+    };
+    walk('dist');
+    expect(found).toEqual({
+      'dist/esm/server/lib/app-info-log.js writeAgentFiles': 1,
+      'dist/esm/server/lib/start-server.js ensureAgentRulesForDev': 1,
+      'dist/server/lib/app-info-log.js writeAgentFiles': 1,
+      'dist/server/lib/start-server.js ensureAgentRulesForDev': 1,
+    });
+  }, 20_000);
+
+  // The root CLAUDE.md points agents at these docs in place of the generated AGENTS.md.
+  it('ships the version-matched docs the root CLAUDE.md points agents at', () => {
+    expect(statSync(path.join(nextDir, 'dist/docs')).isDirectory()).toBe(true);
+    expect(readNext('dist/docs/01-app/02-guides/ai-agents.md')).toMatch(/\bagentRules: false\b/);
   });
 });

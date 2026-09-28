@@ -44,6 +44,7 @@ perform an operation.
 | 0016 | [Dependabot branches never deploy, and commits that change nothing the site is built from never build](0016-vercel-deployment-budget.md) | Accepted                                      | 2026-09-12 |
 | 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)                                       | Accepted                                      | 2026-09-12 |
 | 0018 | [Dependency update policy](0018-dependency-update-policy.md)                                                                             | Accepted                                      | 2026-09-12 |
+| 0019 | [Next.js does not generate agent instruction files](0019-next-agent-rules-disabled.md)                                                   | Accepted                                      | 2026-09-27 |
 | 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)                                   | Superseded by ADR-0021                        | 2026-09-12 |
 | 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)                   | Accepted                                      | 2026-09-13 |
 | 0022 | [The home page renders no boot loader](0022-no-boot-loader.md)                                                                           | Superseded by ADR-0024                        | 2026-09-23 |

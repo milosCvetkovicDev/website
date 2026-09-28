@@ -5965,6 +5965,168 @@
       }
     },
     {
+      "id": "adr-readme-link-0019-next-agent-rules-disabled",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0019-next-agent-rules-disabled.md)",
+      "claim": "The link to 0019-next-agent-rules-disabled.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0019-next-agent-rules-disabled.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0019-next-agent-rules-disabled.md"
+      }
+    },
+    {
+      "id": "adr-index-0019-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0019 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0019's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0019-next-agent-rules-disabled.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0019-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0019 |",
+      "claim": "The index row for ADR 0019 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0019 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0019-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0019 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0019's record carries the Date \"2026-09-27\".",
+      "check": {
+        "file": "docs/adr/0019-next-agent-rules-disabled.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-27"
+      }
+    },
+    {
+      "id": "adr-index-0019-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0019 |",
+      "claim": "The index row for ADR 0019 gives the record's Date, \"2026-09-27\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0019 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-27"
+      }
+    },
+    {
+      "id": "adr-index-0019-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0019 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0019's record carries the H1 title \"Next.js does not generate agent instruction files\".",
+      "check": {
+        "file": "docs/adr/0019-next-agent-rules-disabled.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Next.js does not generate agent instruction files"
+      }
+    },
+    {
+      "id": "adr-index-0019-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0019 |",
+      "claim": "The index row for ADR 0019 gives the record's H1 title, \"Next.js does not generate agent instruction files\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0019 \\| \\[(.+?)\\]\\(0019-",
+        "equals": "Next.js does not generate agent instruction files"
+      }
+    },
+    {
+      "id": "adr-0019-script-dev",
+      "doc": "docs/adr/0019-next-agent-rules-disabled.md",
+      "anchor": "`pnpm dev",
+      "claim": "`pnpm dev` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "dev"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "dev"
+      }
+    },
+    {
+      "id": "adr-0019-script-format-check",
+      "doc": "docs/adr/0019-next-agent-rules-disabled.md",
+      "anchor": "`pnpm format:check",
+      "claim": "`pnpm format:check` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "format:check"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "format:check"
+      }
+    },
+    {
+      "id": "adr-0019-script-typecheck",
+      "doc": "docs/adr/0019-next-agent-rules-disabled.md",
+      "anchor": "`pnpm typecheck",
+      "claim": "`pnpm typecheck` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "typecheck"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "typecheck"
+      }
+    },
+    {
+      "id": "adr-0019-agent-rules-false",
+      "doc": "docs/adr/0019-next-agent-rules-disabled.md",
+      "anchor": "`apps/web/next.config.ts` sets `agentRules: false`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "next.config.ts sets agentRules to false, so next dev writes no agent instruction files.",
+      "check": {
+        "file": "apps/web/next.config.ts",
+        "regex": "^  agentRules: (.+),$",
+        "equals": "false"
+      }
+    },
+    {
       "id": "adr-index-0020-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0020 |",
