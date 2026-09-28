@@ -6,7 +6,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from 'vitest';
-import { isContentDate } from '@/lib/content-date';
+import { isPublishableContentDate } from '@/lib/content-date';
 import { adjacentCaseStudies, caseStudies, formatMetric } from '../case-studies';
 
 describe('formatMetric', () => {
@@ -60,7 +60,10 @@ describe('caseStudies', () => {
       for (const date of [publishedAt, updatedAt]) {
         expect(date, slug).toMatch(/^\d{4}-\d{2}-\d{2}$/);
         expect(new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10), slug).toBe(date);
-        expect(isContentDate(date, now), `${slug}: ${date} is in the future`).toBe(true);
+        expect(
+          isPublishableContentDate(date, now),
+          `${slug}: ${date} is not a real day on or before today`,
+        ).toBe(true);
       }
       expect(updatedAt >= publishedAt, `${slug}: updatedAt before publishedAt`).toBe(true);
     }

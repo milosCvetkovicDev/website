@@ -47,9 +47,12 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
 A case study's visible `Published` / `Updated` line, its TechArticle's `datePublished` and
 `dateModified`, and its sitemap `lastmod` (from `updatedAt` alone) all read the same fields,
 `publishedAt` and `updatedAt` in `case-studies.ts`: the line is two `<time dateTime>` elements
-holding the stored values, written out by `formatContentDate()` in `src/lib/content-date.ts` from a
+holding the stored values, written out by `formatContentDates()` in `src/lib/content-date.ts` from a
 fixed month table rather than the build machine's locale or zone, and `e2e/seo-surface.spec.ts`
-fails when the served line and the TechArticle disagree.
+fails when the served line and the TechArticle disagree. A date that is not a real day from 2000 on,
+or a pair updated before it was published, throws there and fails the prerender. "Not in the
+future" is a unit-test check against the live clock, not a build check, and it counts a day as
+begun once UTC+14 has reached it: an accepted tolerance of up to 14 hours against the UTC date.
 
 ## Quality gates
 

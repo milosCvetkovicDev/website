@@ -388,84 +388,110 @@ test('the JSON-LD blocks are served and parse, and a case study adds its own two
   }
 });
 
-/** A `<time>` in a served body: its attribute, its text, and the text node just before it. */
-interface ServedTime {
-  label: string | undefined;
+/** A date the served body shows: its `<dt>` label, then the `<time>` in the `<dd>` after it. */
+interface ServedDate {
+  label: string;
   datetime: string;
   text: string;
 }
 
 /**
- * A case study as served: every `<time>` in its body, and its JSON-LD blocks. The body's scripts are
- * dropped before the `<time>` elements are read: the RSC flight payload repeats the dates and both
- * labels, and the JSON-LD's `datePublished` contains one of them, all where no reader sees them, so
- * a substring match would pass on a page that shows no date at all.
+ * A case study as served: how many `<time>` elements its body has, the labelled dates among them,
+ * and its JSON-LD blocks. The body's scripts are dropped before the `<time>` elements are read: the
+ * RSC flight payload repeats the dates and both labels, and the JSON-LD's `datePublished` contains
+ * one of them, all where no reader sees them, so a substring match would pass on a page that shows
+ * no date at all. A label is read by structure, a `<dt>` whose `<dd>` holds the `<time>`, so a
+ * separator or hidden text added next to one reads as a changed line, not as a wrong date.
  */
-async function servedCaseStudy(request: APIRequestContext, slug: string) {
-  const response = await request.get(`/work/${slug}`);
-  expect(response.status(), `/work/${slug} should answer 200`).toBe(200);
+async function servedCaseStudy(request: APIRequestContext, path: string) {
+  const response = await request.get(path);
+  expect(response.status(), `${path} should answer 200`).toBe(200);
   const html = await response.text();
   const jsonLd = [
-    ...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
-  ].map(([, block]) => JSON.parse(block) as Record<string, unknown>);
+    ...html.matchAll(/<script\b[^>]*\btype="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
+  ].map(([, block], index) => {
+    try {
+      return JSON.parse(block) as Record<string, unknown>;
+    } catch (error) {
+      throw new Error(
+        `${path}: JSON-LD block ${index} does not parse (${String(error)}): ${block}`,
+      );
+    }
+  });
   const body = (html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? '').replace(
     /<script\b[^>]*>[\s\S]*?<\/script>/gi,
     '',
   );
-  const times: ServedTime[] = [
-    ...body.matchAll(/<time\b[^>]*\bdatetime="([^"]*)"[^>]*>([^<]*)<\/time>/gi),
-  ].map((match) => {
-    // The label is a whole text node, the last non-blank one before the element, not a substring.
-    const textNodes = [...body.slice(0, match.index).matchAll(/>([^<]*)</g)]
-      .map(([, text]) => text.trim())
-      .filter(Boolean);
-    return { label: textNodes.at(-1), datetime: match[1], text: match[2] };
-  });
-  return { times, jsonLd };
+  const timeCount = body.match(/<time\b/gi)?.length ?? 0;
+  const dates: ServedDate[] = [
+    ...body.matchAll(
+      /<dt\b[^>]*>([^<]*)<\/dt>\s*<dd\b[^>]*>\s*<time\b[^>]*\bdatetime="([^"]*)"[^>]*>([^<]*)<\/time>\s*<\/dd>/gi,
+    ),
+  ].map(([, label, datetime, text]) => ({ label: label.trim(), datetime, text }));
+  return { timeCount, dates, jsonLd };
 }
 
-test('each case study shows its published and updated dates, labelled, as the stored values', async ({
-  request,
-}) => {
-  // #56: Google's publication-dates guidance wants a prominent, labelled date a reader can see, and
-  // one that agrees with the markup. Driven off the data, so a new study is covered without an edit
-  // here. The attribute is the stored value byte for byte; the text is what formatContentDate makes
-  // of it, which src/lib/__tests__/content-date.test.ts pins to the exact string.
-  for (const { slug, publishedAt, updatedAt } of caseStudies) {
-    const { times } = await servedCaseStudy(request, slug);
-    expect(
-      times,
-      `/work/${slug}: exactly two <time> elements, Published then Updated, in the served body`,
-    ).toEqual([
+/**
+ * How an en-GB reader writes a stored day, from `Intl` rather than `formatContentDate`, so the text
+ * the page shows is checked against an oracle that does not share the page's month table. The page
+ * itself must not use `Intl` (it would freeze the build machine's ICU data into the HTML); a test
+ * reading one release's output may.
+ */
+const readerDate = (stored: string) =>
+  new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${stored}T00:00:00Z`));
+
+test('there are case studies for the date rows below to check', () => {
+  // The rows are generated from the data; an emptied or broken import would generate none, and a
+  // run with no rows would pass.
+  expect(caseStudies.length).toBeGreaterThan(0);
+});
+
+// One test per study, so a failure on one page does not hide the next, and one fetch per page.
+for (const { slug, publishedAt, updatedAt } of caseStudies) {
+  const path = `/work/${slug}`;
+
+  test(`${path}: shows its published and updated dates, labelled, and its TechArticle carries the same ones`, async ({
+    request,
+  }) => {
+    const { timeCount, dates, jsonLd } = await servedCaseStudy(request, path);
+
+    // #56: Google's publication-dates guidance wants a prominent, labelled date a reader can see, and
+    // one that agrees with the markup. The attribute is the stored value byte for byte; the text is
+    // what formatContentDate makes of it, and also what an en-GB reader would write.
+    expect.soft(timeCount, `${path}: exactly two <time> elements in the served body`).toBe(2);
+    expect.soft(dates, `${path}: Published then Updated, each a <dt> with its <dd><time>`).toEqual([
       { label: 'Published', datetime: publishedAt, text: formatContentDate(publishedAt) },
       { label: 'Updated', datetime: updatedAt, text: formatContentDate(updatedAt) },
     ]);
-  }
-});
+    for (const { label, datetime, text } of dates) {
+      expect
+        .soft(text, `${path}: the ${label} date as a reader writes it`)
+        .toBe(readerDate(datetime));
+    }
 
-test("each case study's TechArticle carries real dates, and the ones its page shows", async ({
-  request,
-}) => {
-  // #57 AC 4: marked-up dates that differ from the visible ones are a structured-data policy
-  // violation. The visible line and TechArticleJsonLd read the same two fields today; this is what
-  // keeps a later change to either from separating them.
-  for (const { slug } of caseStudies) {
-    const path = `/work/${slug}`;
-    const { times, jsonLd } = await servedCaseStudy(request, slug);
+    // #57 AC 4: marked-up dates that differ from the visible ones are a structured-data policy
+    // violation. The visible line and TechArticleJsonLd read the same two fields today; this is what
+    // keeps a later change to either from separating them.
     const articles = jsonLd.filter((block) => block['@type'] === 'TechArticle');
     expect(articles, `${path}: one TechArticle`).toHaveLength(1);
     const { datePublished, dateModified } = articles[0];
-
+    expect(typeof datePublished, `${path}: datePublished is a string`).toBe('string');
+    expect(typeof dateModified, `${path}: dateModified is a string`).toBe('string');
     expect(datePublished, `${path}: datePublished`).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(dateModified, `${path}: dateModified`).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(
       String(dateModified) >= String(datePublished),
-      `${path}: dateModified ${dateModified} is before datePublished ${datePublished}`,
+      `${path}: dateModified ${String(dateModified)} is before datePublished ${String(datePublished)}`,
     ).toBe(true);
-    const shown = (label: string) => times.find((time) => time.label === label)?.datetime;
+    const shown = (label: string) => dates.find((date) => date.label === label)?.datetime;
     expect(
       { datePublished, dateModified },
       `${path}: the TechArticle's dates must be the ones the page shows`,
     ).toEqual({ datePublished: shown('Published'), dateModified: shown('Updated') });
-  }
-});
+  });
+}
