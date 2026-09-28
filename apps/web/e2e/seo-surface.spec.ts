@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
+import { yearsOfExperience } from '../src/data/profile';
 import {
   CASE_STUDY_ROUTES,
   NOT_FOUND_ROUTE,
@@ -384,4 +385,48 @@ test('the JSON-LD blocks are served and parse, and a case study adds its own two
     const article = blocks[2];
     expect(new URL(String(article.url)).pathname, `${path}: the article's own URL`).toBe(path);
   }
+});
+
+test('the Person schema, the hero and the /about description carry one derived years figure, none of it framed as AI-native (#49)', async ({
+  request,
+}) => {
+  // pages-9 and live-14: the Person schema once put the whole career down as AI-native work, which
+  // the site's own timeline (AI from 2025) and /skills (AI/LLM Integration, 2+) contradict, while
+  // /about said `10+`. The figure now comes from `yearsOfExperience()` in data/profile.ts, so every
+  // surface a crawler reads has to carry that one number. The pages are prerendered, so the figure
+  // is the build's: a build from last year answers one lower, and the fix is to rebuild.
+  const expected = yearsOfExperience();
+
+  const homeHtml = await (await request.get('/')).text();
+  const person = [
+    ...homeHtml.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
+  ]
+    .map(([, body]) => JSON.parse(body) as { '@type': string; description?: string })
+    .find((block) => block['@type'] === 'Person');
+  const about = await fetchHead(request, '/about');
+
+  const surfaces = {
+    'the Person JSON-LD description on /': person?.description ?? '',
+    'the /about meta description': first(about.meta, 'description') ?? '',
+    'the /about og:description': first(about.meta, 'og:description') ?? '',
+    // The player card's XP row, as served: a crawler reads it without running the hero.
+    'the hero XP line on /': homeHtml.match(/>(\d+ years · 6 domains · 3 clouds)</)?.[1] ?? '',
+  };
+
+  const problems: string[] = [];
+  for (const [surface, text] of Object.entries(surfaces)) {
+    const figures = [...text.matchAll(/\b(\d+)\+? years\b/g)].map(([, figure]) => Number(figure));
+    if (figures.length === 0) problems.push(`${surface} states no years figure: "${text}"`);
+    for (const figure of figures) {
+      if (figure !== expected) problems.push(`${surface} says ${figure} years, not ${expected}`);
+    }
+    if (/years of (experience building )?AI-native/i.test(text)) {
+      problems.push(`${surface} presents the career as AI-native work: "${text}"`);
+    }
+    // Nor anything else that ties the total to AI inside the clause that states it.
+    if (/\b\d+\+? years\b[^,.;:]*\bAI\b/i.test(text)) {
+      problems.push(`${surface} ties the years to AI: "${text}"`);
+    }
+  }
+  expect(problems).toEqual([]);
 });

@@ -1,6 +1,8 @@
 // NO 'use client' directive — this is a server component
 // All SEO-critical hero content is rendered as static HTML on the server
 
+import { yearsOfExperience } from '@/data/profile';
+
 const SKILL_TAGS = [
   'TypeScript',
   'React',
@@ -12,12 +14,16 @@ const SKILL_TAGS = [
   'Kubernetes',
 ];
 
-const PLAYER_STATS = [
-  { label: 'PLAYER', value: 'Milos Cvetkovic' },
-  { label: 'CLASS', value: 'Full Stack Engineer & Architect' },
-  { label: 'SPEC', value: 'AI-Native Development' },
-  { label: 'XP', value: '13 years \u00B7 6 domains \u00B7 3 clouds' },
-];
+// The card's rows, built per render: the years come from the profile, and this is a server
+// component, so the figure is the one the page was rendered with (see data/profile.ts).
+function playerStats() {
+  return [
+    { label: 'PLAYER', value: 'Milos Cvetkovic' },
+    { label: 'CLASS', value: 'Full Stack Engineer & Architect' },
+    { label: 'SPEC', value: 'AI-Native Development' },
+    { label: 'XP', value: `${yearsOfExperience()} years \u00B7 6 domains \u00B7 3 clouds` },
+  ];
+}
 
 function PlayerCard() {
   return (
@@ -34,7 +40,7 @@ function PlayerCard() {
 
       {/* Body with stats - semantic definition list */}
       <dl className="px-3 py-[10px]">
-        {PLAYER_STATS.map((stat) => (
+        {playerStats().map((stat) => (
           <div
             key={stat.label}
             className="-mx-1.5 flex items-center justify-between rounded px-1.5 py-[3px] transition-colors hover:bg-[rgba(139,92,246,0.05)] max-sm:grid max-sm:grid-cols-[56px_minmax(0,1fr)] max-sm:items-baseline max-sm:gap-x-3"
