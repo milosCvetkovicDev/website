@@ -167,7 +167,7 @@ export const skillsCopy = {
         { text: 'building constantly', tag: 'strong' },
         '.',
       ],
-      "Every week, I ship something—even if it's small. This portfolio? Built with Next.js 15 features I learned while building it. My self-healing agent? Started as a weekend experiment.",
+      "Every week, I ship something—even if it's small. This portfolio? Built with Next.js features I learned while building it. My self-healing agent? Started as a weekend experiment.",
       "The best engineers I know aren't the ones who memorized every API. They're the ones who can pick up any tool and be productive by lunch.",
     ],
   },
