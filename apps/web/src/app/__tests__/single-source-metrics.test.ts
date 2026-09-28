@@ -32,11 +32,13 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
  * The page records under `src/data/pages`, one module per route, less `types.ts`, which holds no
- * copy. They are read from the directory rather than listed, so a record added later is scanned
- * without anyone remembering to add it here.
+ * copy. They are read from the directory, subfolders included, rather than listed, so a record
+ * added later is scanned without anyone remembering to add it here. A `.tsx` record counts; a
+ * declaration file or a test beside the records does not.
  */
-const PAGE_RECORDS = readdirSync(join(SRC, 'data/pages'))
-  .filter((name) => name.endsWith('.ts') && name !== 'types.ts')
+const PAGE_RECORDS = readdirSync(join(SRC, 'data/pages'), { recursive: true, encoding: 'utf8' })
+  .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts') && name !== 'types.ts')
+  .filter((name) => !/(^|\/)__tests__\/|\.test\./.test(name))
   .sort()
   .map((name) => `data/pages/${name}`);
 
