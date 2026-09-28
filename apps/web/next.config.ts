@@ -153,10 +153,11 @@ const nextConfig: NextConfig = {
   // project instructions. Off, per ADR 0019. The docs the generated file pointed at are still
   // there, version-matched, in apps/web/node_modules/next/dist/docs.
   agentRules: false,
-  // Playwright's local web server sets NEXT_DIST_DIR (apps/web/playwright.config.ts) so that the
-  // `next dev` it starts never shares apps/web/.next with a `pnpm dev` running from this same
-  // checkout: two dev servers writing one build directory race over the manifests and chunks.
-  // Unset everywhere else, CI included, where `next build` and `next start` have to agree on it.
+  // Playwright's web server sets NEXT_DIST_DIR in both modes (apps/web/playwright.config.ts).
+  // Locally it is `.next-e2e`, so that the `next dev` it starts never shares apps/web/.next with a
+  // `pnpm dev` running from this same checkout: two dev servers writing one build directory race
+  // over the manifests and chunks. Under CI it is `.next`, the directory `next build` wrote, so
+  // that `next start` serves that build. Nothing else in the repository sets it.
   // `||`, not `??`: an empty value (an unset variable expanded by a shell) must fall back too.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   // Inlined into client bundles too, where only NEXT_PUBLIC_* reaches otherwise: `global-error.tsx`

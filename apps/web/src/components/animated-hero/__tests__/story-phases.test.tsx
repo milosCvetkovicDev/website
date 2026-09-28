@@ -48,6 +48,19 @@ const media = vi.hoisted(() => {
   return state;
 });
 
+// ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom does
+// not implement: every call builds an Error and prints its stack through the virtual console. A
+// no-op defined once for the file's whole lifetime covers every block, so no block has to know
+// whether the phase it mounts refreshes. vi.restoreAllMocks() does not undo a property definition,
+// so the blocks' own restores leave it in place.
+vi.hoisted(() => {
+  Object.defineProperty(window, 'scrollTo', {
+    configurable: true,
+    writable: true,
+    value: () => {},
+  });
+});
+
 // runWithGsap passes through to the real loader, so a test can hold the builds a mount asks for and
 // run them itself, as GSAP arriving at a moment of its choosing would.
 vi.mock('../load-gsap', async (importOriginal) => {
@@ -175,9 +188,6 @@ describe.each(phases)(
     beforeEach(() => {
       media.reduce = false;
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-      // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom
-      // does not implement.
-      vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -345,9 +355,6 @@ describe.each(tweenedTargets)('$name against CSS', ({ name, Phase, targets, coun
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     // Nothing plays by itself, so no tween completes and leaves GSAP's timeline before it is read.
     gsap.ticker.remove(gsap.updateRoot);
-    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom does
-    // not implement.
-    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -412,7 +419,6 @@ describe.each(phases)('$name, built with its section already in view', ({ Phase 
   beforeEach(() => {
     media.reduce = false;
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
     // jsdom lays nothing out: scrolled two screens down, with every box's top on screen.
     scrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 2400 });
@@ -459,10 +465,6 @@ describe.each(phases)('$name, built with its section already in view', ({ Phase 
 describe('ExecutionPhase', () => {
   beforeEach(() => {
     media.reduce = false;
-    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom
-    // does not implement: every call builds an Error, captures a stack and prints it through the
-    // virtual console. A no-op is what ScrollTrigger already gets, without the noise.
-    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -619,9 +621,6 @@ describe.each(phases)('$name, its from-states', ({ Phase }) => {
   beforeEach(() => {
     media.reduce = false;
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    // ScrollTrigger.refresh() restores the scroll position through window.scrollTo, which jsdom does
-    // not implement.
-    vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
   });
 
   afterEach(() => {

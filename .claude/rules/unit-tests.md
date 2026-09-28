@@ -18,9 +18,17 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 - Browser APIs are stubbed per test file, not globally. `matchMedia` and `IntersectionObserver` are
   defined in a `beforeEach` inside the file that needs them, as in
   `src/components/animated-hero/__tests__/tmux-background.test.tsx`. Keep new stubs local too.
+- jsdom does not implement `window.scrollTo`, and `ScrollTrigger.refresh()` calls it: each call
+  prints `Not implemented: Window's scrollTo() method` into the run's output. A file whose mounts
+  refresh ScrollTrigger defines a no-op in `vi.hoisted` for its whole lifetime, as
+  `gauntlet-phase.test.tsx` and `story-phases.test.tsx` in `src/components/animated-hero/__tests__`
+  do; `vi.restoreAllMocks()` leaves a property definition in place. The definition stays inside
+  the file only because Vitest gives every test file its own environment (`isolate`, on by default
+  and not changed in `vitest.config.ts`). A file that asserts on the calls spies on it per test
+  instead, as `section-progress.test.tsx` does.
 - Building a jsdom window costs about two seconds in every worker, and it is by far the largest
   single cost in the suite. A test file with no DOM in it declares `@vitest-environment node` in a
-  docblock at the top, as the three `src/data/__tests__` files do.
+  docblock at the top, as the `src/data/__tests__` files and the config tests in `src/test` do.
 - Two query patterns dominate a slow test file, and a CPU profile says which. `getByRole` with a
   `name` option recomputes the accessible name of every candidate on every call, so resolve an
   element once and reuse it unless the accessible name is what the test is asserting. And every
