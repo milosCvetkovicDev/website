@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import {
   CASE_STUDY_ROUTES,
   NOT_FOUND_ROUTE,
@@ -397,19 +397,47 @@ interface ServedDate {
 
 /**
  * A case study as served: how many `<time>` elements its body has, the labelled dates among them,
- * and its JSON-LD blocks. The body's scripts are dropped before the `<time>` elements are read: the
- * RSC flight payload repeats the dates and both labels, and the JSON-LD's `datePublished` contains
- * one of them, all where no reader sees them, so a substring match would pass on a page that shows
- * no date at all. A label is read by structure, a `<dt>` whose `<dd>` holds the `<time>`, so a
- * separator or hidden text added next to one reads as a changed line, not as a wrong date.
+ * and its JSON-LD blocks. The browser's `DOMParser` reads the response, as `served-html.spec.ts` and
+ * `hydration-marker.spec.ts` do, and not a regular expression: the RSC flight payload repeats the
+ * dates and both labels, and the JSON-LD's `datePublished` contains one of them, all inside scripts
+ * where no reader sees them. Parsed, a script's text is never an element, so only real `<time>`
+ * elements count, and a document made by `DOMParser` runs none of its scripts. A label is read by
+ * structure, a `<dt>` whose next sibling is a `<dd>` holding only the `<time>`, so a separator or
+ * hidden text added next to one reads as a changed line, not as a wrong date.
  */
-async function servedCaseStudy(request: APIRequestContext, path: string) {
+async function servedCaseStudy(request: APIRequestContext, page: Page, path: string) {
   const response = await request.get(path);
   expect(response.status(), `${path} should answer 200`).toBe(200);
-  const html = await response.text();
-  const jsonLd = [
-    ...html.matchAll(/<script\b[^>]*\btype="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
-  ].map(([, block], index) => {
+  const { timeCount, dates, jsonLdSources } = await page.evaluate(
+    (markup) => {
+      const doc = new DOMParser().parseFromString(markup, 'text/html');
+      const labelled: ServedDate[] = [];
+      for (const dt of doc.body.querySelectorAll('dt')) {
+        const dd = dt.nextElementSibling;
+        const time = dd?.firstElementChild;
+        if (dt.children.length > 0 || dd?.localName !== 'dd' || time?.localName !== 'time')
+          continue;
+        const onlyTheTime = [...dd.childNodes].every(
+          (node) => node === time || (node instanceof Text && node.data.trim() === ''),
+        );
+        if (!onlyTheTime || time.children.length > 0) continue;
+        labelled.push({
+          label: (dt.textContent ?? '').trim(),
+          datetime: time.getAttribute('datetime') ?? '',
+          text: time.textContent ?? '',
+        });
+      }
+      return {
+        timeCount: doc.body.querySelectorAll('time').length,
+        dates: labelled,
+        jsonLdSources: [...doc.querySelectorAll('script[type="application/ld+json"]')].map(
+          (script) => script.textContent ?? '',
+        ),
+      };
+    },
+    await response.text(),
+  );
+  const jsonLd = jsonLdSources.map((block, index) => {
     try {
       return JSON.parse(block) as Record<string, unknown>;
     } catch (error) {
@@ -418,16 +446,6 @@ async function servedCaseStudy(request: APIRequestContext, path: string) {
       );
     }
   });
-  const body = (html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? '').replace(
-    /<script\b[^>]*>[\s\S]*?<\/script>/gi,
-    '',
-  );
-  const timeCount = body.match(/<time\b/gi)?.length ?? 0;
-  const dates: ServedDate[] = [
-    ...body.matchAll(
-      /<dt\b[^>]*>([^<]*)<\/dt>\s*<dd\b[^>]*>\s*<time\b[^>]*\bdatetime="([^"]*)"[^>]*>([^<]*)<\/time>\s*<\/dd>/gi,
-    ),
-  ].map(([, label, datetime, text]) => ({ label: label.trim(), datetime, text }));
   return { timeCount, dates, jsonLd };
 }
 
@@ -456,9 +474,10 @@ for (const { slug, publishedAt, updatedAt } of caseStudies) {
   const path = `/work/${slug}`;
 
   test(`${path}: shows its published and updated dates, labelled, and its TechArticle carries the same ones`, async ({
+    page,
     request,
   }) => {
-    const { timeCount, dates, jsonLd } = await servedCaseStudy(request, path);
+    const { timeCount, dates, jsonLd } = await servedCaseStudy(request, page, path);
 
     // #56: Google's publication-dates guidance wants a prominent, labelled date a reader can see, and
     // one that agrees with the markup. The attribute is the stored value byte for byte; the text is
