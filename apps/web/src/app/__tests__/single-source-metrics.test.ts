@@ -66,6 +66,9 @@ const COPY_MODULES = [
   ...PAGE_RECORDS,
 ];
 
+/** The About page and the record that holds its copy, one of which quotes the case studies. */
+const ABOUT_COPY = ['app/about/page.tsx', 'data/pages/about.ts'];
+
 interface Hit {
   file: string;
   line: number;
@@ -120,16 +123,17 @@ describe('metrics and biography live in one place', () => {
       const restated = findLiterals(rendered);
       expect(
         restated.map(describeHit),
-        'about/page.tsx hard-codes 40% in its timeline, so the About page can contradict /work and ' +
-          'the home page without anything failing. Its 73% is already read from the study.',
+        'the About timeline (data/pages/about.ts) hard-codes 40%, so the About page can contradict ' +
+          '/work and the home page without anything failing. Its 73% is already read from the study.',
       ).toEqual([]);
 
-      // The other half of the same row: the page has to read the figures from somewhere. Forbidding the
-      // literal without requiring the import would be satisfied by deleting the sentence.
-      const about = readFileSync(join(SRC, 'app/about/page.tsx'), 'utf8');
+      // The other half of the same row: the About copy has to read the figures from somewhere.
+      // Forbidding the literal without requiring the import would be satisfied by deleting the
+      // sentence. #59 moved the copy from the page into its record, so either module may hold it.
+      const about = ABOUT_COPY.map((file) => readFileSync(join(SRC, file), 'utf8')).join('\n');
       expect(
         about,
-        'the About page must import the case-study data it quotes figures from',
+        `the About copy (${ABOUT_COPY.join(' or ')}) must import the case-study data it quotes figures from`,
       ).toMatch(/from '@\/data\/case-studies'/);
     },
   );
@@ -138,9 +142,10 @@ describe('metrics and biography live in one place', () => {
     'R34 (#49): no page, layout or JSON-LD module hard-codes a years-of-experience figure',
     () => {
       // Two numbers ship today for one fact: `13 years` in json-ld.tsx and hero-content.tsx, and
-      // `10+` in about/page.tsx, in its description and its "Years shipping code" stat; /skills adds
-      // its own `2+` for AI. #48 took the figure out of the page descriptions and deleted
-      // skills/layout.tsx, which leaves four hits. Whichever figure is right, it cannot be two.
+      // `10+` in the About record (data/pages/about.ts), in its description and its "Years shipping
+      // code" stat; /skills adds its own `2+` for AI. #48 took the figure out of the page
+      // descriptions and deleted skills/layout.tsx, which leaves four hits. Whichever figure is
+      // right, it cannot be two.
       const yearPatterns = [
         /\b\d{1,2}\+? years\b/,
         /\b\d{1,2}\+? yrs\b/,
