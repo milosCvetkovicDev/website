@@ -5,8 +5,8 @@
 #     6e0a87a reports "Found .vercelignore (repository root)" and "Removed 2 ignored files defined
 #     in .vercelignore /.vscode/extensions.json /.vscode/settings.json".
 # The CLI's built-in list covers node_modules, .next, .git, .env.local, .env.*.local, .DS_Store,
-# npm-debug.log and a few more, so everything else that the root .gitignore and the two
-# apps/*/.gitignore files exclude is repeated below. .turbo matters most: its cache tarballs exceed
+# npm-debug.log and a few more, so everything else that the root .gitignore and
+# apps/web/.gitignore exclude is repeated below. .turbo matters most: its cache tarballs exceed
 # Vercel's 100 MB per-file upload limit, and the first Path B attempt failed on 1.9 GB of it.
 #
 # Syntax is .gitignore's, so a leading slash anchors a pattern to the repository root. Every
@@ -19,7 +19,6 @@
 # Turborepo caches: one at the root, one per workspace package that runs a task.
 /.turbo
 /apps/web/.turbo
-/apps/playground/.turbo
 /scripts/.turbo
 /.pnpm-store
 
@@ -27,7 +26,6 @@
 /apps/web/.next-e2e
 /apps/web/out
 /apps/web/build
-/apps/playground/dist
 /build
 /out
 /dist

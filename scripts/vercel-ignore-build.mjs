@@ -48,9 +48,7 @@ export const BUILD_EXIT_CODE = 1;
  * single byte Vercel serves, so building it spends a deployment on an identical output.
  *
  * This list is the policy. ADR 0016 points at it rather than restating it, so there is one place to
- * change when the build inputs change. `apps/playground` is absent on purpose: it is a local Vite
- * sandbox with no Vercel project (ADR 0005), and a change to its own files cannot reach `apps/web`.
- * A change to its dependencies does reach `pnpm-lock.yaml`, which is listed.
+ * change when the build inputs change.
  */
 export const BUILD_INPUT_DIRECTORIES = ['apps/web/', 'packages/'];
 export const BUILD_INPUT_FILES = [

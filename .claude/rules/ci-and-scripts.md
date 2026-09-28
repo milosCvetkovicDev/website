@@ -40,11 +40,10 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `pnpm dev`                                                              | `turbo dev` across every app                                                                                                                                                         |
 | `pnpm dev:web`                                                          | Next.js dev server on port 3000                                                                                                                                                      |
-| `pnpm dev:playground`                                                   | Vite dev server for the sandbox                                                                                                                                                      |
-| `pnpm build`                                                            | `next build` (web) and `tsc -b && vite build` (playground)                                                                                                                           |
+| `pnpm build`                                                            | `next build` (web)                                                                                                                                                                   |
 | `pnpm lint`                                                             | ESLint in each app with `--max-warnings 0`                                                                                                                                           |
 | `pnpm lint:fix`                                                         | `eslint --fix` in each app, without `--max-warnings 0`                                                                                                                               |
-| `pnpm typecheck`                                                        | `turbo typecheck`: `next typegen && tsc --noEmit` (web), `tsc -b` (playground), `tsc -p .` (scripts)                                                                                 |
+| `pnpm typecheck`                                                        | `turbo typecheck`: `next typegen && tsc --noEmit` (web), `tsc -p .` (scripts)                                                                                                        |
 | `pnpm test`                                                             | Vitest unit tests (web only)                                                                                                                                                         |
 | `pnpm test:e2e`                                                         | Playwright specs in `apps/web/e2e`; `turbo.json` gives it `dependsOn: ["build"]`, so the root script builds `web` first. Prefer `pnpm --filter web test:e2e` locally, which does not |
 | `pnpm test:e2e:sweep e2e/<spec> [runs] [out-dir]`                       | Runs one spec file N times (10 by default) and summarises every test's outcomes and durations; see `scripts/flake-sweep.sh`                                                          |
@@ -54,7 +53,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `pnpm check:docs-drift`                                                 | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                  |
 | `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/`                                                                                                                                            |
 | `scripts/flake-hunt.sh [runs]`                                          | Runs the whole e2e suite N times (30 by default) and ranks specs by failure rate in `flake-hunt/flake-report.json`                                                                   |
-| `pnpm clean`                                                            | `turbo clean` in both apps, then `rm -rf node_modules` at the root                                                                                                                   |
+| `pnpm clean`                                                            | `turbo clean` in `apps/web`, then `rm -rf node_modules` at the root                                                                                                                  |
 | `pnpm prepare`                                                          | `husky`; runs on install and is what creates the git hooks                                                                                                                           |
 | `pnpm --filter web test:e2e`                                            | Playwright without going through Turborepo                                                                                                                                           |
 | `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`                       | Playwright on a port other than the default 3210                                                                                                                                     |
@@ -65,7 +64,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `scripts/agent-resume.sh [task-id ...]`                                 | Briefs each `.agent-state/<task-id>.json` checkpoint and checks it against git and gh; exits 1 when one is invalid or cannot be briefed                                              |
 | `scripts/verify-flake.sh <runs> e2e/<spec>`                             | Runs one spec N times into `.verify` with pass rate and p50/p95; exits 0 all passed, 1 any failed, 2 usage, tool or lock error or unmeasured run, 130/129/143 on INT/HUP/TERM        |
 
-`pnpm clean` only reaches the two apps, because `packages/*` and `scripts` define no `clean` task.
+`pnpm clean` only reaches `apps/web`, because `packages/*` and `scripts` define no `clean` task.
 Their `node_modules` survive it and have to be deleted by hand before a truly cold reinstall.
 
 `typecheck` and `test` declare `dependsOn: ["^build"]` in `turbo.json`. Nothing an app depends on
@@ -77,14 +76,13 @@ list. `$TURBO_DEFAULT$` is turbo's default input set: the package's files that g
 tracked or untracked (an untracked, unignored file in `apps/web` moves the web#build hash in
 `turbo run build --dry=json`, turbo 2.10.13). A gitignored `apps/web/.env.local` therefore counts
 only through the `.env*` glob: without it, editing that file left the hash unchanged and replayed a
-cached build that baked in the old origin. The glob sits on the shared task, so it also covers the
-playground's Vite build, which reads the same file names, and it is relative to each package, so
-the repository-root `.env.example` is not an input; nothing in the repository loads a root env file
-(Next.js reads them from `apps/web`, Vite from `apps/playground`). It deliberately matches more
-than a build reads (`.env.example`, `.env.test`, an editor backup): an edit to one of those costs a
-rebuild, where a list of names would miss the file a later mode reads and replay a stale build. Only
-`build` carries it: no other cached task's result depends on an env file (the web tests use no
-`import.meta.env`, the only place Vitest puts env-file values).
+cached build that baked in the old origin. The glob is relative to each package, so the
+repository-root `.env.example` is not an input; nothing in the repository loads a root env file
+(Next.js reads them from `apps/web`). It deliberately matches more than a build reads
+(`.env.example`, `.env.test`, an editor backup): an edit to one of those costs a rebuild, where a
+list of names would miss the file a later mode reads and replay a stale build. Only `build` carries
+it: no other cached task's result depends on an env file (the web tests use no `import.meta.env`,
+the only place Vitest puts env-file values).
 
 Its `outputs` exclude `.next/dev/**`: without that, a cached web build also carried whatever
 `next dev` had left in `apps/web/.next/dev`, and a cache hit wrote it back there. On 2026-09-27 the
@@ -116,9 +114,8 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 
 The root has no `typescript` at all, so `.vscode/settings.json` points `typescript.tsdk` at
 `apps/web/node_modules/typescript/lib`, the shipping app's own compiler (`^6` in its
-`package.json`; 6.0.3 on 2026-09-27, which the playground resolves too). `@repo/scripts` resolves
-5.9.3 from its `^5`, so the editor can report a `scripts/` file differently from `pnpm typecheck`,
-which is the reference there.
+`package.json`; 6.0.3 on 2026-09-27). `@repo/scripts` resolves 5.9.3 from its `^5`, so the editor
+can report a `scripts/` file differently from `pnpm typecheck`, which is the reference there.
 
 ## Quality gates
 

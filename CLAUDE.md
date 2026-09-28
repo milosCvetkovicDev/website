@@ -42,15 +42,13 @@ from `.nvmrc` and pnpm from `packageManager`; how the `engines.node` range is de
 
 - `apps/web` — the site. Next.js 16 (App Router), React 19, Tailwind v4, GSAP.
   Source in `src/{app,components,data,hooks,lib,test}`, e2e specs in `e2e/`.
-- `apps/playground` — Vite 7 + React sandbox. Not deployed, no tests.
 - `packages/prettier-config` — `@repo/prettier-config`. Referenced by `prettier.config.mjs` at the
   repo root and by `apps/web/prettier.config.mjs`, which adds
   `tailwindStylesheet: './src/app/globals.css'` so the class sorter sees the theme.
 - `scripts/` — the gates that run outside the apps and their `node:test` suites
   (`pnpm test:scripts`): a private `@repo/scripts` package that `turbo typecheck` type-checks.
-- `packages/eslint-config` and `packages/typescript-config` exist but no app references them yet.
-  `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next`, and each app
-  has its own `tsconfig.json`.
+- `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next` and has its
+  own `tsconfig.json`; there is no shared ESLint or TypeScript config package (ADR 0018).
 
 ## Routes (App Router)
 
@@ -64,8 +62,8 @@ means widening `contentSecurityPolicy()` and its test; see `deploy-and-next-conf
 
 ## Commands
 
-- `pnpm dev` (`turbo dev`, every app), `pnpm dev:web` (Next.js on port 3000), `pnpm dev:playground`
-- `pnpm build`: `next build` (web) and `tsc -b && vite build` (playground)
+- `pnpm dev` (`turbo dev`), `pnpm dev:web` (Next.js on port 3000)
+- `pnpm build`: `next build` (web)
 - `pnpm lint` (ESLint, `--max-warnings 0`), `pnpm lint:fix`, `pnpm typecheck` (`turbo typecheck`)
 - `pnpm test` (Vitest, web only); one file: `pnpm --filter web exec vitest run <path>`; watch:
   `pnpm --filter web test:watch`
@@ -79,7 +77,7 @@ means widening `contentSecurityPolicy()` and its test; see `deploy-and-next-conf
 - `pnpm test:scripts` (`node:test` for `scripts/`), `pnpm check:allowbuilds`, `pnpm check:docs-drift`
   (exit 1 on drift, 2 when a check could not run)
 - `scripts/agent-resume.sh [task-id ...]`: briefs the `.agent-state` checkpoints against git and gh
-- `pnpm clean` (`turbo clean` in both apps, then the root `node_modules`), `pnpm prepare` (`husky`)
+- `pnpm clean` (`turbo clean` in `apps/web`, then the root `node_modules`), `pnpm prepare` (`husky`)
 
 `pnpm lint:fix` drops `--max-warnings 0`, so it exits 0 on warnings that `pnpm lint` and CI fail on.
 Always finish with `pnpm lint`.
@@ -94,7 +92,7 @@ Always finish with `pnpm lint`.
   and `Commit messages`; renaming one of those jobs strands its required check (ADR 0021).
 - Pull request titles are linted as the squash commit, with GitHub's ` (#NN)` suffix and without
   commitlint's default ignores, so keep them conventional and short.
-- Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.
+- Warnings are errors. Lint runs with `--max-warnings 0` in `apps/web`, so a warning fails CI.
 - Every route must load with a clean browser console and pass axe in both colour schemes
   (`e2e/console-clean.spec.ts`, `e2e/accessibility.spec.ts`); never widen a budget or lower a floor
   to quieten a failure.
@@ -213,9 +211,6 @@ Always finish with `pnpm lint`.
   entry in `pnpm-workspace.yaml`.
 - If `pnpm typecheck` disagrees with CI about a route another branch added, renamed or removed,
   `apps/web/.next-e2e` is stale: `pnpm --filter web clean`.
-- `apps/web/README.md` is untouched `create-next-app` boilerplate: it says `npm run dev` and
-  `app/page.tsx`, both wrong here. Ignore it. The root `README.md` and this file are the
-  authoritative documents.
 - `next dev` writes no agent files (`agentRules: false`, ADR 0019): delete a stray
   `apps/web/AGENTS.md` or `apps/web/CLAUDE.md` (never the root `CLAUDE.md`), never commit it.
   Version-matched Next.js docs are in `apps/web/node_modules/next/dist/docs`.
