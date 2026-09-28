@@ -48,7 +48,10 @@ export const BUILD_EXIT_CODE = 1;
  * single byte Vercel serves, so building it spends a deployment on an identical output.
  *
  * This list is the policy. ADR 0016 points at it rather than restating it, so there is one place to
- * change when the build inputs change.
+ * change when the build inputs change. `apps/web/` is listed rather than `apps/`, because `apps/web`
+ * is the only app Vercel builds: add a directory here if it ever reads from another. `packages/` is
+ * listed whole, although its one package, `@repo/prettier-config`, cannot change the served bytes, so
+ * that a package added later counts as a build input until someone decides otherwise.
  */
 export const BUILD_INPUT_DIRECTORIES = ['apps/web/', 'packages/'];
 export const BUILD_INPUT_FILES = [

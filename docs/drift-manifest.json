@@ -619,6 +619,66 @@
       }
     },
     {
+      "id": "adr-0002-playground-retired",
+      "doc": "docs/adr/0002-monorepo-toolchain.md",
+      "anchor": "It also retired `apps/playground`",
+      "method": "file-line",
+      "evaluation": "live",
+      "claim": "apps/playground no longer exists.",
+      "check": {
+        "path": "apps/playground/package.json",
+        "exists": false
+      }
+    },
+    {
+      "id": "adr-0002-eslint-config-deleted",
+      "doc": "docs/adr/0002-monorepo-toolchain.md",
+      "anchor": "deleted `@repo/eslint-config` and `@repo/typescript-config`",
+      "method": "file-line",
+      "evaluation": "live",
+      "claim": "packages/eslint-config no longer exists.",
+      "check": {
+        "path": "packages/eslint-config/package.json",
+        "exists": false
+      }
+    },
+    {
+      "id": "adr-0002-typescript-config-deleted",
+      "doc": "docs/adr/0002-monorepo-toolchain.md",
+      "anchor": "deleted `@repo/eslint-config` and `@repo/typescript-config`",
+      "method": "file-line",
+      "evaluation": "live",
+      "claim": "packages/typescript-config no longer exists.",
+      "check": {
+        "path": "packages/typescript-config/package.json",
+        "exists": false
+      }
+    },
+    {
+      "id": "adr-0002-no-dev-playground-script",
+      "doc": "docs/adr/0002-monorepo-toolchain.md",
+      "anchor": "`dev:playground` as a filtered `dev`",
+      "method": "file-line",
+      "evaluation": "live",
+      "claim": "The root package.json has no dev:playground script.",
+      "check": {
+        "path": "package.json",
+        "absent": "dev:playground"
+      }
+    },
+    {
+      "id": "adr-0003-playground-retired",
+      "doc": "docs/adr/0003-formatting-and-linting-standards.md",
+      "anchor": "which ADR 0018 retired",
+      "method": "file-line",
+      "evaluation": "live",
+      "claim": "apps/playground no longer exists.",
+      "check": {
+        "path": "apps/playground/package.json",
+        "exists": false
+      }
+    },
+    {
       "id": "adr-0004-link-0021-squash-only-merges-and-required-checks",
       "doc": "docs/adr/0004-ci-pipeline-and-quality-gates.md",
       "anchor": "](0021-squash-only-merges-and-required-checks.md)",
@@ -8289,6 +8349,42 @@
         "file": "docs/plans/README.md",
         "regex": "^\\| \\[2026\\-01\\-27\\-monorepo\\-design\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
         "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-index-2026-01-27-monorepo-design-eslint-config-deleted",
+      "doc": "docs/plans/README.md",
+      "anchor": "were deleted under ADR 0018",
+      "method": "file-line",
+      "evaluation": "live",
+      "claim": "packages/eslint-config no longer exists.",
+      "check": {
+        "path": "packages/eslint-config/package.json",
+        "exists": false
+      }
+    },
+    {
+      "id": "plans-index-2026-01-27-monorepo-design-typescript-config-deleted",
+      "doc": "docs/plans/README.md",
+      "anchor": "were deleted under ADR 0018",
+      "method": "file-line",
+      "evaluation": "live",
+      "claim": "packages/typescript-config no longer exists.",
+      "check": {
+        "path": "packages/typescript-config/package.json",
+        "exists": false
+      }
+    },
+    {
+      "id": "plans-index-2026-01-27-monorepo-design-playground-retired",
+      "doc": "docs/plans/README.md",
+      "anchor": "the playground was never deployed and was retired under ADR 0018",
+      "method": "file-line",
+      "evaluation": "live",
+      "claim": "apps/playground no longer exists.",
+      "check": {
+        "path": "apps/playground/package.json",
+        "exists": false
       }
     },
     {

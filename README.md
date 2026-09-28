@@ -65,7 +65,7 @@ CI runs on every pull request and every push to `main` (`.github/workflows/ci.ym
 | `pnpm check:allowbuilds`          | `allowBuilds` entries against the versions the lockfile resolves                                                                    | -                  | yes |
 | `pnpm test:scripts`               | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step, commitlint configs, web server log, flake hunt | -                  | yes |
 | `pnpm format:check`               | Prettier, shared config, Tailwind class order                                                                                       | yes (staged files) | yes |
-| `pnpm lint`                       | ESLint with `--max-warnings 0` in every app                                                                                         | yes (staged files) | yes |
+| `pnpm lint`                       | ESLint with `--max-warnings 0` in `apps/web`                                                                                        | yes (staged files) | yes |
 | commitlint                        | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...); in CI, the PR title and every commit                            | yes                | yes |
 | `pnpm typecheck`                  | `next typegen && tsc --noEmit` (web), strict `checkJs` over `scripts/`                                                              | -                  | yes |
 | `pnpm test`                       | Vitest unit tests                                                                                                                   | -                  | yes |

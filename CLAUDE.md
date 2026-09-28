@@ -47,8 +47,9 @@ from `.nvmrc` and pnpm from `packageManager`; how the `engines.node` range is de
   `tailwindStylesheet: './src/app/globals.css'` so the class sorter sees the theme.
 - `scripts/` — the gates that run outside the apps and their `node:test` suites
   (`pnpm test:scripts`): a private `@repo/scripts` package that `turbo typecheck` type-checks.
-- `apps/web` lints through its own `eslint.config.mjs` built on `eslint-config-next` and has its
-  own `tsconfig.json`; there is no shared ESLint or TypeScript config package (ADR 0018).
+
+There is no shared ESLint or TypeScript config package (ADR 0018): `apps/web` lints through its own
+`eslint.config.mjs` built on `eslint-config-next` and has its own `tsconfig.json`.
 
 ## Routes (App Router)
 

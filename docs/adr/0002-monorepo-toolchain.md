@@ -8,8 +8,9 @@ Superseded by ADR-0018 (corrected 2026-09-13)
 `22.x` as the tightening of `engines.node`. It also retired `apps/playground` and deleted
 `@repo/eslint-config` and `@repo/typescript-config`, so the Context's sentence on five workspaces
 no longer holds and the decision's playground rules no longer apply: `dev:playground` as a filtered
-`dev`, the scripts said to exist in both apps, and the playground's `tsc -b` typecheck. The rest of
-this record still stands, read with the corrections recorded at the end of it.
+`dev`; `dev`, `build`, `lint`, `lint:fix`, `typecheck` and `clean` existing in both apps; and the
+playground's `tsc -b` typecheck. The rest of this record still stands, read with the corrections
+recorded at the end of it.
 
 ## Date
 

@@ -21,6 +21,10 @@
 /apps/web/.turbo
 /scripts/.turbo
 /.pnpm-store
+# apps/playground was retired under ADR 0018, but a checkout made before that still holds its
+# untracked, gitignored cache and build output after pulling, and the CLI would upload both.
+/apps/playground/.turbo
+/apps/playground/dist
 
 # Build output. .next is on the CLI's built-in list; .next-e2e is the local e2e dist dir (ADR 0014).
 /apps/web/.next-e2e
