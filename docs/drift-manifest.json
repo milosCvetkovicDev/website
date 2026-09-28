@@ -1402,6 +1402,36 @@
       }
     },
     {
+      "id": "adr-0013-link-0027-vite-8-in-apps-web",
+      "doc": "docs/adr/0013-dependency-build-scripts-reviewed.md",
+      "anchor": "](0027-vite-8-in-apps-web.md)",
+      "claim": "The link to 0027-vite-8-in-apps-web.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0027-vite-8-in-apps-web.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0027-vite-8-in-apps-web.md"
+      }
+    },
+    {
+      "id": "adr-0013-pointer-allowbuilds-one-entry",
+      "doc": "docs/adr/0013-dependency-build-scripts-reviewed.md",
+      "anchor": "keeps one entry, unrs-resolver",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "allowBuilds denies unrs-resolver and nothing else, as the pointer under the status says.",
+      "check": {
+        "file": "pnpm-workspace.yaml",
+        "regex": "^  ([\\w@/.-]+): (?:true|false)$",
+        "equalsAll": ["unrs-resolver"]
+      }
+    },
+    {
       "id": "adr-0013-script-check-allowbuilds",
       "doc": "docs/adr/0013-dependency-build-scripts-reviewed.md",
       "anchor": "`pnpm check:allowbuilds",
@@ -5561,24 +5591,24 @@
       "anchor": "| 0013 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0013's record carries the status line \"Accepted\".",
+      "claim": "ADR 0013's record carries the status line \"Superseded by ADR-0027\".",
       "check": {
         "file": "docs/adr/0013-dependency-build-scripts-reviewed.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0027"
       }
     },
     {
       "id": "adr-index-0013-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0013 |",
-      "claim": "The index row for ADR 0013 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0013 gives the record's status line, \"Superseded by ADR-0027\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0013 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0027"
       }
     },
     {
@@ -6773,6 +6803,234 @@
       }
     },
     {
+      "id": "adr-readme-link-0027-vite-8-in-apps-web",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0027-vite-8-in-apps-web.md)",
+      "claim": "The link to 0027-vite-8-in-apps-web.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0027-vite-8-in-apps-web.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0027-vite-8-in-apps-web.md"
+      }
+    },
+    {
+      "id": "adr-index-0027-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0027 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0027's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0027-vite-8-in-apps-web.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0027-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0027 |",
+      "claim": "The index row for ADR 0027 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0027 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0027-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0027 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0027's record carries the Date \"2026-09-28\".",
+      "check": {
+        "file": "docs/adr/0027-vite-8-in-apps-web.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-28"
+      }
+    },
+    {
+      "id": "adr-index-0027-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0027 |",
+      "claim": "The index row for ADR 0027 gives the record's Date, \"2026-09-28\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0027 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-28"
+      }
+    },
+    {
+      "id": "adr-index-0027-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0027 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0027's record carries the H1 title \"vite 8 is declared in `apps/web`, and `allowBuilds` keeps one entry\".",
+      "check": {
+        "file": "docs/adr/0027-vite-8-in-apps-web.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "vite 8 is declared in `apps/web`, and `allowBuilds` keeps one entry"
+      }
+    },
+    {
+      "id": "adr-index-0027-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0027 |",
+      "claim": "The index row for ADR 0027 gives the record's H1 title, \"vite 8 is declared in `apps/web`, and `allowBuilds` keeps one entry\" (ADR 0012: the status in the record and in the index must agree).",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0027 \\| \\[(.+?)\\]\\(0027-",
+        "equals": "vite 8 is declared in `apps/web`, and `allowBuilds` keeps one entry"
+      }
+    },
+    {
+      "id": "adr-0027-link-0018-dependency-update-policy",
+      "doc": "docs/adr/0027-vite-8-in-apps-web.md",
+      "anchor": "](0018-dependency-update-policy.md)",
+      "claim": "The link to 0018-dependency-update-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0018-dependency-update-policy.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0018-dependency-update-policy.md"
+      }
+    },
+    {
+      "id": "adr-0027-link-0013-dependency-build-scripts-reviewed",
+      "doc": "docs/adr/0027-vite-8-in-apps-web.md",
+      "anchor": "](0013-dependency-build-scripts-reviewed.md)",
+      "claim": "The link to 0013-dependency-build-scripts-reviewed.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0013-dependency-build-scripts-reviewed.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0013-dependency-build-scripts-reviewed.md"
+      }
+    },
+    {
+      "id": "adr-0027-link-0012-correcting-accepted-records",
+      "doc": "docs/adr/0027-vite-8-in-apps-web.md",
+      "anchor": "](0012-correcting-accepted-records.md)",
+      "claim": "The link to 0012-correcting-accepted-records.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0012-correcting-accepted-records.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0012-correcting-accepted-records.md"
+      }
+    },
+    {
+      "id": "adr-0027-script-check-allowbuilds",
+      "doc": "docs/adr/0027-vite-8-in-apps-web.md",
+      "anchor": "`pnpm check:allowbuilds`",
+      "claim": "`pnpm check:allowbuilds` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:allowbuilds"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:allowbuilds"
+      }
+    },
+    {
+      "id": "adr-0027-web-declares-vite-8",
+      "doc": "docs/adr/0027-vite-8-in-apps-web.md",
+      "anchor": "**`apps/web` declares `vite` `^8.3.1` and `@vitejs/plugin-react` `^6.1.1` as devDependencies.**",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "apps/web/package.json declares vite directly, on major 8.",
+      "check": {
+        "file": "apps/web/package.json",
+        "regex": "^    \"vite\": \"\\^(\\d+)\\.",
+        "equals": "8"
+      }
+    },
+    {
+      "id": "adr-0027-web-plugin-react-6",
+      "doc": "docs/adr/0027-vite-8-in-apps-web.md",
+      "anchor": "**`apps/web` declares `vite` `^8.3.1` and `@vitejs/plugin-react` `^6.1.1` as devDependencies.**",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "apps/web/package.json declares @vitejs/plugin-react on major 6.",
+      "check": {
+        "file": "apps/web/package.json",
+        "regex": "^    \"@vitejs/plugin-react\": \"\\^(\\d+)\\.",
+        "equals": "6"
+      }
+    },
+    {
+      "id": "adr-0027-allowbuilds-one-entry",
+      "doc": "docs/adr/0027-vite-8-in-apps-web.md",
+      "anchor": "**esbuild is not in the dependency tree, and `allowBuilds` keeps one entry, `unrs-resolver: false`.**",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "allowBuilds denies unrs-resolver and nothing else.",
+      "check": {
+        "file": "pnpm-workspace.yaml",
+        "regex": "^  ([\\w@/.-]+): (?:true|false)$",
+        "equalsAll": ["unrs-resolver"]
+      }
+    },
+    {
+      "id": "adr-0027-no-esbuild-resolved",
+      "doc": "docs/adr/0027-vite-8-in-apps-web.md",
+      "anchor": "**esbuild is not in the dependency tree, and `allowBuilds` keeps one entry, `unrs-resolver: false`.**",
+      "method": "file-line",
+      "evaluation": "live",
+      "claim": "pnpm-lock.yaml resolves no esbuild package: no esbuild@ or @esbuild/*@ key or peer suffix (vite's own peer metadata may still name esbuild).",
+      "check": {
+        "path": "pnpm-lock.yaml",
+        "absent": "esbuild@"
+      }
+    },
+    {
+      "id": "adr-0027-dependabot-vite-group",
+      "doc": "docs/adr/0027-vite-8-in-apps-web.md",
+      "anchor": "**`.github/dependabot.yml` gains the `vite` group that ADR 0018 decided**",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "dependabot.yml declares the vite group (vite, @vitejs/*, vitest, @vitest/*, majors included) ahead of minor-and-patch.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "^ {6}(vite):\\n {8}patterns: \\['vite', '@vitejs/\\*', 'vitest', '@vitest/\\*'\\]\\n {8}update-types: \\[major, minor, patch\\]\\n(?:[^\\n]*\\n)*? {6}minor-and-patch:$",
+        "equals": "vite"
+      }
+    },
+    {
       "id": "adr-index-0025-cell-date",
       "doc": "docs/adr/README.md",
       "anchor": "| 0025 |",
@@ -7769,12 +8027,13 @@
       "id": "adr-0018-no-vite-group-yet",
       "doc": "docs/adr/0018-dependency-update-policy.md",
       "anchor": "until it merges, `.github/dependabot.yml` carries no vite",
-      "method": "file-line",
+      "method": "config-value",
       "evaluation": "live",
-      "claim": "Until the vite 8 migration merges, dependabot.yml has no vite group.",
+      "claim": "The vite 8 migration has merged (ADR 0027), so dependabot.yml declares the vite group this record gives, ahead of minor-and-patch.",
       "check": {
-        "path": ".github/dependabot.yml",
-        "absent": "vite:"
+        "file": ".github/dependabot.yml",
+        "regex": "^ {6}(vite):\\n {8}patterns: \\['vite', '@vitejs/\\*', 'vitest', '@vitest/\\*'\\]\\n {8}update-types: \\[major, minor, patch\\]\\n(?:[^\\n]*\\n)*? {6}minor-and-patch:$",
+        "equals": "vite"
       }
     },
     {
@@ -7782,7 +8041,8 @@
       "doc": "docs/adr/0013-dependency-build-scripts-reviewed.md",
       "anchor": "`allowBuilds` keeps two entries, and gains a rule and a check.",
       "method": "config-value",
-      "evaluation": "live",
+      "evaluation": "historical",
+      "asOf": "1c904ad08bf73c68cf9570d92693ff6dffdc424a",
       "claim": "allowBuilds denies esbuild and unrs-resolver and nothing else.",
       "check": {
         "file": "pnpm-workspace.yaml",

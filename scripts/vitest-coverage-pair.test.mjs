@@ -4,8 +4,10 @@
 // `@vitest/coverage-v8` peers on one exact vitest version, and vitest does not support running with
 // a provider from another release. pnpm only warns about a peer mismatch, and CI never runs
 // `pnpm --filter web test:coverage`, so without this test a pull request that moves vitest alone
-// (a manual `pnpm update vitest`, or a Dependabot major, which the `minor-and-patch` group does not
-// batch) would pass every check and leave the coverage command broken for whoever runs it next.
+// would pass every check and leave the coverage command broken for whoever runs it next.
+// Dependabot's version updates put vitest and every `@vitest/*` package in its `vite` group, majors
+// included, so those move together; a manual `pnpm update vitest`, or a security update, which
+// targets the package with the advisory, can still move one without the other.
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

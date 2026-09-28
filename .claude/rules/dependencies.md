@@ -54,8 +54,11 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   majors (they follow `.nvmrc` by hand). Adding one is a policy change, so read
   `docs/adr/0018-dependency-update-policy.md` first; deleting one without the trigger having fired
   puts the red pull request back. A `vite` group (`vite`, `@vitejs/*`, `vitest`, `@vitest/*`, majors
-  included) goes ahead of `minor-and-patch` in the same pull request that makes `apps/web` declare
-  `vite` directly, and not before: added now it would regenerate a red grouped pull request.
+  included) sits ahead of `minor-and-patch`, because Dependabot puts a dependency in the first group
+  that matches it, so a vite major arrives in one pull request with the `@vitejs/plugin-react` and
+  vitest releases that peer on it. The group relies on `apps/web` declaring `vite` directly (ADR
+  0027): without that, a plugin-react major would arrive without the vite major it needs and fail
+  as #9 did. Keep the declaration while the group exists.
 
 ## Gotchas
 
@@ -68,11 +71,13 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   lockfile already matches the manifests, so resolution is skipped. Taking `main`'s whole lockfile
   with `git checkout` and resolving again (`pnpm install --resolution-only`) usually writes it back.
 - `pnpm install` runs no dependency lifecycle scripts. `allowBuilds` in `pnpm-workspace.yaml` denies
-  the two packages pnpm 10 would otherwise warn about (esbuild, unrs-resolver): their scripts only
-  check the prebuilt platform binaries the lockfile already installs, and download one only when
-  none is present. sharp has no entry because it has had no install script since 0.35.0, and an
-  entry belongs there only while the package still declares one — an entry for a scriptless package
-  would silently deny whatever a later release adds instead of letting pnpm report it. Each entry
+  the one package pnpm 10 would otherwise warn about, unrs-resolver: its script only checks the
+  prebuilt platform binary the lockfile already installs, and downloads one only when none is
+  present. esbuild's entry went with the vite 8 migration (ADR 0027), because vite 8 does not depend
+  on esbuild and nothing else does. sharp has no entry because it has had no install script since
+  0.35.0, and an entry belongs there only while the package still declares one — an entry for a
+  scriptless package would silently deny whatever a later release adds instead of letting pnpm
+  report it. Each entry
   carries a `Reviewed at <version>` comment, and `pnpm check:allowbuilds` fails CI when one drifts
   from the lockfile or outlives its script, so a Dependabot bump of a denied package means reading
   the new script and updating the comment. That check fails closed: anything it cannot parse is an
@@ -99,3 +104,11 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   patched version for some dependents and silently leave the vulnerable copy pinned under others
   whose own ranges admitted the fix. Always pass `--depth Infinity` and re-run `pnpm audit` to confirm
   the count actually moved.
+- pnpm resolves an optional peer when the package is already in the dependency graph, and keeps
+  it: a lockfile that once resolved it holds it in the graph by itself. vite 8.3.1 kept
+  `esbuild@0.27.2` as its optional peer that way after nothing else needed esbuild, and neither
+  `pnpm install --resolution-only`, `pnpm dedupe` nor `pnpm update -r vite --depth Infinity` dropped
+  it. `pnpm --filter web remove` of every package that brings vite in (`vite`,
+  `@vitejs/plugin-react`, `vitest`, `@vitest/coverage-v8`), then `pnpm --filter web add -D` of the
+  same ranges, did. pnpm writes the resolved version as the new specifier (`^5.0.0` came back as
+  `^5.0.2`), so put back any range that was not meant to move and run `pnpm install`.
