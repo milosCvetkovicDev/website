@@ -67,6 +67,12 @@ const COPY_MODULES = [
   ...PAGE_RECORDS,
 ];
 
+/**
+ * A years-of-experience figure as copy prints it, and the About fact's label, which names one. The
+ * label is a hit because its row comes whole from `data/profile.ts` (R34 below).
+ */
+const YEAR_PATTERNS = [/\b\d{1,2}\+? years\b/, /\b\d{1,2}\+? yrs\b/, /\bYears shipping code\b/];
+
 /** The About page and the record that holds its copy, one of which quotes the case studies. */
 const ABOUT_COPY = ['app/about/page.tsx', 'data/pages/about.ts'];
 
@@ -168,12 +174,11 @@ describe('metrics and biography live in one place', () => {
     // from there, which is why the label is still a hit here if a module spells it out again.
     // /skills' per-skill badges (`2+` for AI/LLM Integration) are a different fact, one per skill,
     // and its record holds them as bare figures that the page suffixes, so they are not hits.
-    const yearPatterns = [/\b\d{1,2}\+? years\b/, /\b\d{1,2}\+? yrs\b/, /\bYears shipping code\b/];
     const hits: Hit[] = [];
     for (const file of COPY_MODULES) {
       const source = readFileSync(join(SRC, file), 'utf8');
       source.split('\n').forEach((text, index) => {
-        const match = yearPatterns.map((pattern) => text.match(pattern)).find(Boolean);
+        const match = YEAR_PATTERNS.map((pattern) => text.match(pattern)).find(Boolean);
         if (!match) return;
         hits.push({ file, line: index + 1, text: text.trim().slice(0, 110), literal: match[0] });
       });
@@ -184,5 +189,34 @@ describe('metrics and biography live in one place', () => {
       'the years of experience is stated in several places with different values. Put it in ' +
         'src/data and derive it, so the biography cannot disagree with itself.',
     ).toEqual([]);
+  });
+
+  it('R34 beyond the listed modules: only src/data states a years figure', () => {
+    // COPY_MODULES names the routes and the JSON-LD; a component or helper added later is not on it.
+    // Every module under src outside src/data renders or builds what the pages say, so none of them
+    // may state the figure either. src/data is where it belongs: profile.ts derives it.
+    const modules = readdirSync(SRC, { recursive: true, encoding: 'utf8' })
+      .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts'))
+      .filter((name) => !/(^|\/)(__tests__|test)\/|\.test\./.test(name))
+      .filter((name) => !name.startsWith('data/') || name.startsWith('data/pages/'));
+    expect(modules).toContain('components/animated-hero/hero-content.tsx');
+    expect(modules).not.toContain('data/profile.ts');
+
+    const hits: Hit[] = [];
+    for (const file of modules) {
+      readFileSync(join(SRC, file), 'utf8')
+        .split('\n')
+        .forEach((text, index) => {
+          const match = YEAR_PATTERNS.map((pattern) => text.match(pattern)).find(Boolean);
+          if (match)
+            hits.push({
+              file,
+              line: index + 1,
+              text: text.trim().slice(0, 110),
+              literal: match[0],
+            });
+        });
+    }
+    expect(hits.map(describeHit), 'read the figure from data/profile.ts').toEqual([]);
   });
 });

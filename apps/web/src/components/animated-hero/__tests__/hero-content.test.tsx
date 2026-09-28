@@ -29,6 +29,7 @@ describe('HeroContent', () => {
       vi.setSystemTime(new Date('2031-06-15T12:00:00Z'));
       render(<HeroContent />);
       const xp = screen.getByText('XP').nextElementSibling;
+      expect(xp, 'the XP term is followed by its definition').not.toBeNull();
       expect(xp?.textContent).toBe(`${yearsOfExperience()} years · 6 domains · 3 clouds`);
       expect(xp?.textContent).toMatch(/^18 years/);
     } finally {

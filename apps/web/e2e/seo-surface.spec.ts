@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { yearsOfExperience } from '../src/data/profile';
+import { yearsClausesAboutAi, yearsFigures } from '../src/test/experience-claims';
 import {
   CASE_STUDY_ROUTES,
   NOT_FOUND_ROUTE,
@@ -393,17 +394,22 @@ test('the Person schema, the hero and the /about description carry one derived y
   // pages-9 and live-14: the Person schema once put the whole career down as AI-native work, which
   // the site's own timeline (AI from 2025) and /skills (AI/LLM Integration, 2+) contradict, while
   // /about said `10+`. The figure now comes from `yearsOfExperience()` in data/profile.ts, so every
-  // surface a crawler reads has to carry that one number. The pages are prerendered, so the figure
-  // is the build's: a build from last year answers one lower, and the fix is to rebuild.
-  const expected = yearsOfExperience();
-
-  const homeHtml = await (await request.get('/')).text();
-  const person = [
+  // surface a crawler reads has to carry that one number.
+  const home = await request.get('/');
+  expect(home.status(), 'GET /').toBe(200);
+  const homeHtml = await home.text();
+  const blocks = [
     ...homeHtml.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
-  ]
-    .map(([, body]) => JSON.parse(body) as { '@type': string; description?: string })
-    .find((block) => block['@type'] === 'Person');
+  ].map(([, body], index) => {
+    try {
+      return JSON.parse(body) as { '@type': string; description?: string };
+    } catch (error) {
+      throw new Error(`JSON-LD block ${index} on / does not parse: ${String(error)}\n${body}`);
+    }
+  });
+  const person = blocks.find((block) => block['@type'] === 'Person');
   const about = await fetchHead(request, '/about');
+  expect(about.status, 'GET /about').toBe(200);
 
   const surfaces = {
     'the Person JSON-LD description on /': person?.description ?? '',
@@ -414,19 +420,31 @@ test('the Person schema, the hero and the /about description carry one derived y
   };
 
   const problems: string[] = [];
+  const figures = new Map<string, number[]>();
   for (const [surface, text] of Object.entries(surfaces)) {
-    const figures = [...text.matchAll(/\b(\d+)\+? years\b/g)].map(([, figure]) => Number(figure));
-    if (figures.length === 0) problems.push(`${surface} states no years figure: "${text}"`);
-    for (const figure of figures) {
-      if (figure !== expected) problems.push(`${surface} says ${figure} years, not ${expected}`);
-    }
-    if (/years of (experience building )?AI-native/i.test(text)) {
-      problems.push(`${surface} presents the career as AI-native work: "${text}"`);
-    }
-    // Nor anything else that ties the total to AI inside the clause that states it.
-    if (/\b\d+\+? years\b[^,.;:]*\bAI\b/i.test(text)) {
-      problems.push(`${surface} ties the years to AI: "${text}"`);
+    figures.set(surface, yearsFigures(text));
+    if (yearsFigures(text).length === 0)
+      problems.push(`${surface} states no years figure: "${text}"`);
+    for (const clause of yearsClausesAboutAi(text)) {
+      problems.push(`${surface} ties the years to AI work: "${clause}"`);
     }
   }
+  // One source: every surface states the same figure, whenever the build ran.
+  const stated = new Set([...figures.values()].flat());
+  if (stated.size > 1) {
+    problems.push(`the surfaces disagree: ${JSON.stringify(Object.fromEntries(figures))}`);
+  }
   expect(problems).toEqual([]);
+
+  // And that figure is the derived one. The pages are prerendered, so it is the build's clock that
+  // counts: a build made before 1 January and served after it states one year fewer, which is a
+  // stale build rather than a second source, and the message says so.
+  const expected = yearsOfExperience();
+  const [served] = stated;
+  expect(
+    served,
+    served === expected - 1
+      ? `the build predates 1 January: it states ${served} years, the clock gives ${expected}; rebuild`
+      : `yearsOfExperience() gives ${expected}`,
+  ).toBe(expected);
 });

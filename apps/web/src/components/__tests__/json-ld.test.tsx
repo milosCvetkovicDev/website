@@ -2,6 +2,7 @@ import { render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
 import { yearsOfExperience } from '@/data/profile';
+import { yearsClausesAboutAi, yearsFigures } from '@/test/experience-claims';
 
 /**
  * The two JSON-LD blocks.
@@ -115,9 +116,9 @@ describe('the JSON-LD blocks', () => {
       const later = await descriptionIn();
       expect(later).toContain('18 years of experience');
       for (const description of [today, later]) {
-        expect(description).not.toMatch(/years of (experience building )?AI-native/i);
-        // Nor anything else that ties the total to AI inside the clause that states it.
-        expect(description).not.toMatch(/\b\d+\+? years\b[^,.;:]*\bAI\b/i);
+        // One figure, and the clause that states it names no AI work.
+        expect(yearsFigures(description)).toHaveLength(1);
+        expect(yearsClausesAboutAi(description)).toEqual([]);
       }
     } finally {
       vi.useRealTimers();
