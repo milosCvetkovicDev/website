@@ -73,10 +73,34 @@ export interface UnfilledOwnerField {
 }
 
 /**
- * Every field still waiting for the owner. Empty while nothing is: a later task adds one row per
- * placeholder it leaves.
+ * The `expires` of a row whose deadline the owner has not chosen yet. It is the placeholder itself,
+ * which the gate reads as a deadline already passed, so `pnpm test` fails on the row until the owner
+ * writes a real day over it: no agent picks one. The cast gets it past `IsoDay`, which is there to
+ * catch a mistyped day rather than this deliberate gap, and it can never get it past the gate.
  */
-export const unfilledOwnerFields: readonly UnfilledOwnerField[] = [];
+export const DEADLINE_UNSET = OWNER_TODO as string as IsoDay;
+
+/**
+ * Every field still waiting for the owner, one row per placeholder. A row goes in the commit that
+ * leaves the placeholder and comes out in the commit that fills it.
+ */
+export const unfilledOwnerFields: readonly UnfilledOwnerField[] = [
+  {
+    field: 'case-studies.0.metricDefinition',
+    why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the self-healing agent's 73% faster resolution: facts only the owner has.",
+    expires: DEADLINE_UNSET,
+  },
+  {
+    field: 'case-studies.1.metricDefinition',
+    why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the enterprise B2B platform's 40% less complexity: facts only the owner has.",
+    expires: DEADLINE_UNSET,
+  },
+  {
+    field: 'case-studies.2.metricDefinition',
+    why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the Nx remote cache's 5× faster builds: facts only the owner has.",
+    expires: DEADLINE_UNSET,
+  },
+];
 
 /**
  * How far ahead a deadline may be. A row is a dated promise, not an allowlist: an `expires` years

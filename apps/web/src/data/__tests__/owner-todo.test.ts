@@ -27,9 +27,13 @@ import {
 
 /**
  * Modules under `src` that import owner-todo only to narrow or omit a placeholder, never to leave
- * one, so they are no source: the path under `src`, and why.
+ * one that could be served, so they are no source: a renderer, or a unit test whose fixtures ship
+ * nowhere. The path under `src`, and why.
  */
-const RENDERS_ONLY: Record<string, string> = {};
+const RENDERS_ONLY: Record<string, string> = {
+  'data/__tests__/case-studies.test.ts':
+    'a unit test: builds unfilled fixtures to prove formatMetricScope leaves them out, and ships nowhere',
+};
 
 /**
  * Every source the live gate walks, as one array literal. A task that leaves a placeholder somewhere
