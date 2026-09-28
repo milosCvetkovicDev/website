@@ -207,9 +207,11 @@ export function LoopPhase() {
               </div>
             </div>
 
-            {/* Alert. transition-colors only: GSAP's pulse writes its opacity and transform. */}
+            {/* Alert. transition-colors only: GSAP's pulse writes its opacity and transform.
+                data-loop-alert names it for the tests. */}
             <div
               ref={alertRef}
+              data-loop-alert
               className={`rounded-lg border p-4 transition-colors duration-500 ${
                 shownAlertStatus === 'error'
                   ? 'border-[var(--status-err)]/50 bg-[var(--status-err)]/10'

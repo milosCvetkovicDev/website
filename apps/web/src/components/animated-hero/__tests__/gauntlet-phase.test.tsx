@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { gsap, ScrollTrigger } from '../gsap-runtime';
 import { requestGsap } from '../load-gsap';
 import { GauntletPhase } from '../gauntlet-phase';
+import { pickTween, progressDriver } from './gsap-tweens';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
 // at import time, so the stub must exist before the imports above are evaluated.
@@ -56,8 +57,11 @@ vi.hoisted(() => {
 const STAGE_COUNT = 6;
 // The six stages run back to back with a 0.2s gap; deployment starts once the last one ends.
 const PIPELINE_MS = 5300;
+// LINT, the first stage, runs its progress tween for 0.5 s (`pipelineStages` in gauntlet-phase.tsx).
+const lintProgress = progressDriver(0.5);
 
-const achievement = () => screen.getByText('Achievement Unlocked').closest('.mt-6');
+const achievement = () =>
+  screen.getByText('Achievement Unlocked').closest('[data-gauntlet="achievement"]');
 const pendingStages = () => screen.getAllByText('○');
 const passedStages = () => screen.getAllByText('●');
 
@@ -134,10 +138,10 @@ describe('GauntletPhase', () => {
 
   it('clears every pending timer and tween when unmounted mid-sequence', () => {
     const { unmount } = mount();
-    // Spy after mount: the first timer creates the LINT stage's progress tween on a plain object.
+    // The first timer starts the LINT stage, whose progress tween runs on a plain object.
     const toSpy = vi.spyOn(gsap, 'to');
     act(() => vi.advanceTimersByTime(1));
-    const [progressTarget] = toSpy.mock.calls[0];
+    const { target: progressTarget } = pickTween(toSpy, lintProgress);
     expect(gsap.getTweensOf(progressTarget)).toHaveLength(1);
     expect(vi.getTimerCount()).toBeGreaterThan(0);
 
@@ -165,7 +169,8 @@ describe('GauntletPhase', () => {
     mount();
     const toSpy = vi.spyOn(gsap, 'to');
     act(() => vi.advanceTimersByTime(1));
-    const [progressTarget] = toSpy.mock.calls[0];
+    const { target: progressTarget } = pickTween(toSpy, lintProgress);
+    expect(gsap.getTweensOf(progressTarget)).toHaveLength(1);
     expect(vi.getTimerCount()).toBeGreaterThan(0);
 
     act(() => media.set(true));
