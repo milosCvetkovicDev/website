@@ -17,9 +17,11 @@ import { servedText } from './support/served-text';
  * one comparison with a rendered page.
  *
  * The text comes from `servedText` (`support/served-text.ts`), the zero-join extractor
- * `served-html.spec.ts` uses too. Every number below is pinned to that function: a different
- * extractor measures a different number on the same page, and a whitespace-joining one shatters the
- * `AnimatedText` headlines into letters, which its docblock explains.
+ * `served-html.spec.ts` uses too, read from `<body>` only: the `<title>` repeats each case study's
+ * title, so a phrase check that read `<head>` could never fail on it. Every number below is pinned
+ * to that function and that root: a different extractor measures a different number on the same
+ * page, and a whitespace-joining one shatters the `AnimatedText` headlines into letters, which its
+ * docblock explains. The first test proves the extractor on markup written here.
  *
  * Per route, the served HTML must answer 200, carry at least its floor of characters, and contain
  * its load-bearing phrases.
@@ -28,25 +30,31 @@ import { servedText } from './support/served-text';
  * `accessibility.spec.ts`: content that stops being prerendered, because it moved into a client-only
  * component, behind a `<Suspense>` boundary or a `React.lazy` import, fails here while every browser
  * test stays green. ADR 0009's static phase imports are why `/` prerendered its whole story in the
- * first place. `/`, `/about` and `/work` take the floors of the PRD's "Content a machine can extract"
- * scenario (`.claude/prds/ai-discoverability-2026-09.md`: 4000, 2500 and 1200). The rest are about
- * 80% of the measurement below, rounded down to a hundred: room for copy edits, and a failure for a
- * page that loses a fifth of its text. The case studies share one floor, taken from the shortest,
- * because they share one template: it catches the template losing a section, not one study doing so.
- * Measured on 2026-09-28 against the production build of `main` at bb039fa:
+ * first place. Each floor is about 80% of the measurement below, rounded down to a hundred: room for
+ * copy edits, and a failure for a page that loses a fifth of its text. The PRD's "Content a machine
+ * can extract" scenario (`.claude/prds/ai-discoverability-2026-09.md`) sets 4000, 2500 and 1200 for
+ * `/`, `/about` and `/work` as minimums; `/` and `/about` sit at or above 80% already, and `/work`
+ * takes 1600, because 1200 would let it lose 43% of its text. Each case study has its own floor, so
+ * one study losing a section fails; a study added to `case-studies.ts` before it is measured takes
+ * the shortest study's floor, and its first change records its own. Measured on 2026-09-28 against
+ * the production build of `main` at bb039fa, body text only:
  *
  * | Route                           | Characters | Floor |
  * | ------------------------------- | ---------- | ----- |
- * | `/`                             | 4588       | 4000  |
- * | `/about`                        | 3180       | 2500  |
- * | `/work`                         | 2154       | 1200  |
- * | `/skills`                       | 2311       | 1800  |
- * | `/blog`                         | 401        | 300   |
- * | `/contact`                      | 695        | 500   |
- * | `/privacy`                      | 1791       | 1400  |
- * | `/work/self-healing-agent`      | 3951       | 3100  |
- * | `/work/enterprise-b2b-platform` | 3929       | 3100  |
- * | `/work/nx-remote-cache`         | 4746       | 3100  |
+ * | `/`                             | 4542       | 4000  |
+ * | `/about`                        | 3126       | 2500  |
+ * | `/work`                         | 2095       | 1600  |
+ * | `/skills`                       | 2250       | 1800  |
+ * | `/blog`                         | 374        | 300   |
+ * | `/contact`                      | 668        | 500   |
+ * | `/privacy`                      | 1764       | 1400  |
+ * | `/work/self-healing-agent`      | 3889       | 3100  |
+ * | `/work/enterprise-b2b-platform` | 3870       | 3000  |
+ * | `/work/nx-remote-cache`         | 4685       | 3700  |
+ *
+ * The text counted is what the response carries, hidden or not: no route serves an element with the
+ * `hidden` attribute, and `aria-hidden` text is 4 characters everywhere except `/`, where most of its
+ * 578 are the typewriter's not-yet-typed tail, copy a crawler reads from the bytes.
  *
  * Never lower a floor to quieten a failure. A deliberate cut of a page's copy re-measures, and
  * records the new count and its date in this table in the same change.
@@ -54,7 +62,9 @@ import { servedText } from './support/served-text';
  * **Phrases.** Presence only. No year count and no metric value is written here, because #49 settles
  * those: the case-study titles, metrics and stacks are read from `src/data/case-studies.ts`, so this
  * file cannot fork them. The headline metric is asserted on `/work` alone: on `/`, `MetricCounter`
- * serves the active card's metric at the start of its count (`0%`), not its value.
+ * serves the active card's metric at the start of its count (`0%`), not its value. A phrase is
+ * compared with its whitespace collapsed the way `servedText` collapses it, and as a plain substring:
+ * the stack is served zero-joined (`BunElysiaAzure`), so a whole-word match would miss every item.
  */
 
 test.describe.configure({ retries: 0 });
@@ -65,40 +75,80 @@ type StaticRoute = (typeof STATIC_ROUTES)[number];
 const FLOORS: Record<StaticRoute, number> = {
   '/': 4000,
   '/about': 2500,
-  '/work': 1200,
+  '/work': 1600,
   '/skills': 1800,
   '/blog': 300,
   '/contact': 500,
   '/privacy': 1400,
 };
 
-/** Every `/work/<slug>`: one template, so one floor, taken from the shortest study. */
-const CASE_STUDY_FLOOR = 3100;
+/** Each case study's floor, by slug, from the table above. */
+const CASE_STUDY_FLOORS: Record<string, number> = {
+  'self-healing-agent': 3100,
+  'enterprise-b2b-platform': 3000,
+  'nx-remote-cache': 3700,
+};
 
-const floorOf = (path: string): number =>
-  path in FLOORS ? FLOORS[path as StaticRoute] : CASE_STUDY_FLOOR;
+/** A study not measured yet shares the template, so it takes the shortest study's floor. */
+const UNMEASURED_CASE_STUDY_FLOOR = Math.min(...Object.values(CASE_STUDY_FLOORS));
+
+const studyAt = (path: string) => caseStudies.find(({ slug }) => path === `/work/${slug}`);
+
+function floorOf(path: string): number {
+  if (Object.hasOwn(FLOORS, path)) return FLOORS[path as StaticRoute];
+  const study = studyAt(path);
+  if (!study)
+    throw new Error(`${path} is neither a static route nor a case study: it has no floor`);
+  return Object.hasOwn(CASE_STUDY_FLOORS, study.slug)
+    ? (CASE_STUDY_FLOORS[study.slug] as number)
+    : UNMEASURED_CASE_STUDY_FLOOR;
+}
 
 const HOME_PHRASES = [
-  // The discovery phase's headline (`discovery-phase.tsx:206`), rendered one `<span>` per character
-  // by `AnimatedText`'s wave animation: a zero-join extractor reads it whole.
+  // The discovery phase's headline (`DiscoveryPhase`), rendered one `<span>` per character by
+  // `AnimatedText`'s wave animation: a zero-join extractor reads it whole.
   'Most bugs live in the gap between what you asked for and what you meant.',
-  // Two phrases, not one sentence: `hero-content.tsx:140-142` separates them with a `<br />`, which
-  // yields no whitespace under any tag-strip, so the served text reads `…at 3am.Nobody woke up.` and
-  // the sentence with its space is in no crawler's copy of the page.
+  // Two phrases, not one sentence: the hero headline (`HeroContent`) separates them with a `<br />`,
+  // which yields no whitespace under any tag-strip, so the served text reads `…at 3am.Nobody woke up.`
+  // and the sentence with its space is in no crawler's copy of the page.
   'This happened at 3am.',
   'Nobody woke up.',
 ];
 
-/** The load-bearing phrases each route must serve. A route that is not listed has none. */
-const PHRASES = new Map<string, string[]>([
-  ['/', HOME_PHRASES],
-  ['/work', caseStudies.flatMap(({ title, highlight }) => [title, formatMetric(highlight.metric)])],
-  ...CASE_STUDY_ROUTES.map((path): [string, string[]] => {
-    const study = caseStudies.find(({ slug }) => path === `/work/${slug}`);
+/**
+ * The load-bearing phrases `path` must serve, whitespace collapsed as `servedText` collapses it. A
+ * route with none returns an empty list. Called inside the route's test, so a case-study route with
+ * no study behind it fails that test rather than the whole file's collection.
+ */
+function phrasesOf(path: string): string[] {
+  let phrases: string[] = [];
+  if (path === '/') phrases = HOME_PHRASES;
+  else if (path === '/work') {
+    phrases = caseStudies.flatMap(({ title, highlight }) => [
+      title,
+      formatMetric(highlight.metric),
+    ]);
+  } else if (path.startsWith('/work/')) {
+    const study = studyAt(path);
     if (!study) throw new Error(`no case study behind ${path}`);
-    return [path, [study.title, ...study.techStack.flatMap(({ items }) => items)]];
-  }),
-]);
+    phrases = [study.title, ...study.techStack.flatMap(({ items }) => items)];
+  }
+  return phrases.map((phrase) => phrase.replace(/\s+/g, ' ').trim()).filter((phrase) => phrase);
+}
+
+test('servedText reads markup the way a browser does', async ({ page }) => {
+  // The control for every floor and phrase below, which are only as good as this reading: a walker
+  // that started counting script source, or stopped decoding entities, would move every number.
+  const html =
+    '<!doctype html><html><head><title>Head title</title></head><body>' +
+    '<h1>M<span>o</span>st</h1><script>code()</script >after' +
+    '<style>p { color: red }</style><template><p>inert</p></template>' +
+    '<noscript><p>fallback</p></noscript>' +
+    '<p>1 &gt; 0 &amp;nbsp; x&nbsp; y</p><!-- a > b -->end</body></html>';
+  const body = 'Most after fallback1 > 0 &nbsp; x yend';
+  expect(await servedText(page, html, { root: 'body' })).toBe(body);
+  expect(await servedText(page, html)).toBe(`Head title${body}`);
+});
 
 for (const path of [...STATIC_ROUTES, ...CASE_STUDY_ROUTES]) {
   test(`${path} serves its text to a crawler that runs no JavaScript`, async ({
@@ -107,7 +157,7 @@ for (const path of [...STATIC_ROUTES, ...CASE_STUDY_ROUTES]) {
   }) => {
     const response = await request.get(path);
     expect(response.status(), `${path} must answer 200`).toBe(200);
-    const text = await servedText(page, await response.text());
+    const text = await servedText(page, await response.text(), { root: 'body' });
 
     const floor = floorOf(path);
     expect
@@ -118,38 +168,50 @@ for (const path of [...STATIC_ROUTES, ...CASE_STUDY_ROUTES]) {
       )
       .toBeGreaterThanOrEqual(floor);
 
-    const missing = (PHRASES.get(path) ?? []).filter((phrase) => !text.includes(phrase));
+    const missing = phrasesOf(path).filter((phrase) => !text.includes(phrase));
     expect(missing, `${path} does not serve these load-bearing phrases in its HTML`).toEqual([]);
   });
 }
 
-test('/ renders at most 15% more text with JavaScript than it serves without', async ({
-  page,
-  request,
-}) => {
+test('/ renders within 15% of the text it serves without JavaScript', async ({ page, request }) => {
   // The day copy moves into a client-only component, the rendered page gains text the response
-  // lacks. Measured 3% on 2026-09-12 (#55: 5,320 rendered against 5,156 served, another extractor)
-  // and 5.5% on 2026-09-28 (4,839 against 4,588, this one). Most of today's difference is not copy:
-  // `innerText` puts a line break between blocks, and both sides collapse whitespace the same way,
-  // but zero-join puts nothing there.
-  const served = await servedText(page, await (await request.get('/')).text());
+  // lacks; the day hydration drops server-rendered copy, a rendering crawler reads less than the
+  // response promised. Both sides are read by `servedText` from `<body>`: the response, and the
+  // hydrated DOM serialised back to HTML, so hidden text, the head and block line breaks count the
+  // same on both and only what the client added or removed differs. Measured 0.1% on 2026-09-28
+  // (4,547 rendered against 4,542 served). The earlier reads compared `innerText` with a whole-
+  // document walk, unlike quantities: 3% on 2026-09-12 (#55, 5,320 against 5,156, another
+  // extractor) and 5.5% on 2026-09-28 (4,839 against 4,588), mostly `innerText`'s line breaks.
+  const response = await request.get('/');
+  expect(response.status(), '/ must answer 200').toBe(200);
+  const served = await servedText(page, await response.text(), { root: 'body' });
+  expect(served.length, '/ served no body text at all').toBeGreaterThan(0);
 
   // The clock is paused before the page loads, so no timer fires and the read is the page exactly as
-  // it hydrated (React hydrates without a timer: 370 ms in the measurement). Without the pause the
-  // number moves. The decorative tmux background (`tmux-background.tsx`, `aria-hidden`, desktop
-  // widths only) streams a log line into each of its five panes every 400 to 850 ms from the first
-  // idle moment, and the same read measured 5.5% at hydration, 11.9% two seconds later and 39.7%
-  // seven seconds later: a gate on a number that grows while it waits is a flaky gate. The cost is
-  // copy that only a timer reveals, which this read cannot see; a client-only component renders
-  // when the page hydrates, and that is what it reads.
+  // it hydrated (React hydrates without a timer: 310 to 370 ms in the measurements). `gotoHydrated`
+  // is not held up by the pause: it polls the marker from the test runner, not from page timers.
+  // Without the pause the number moves. The decorative tmux background (`TmuxBackground`,
+  // `aria-hidden`, desktop widths only) streams a log line into each of its five panes every 400 to
+  // 850 ms from the first idle moment, and an `innerText` read measured 5.5% at hydration, 11.9% two
+  // seconds later and 39.7% seven seconds later: a gate on a number that grows while it waits is a
+  // flaky gate. The cost is copy that only a timer or an idle callback reveals, which this read
+  // cannot see; a client-only component renders when the page hydrates, and that is what it reads.
   await page.clock.install({ time: new Date('2026-09-28T12:00:00Z') });
   await page.clock.pauseAt(new Date('2026-09-28T12:00:01Z'));
   await gotoHydrated(page, '/');
-  const rendered = (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ');
+  const rendered = await servedText(page, await page.content(), { root: 'body' });
 
+  const ratio = rendered.length / served.length;
+  const counts = `/ renders ${rendered.length} characters with JavaScript against ${served.length} served`;
+  expect
+    .soft(
+      ratio,
+      `${counts} without it: copy that only the browser renders is invisible to every AI crawler`,
+    )
+    .toBeLessThanOrEqual(1.15);
   expect(
-    rendered.length / served.length,
-    `/ renders ${rendered.length} characters with JavaScript against ${served.length} served ` +
-      'without it: copy that only the browser renders is invisible to every AI crawler',
-  ).toBeLessThanOrEqual(1.15);
+    ratio,
+    `${counts} without it: hydration removes copy the response carries, so a rendering crawler ` +
+      'reads less than a plain one',
+  ).toBeGreaterThanOrEqual(0.85);
 });

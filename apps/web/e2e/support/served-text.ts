@@ -35,7 +35,7 @@ import type { Page } from '@playwright/test';
  *   one; `/` served one while its tmux background was lazy). The space keeps the words either side
  *   apart, as the regular expressions did for script and style.
  * - `noscript` is kept. With scripting disabled the parser reads its content as ordinary markup, which
- *   is exactly what a crawler that runs no JavaScript does with it. None of the eleven routes serves one
+ *   is exactly what a crawler that runs no JavaScript does with it. None of the eleven `PAGE_ROUTES` serves one
  *   today, but a fallback added later is copy written for that very reader, so it has to count.
  * - Text nodes are joined with nothing, because an element boundary is not a word boundary: that is how
  *   the `AnimatedText` spans read back as `EXECUTION`. Whitespace runs then collapse to a single space;
@@ -53,22 +53,35 @@ import type { Page } from '@playwright/test';
  * to suit an extractor. The flip side is that zero-join cannot invent a word boundary the markup does
  * not have: `<br />` is an element, not a space, so text either side of one runs together (see the
  * hero headline in `no-js-text.spec.ts`).
+ *
+ * `root` picks what is read. `'document'`, the default, reads the whole document, `<head>` included,
+ * so the `<title>` counts: that is what `served-html.spec.ts` measures. `'body'` reads the page's
+ * copy only, so a phrase the `<title>` repeats (every case study's title does) can only be found in
+ * the body, and a hydrated page serialised back to HTML is read on the same terms as the response.
  */
-export async function servedText(page: Page, html: string): Promise<string> {
-  return page.evaluate((markup) => {
-    const skipped = new Set(['script', 'style', 'template']);
-    const parts: string[] = [];
-    const walk = (parent: Node) => {
-      for (const node of parent.childNodes) {
-        if (node instanceof Text) {
-          parts.push(node.data);
-        } else if (node instanceof Element) {
-          if (skipped.has(node.localName)) parts.push(' ');
-          else walk(node);
+export async function servedText(
+  page: Page,
+  html: string,
+  { root = 'document' }: { root?: 'document' | 'body' } = {},
+): Promise<string> {
+  return page.evaluate(
+    ({ markup, from }) => {
+      const skipped = new Set(['script', 'style', 'template']);
+      const parts: string[] = [];
+      const walk = (parent: Node) => {
+        for (const node of parent.childNodes) {
+          if (node instanceof Text) {
+            parts.push(node.data);
+          } else if (node instanceof Element) {
+            if (skipped.has(node.localName)) parts.push(' ');
+            else walk(node);
+          }
         }
-      }
-    };
-    walk(new DOMParser().parseFromString(markup, 'text/html'));
-    return parts.join('').replace(/\s+/g, ' ');
-  }, html);
+      };
+      const doc = new DOMParser().parseFromString(markup, 'text/html');
+      walk(from === 'body' ? doc.body : doc);
+      return parts.join('').replace(/\s+/g, ' ');
+    },
+    { markup: html, from: root },
+  );
 }
