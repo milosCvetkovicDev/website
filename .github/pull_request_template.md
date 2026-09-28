@@ -7,6 +7,7 @@
 <!-- Commands you ran and their result. "Seems fine" is not evidence. -->
 
 - [ ] `pnpm check:allowbuilds`
+- [ ] `pnpm check:adrs`
 - [ ] `pnpm test:scripts`
 - [ ] `pnpm format:check`
 - [ ] `pnpm lint`
