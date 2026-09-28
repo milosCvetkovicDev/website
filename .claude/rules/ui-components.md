@@ -55,8 +55,8 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   panels and on their own tints; anything dimmer fails. Inside `Terminal` the tokens resolve to
   their dark values in both themes.
 - Components live in `apps/web/src/components`. `index.ts` is a barrel for the page-level ones
-  (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `FeaturedWork`, `TechStack`,
-  `PersonJsonLd`, `WebsiteJsonLd`), plus the `Logo` wordmark the header and footer draw.
+  (`ThemeProvider`, `useTheme`, `Navigation`, `Footer`, `FeaturedWork`, `TechStack`, `PersonJsonLd`,
+  `WebsiteJsonLd`), plus the `Logo` wordmark the header and footer draw.
   The hero and its phases live in `components/animated-hero` and are imported from there
   directly, not through the barrel.
   Layouts import from the component modules directly, never through the barrel: every client module
