@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { BreadcrumbListJsonLd, TechArticleJsonLd } from '@/components/json-ld';
 import { adjacentCaseStudies, caseStudies, getCaseStudy } from '@/data/case-studies';
+import { formatContentDates } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
 import { cardAlt } from '@/lib/og-image';
 
@@ -53,6 +54,16 @@ export default async function CaseStudyPage({ params }: PageProps) {
     notFound();
   }
 
+  // The two fields the TechArticle's datePublished and dateModified read (and the sitemap's lastmod,
+  // updatedAt), so the visible dates and the marked-up ones cannot disagree. A date that does not
+  // format, or a pair updated before it was published, throws here and fails the prerender: the
+  // page never ships the markup's dates without the visible ones.
+  const { published, updated } = formatContentDates(
+    `/work/${caseStudy.slug}`,
+    caseStudy.publishedAt,
+    caseStudy.updatedAt,
+  );
+
   return (
     <div className="py-16 md:py-24">
       <TechArticleJsonLd caseStudy={caseStudy} />
@@ -87,6 +98,20 @@ export default async function CaseStudyPage({ params }: PageProps) {
           </p>
           <h1 className="mb-4 text-4xl font-bold md:text-5xl">{caseStudy.title}</h1>
           <p className="mb-6 text-xl text-[var(--muted)]">{caseStudy.description}</p>
+          <dl className="mb-6 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <div className="flex gap-2">
+              <dt className="text-[var(--muted)]">Published</dt>
+              <dd>
+                <time dateTime={caseStudy.publishedAt}>{published}</time>
+              </dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-[var(--muted)]">Updated</dt>
+              <dd>
+                <time dateTime={caseStudy.updatedAt}>{updated}</time>
+              </dd>
+            </div>
+          </dl>
           <div className="flex flex-wrap gap-2">
             {caseStudy.tags.map((tag) => (
               <span

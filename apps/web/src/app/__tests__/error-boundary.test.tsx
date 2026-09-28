@@ -8,14 +8,15 @@ import ErrorPage from '../error';
 /**
  * The route error boundary, and the global one that replaces the root layout when that throws.
  *
- * Row R37 of the RED manifest, fixed by #49, plus the green assertions for `error.tsx` — which had no
- * test at all, despite holding the only `console.error` in shipped source.
+ * Row R37 of the RED manifest, which #138 fixed when it added `global-error.tsx`, plus the green
+ * assertions for `error.tsx` — which had no test at all, despite holding the only `console.error` in
+ * shipped source.
  *
  * `error.tsx` catches a throw inside `<main>`. It cannot catch one in the root layout's own client
  * components — `ThemeProvider`, `Navigation`, `Footer` — because a route-level boundary lives *inside*
- * the layout it is rendered by. That is what `global-error.tsx` is for, and there is no such file, so a
- * throw in the header today falls through to Next's built-in page: unthemed, unbranded, with no way
- * back to the site.
+ * the layout it is rendered by. That is what `global-error.tsx` is for. Before #138 there was no such
+ * file, so a throw in the header fell through to Next's built-in page: unthemed, unbranded, with no
+ * way back to the site.
  */
 
 const APP_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -75,7 +76,7 @@ describe('error.tsx', () => {
     expect(console.error).toHaveBeenCalledWith('Application error:', expect.any(Error));
   });
 
-  it('R37 (#49): a global-error module exists and renders its own <html> and <body>', () => {
+  it('R37 (#138): a global-error module exists and renders its own <html> and <body>', () => {
     // A check over the source, beside the render in `global-error.test.tsx`: it names the row, and it
     // says why the file matters if it is ever deleted, where that render file would only fail to
     // resolve its import.
