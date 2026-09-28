@@ -69,6 +69,15 @@ const COPY_MODULES = [
 /** The About page and the record that holds its copy, one of which quotes the case studies. */
 const ABOUT_COPY = ['app/about/page.tsx', 'data/pages/about.ts'];
 
+/**
+ * Whether `source` has a value import from the case-study data: a statement at the start of a line,
+ * so a comment that names the module does not count, and not `import type`, which brings no figure
+ * in. Behaviour (the sentence quoting the study's metric) is `data/pages/__tests__/records.test.ts`'s.
+ */
+function importsCaseStudies(source: string): boolean {
+  return /^import\s+(?!type\s)[^;]*?\sfrom\s+'@\/data\/case-studies';/m.test(source);
+}
+
 interface Hit {
   file: string;
   line: number;
@@ -108,8 +117,18 @@ describe('metrics and biography live in one place', () => {
       const source = readFileSync(join(SRC, file), 'utf8');
       expect(source.length, `${file} must be readable and non-empty`).toBeGreaterThan(100);
     }
+    // R33's import half reads ABOUT_COPY, and it only runs once #49 turns R33 into `it`: until then
+    // the literal half fails first. So its files are proven readable here, and inside the scanned
+    // set, or a rename would leave R33 passing as an expected failure and throwing ENOENT later.
+    for (const file of ABOUT_COPY) {
+      expect(COPY_MODULES, `${file} must be one of the scanned copy modules`).toContain(file);
+      const source = readFileSync(join(SRC, file), 'utf8');
+      expect(source.length, `${file} must be readable and non-empty`).toBeGreaterThan(100);
+    }
     // And a literal that really is there, so the search itself is proven to work.
     expect(findLiterals(['Milos Cvetkovic'], ['app/layout.tsx']).length).toBeGreaterThan(0);
+    // And the import check on a module that does import the data, so its pattern is proven too.
+    expect(importsCaseStudies(readFileSync(join(SRC, 'data/pages/about.ts'), 'utf8'))).toBe(true);
   });
 
   it.fails(
@@ -130,11 +149,13 @@ describe('metrics and biography live in one place', () => {
       // The other half of the same row: the About copy has to read the figures from somewhere.
       // Forbidding the literal without requiring the import would be satisfied by deleting the
       // sentence. #59 moved the copy from the page into its record, so either module may hold it.
-      const about = ABOUT_COPY.map((file) => readFileSync(join(SRC, file), 'utf8')).join('\n');
+      const importers = ABOUT_COPY.filter((file) =>
+        importsCaseStudies(readFileSync(join(SRC, file), 'utf8')),
+      );
       expect(
-        about,
+        importers,
         `the About copy (${ABOUT_COPY.join(' or ')}) must import the case-study data it quotes figures from`,
-      ).toMatch(/from '@\/data\/case-studies'/);
+      ).not.toHaveLength(0);
     },
   );
 

@@ -14,38 +14,38 @@ if (!agentStudy) throw new Error('The About page quotes the "self-healing-agent"
 const agentMetric = agentStudy.highlight.metric;
 
 export interface TimelineEntry {
-  year: string;
-  role: string;
-  company: string;
-  highlight: string;
-  description: string;
+  readonly year: string;
+  readonly role: string;
+  readonly company: string;
+  readonly highlight: string;
+  readonly description: string;
 }
 
 export interface Belief {
-  title: string;
-  description: string;
-  icon: string;
+  readonly title: string;
+  readonly description: string;
+  readonly icon: string;
 }
 
 export interface Fact {
-  label: string;
-  value: string;
+  readonly label: string;
+  readonly value: string;
 }
 
 export interface Credential {
-  icon: string;
-  text: string;
+  readonly icon: string;
+  readonly text: string;
 }
 
 /** A profile the closing call to action links to; the primary one is the filled button. */
 export interface ProfileLink {
-  name: string;
-  href: string;
-  primary: boolean;
+  readonly name: string;
+  readonly href: string;
+  readonly primary: boolean;
 }
 
 /** A run of story text: plain, or set in bold or italics where the page emphasises it. */
-export type StoryRun = string | { text: string; emphasis: 'strong' | 'em' };
+export type StoryRun = string | { readonly text: string; readonly emphasis: 'strong' | 'em' };
 
 /** A story paragraph: plain text, or its runs in reading order, joined as they are. */
 export type StoryParagraph = string | readonly StoryRun[];
@@ -152,7 +152,7 @@ export const aboutCopy = {
     text: 'I share engineering insights, open-source work, and lessons learned from the trenches. Follow along or drop me a message.',
     links: connectLinks,
   },
-};
+} as const;
 
 /** A story paragraph as the text it reads as: the twin has no emphasis to carry. */
 function plainText(paragraph: StoryParagraph): string {

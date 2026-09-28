@@ -16,16 +16,22 @@ export const metadata = buildMetadata({
   path: aboutRecord.path,
 });
 
-/** A story paragraph's runs, with the emphasis the record marks. */
+/**
+ * A story paragraph's runs, with the emphasis the record marks. A run is keyed by its place: two
+ * runs of one paragraph may carry the same text, and the list never reorders.
+ */
 function StoryText({ paragraph }: { paragraph: StoryParagraph }) {
   if (typeof paragraph === 'string') return paragraph;
-  return paragraph.map((run) => {
+  return paragraph.map((run, index) => {
     if (typeof run === 'string') return run;
-    return run.emphasis === 'strong' ? (
-      <strong key={run.text}>{run.text}</strong>
-    ) : (
-      <em key={run.text}>{run.text}</em>
-    );
+    switch (run.emphasis) {
+      case 'strong':
+        return <strong key={index}>{run.text}</strong>;
+      case 'em':
+        return <em key={index}>{run.text}</em>;
+      default:
+        throw new Error(`StoryText: unknown emphasis ${String(run.emphasis satisfies never)}`);
+    }
   });
 }
 

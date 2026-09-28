@@ -8,13 +8,13 @@ import type { PageRecord, PageSection } from './types';
 
 export interface SocialLink {
   /** The profile's name, the card's heading, and the key of its icon on the page. */
-  name: string;
-  href: string;
-  description: string;
+  readonly name: string;
+  readonly href: string;
+  readonly description: string;
   /** The button label beside the card. */
-  cta: string;
+  readonly cta: string;
   /** The one profile whose button is filled rather than outlined. */
-  primary: boolean;
+  readonly primary: boolean;
 }
 
 export const socialLinks = [
@@ -55,7 +55,7 @@ export const contactCopy = {
     text: 'Check out my latest projects, case studies, and the engineering behind them.',
     link: { text: 'View My Work', href: '/work' },
   },
-};
+} as const;
 
 const sections: readonly PageSection[] = [
   { kind: 'prose', heading: contactCopy.eyebrow, paragraphs: [contactCopy.intro] },
