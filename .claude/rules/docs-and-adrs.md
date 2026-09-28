@@ -3,6 +3,8 @@ paths:
   - 'docs/**'
   - '.github/prompts/**'
   - '.github/workflows/docs-drift.yml'
+  - 'scripts/check-adr-index.mjs'
+  - 'scripts/check-adr-index.test.mjs'
   - 'scripts/check-docs-drift.ts'
   - 'scripts/docs-drift-patch.mjs'
   - 'scripts/ai-refusals.test.mjs'
@@ -51,6 +53,12 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   false when the record was accepted, under the rules in
   `docs/adr/0012-correcting-accepted-records.md`, which sets the status to
   `Accepted (corrected YYYY-MM-DD)` and adds a dated, append-only `## Corrections` entry.
+  `pnpm check:adrs` (`scripts/check-adr-index.mjs`, a step of CI's `quality` job) fails when a
+  record's status, H1 title, date or link disagrees with its index row, when a status is not one of
+  ADR 0012's six forms, when a `(corrected …)` date is not the newest `## Corrections` heading, or
+  when a superseded record's pointer does not link its successor or that successor is not an
+  accepted, later record; it never rewrites either side. It exits 1 on a disagreement and 2 when it
+  could not run, as `pnpm check:docs-drift` does.
 - Before editing a document that describes repository or CI settings, check each claim against the
   live settings (`gh api repos/milosCvetkovicDev/website`, `.../branches/main/protection`) rather
   than trusting the existing text, and cite code as a path with line numbers checked against

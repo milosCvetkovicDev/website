@@ -29,11 +29,8 @@ Personal site of Milos Cvetkovic, Senior Full-Stack Engineer. An interactive, an
 ```
 apps/
   web/            Next.js site (src/app routes, src/components, src/data, e2e/)
-  playground/     Vite + React sandbox for experiments
 packages/
-  eslint-config/      shared ESLint presets (not yet wired into the apps)
   prettier-config/    shared Prettier config, referenced by prettier.config.mjs files
-  typescript-config/  shared tsconfig bases (not yet wired into the apps)
 scripts/          @repo/scripts package: CI gates, Vercel build step, flake hunt, tests
 docs/
   adr/            architecture decision records
@@ -54,25 +51,26 @@ pnpm install
 pnpm dev:web
 ```
 
-The site runs on `http://localhost:3000`. `pnpm dev:playground` starts the sandbox.
+The site runs on `http://localhost:3000`.
 
 `pnpm install` runs no dependency build scripts: the packages pnpm 10 would ask about ship prebuilt binaries and are denied in `pnpm-workspace.yaml` ([ADR 0013](docs/adr/0013-dependency-build-scripts-reviewed.md)). Each denial records the version whose script was read, and `pnpm check:allowbuilds` fails CI when that drifts from the lockfile. A checkout from before the setting keeps printing the warning until `pnpm clean && pnpm install`.
 
 ## Quality gates
 
-CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, commitlint runs in a workflow of its own, `.github/workflows/commitlint.yml`, over the pull request title (as written, and with the ` (#NN)` suffix the squash commit gets) and every commit on the branch, or over every commit a push to `main` lands. The title and the push to `main` are linted without commitlint's default ignores, so a title such as `revert everything` or `Merge branch x into y` fails there although the local hook would accept it as a commit. Of the rest, the `quality` job runs the first eight in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last two. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message.
+CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, commitlint runs in a workflow of its own, `.github/workflows/commitlint.yml`, over the pull request title (as written, and with the ` (#NN)` suffix the squash commit gets) and every commit on the branch, or over every commit a push to `main` lands. The title and the push to `main` are linted without commitlint's default ignores, so a title such as `revert everything` or `Merge branch x into y` fails there although the local hook would accept it as a commit. Of the rest, the `quality` job runs the first nine in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last two. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message.
 
 | Command                           | What it checks                                                                                                                      | Pre-commit         | CI  |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --- |
 | dependency review                 | Lockfile dependencies a pull request adds with a known advisory                                                                     | -                  | yes |
 | `pnpm check:allowbuilds`          | `allowBuilds` entries against the versions the lockfile resolves                                                                    | -                  | yes |
+| `pnpm check:adrs`                 | Each ADR's status, title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules            | -                  | yes |
 | `pnpm test:scripts`               | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step, commitlint configs, web server log, flake hunt | -                  | yes |
 | `pnpm format:check`               | Prettier, shared config, Tailwind class order                                                                                       | yes (staged files) | yes |
-| `pnpm lint`                       | ESLint with `--max-warnings 0` in every app                                                                                         | yes (staged files) | yes |
+| `pnpm lint`                       | ESLint with `--max-warnings 0` in `apps/web`                                                                                        | yes (staged files) | yes |
 | commitlint                        | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...); in CI, the PR title and every commit                            | yes                | yes |
-| `pnpm typecheck`                  | `next typegen && tsc --noEmit` (web), `tsc -b` (playground), strict `checkJs` over `scripts/`                                       | -                  | yes |
+| `pnpm typecheck`                  | `next typegen && tsc --noEmit` (web), strict `checkJs` over `scripts/`                                                              | -                  | yes |
 | `pnpm test`                       | Vitest unit tests                                                                                                                   | -                  | yes |
-| `pnpm build`                      | Production builds of both apps                                                                                                      | -                  | yes |
+| `pnpm build`                      | Production build of `apps/web`                                                                                                      | -                  | yes |
 | `pnpm --filter web test:e2e`      | Playwright against the production build; a test that passes only on a retry fails the run                                           | -                  | yes |
 | `scripts/check-webserver-log.mjs` | Anything the web server wrote to stderr during the e2e run, beyond ADR 0015's `NoFallbackError` block                               | -                  | yes |
 

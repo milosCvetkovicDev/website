@@ -54,6 +54,9 @@ jobs:
       - name: Check allowBuilds entries against the lockfile
         run: pnpm check:allowbuilds
 
+      - name: Check ADR records against their index
+        run: pnpm check:adrs
+
       - name: Root script tests
         run: pnpm test:scripts
 
