@@ -95,7 +95,7 @@ export default function AboutPage() {
 
         {/* The story */}
         <section className="mb-20">
-          <div className="prose prose-lg dark:prose-invert max-w-none space-y-6">
+          <div className="space-y-6">
             <p className="text-lg leading-relaxed">
               You know that codebase? The one with the &quot;temporary&quot; workaround from 2017
               that somehow became load-bearing? The one where three developers quit rather than
