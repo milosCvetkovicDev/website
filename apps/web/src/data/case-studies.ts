@@ -17,7 +17,8 @@ export interface CaseStudyHighlight {
 /**
  * Renders a metric for display. Total by construction: a value that is not a finite number has no
  * honest rendering, so it becomes an em dash rather than "NaN%", and the digit count is clamped to
- * the range toFixed accepts so a data edit cannot throw during server rendering.
+ * 0..20, inside the 0..100 that toFixed accepts, so a data edit cannot throw during server
+ * rendering.
  */
 export function formatMetric(metric: CaseStudyMetric): string {
   if (!Number.isFinite(metric.value)) return '—';

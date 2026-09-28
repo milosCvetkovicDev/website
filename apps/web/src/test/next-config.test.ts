@@ -1,9 +1,18 @@
+/**
+ * These assertions read a configuration module and the filesystem and run git, with no DOM in
+ * them, and building a jsdom window is the most expensive thing in a test file that does not need
+ * one.
+ *
+ * @vitest-environment node
+ */
 import { execFileSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
@@ -12,7 +21,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { unstable_getResponseFromNextConfig } from 'next/experimental/testing/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import nextConfig, {
   contentSecurityPolicy,
   crossOriginOpenerPolicy,
@@ -27,6 +36,29 @@ import { PRODUCTION_ALIAS_HOST } from '../../production-alias';
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.resolve(testDir, '../..');
 const repoRoot = path.resolve(appDir, '../..');
+
+/** Every temp tree this file builds, removed in afterAll so a run leaves the OS temp dir as is. */
+const tempDirs: string[] = [];
+
+function makeTempDir(prefix: string): string {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
+
+afterAll(() => {
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+});
+
+/**
+ * Loads next.config.ts fresh under the current environment. The module reads variables such as
+ * VERCEL_ENV and NEXT_DIST_DIR from `process.env` while it is evaluated, so each case that stubs
+ * one needs its own module instance.
+ */
+async function loadFreshConfig() {
+  vi.resetModules();
+  return (await import('../../next.config')).default;
+}
 
 describe('findWorkspaceRoot', () => {
   it('finds the repository root from the app directory', () => {
@@ -46,7 +78,7 @@ describe('findWorkspaceRoot', () => {
   });
 
   it('takes the innermost workspace when checkouts are nested, as in a git worktree', () => {
-    const outer = mkdtempSync(path.join(tmpdir(), 'workspace-root-'));
+    const outer = makeTempDir('workspace-root-');
     const inner = path.join(outer, '.claude', 'worktrees', 'nested');
     const innerApp = path.join(inner, 'apps', 'web');
     mkdirSync(innerApp, { recursive: true });
@@ -58,7 +90,17 @@ describe('findWorkspaceRoot', () => {
   });
 
   it('returns null when no workspace file is above the starting directory', () => {
-    const orphan = mkdtempSync(path.join(tmpdir(), 'no-workspace-'));
+    const orphan = makeTempDir('no-workspace-');
+    // The walk stops at the filesystem root, so the null case means something only while no
+    // ancestor of the OS temp directory holds a workspace file. Assert that rather than assume it.
+    for (let dir = orphan; ; dir = path.dirname(dir)) {
+      expect(
+        existsSync(path.join(dir, 'pnpm-workspace.yaml')),
+        `${dir} holds a pnpm-workspace.yaml, so ${orphan} is not workspace-free`,
+      ).toBe(false);
+      if (path.dirname(dir) === dir) break;
+    }
+
     expect(findWorkspaceRoot(orphan)).toBeNull();
   });
 });
@@ -324,24 +366,18 @@ describe('the production alias', () => {
 });
 
 describe('env', () => {
-  // The config reads VERCEL_ENV when it is evaluated, so each case imports a fresh copy.
-  const freshConfig = async () => {
-    vi.resetModules();
-    return (await import('../../next.config')).default;
-  };
-
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
   it('inlines VERCEL_ENV, so the client-side global error page gates analytics like the layout', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
-    expect((await freshConfig()).env).toEqual({ VERCEL_ENV: 'production' });
+    expect((await loadFreshConfig()).env).toEqual({ VERCEL_ENV: 'production' });
   });
 
   it('inlines an empty string when VERCEL_ENV is unset, which the gate reads as off', async () => {
     vi.stubEnv('VERCEL_ENV', undefined);
-    expect((await freshConfig()).env).toEqual({ VERCEL_ENV: '' });
+    expect((await loadFreshConfig()).env).toEqual({ VERCEL_ENV: '' });
   });
 });
 
@@ -489,5 +525,29 @@ describe('the installed Next.js honours agentRules', () => {
   it('ships the version-matched docs the root CLAUDE.md points agents at', () => {
     expect(statSync(path.join(nextDir, 'dist/docs')).isDirectory()).toBe(true);
     expect(readNext('dist/docs/01-app/02-guides/ai-agents.md')).toMatch(/\bagentRules: false\b/);
+  });
+});
+
+describe('distDir', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('is .next when NEXT_DIST_DIR is unset, as when Playwright did not start Next', async () => {
+    vi.stubEnv('NEXT_DIST_DIR', undefined);
+    expect((await loadFreshConfig()).distDir).toBe('.next');
+  });
+
+  // `||`, not `??`: a shell that expands an unset variable into the environment hands Next an
+  // empty string, which is not a usable distDir and must fall back the way an absent one does.
+  it('falls back to .next when NEXT_DIST_DIR is present but empty', async () => {
+    vi.stubEnv('NEXT_DIST_DIR', '');
+    expect((await loadFreshConfig()).distDir).toBe('.next');
+  });
+
+  it("takes NEXT_DIST_DIR when Playwright's web server sets it", async () => {
+    vi.stubEnv('NEXT_DIST_DIR', '.next-e2e');
+    expect((await loadFreshConfig()).distDir).toBe('.next-e2e');
   });
 });
