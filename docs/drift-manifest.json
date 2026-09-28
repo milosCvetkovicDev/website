@@ -2389,12 +2389,12 @@
       "id": "adr-readme-check-adrs-in-quality-job",
       "doc": "docs/adr/README.md",
       "anchor": "which CI's `quality` job also runs",
-      "claim": "The quality job runs pnpm check:adrs, as the step after check:allowbuilds.",
+      "claim": "The quality job runs pnpm check:adrs.",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": ".github/workflows/ci.yml",
-        "regex": "run: pnpm check:allowbuilds\\n\\n\\s+- name: [^\\n]+\\n\\s+run: (pnpm check:adrs)",
+        "regex": "^  quality:\\r?$(?:\\n(?!  \\S)[^\\n]*)*?\\n\\s+run: (pnpm check:adrs)\\r?$",
         "equals": "pnpm check:adrs"
       }
     },

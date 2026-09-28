@@ -11,17 +11,22 @@
 //   2. the status is one of ADR 0012's six forms, and any date in it is a real one;
 //   3. the H1 is `# NNNN. Title`, numbered as the file is, and the index link text is that title;
 //   4. every record has one row, every row has one file, and each row's link resolves to its file;
-//      no number has two files and no other `.md` sits in the directory;
+//      the rows run in ascending order and none sits after the end of the table; no number has
+//      two files, and nothing but the index and the records sits in the directory (a hidden file
+//      such as .DS_Store is skipped);
 //   5. a `(corrected YYYY-MM-DD)` status has a `## Corrections` section whose newest
 //      `### YYYY-MM-DD` entry carries that date, a `## Corrections` section has such a status, and
-//      its entries run oldest first;
-//   6. a superseded record has a pointer paragraph beneath its status that links its successor;
+//      its entries run oldest first, no earlier than the record's `## Date`, with a second entry on
+//      one day lettered `b`, a third `c`, and so on;
+//   6. a superseded record has a pointer paragraph beneath its status that links its successor,
+//      and that successor is a later record whose status is Accepted or Superseded;
 //
 // and that the index row's Date equals the record's `## Date`.
 //
 // Run with `pnpm check:adrs`, or `node scripts/check-adr-index.mjs [adr-directory]` to check
-// another directory. Prints every problem and exits 1, or exits 0 quietly; exits 2 on a usage
-// error.
+// another directory. Exit codes follow scripts/check-docs-drift.ts: 0 when every record agrees,
+// quietly; 1 when one does not, with every problem listed; 2 when the check could not run (a
+// directory or file it cannot read) or on a usage error.
 //
 // Two rules, both from check-allowbuilds-drift.mjs and the issue. It never exits 0 because it could
 // not see: a heading, row or status it cannot read is a problem with a message, not a skip, so an
@@ -83,7 +88,13 @@ class CheckError extends Error {}
  *   pointer: string | null,
  *   date: string | null,
  *   corrections: CorrectionHeading[] | null,
+ *   correctionsKnown: boolean,
  * }} AdrRecord
+ *
+ * `corrections` is null when the record has no `## Corrections` section, and also when it has one
+ * this check cannot read: two of them, or one an unclosed fence may hide. `correctionsKnown` is
+ * false in the second case, where the reason is already a problem and "has no section" would be
+ * false.
  */
 
 /**
@@ -119,7 +130,9 @@ export function isRealDate(text) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
   if (!match) return false;
   const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
-  const date = new Date(Date.UTC(year, month - 1, day));
+  // Not Date.UTC, which reads a year from 0 to 99 as 1900 to 1999.
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
   return (
     date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
   );
@@ -171,7 +184,7 @@ export function parseStatus(line) {
  */
 export function markdownLines(source) {
   const texts = source
-    .replace(/^﻿/, '')
+    .replace(/^\uFEFF/, '')
     .split('\n')
     .map((text) => text.replace(/\r$/, ''));
 
@@ -307,9 +320,11 @@ export function readRecord(name, source) {
     pointer: null,
     date: null,
     corrections: null,
+    correctionsKnown: true,
   };
 
   const { lines, unclosedFence } = markdownLines(source);
+  if (unclosedFence !== null) record.correctionsKnown = false;
   if (unclosedFence !== null) {
     say(
       `the code fence opened on line ${unclosedFence} is never closed, so no heading after it ` +
@@ -360,7 +375,10 @@ export function readRecord(name, source) {
     } else {
       record.status = line[0].text.trim();
     }
-    if (pointer) record.pointer = pointer.map((l) => l.text.trim()).join(' ');
+    // A fenced block is an example, never the pointer, so a link quoted in one cannot satisfy it.
+    if (pointer && !pointer.some((l) => l.fenced)) {
+      record.pointer = pointer.map((l) => l.text.trim()).join(' ');
+    }
   }
 
   const date = section('Date', true);
@@ -378,6 +396,7 @@ export function readRecord(name, source) {
   }
 
   const corrections = section('Corrections', false);
+  if ((sections.get('Corrections') ?? []).length > 1) record.correctionsKnown = false;
   if (corrections) {
     /** @type {CorrectionHeading[]} */
     const headings = [];
@@ -414,43 +433,47 @@ export function readRecord(name, source) {
  * @returns {{ rows: IndexRow[] | null, problems: string[] }}
  */
 export function readIndex(source) {
-  const { lines } = markdownLines(source);
+  const { lines, unclosedFence } = markdownLines(source);
+  /** @type {string[]} */
+  const problems = [];
+  if (unclosedFence !== null) {
+    problems.push(
+      `${INDEX}: the code fence opened on line ${unclosedFence} is never closed, so nothing ` +
+        'after it can be read',
+    );
+  }
   const headers = lines.filter((line) => !line.fenced && INDEX_HEADER.test(line.text));
 
   if (headers.length === 0) {
-    return {
-      rows: null,
-      problems: [
-        `${INDEX}: has no index table with the header \`| ADR | Title | Status | Date |\``,
-      ],
-    };
+    problems.push(
+      `${INDEX}: has no index table with the header \`| ADR | Title | Status | Date |\``,
+    );
+    return { rows: null, problems };
   }
   if (headers.length > 1) {
-    return {
-      rows: null,
-      problems: [
-        `${INDEX}: has ${headers.length} index tables ` +
-          `(lines ${headers.map((h) => h.number).join(', ')}); this check reads one`,
-      ],
-    };
+    problems.push(
+      `${INDEX}: has ${headers.length} index tables ` +
+        `(lines ${headers.map((h) => h.number).join(', ')}); this check reads one`,
+    );
+    return { rows: null, problems };
   }
 
   const start = headers[0].number; // the line after the header, as an index into `lines`
   const delimiter = lines[start];
   if (!delimiter || !/^\|(?:\s*:?-+:?\s*\|){4}\s*$/.test(delimiter.text)) {
-    return {
-      rows: null,
-      problems: [`${INDEX}: line ${start + 1} is not the table's delimiter row, \`| --- | ... |\``],
-    };
+    problems.push(
+      `${INDEX}: line ${start + 1} is not the table's delimiter row, \`| --- | ... |\``,
+    );
+    return { rows: null, problems };
   }
 
   /** @type {IndexRow[]} */
   const rows = [];
-  /** @type {string[]} */
-  const problems = [];
 
+  let end = start + 1; // the index into `lines` of the first line after the table
   for (const line of lines.slice(start + 1)) {
     if (!line.text.trimStart().startsWith('|')) break;
+    end += 1;
     /** @param {string} message */
     const say = (message) => problems.push(`${INDEX} line ${line.number}: ${message}`);
 
@@ -483,7 +506,25 @@ export function readIndex(source) {
     if (!isRealDate(date)) say(`the ${number} row's date "${date}" is not a real YYYY-MM-DD date`);
     else row.date = date;
 
+    // An equal number is a duplicate row, which collectProblems reports.
+    const previous = rows.at(-1);
+    if (previous && number < previous.number) {
+      say(`the ${number} row comes after the ${previous.number} row; rows run in ADR order`);
+    }
+
     rows.push(row);
+  }
+
+  // The table ends at the first line that does not start with `|`, as in GitHub's rendering, so a
+  // blank line or a row without its leading pipe cuts off every row after it. Those rows would
+  // otherwise be dropped unread.
+  for (const line of lines.slice(end)) {
+    if (!line.fenced && /^\s*\|?\s*\d{4}\s*\|/.test(line.text)) {
+      problems.push(
+        `${INDEX} line ${line.number}: reads like an index row, but the table ends on line ` +
+          `${end}; a table has no blank line inside it and every row starts with \`|\``,
+      );
+    }
   }
 
   if (rows.length === 0 && problems.length === 0) {
@@ -506,14 +547,15 @@ function splitRow(text) {
 }
 
 /**
- * The problems with one record on its own: its status form, its correction bookkeeping and the
- * pointer to the record that supersedes it.
+ * The problems with one record: its status form, its correction bookkeeping and the pointer to the
+ * record that supersedes it, and that successor's own status.
  *
  * @param {AdrRecord} record
  * @param {Set<string>} names every `.md` in the directory
+ * @param {Map<string, AdrRecord>} records every record read, by number, where the number has one file
  * @returns {string[]}
  */
-function recordProblems(record, names) {
+function recordProblems(record, names, records) {
   /** @type {string[]} */
   const problems = [];
   /** @param {string} message */
@@ -527,12 +569,44 @@ function recordProblems(record, names) {
     // Compared as plain strings: the dates are fixed-width, and a date alone sorts before the same
     // date with a letter.
     const labels = corrections.map(({ date, suffix }) => `${date}${suffix}`);
-    for (let i = 1; i < corrections.length; i++) {
+    for (let i = 0; i < corrections.length; i++) {
+      const { date, suffix, line } = corrections[i];
+      if (record.date !== null && date < record.date) {
+        say(
+          `the correction dated ${labels[i]} (line ${line}) is earlier than the record's own ` +
+            `\`## Date\`, ${record.date}`,
+        );
+      }
+      if (i === 0) {
+        if (suffix !== '') {
+          say(
+            `the correction dated ${labels[i]} (line ${line}) is the first on its day, so it ` +
+              `carries no letter: \`### ${date}\``,
+          );
+        }
+        continue;
+      }
+      const previous = corrections[i - 1];
       if (labels[i] <= labels[i - 1]) {
         say(
-          `the correction dated ${labels[i]} (line ${corrections[i].line}) comes after ` +
-            `${labels[i - 1]} (line ${corrections[i - 1].line}); entries run oldest first, and ` +
+          `the correction dated ${labels[i]} (line ${line}) comes after ` +
+            `${labels[i - 1]} (line ${previous.line}); entries run oldest first, and ` +
             'a second one on the same day gets a letter (`### 2026-09-10b`)',
+        );
+        continue;
+      }
+      // ADR 0012 letters a second correction on one day `b`; a third takes `c`, and so on.
+      const expected =
+        date === previous.date
+          ? previous.suffix === ''
+            ? 'b'
+            : String.fromCharCode(previous.suffix.charCodeAt(0) + 1)
+          : '';
+      if (suffix !== expected) {
+        say(
+          `the correction dated ${labels[i]} (line ${line}) should be headed ` +
+            `\`### ${date}${expected}\`: the first entry on a day has no letter, the second ` +
+            '`b`, the third `c`',
         );
       }
     }
@@ -548,10 +622,13 @@ function recordProblems(record, names) {
 
   if (status.corrected !== null) {
     if (corrections === null) {
-      say(
-        `the status says corrected ${status.corrected}, but the record has no ` +
-          '`## Corrections` section',
-      );
+      // When the section is there but unreadable, that is already a problem of its own.
+      if (record.correctionsKnown) {
+        say(
+          `the status says corrected ${status.corrected}, but the record has no ` +
+            '`## Corrections` section',
+        );
+      }
     } else if (corrections.length > 0) {
       const newest = corrections.reduce((a, b) => (b.date > a.date ? b : a));
       if (newest.date !== status.corrected) {
@@ -562,11 +639,18 @@ function recordProblems(record, names) {
       }
     }
   } else if (corrections !== null) {
-    say(
-      `has a \`## Corrections\` section, but its status "${record.status}" does not say ` +
-        '`(corrected YYYY-MM-DD)`; ADR 0012 sets it to the date of the newest entry, in the ' +
-        'record and the index',
-    );
+    if (status.kind === 'Accepted' || status.kind === 'Superseded') {
+      say(
+        `has a \`## Corrections\` section, but its status "${record.status}" does not say ` +
+          '`(corrected YYYY-MM-DD)`; ADR 0012 sets it to the date of the newest entry, in the ' +
+          'record and the index',
+      );
+    } else {
+      say(
+        `has a \`## Corrections\` section, but its status is ${status.kind}; ADR 0012 corrects ` +
+          'only an accepted record, one that is Accepted or Superseded',
+      );
+    }
   }
 
   if (status.kind === 'Superseded' && status.supersededBy !== null) {
@@ -576,20 +660,47 @@ function recordProblems(record, names) {
       .sort();
     if (by === record.number) {
       say('is superseded by itself');
+    } else if (by < record.number) {
+      // A record is superseded by a new one, and numbers run in the order records are accepted
+      // (ADR 0012). This also rules out two records superseding each other.
+      say(
+        `is superseded by ADR-${by}, an earlier record; a record is superseded by a later one, ` +
+          'with a new number',
+      );
     } else if (successors.length === 0) {
       say(`is superseded by ADR-${by}, but there is no ${by}-*.md in this directory`);
-    } else if (record.pointer === null) {
-      say(
-        `is superseded by ADR-${by}, but has no pointer paragraph beneath its status saying ` +
-          'which of its rules no longer apply (docs/adr/README.md, step 4)',
-      );
-    } else if (
-      !linkTargets(record.pointer).some((target) => {
-        const file = resolveLink(target, names);
-        return file !== null && successors.includes(file);
-      })
-    ) {
-      say(`the pointer beneath its status does not link the superseding record, ${successors[0]}`);
+    } else {
+      if (record.pointer === null) {
+        say(
+          `is superseded by ADR-${by}, but has no pointer paragraph beneath its status saying ` +
+            'which of its rules no longer apply (docs/adr/README.md, step 4)',
+        );
+      } else if (
+        !linkTargets(record.pointer).some((target) => {
+          const file = resolveLink(target, names);
+          return file !== null && successors.includes(file);
+        })
+      ) {
+        say(
+          `the pointer beneath its status does not link the superseding record, ${successors[0]}`,
+        );
+      }
+      // A successor that is still Proposed, or was Withdrawn, replaces nothing. One that has since
+      // been superseded itself is a chain, which is allowed. An unreadable status is already a
+      // problem of the successor's own.
+      const successor = records.get(by);
+      const parsedSuccessor = successor?.status ? parseStatus(successor.status) : null;
+      if (
+        successor &&
+        parsedSuccessor &&
+        'status' in parsedSuccessor &&
+        (parsedSuccessor.status.kind === 'Proposed' || parsedSuccessor.status.kind === 'Withdrawn')
+      ) {
+        say(
+          `is superseded by ADR-${by}, but ${successor.name} is ${parsedSuccessor.status.kind}; ` +
+            'only an accepted record supersedes another',
+        );
+      }
     }
   }
 
@@ -597,16 +708,34 @@ function recordProblems(record, names) {
 }
 
 /**
+ * An entry of the ADR directory that is not a `.md` file this check reads: a file with another
+ * extension, or a directory, symlink or anything else that is not a regular file.
+ *
+ * @typedef {{ name: string, file: boolean }} OtherEntry
+ */
+
+/**
  * Every problem with an ADR directory, given every `.md` file in it by name. Pure: the caller
  * reads the files.
  *
- * @param {Map<string, string>} files each `.md` file's name and text, the index included
+ * @param {Map<string, string>} files each regular `.md` file's name and text, the index included
+ * @param {OtherEntry[]} [others] every other entry in the directory, hidden ones excepted
  * @returns {string[]}
  */
-export function collectProblems(files) {
+export function collectProblems(files, others = []) {
   /** @type {string[]} */
   const problems = [];
   const names = new Set(files.keys());
+
+  for (const { name, file } of [...others].sort((a, b) => (a.name < b.name ? -1 : 1))) {
+    problems.push(
+      file
+        ? `${name}: is not a .md file; only README.md and NNNN-kebab-case-title.md sit in the ` +
+            'ADR directory, so rename it or move it out'
+        : `${name}: is not a regular file; only README.md and NNNN-kebab-case-title.md sit in ` +
+            'the ADR directory, so move it out',
+    );
+  }
 
   /** @type {Map<string, string[]>} */
   const filesByNumber = new Map();
@@ -676,9 +805,17 @@ export function collectProblems(files) {
     }
   }
 
-  for (const name of recordNames) {
-    const { record, problems: unreadable } = readRecord(name, files.get(name) ?? '');
-    problems.push(...unreadable, ...recordProblems(record, names));
+  // Read every record first: a superseded record's check reads its successor's status.
+  const read = recordNames.map((name) => readRecord(name, files.get(name) ?? ''));
+  /** @type {Map<string, AdrRecord>} */
+  const records = new Map();
+  for (const { record } of read) {
+    if ((filesByNumber.get(record.number) ?? []).length === 1) records.set(record.number, record);
+  }
+
+  for (const { record, problems: unreadable } of read) {
+    const { name } = record;
+    problems.push(...unreadable, ...recordProblems(record, names, records));
 
     if (rows === null) continue;
     const matching = rowsByNumber.get(record.number) ?? [];
@@ -711,32 +848,46 @@ export function collectProblems(files) {
 }
 
 /**
- * Reads every `.md` file in the directory.
+ * Reads every regular `.md` file in the directory, and lists every other entry but the hidden
+ * ones (an editor's or Finder's `.DS_Store`, which git ignores) for collectProblems to report.
  *
  * @param {string} dir
- * @returns {Map<string, string>}
+ * @returns {{ files: Map<string, string>, others: OtherEntry[] }}
  */
-function readDirectory(dir) {
-  let names;
+export function readDirectory(dir) {
+  let entries;
   try {
-    names = readdirSync(dir).filter((name) => /\.md$/i.test(name));
+    entries = readdirSync(dir, { withFileTypes: true });
   } catch (error) {
     throw new CheckError(`cannot list ${dir}: ${messageOf(error)}`);
   }
   /** @type {Map<string, string>} */
   const files = new Map();
-  for (const name of names) {
+  /** @type {OtherEntry[]} */
+  const others = [];
+  for (const entry of entries) {
+    if (entry.name.startsWith('.')) continue;
+    if (!entry.isFile()) {
+      others.push({ name: entry.name, file: false });
+      continue;
+    }
+    if (!/\.md$/.test(entry.name)) {
+      others.push({ name: entry.name, file: true });
+      continue;
+    }
     try {
-      files.set(name, readFileSync(join(dir, name), 'utf8'));
+      files.set(entry.name, readFileSync(join(dir, entry.name), 'utf8'));
     } catch (error) {
-      throw new CheckError(`cannot read ${join(dir, name)}: ${messageOf(error)}`);
+      throw new CheckError(`cannot read ${join(dir, entry.name)}: ${messageOf(error)}`);
     }
   }
-  return files;
+  return { files, others };
 }
 
 function main() {
   const args = process.argv.slice(2);
+  // `pnpm check:adrs -- <dir>` passes the `--` on to the script.
+  if (args[0] === '--') args.shift();
   if (args.length > 1 || args.some((arg) => arg === '' || arg.startsWith('-'))) {
     console.error(USAGE);
     process.exitCode = 2;
@@ -746,11 +897,12 @@ function main() {
 
   let problems;
   try {
-    problems = collectProblems(readDirectory(dir));
+    const { files, others } = readDirectory(dir);
+    problems = collectProblems(files, others);
   } catch (error) {
     if (!(error instanceof CheckError)) throw error;
     console.error(`ADR index check could not run: ${error.message}`);
-    process.exitCode = 1;
+    process.exitCode = 2;
     return;
   }
 

@@ -3,8 +3,10 @@
 // Every check gets a fixture that passes and one that fails, because a check that has only ever
 // been seen passing may be a check that cannot fail. The parse cases matter as much as the checks:
 // the script's rule is that anything it cannot read is a problem, never a skip, so each shape it
-// refuses is pinned here. The last group runs it against a copy of the real docs/adr, clean and
-// with the four index defects task #51 found by hand put back.
+// refuses is pinned here. One group puts the four index defects task #51 found by hand back into
+// the real docs/adr and expects exactly those four on top of whatever the records say today, with
+// the expected text read from the records, so a later correction to one of them leaves it green.
+// Whether the real records pass is `pnpm check:adrs`'s job in CI, not this suite's.
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -28,6 +30,7 @@ import {
   isRealDate,
   markdownLines,
   parseStatus,
+  readDirectory,
   readIndex,
   readRecord,
 } from './check-adr-index.mjs';
@@ -251,7 +254,7 @@ describe('parseStatus', () => {
 });
 
 describe('isRealDate', () => {
-  for (const text of ['2026-09-28', '2024-02-29', '2026-12-31', '2026-01-01']) {
+  for (const text of ['2026-09-28', '2024-02-29', '2026-12-31', '2026-01-01', '0099-01-01']) {
     it(`accepts ${text}`, () => assert.equal(isRealDate(text), true));
   }
   for (const text of [
@@ -289,7 +292,7 @@ describe('markdownLines', () => {
   });
 
   it('drops a carriage return and a byte order mark', () => {
-    const { lines } = markdownLines('﻿# 0001. Title\r\n\r\n');
+    const { lines } = markdownLines('\uFEFF# 0001. Title\r\n\r\n');
     assert.equal(lines[0].text, '# 0001. Title');
     assert.equal(lines[1].text, '');
   });
@@ -307,6 +310,7 @@ describe('readRecord', () => {
         pointer: 'No longer applies: all of it. See [ADR 0002](0002-second-decision.md).',
         date: '2026-09-08',
         corrections: null,
+        correctionsKnown: true,
       },
       problems: [],
     });
@@ -354,6 +358,15 @@ describe('readRecord', () => {
     assert.deepEqual(problems, []);
     assert.equal(record.status, 'Superseded by ADR-0002');
     assert.equal(record.pointer, 'See [ADR 0002](0002-second-decision.md).');
+  });
+
+  it('reads no pointer from a fenced block beneath the status', () => {
+    const [first] = baseRecords();
+    const source = recordSource({
+      ...first,
+      pointer: '```md\nSee [ADR 0002](0002-second-decision.md).\n```',
+    });
+    assert.equal(readRecord(fileName(first), source).record.pointer, null);
   });
 
   /** @type {[string, (source: string) => string, RegExp][]} */
@@ -518,6 +531,48 @@ describe('readIndex', () => {
     const { problems } = readIndex(source);
     assert.match(problems.join('\n'), /line 9: has 3 cells, not 4/);
   });
+
+  it('reports a code fence that is never closed, above the table or below it', () => {
+    const table = indexSource(baseRecords().map(rowOf));
+    const above = readIndex(`\`\`\`\n${table}`);
+    assert.equal(above.rows, null);
+    assert.match(above.problems[0], /^README\.md: the code fence opened on line 1 is never closed/);
+    assert.match(above.problems[1], /no index table with the header/);
+
+    const below = readIndex(`${table}\n\`\`\`\nnever closed\n`);
+    assert.equal(below.rows?.length, 3);
+    assert.deepEqual(below.problems, [
+      `README.md: the code fence opened on line ${table.split('\n').length + 1} is never closed, ` +
+        'so nothing after it can be read',
+    ]);
+  });
+
+  it('reports a row out of ADR order', () => {
+    const [first, second, third] = baseRecords().map(rowOf);
+    const { problems } = readIndex(indexSource([first, third, second]));
+    assert.deepEqual(problems, [
+      'README.md line 9: the 0002 row comes after the 0003 row; rows run in ADR order',
+    ]);
+  });
+
+  /** @type {[string, (row: string) => string][]} */
+  const cutOff = [
+    ['a blank line', (row) => `\n${row}`],
+    ['no leading pipe', (row) => row.replace(/^\| /, '')],
+  ];
+  for (const [name, change] of cutOff) {
+    it(`reports a row cut off from the table by ${name}`, () => {
+      const row = '| 0003 | [Third decision](0003-third-decision.md) | Accepted | 2026-09-10 |';
+      const source = indexSource(baseRecords().map(rowOf)).replace(row, change(row));
+      const { rows, problems } = readIndex(source);
+      assert.equal(rows?.length, 2);
+      assert.equal(problems.length, 1, problems.join('\n'));
+      assert.match(
+        problems[0],
+        /^README\.md line (9|10): reads like an index row, but the table ends on line 8/,
+      );
+    });
+  }
 });
 
 describe('check 1: the status agrees with the index', () => {
@@ -691,6 +746,19 @@ describe('check 4: one row per record, one file per row, links that resolve', ()
     });
   }
 
+  it('fails an entry that is not a .md file, or not a file at all', () => {
+    const problems = collectProblems(directory(baseRecords()), [
+      { name: '0004-fourth.markdown', file: true },
+      { name: 'drafts.md', file: false },
+    ]);
+    assert.deepEqual(problems, [
+      '0004-fourth.markdown: is not a .md file; only README.md and NNNN-kebab-case-title.md sit ' +
+        'in the ADR directory, so rename it or move it out',
+      'drafts.md: is not a regular file; only README.md and NNNN-kebab-case-title.md sit in the ' +
+        'ADR directory, so move it out',
+    ]);
+  });
+
   it('fails a directory with no index', () => {
     const files = directory(baseRecords());
     files.delete('README.md');
@@ -777,6 +845,78 @@ describe('check 5: correction bookkeeping', () => {
       /the correction dated 2026-09-12 \(line \d+\) comes after 2026-09-12 \(line \d+\).*a letter/,
     );
   });
+
+  it('passes a third correction on one day lettered c', () => {
+    assert.deepEqual(
+      collectProblems(
+        withRecord('0002', {
+          corrections: ['2026-09-10', '2026-09-12', '2026-09-12b', '2026-09-12c'],
+        }),
+      ),
+      [],
+    );
+  });
+
+  it('fails a letter that skips one', () => {
+    assertOneProblem(
+      withRecord('0002', { corrections: ['2026-09-10', '2026-09-12', '2026-09-12z'] }),
+      /the correction dated 2026-09-12z \(line \d+\) should be headed `### 2026-09-12b`/,
+    );
+  });
+
+  it('fails a letter on the first correction of a day', () => {
+    assertOneProblem(
+      withRecord('0002', { corrections: ['2026-09-10', '2026-09-12a'] }),
+      /the correction dated 2026-09-12a \(line \d+\) should be headed `### 2026-09-12`/,
+    );
+    assertOneProblem(
+      withRecord('0002', {
+        status: 'Accepted (corrected 2026-09-10)',
+        corrections: ['2026-09-10b'],
+      }),
+      /the correction dated 2026-09-10b \(line \d+\) is the first on its day, so it carries no letter/,
+    );
+  });
+
+  it('fails a correction dated before the record itself', () => {
+    assertOneProblem(
+      withRecord('0002', {
+        status: 'Accepted (corrected 2026-09-01)',
+        corrections: ['2026-09-01'],
+      }),
+      /^0002-second-decision\.md: the correction dated 2026-09-01 \(line \d+\) is earlier than the record's own `## Date`, 2026-09-09$/,
+    );
+  });
+
+  for (const status of ['Proposed', 'Withdrawn']) {
+    it(`fails a Corrections section under ${status} without suggesting a corrected form`, () => {
+      assertOneProblem(
+        withRecord('0003', { status, corrections: ['2026-09-11'] }),
+        new RegExp(
+          `^0003-third-decision\\.md: has a \`## Corrections\` section, but its status is ${status}; ` +
+            'ADR 0012 corrects only an accepted record',
+        ),
+      );
+    });
+  }
+
+  it('does not call two Corrections sections none, under a corrected status', () => {
+    const [, second] = baseRecords();
+    const source =
+      `${recordSource({ ...second, corrections: [] })}\n## Corrections\n\n### 2026-09-12\n\nx\n` +
+      '\n## Corrections\n\n### 2026-09-12b\n\ny\n';
+    const problems = collectProblems(withRecord('0002', { source }));
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /has 2 `## Corrections` sections/);
+  });
+
+  it('does not call a Corrections section hidden by an unclosed fence none', () => {
+    const [, second] = baseRecords();
+    const source = recordSource(second).replace('What.\n', 'What.\n\n```\nnever closed\n');
+    const problems = collectProblems(withRecord('0002', { source }));
+    assert.equal(problems.length, 1, problems.join('\n'));
+    assert.match(problems[0], /the code fence opened on line \d+ is never closed/);
+  });
 });
 
 describe('check 6: a superseded record points at its successor', () => {
@@ -823,6 +963,45 @@ describe('check 6: a superseded record points at its successor', () => {
     });
     assertOneProblem(files, /^0001-first-decision\.md: is superseded by itself$/);
   });
+
+  it('fails a pointer that only quotes the link in a fenced block', () => {
+    assertOneProblem(
+      withRecord('0001', { pointer: '```md\nSee [ADR 0002](0002-second-decision.md).\n```' }),
+      /^0001-first-decision\.md: is superseded by ADR-0002, but has no pointer paragraph/,
+    );
+  });
+
+  for (const status of ['Proposed', 'Withdrawn']) {
+    it(`fails a record superseded by one that is ${status}`, () => {
+      assertOneProblem(
+        withRecord('0002', { status, corrections: [] }),
+        new RegExp(
+          `^0001-first-decision\\.md: is superseded by ADR-0002, but 0002-second-decision\\.md is ${status}; ` +
+            'only an accepted record supersedes another$',
+        ),
+      );
+    });
+  }
+
+  it('passes a chain, a successor that has been superseded in turn', () => {
+    const files = withRecord('0002', {
+      status: 'Superseded by ADR-0003 (corrected 2026-09-12)',
+      pointer: 'See [ADR 0003](0003-third-decision.md).',
+    });
+    assert.deepEqual(collectProblems(files), []);
+  });
+
+  it('fails a record superseded by an earlier one, which rules out a cycle', () => {
+    const files = withRecord('0002', {
+      status: 'Superseded by ADR-0001',
+      pointer: 'See [ADR 0001](0001-first-decision.md).',
+      corrections: [],
+    });
+    assertOneProblem(
+      files,
+      /^0002-second-decision\.md: is superseded by ADR-0001, an earlier record; a record is superseded by a later one/,
+    );
+  });
 });
 
 describe('the index Date agrees with the record', () => {
@@ -836,16 +1015,10 @@ describe('the index Date agrees with the record', () => {
 
 describe('the real records', () => {
   /** @returns {Map<string, string>} */
-  const realFiles = () =>
-    new Map(
-      readdirSync(realAdrDir)
-        .filter((name) => name.endsWith('.md'))
-        .map((name) => [name, readFileSync(join(realAdrDir, name), 'utf8')]),
-    );
+  const realFiles = () => readDirectory(realAdrDir).files;
 
-  it('pass as they stand in docs/adr', () => {
-    assert.deepEqual(collectProblems(realFiles()), []);
-  });
+  /** @param {string} text */
+  const literal = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   /**
    * Replaces one cell of an index row. Column 0 is the number, then title, status and date.
@@ -873,35 +1046,52 @@ describe('the real records', () => {
 
   // Task #51 of epic #42 found these four at once and fixed them by hand. Each would have failed
   // this check: two statuses written without the `ADR-` of ADR 0012's form, one that had dropped
-  // its correction, and a title cell cut short of its record's H1.
+  // its correction, and a title cell cut short of its record's H1. The expected text comes from the
+  // records as they are now, so a later correction to one of them does not break this test.
   it("fail with task #51's four index defects put back", () => {
     const files = realFiles();
+    /** @param {string} number */
+    const recordOf = (number) => {
+      const name = [...files.keys()].find((key) => key.startsWith(`${number}-`));
+      assert.ok(name, `no record ${number} in docs/adr`);
+      return readRecord(name, files.get(name) ?? '').record;
+    };
+    const [r5, r7, r8, r15] = ['0005', '0007', '0008', '0015'].map(recordOf);
+    assert.ok(r5.status && r7.status && r8.status && r15.title, 'the four records read cleanly');
+
+    const uncorrected = r5.status.replace(/ \(corrected \d{4}-\d{2}-\d{2}\)$/, '');
+    assert.notEqual(uncorrected, r5.status, 'ADR 0005 is still corrected, as it was in task #51');
+    const truncated = 'Case-study slugs are fixed at build time';
+    assert.notEqual(truncated, r15.title);
+
+    const before = collectProblems(files);
     let index = files.get('README.md') ?? '';
-    index = setCell(index, '0005', 2, 'Superseded by ADR-0016');
+    index = setCell(index, '0005', 2, uncorrected);
     index = setCell(index, '0007', 2, 'Superseded by 0013 (corrected 2026-09-10)');
     index = setCell(index, '0008', 2, 'Superseded by 0011');
-    index = setCell(
-      index,
-      '0015',
-      1,
-      '[Case-study slugs are fixed at build time](0015-static-case-study-params.md)',
-    );
+    index = setCell(index, '0015', 1, `[${truncated}](${r15.name})`);
     files.set('README.md', index);
 
-    const problems = collectProblems(files);
-    assert.equal(problems.length, 4, problems.join('\n'));
+    const added = collectProblems(files).filter((problem) => !before.includes(problem));
+    assert.equal(added.length, 4, added.join('\n'));
     assert.match(
-      problems[0],
-      /^0005-hosting-on-vercel\.md: the status reads "Superseded by ADR-0016 \(corrected 2026-09-13\)", but its index row .* reads "Superseded by ADR-0016"$/,
+      added[0],
+      new RegExp(
+        `^${literal(r5.name)}: the status reads "${literal(r5.status)}", but its index row .* ` +
+          `reads "${literal(uncorrected)}"$`,
+      ),
     );
     assert.match(
-      problems[1],
-      /^0007-dependency-build-scripts\.md: .* reads "Superseded by 0013 \(corrected 2026-09-10\)"$/,
+      added[1],
+      new RegExp(`^${literal(r7.name)}: .* reads "Superseded by 0013 \\(corrected 2026-09-10\\)"$`),
     );
-    assert.match(problems[2], /^0008-accent-colour-roles\.md: .* reads "Superseded by 0011"$/);
+    assert.match(added[2], new RegExp(`^${literal(r8.name)}: .* reads "Superseded by 0011"$`));
     assert.match(
-      problems[3],
-      /^0015-static-case-study-params\.md: the H1 title is "Case-study slugs are fixed at build time, so unknown ones 404 at the router", but its index row .* says "Case-study slugs are fixed at build time"$/,
+      added[3],
+      new RegExp(
+        `^${literal(r15.name)}: the H1 title is "${literal(r15.title)}", but its index row .* ` +
+          `says "${literal(truncated)}"$`,
+      ),
     );
   });
 });
@@ -929,9 +1119,20 @@ describe('the command', () => {
     }
   }
 
-  it('exits 0 with no output on a copy of the real docs/adr', () => {
+  /**
+   * Writes a fixture directory to disk.
+   *
+   * @param {string} dir
+   * @param {Map<string, string>} files
+   */
+  function writeDirectory(dir, files) {
+    mkdirSync(dir, { recursive: true });
+    for (const [name, source] of files) writeFileSync(join(dir, name), source);
+  }
+
+  it('exits 0 with no output on a directory that agrees with its index', () => {
     inTemp((dir) => {
-      cpSync(realAdrDir, join(dir, 'adr'), { recursive: true });
+      writeDirectory(join(dir, 'adr'), directory(baseRecords()));
       const result = run([join(dir, 'adr')]);
       assert.equal(result.status, 0, result.stderr);
       assert.equal(result.stdout, '');
@@ -941,43 +1142,63 @@ describe('the command', () => {
 
   it('exits 1 and lists every problem when a record disagrees with the index', () => {
     inTemp((dir) => {
-      cpSync(realAdrDir, join(dir, 'adr'), { recursive: true });
-      const index = join(dir, 'adr', 'README.md');
-      const source = readFileSync(index, 'utf8');
-      writeFileSync(
-        index,
-        source
-          .replace(
-            /(\| 0008 \|[^\n]*\| )Superseded by ADR-0011( +\|)/,
-            '$1Superseded by 0011    $2',
-          )
-          .replace(/(\| 0012 \|[^\n]*\| )Accepted( +\|)/, '$1Proposed$2'),
-      );
+      const records = baseRecords();
+      const rows = records
+        .map(rowOf)
+        .map((row) =>
+          row.number === '0001'
+            ? { ...row, status: 'Superseded by 0002' }
+            : row.number === '0003'
+              ? { ...row, status: 'Proposed' }
+              : row,
+        );
+      writeDirectory(join(dir, 'adr'), directory(records, { rows }));
       const result = run([join(dir, 'adr')]);
       assert.equal(result.status, 1);
       assert.equal(result.stdout, '');
       assert.match(
         result.stderr,
-        /0008-accent-colour-roles\.md: the status reads "Superseded by ADR-0011"/,
+        /0001-first-decision\.md: the status reads "Superseded by ADR-0002"/,
       );
-      assert.match(
-        result.stderr,
-        /0012-correcting-accepted-records\.md: the status reads "Accepted"/,
-      );
+      assert.match(result.stderr, /0003-third-decision\.md: the status reads "Accepted"/);
       assert.match(result.stderr, /never rewrites/);
     });
   });
 
-  it('exits 1 when the directory cannot be read', () => {
+  it('reports what else sits in the directory, and skips hidden files', () => {
+    inTemp((dir) => {
+      const adr = join(dir, 'adr');
+      writeDirectory(adr, directory(baseRecords()));
+      writeFileSync(join(adr, '.DS_Store'), '');
+      writeFileSync(join(adr, '0004-fourth.markdown'), '# 0004. Fourth\n');
+      mkdirSync(join(adr, 'drafts.md'));
+      const result = run([adr]);
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(result.stderr, /- 0004-fourth\.markdown: is not a \.md file/);
+      assert.match(result.stderr, /- drafts\.md: is not a regular file/);
+      assert.doesNotMatch(result.stderr, /DS_Store/);
+    });
+  });
+
+  it('exits 2 when the directory cannot be read', () => {
     inTemp((dir) => {
       const result = run([join(dir, 'missing')]);
-      assert.equal(result.status, 1);
+      assert.equal(result.status, 2);
       assert.match(result.stderr, /ADR index check could not run: cannot list /);
     });
   });
 
+  it('takes the directory after a `--`, as `pnpm check:adrs -- <dir>` passes it', () => {
+    inTemp((dir) => {
+      writeDirectory(join(dir, 'adr'), directory(baseRecords()));
+      const result = run(['--', join(dir, 'adr')]);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.stderr, '');
+    });
+  });
+
   it('exits 2 on a usage error', () => {
-    for (const args of [['a', 'b'], ['--fix'], ['']]) {
+    for (const args of [['a', 'b'], ['--fix'], [''], ['--', '--fix'], ['--', 'a', 'b']]) {
       const result = run(args);
       assert.equal(result.status, 2, `${args.join(' ')}: ${result.stderr}`);
       assert.match(result.stderr, /usage: node scripts\/check-adr-index\.mjs \[adr-directory\]/);
