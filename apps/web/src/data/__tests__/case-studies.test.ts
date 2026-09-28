@@ -6,6 +6,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from 'vitest';
+import { isContentDate } from '@/lib/content-date';
 import { adjacentCaseStudies, caseStudies, formatMetric } from '../case-studies';
 
 describe('formatMetric', () => {
@@ -51,11 +52,15 @@ describe('caseStudies', () => {
     expect(new Set(caseStudies.map((study) => study.slug)).size).toBe(caseStudies.length);
   });
 
-  it('dates every study with real calendar dates, updated no earlier than published', () => {
+  it('dates every study with real calendar dates, none in the future, updated no earlier than published', () => {
+    // The live clock is deliberate: "not in the future" is a statement about the day the suite runs.
+    // Google's publication-dates guidance forbids a future date, and the page now shows these.
+    const now = new Date();
     for (const { slug, publishedAt, updatedAt } of caseStudies) {
       for (const date of [publishedAt, updatedAt]) {
         expect(date, slug).toMatch(/^\d{4}-\d{2}-\d{2}$/);
         expect(new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10), slug).toBe(date);
+        expect(isContentDate(date, now), `${slug}: ${date} is in the future`).toBe(true);
       }
       expect(updatedAt >= publishedAt, `${slug}: updatedAt before publishedAt`).toBe(true);
     }
