@@ -184,7 +184,12 @@ export const skillsCopy = {
   intro: RichParagraph;
   headings: Record<'coreSkills' | 'differentiators' | 'toolkit', string>;
   staySharp: { heading: string; paragraphs: readonly RichParagraph[] };
-  cta: { prompt: string; work: InlineLink; linkedIn: InlineLink };
+  // The page renders `work` through `next/link` and `linkedIn` as an external `<a target="_blank">`.
+  cta: {
+    prompt: string;
+    work: InlineLink & { href: `/${string}` };
+    linkedIn: InlineLink & { href: `https://${string}` };
+  };
 };
 
 export const skillsRecord: PageRecord = {

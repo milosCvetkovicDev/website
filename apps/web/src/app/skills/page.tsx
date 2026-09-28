@@ -22,13 +22,21 @@ function Rich({ paragraph }: { paragraph: RichParagraph }) {
   if (typeof paragraph === 'string') return paragraph;
   return paragraph.map((piece, index) => {
     if (typeof piece === 'string') return piece;
-    return piece.tag === 'em' ? (
-      <em key={index}>{piece.text}</em>
-    ) : (
-      <strong key={index} className="text-[var(--foreground)]">
-        {piece.text}
-      </strong>
-    );
+    switch (piece.tag) {
+      case 'em':
+        return <em key={index}>{piece.text}</em>;
+      case 'strong':
+        return (
+          <strong key={index} className="text-[var(--foreground)]">
+            {piece.text}
+          </strong>
+        );
+      default: {
+        // The types rule this out; a new tag must get its own markup rather than fall into another's.
+        const unknown: never = piece.tag;
+        throw new Error(`Rich: no markup for the emphasis tag "${String(unknown)}"`);
+      }
+    }
   });
 }
 

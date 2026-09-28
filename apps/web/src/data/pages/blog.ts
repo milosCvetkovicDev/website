@@ -19,7 +19,7 @@ const comingSoon = {
 export const blogCopy = {
   intro: 'Hard-won lessons from the trenches. No fluff, no hype—just what actually works.',
   comingSoon,
-};
+} satisfies { intro: string; comingSoon: ProseSection };
 
 export const blogRecord: PageRecord = {
   path: '/blog',

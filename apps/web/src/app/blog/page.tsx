@@ -39,8 +39,8 @@ export default function BlogPage() {
             </svg>
           </div>
           <h2 className="mb-3 text-xl font-semibold">{blogCopy.comingSoon.heading}</h2>
-          {blogCopy.comingSoon.paragraphs.map((paragraph) => (
-            <p key={paragraph} className="mx-auto max-w-md text-[var(--muted)]">
+          {blogCopy.comingSoon.paragraphs.map((paragraph, index) => (
+            <p key={index} className="mx-auto max-w-md text-[var(--muted)]">
               {paragraph}
             </p>
           ))}

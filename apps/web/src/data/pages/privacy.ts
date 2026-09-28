@@ -72,6 +72,10 @@ export const privacyCopy = {
     'This site sets no cookies, has no accounts, forms or ads, and does not follow you to other sites. Beyond what any web host receives, it counts page views, and that is all.',
   statistics,
   notes,
+} satisfies {
+  intro: string;
+  statistics: { heading: string; lead: string; closing: Paragraph };
+  notes: readonly ProseSection[];
 };
 
 export const privacyRecord: PageRecord = {
@@ -83,9 +87,10 @@ export const privacyRecord: PageRecord = {
     {
       kind: 'prose',
       heading: statistics.heading,
-      // A prose section has no list, so the twin gives each collected item a paragraph of its own,
-      // between the lead-in and the closing paragraph, in the page's order.
-      paragraphs: [statistics.lead, ...COLLECTED, statistics.closing],
+      // A prose section has no list, so the twin reads the lead-in and the collected items as one
+      // sentence: the items in the page's order, separated by semicolons because several hold
+      // commas of their own. A standalone paragraph per item would read as broken prose.
+      paragraphs: [`${statistics.lead} ${COLLECTED.join('; ')}.`, statistics.closing],
     },
     ...notes,
   ],

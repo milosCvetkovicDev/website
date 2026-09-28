@@ -38,12 +38,15 @@ export const workCopy = {
   intro: string;
   stats: readonly WorkStat[];
   readMore: string;
-  cta: { heading: string; text: string; link: InlineLink };
+  // The page renders the CTA as an external `<a target="_blank">`, so its href must be one.
+  cta: { heading: string; text: string; link: InlineLink & { href: `https://${string}` } };
 };
 
 /**
  * One section per card, under the title the card shows as its heading: the description, the metric
- * as the card renders it through `formatMetric()`, and the link to the study.
+ * as the card renders it through `formatMetric()`, and the link to the study. On the page the whole
+ * card is the link, so its name carries the title; the twin's link names the study itself, or every
+ * card's link would read the same.
  */
 const studies = caseStudies.map(
   ({ slug, title, description, highlight: { metric } }): ProseSection => ({
@@ -52,7 +55,7 @@ const studies = caseStudies.map(
     paragraphs: [
       description,
       `${formatMetric(metric)} ${metric.label}`,
-      [{ text: workCopy.readMore, href: `/work/${slug}` }],
+      [{ text: `${workCopy.readMore}: ${title}`, href: `/work/${slug}` }],
     ],
   }),
 );

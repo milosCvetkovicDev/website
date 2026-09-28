@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { COLLECTED, privacyCopy, privacyRecord } from '@/data/pages/privacy';
 import type { Paragraph } from '@/data/pages/types';
+import { linkKind } from '@/lib/links';
 import { buildMetadata } from '@/lib/metadata';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
@@ -17,8 +18,9 @@ function Sentence({ paragraph }: { paragraph: Paragraph }) {
   if (typeof paragraph === 'string') return paragraph;
   return paragraph.map((piece, index) => {
     if (typeof piece === 'string') return piece;
-    // An on-site path goes through the router; anything else is a plain link, as before.
-    return piece.href.startsWith('/') ? (
+    // An on-site path goes through the router, an external URL is a plain link, as before, and any
+    // other href throws at build time.
+    return linkKind(piece.href) === 'site' ? (
       <Link key={index} href={piece.href} className={LINK_CLASS}>
         {piece.text}
       </Link>
