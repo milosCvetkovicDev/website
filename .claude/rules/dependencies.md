@@ -58,7 +58,10 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   that matches it, so a vite major arrives in one pull request with the `@vitejs/plugin-react` and
   vitest releases that peer on it. The group relies on `apps/web` declaring `vite` directly (ADR
   0027): without that, a plugin-react major would arrive without the vite major it needs and fail
-  as #9 did. Keep the declaration while the group exists.
+  as #9 did. Keep the declaration while the group exists. The major is not pinned by any decision:
+  `scripts/vitest-coverage-pair.test.mjs` fails `pnpm test:scripts` when the installed vite's major
+  is outside the installed plugin-react's `vite` peer range, which is what catches a manual or
+  security update that moves one without the other.
 
 ## Gotchas
 

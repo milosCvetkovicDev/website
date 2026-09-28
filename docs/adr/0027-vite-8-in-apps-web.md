@@ -38,17 +38,24 @@ go, and the two-entry sentence stops being true. It was true when ADR 0013 was a
 
 ## Decision
 
-**`apps/web` declares `vite` `^8.3.1` and `@vitejs/plugin-react` `^6.1.1` as devDependencies.**
-vitest and `@vitest/coverage-v8` keep their specifiers, and `apps/web/vitest.config.ts` is
-unchanged, because plugin-react 6 is called the same way.
+**`apps/web` declares `vite` and `@vitejs/plugin-react` directly, as devDependencies.** When this
+record was accepted they were `^8.3.1` and `^6.1.1`. The decision is the declaration, not the
+major: a later vite or plugin-react major moves both specifiers in the grouped pull request without
+reopening this record, as long as plugin-react's `vite` peer range admits the vite major that
+`apps/web` resolves, which `scripts/vitest-coverage-pair.test.mjs` checks under
+`pnpm test:scripts`. vitest and `@vitest/coverage-v8` keep their specifiers.
+`apps/web/vitest.config.ts` is unchanged: it calls `react()` with no options and sets no `esbuild`
+or `babel` option, so neither plugin-react 6 dropping Babel nor vite 8 moving its transforms from
+esbuild to oxc reaches it.
 
 **esbuild is not in the dependency tree, and `allowBuilds` keeps one entry, `unrs-resolver: false`.**
 This replaces ADR 0013's sentence "`allowBuilds` keeps two entries, and gains a rule and a check.",
 the two-entry block beneath it, and what its bullets say about esbuild. The rest of ADR 0013's
 decision stands, and it is what removed the entry: an entry lives only as long as its package has a
-script to deny, and the check enforces that. If esbuild comes back, whether as another package's dependency or as vite's optional peer
-again, pnpm reports it as an ignored build script. That is a new decision under ADR 0013's
-procedure, not a reason to restore the old entry.
+script to deny, and the check enforces that. If esbuild comes back, whether as another package's
+dependency or as vite's optional peer again, it is a new decision: its install script gets a fresh
+review under ADR 0013's procedure rather than the old entry back, and a record superseding this
+one's esbuild sentence replaces the drift-manifest entry that checks it.
 
 To get esbuild out of the lockfile, every package in `apps/web` that brings vite in (`vite`,
 `@vitejs/plugin-react`, `vitest` and `@vitest/coverage-v8`) was removed with pnpm and added back at
@@ -79,8 +86,11 @@ the same ranges. The lockfile was never edited by hand.
   `estree-walker`'s `@types/estree` moved down from 1.0.9 to the 1.0.8 already in the tree. That
   is pnpm's own output, but it moves more of the lockfile than the manifest change alone would.
 - The optional-peer loop can form again. Any package that brings esbuild into the graph makes vite
-  resolve it as its peer once more, and the ignored-build-scripts warning is the only signal that
-  it has.
+  resolve it as its peer once more. Two things report it: pnpm's ignored-build-scripts warning on
+  every install, and the drift-manifest entry for this record's esbuild sentence, which fails once
+  the lockfile resolves an `esbuild` or `@esbuild/*` package. The drift check runs weekly and on
+  pushes to `main` that touch `docs/adr/`, not on pull requests, so it reports the loop after the
+  pull request that formed it has merged.
 
 ## Alternatives considered
 

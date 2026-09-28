@@ -1,4 +1,5 @@
-// Holds apps/web's `@vitest/*` packages to the exact vitest version the lockfile installs. Run with
+// Holds apps/web's `@vitest/*` packages to the exact vitest version the lockfile installs, and its
+// vite to the vite peer range of the `@vitejs/plugin-react` it installs. Run with
 // `pnpm test:scripts` (node:test), which CI's `quality` job runs.
 //
 // `@vitest/coverage-v8` peers on one exact vitest version, and vitest does not support running with
@@ -8,6 +9,11 @@
 // Dependabot's version updates put vitest and every `@vitest/*` package in its `vite` group, majors
 // included, so those move together; a manual `pnpm update vitest`, or a security update, which
 // targets the package with the advisory, can still move one without the other.
+//
+// The same holds for vite and plugin-react: plugin-react 6 peers `vite: ^8.0.0`, and #9 failed
+// because it arrived alone against vite 7. The group moves them together, but a manual update or a
+// security update can split them, and pnpm again only warns. ADR 0027 decides that `apps/web`
+// declares both; the pair check below is what keeps their majors in step.
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -69,6 +75,61 @@ function mismatches(versions) {
   return [...versions]
     .filter(([name, version]) => name.startsWith('@vitest/') && version !== vitest)
     .map(([name, version]) => `${name} ${version} is not vitest ${vitest}`);
+}
+
+/**
+ * The range one `packages:` entry of pnpm-lock.yaml declares for one of its peers.
+ *
+ * @param {string} source the text of pnpm-lock.yaml
+ * @param {string} key the package key, such as `@vitejs/plugin-react@6.1.1`
+ * @param {string} peer the peer's name, such as `vite`
+ * @returns {string} the range, such as `^8.0.0`
+ */
+function peerRange(source, key, peer) {
+  const lines = source.split('\n');
+  const packagesAt = lines.indexOf('packages:');
+  const start = lines.findIndex(
+    (line, index) => index > packagesAt && (line === `  ${key}:` || line === `  '${key}':`),
+  );
+  if (packagesAt === -1 || start === -1) {
+    throw new Error(`pnpm-lock.yaml has no \`${key}\` package entry`);
+  }
+  let inPeers = false;
+  for (const line of lines.slice(start + 1)) {
+    // The next package, or the next top-level section, ends this entry.
+    if (/^ {0,2}\S/.test(line)) break;
+    if (/^ {4}\S/.test(line)) {
+      inPeers = line === '    peerDependencies:';
+      continue;
+    }
+    const entry = inPeers && line.match(/^ {6}'?([^'\s:]+)'?: (.+)$/);
+    if (entry && entry[1] === peer) return entry[2].replace(/^'(.*)'$/, '$1');
+  }
+  throw new Error(`\`${key}\` declares no \`${peer}\` peer`);
+}
+
+/**
+ * Whether a peer range admits a major version. It reads the forms plugin-react's peer ranges use,
+ * `^8.0.0`, `~8.1.0`, `8.x`, `>=8` (optionally `<10`) and `||` between them, and throws on
+ * anything else rather than guessing.
+ *
+ * @param {string} range
+ * @param {number} major
+ * @returns {boolean}
+ */
+function admitsMajor(range, major) {
+  return range.split('||').some((alternative) => {
+    const text = alternative.trim();
+    const pinned = text.match(/^[\^~]?(\d+)(?:\.(?:\d+|x|\*)){0,2}$/);
+    if (pinned) return Number(pinned[1]) === major;
+    const bounded = text.match(/^>=\s*(\d+)(?:\.\d+){0,2}(?:\s+<\s*(\d+)(?:\.\d+){0,2})?$/);
+    if (bounded) {
+      return (
+        major >= Number(bounded[1]) && (bounded[2] === undefined || major < Number(bounded[2]))
+      );
+    }
+    throw new Error(`cannot read the range \`${text}\``);
+  });
 }
 
 // Parsed at module level for the same reason: a parse that throws fails the file.
@@ -139,5 +200,66 @@ describe('apps/web in pnpm-lock.yaml', () => {
 
   it('installs every @vitest/* package at the exact vitest version', () => {
     assert.deepEqual(mismatches(webVersions), []);
+  });
+});
+
+describe('the vite and plugin-react pair check', () => {
+  const packages = `lockfileVersion: '9.0'
+
+packages:
+
+  '@vitejs/plugin-react@6.1.1':
+    resolution: {integrity: sha512-x}
+    peerDependencies:
+      '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0
+      vite: ^8.0.0
+    peerDependenciesMeta:
+      '@rolldown/plugin-babel':
+        optional: true
+
+  vite@8.3.1:
+    resolution: {integrity: sha512-y}
+    peerDependencies:
+      esbuild: ^0.27.0
+`;
+
+  it('reads one peer range out of one package entry', () => {
+    assert.equal(peerRange(packages, '@vitejs/plugin-react@6.1.1', 'vite'), '^8.0.0');
+    assert.equal(
+      peerRange(packages, '@vitejs/plugin-react@6.1.1', '@rolldown/plugin-babel'),
+      '^0.1.7 || ^0.2.0',
+    );
+  });
+
+  it('throws rather than passing when the entry or the peer is missing', () => {
+    assert.throws(() => peerRange(packages, '@vitejs/plugin-react@5.2.0', 'vite'), /no `@vitejs/);
+    assert.throws(() => peerRange(packages, 'vite@8.3.1', 'vite'), /declares no `vite` peer/);
+  });
+
+  it('admits only the majors a range names', () => {
+    assert.equal(admitsMajor('^8.0.0', 8), true);
+    assert.equal(admitsMajor('^8.0.0', 9), false);
+    assert.equal(admitsMajor('^8.0.0', 7), false);
+    assert.equal(admitsMajor('^7.0.0 || ^8.0.0', 7), true);
+    assert.equal(admitsMajor('8.x', 8), true);
+    assert.equal(admitsMajor('>=8', 9), true);
+    assert.equal(admitsMajor('>=8.0.0 <10', 10), false);
+  });
+
+  it('throws on a range it cannot read', () => {
+    assert.throws(() => admitsMajor('latest', 8), /cannot read the range `latest`/);
+  });
+});
+
+describe('apps/web vite in pnpm-lock.yaml', () => {
+  it("installs a vite whose major @vitejs/plugin-react's vite peer range admits", () => {
+    const vite = webVersions.get('vite');
+    const pluginReact = webVersions.get('@vitejs/plugin-react');
+    assert.ok(vite && pluginReact, [...webVersions.keys()].join(', '));
+    const range = peerRange(lockfile, `@vitejs/plugin-react@${pluginReact}`, 'vite');
+    assert.ok(
+      admitsMajor(range, Number(vite.split('.')[0])),
+      `vite ${vite} is outside @vitejs/plugin-react ${pluginReact}'s vite peer range ${range}`,
+    );
   });
 });

@@ -75,8 +75,9 @@ sentence of its first Decision bullet saying there is no second `headers()` entr
 one now sends `X-Robots-Tag: noindex` on the production alias alone, and the six security headers
 and the rest of 0023's decision stand.
 ADR 0013 is superseded in part as well: [ADR 0027](0027-vite-8-in-apps-web.md) replaces the
-sentence of its decision saying `allowBuilds` keeps two entries, since esbuild left the dependency
-tree with vite 8 and its entry went under 0013's own rule, and the rest of 0013's decision stands.
+sentence of its decision saying `allowBuilds` keeps two entries, the two-entry block beneath it and
+what its bullets say about esbuild, since esbuild left the dependency tree with vite 8 and its entry
+went under 0013's own rule, and the rest of 0013's decision stands.
 The bodies of 0002, 0003, 0004 and 0005 still describe the state on 2026-09-08, when they were
 accepted.
 A record's decision is never edited afterwards, and its other sections only to correct a claim

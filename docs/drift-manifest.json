@@ -1424,11 +1424,11 @@
       "anchor": "keeps one entry, unrs-resolver",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "allowBuilds denies unrs-resolver and nothing else, as the pointer under the status says.",
+      "claim": "Every line of the allowBuilds block in pnpm-workspace.yaml that is not a comment reads `unrs-resolver: false`, so allowBuilds denies unrs-resolver and nothing else, as the pointer under the status says; an entry in any other form, quoted or with a trailing comment, fails the check.",
       "check": {
         "file": "pnpm-workspace.yaml",
-        "regex": "^  ([\\w@/.-]+): (?:true|false)$",
-        "equalsAll": ["unrs-resolver"]
+        "regex": "(?<=^allowBuilds:[^\\n]*\\n(?:(?:[ \\t#][^\\n]*)?\\n)*)^[ \\t]+(?!#)(\\S[^\\n]*)$",
+        "equalsAll": ["unrs-resolver: false"]
       }
     },
     {
@@ -4030,6 +4030,23 @@
       "check": {
         "package": ".",
         "script": "test:scripts"
+      }
+    },
+    {
+      "id": "runbook-deploy-link-adr-0027-vite-8-in-apps-web",
+      "doc": "docs/runbooks/deploy.md",
+      "anchor": "](../adr/0027-vite-8-in-apps-web.md)",
+      "claim": "The link to ../adr/0027-vite-8-in-apps-web.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0027-vite-8-in-apps-web.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0027-vite-8-in-apps-web.md"
       }
     },
     {
@@ -6967,29 +6984,47 @@
       }
     },
     {
-      "id": "adr-0027-web-declares-vite-8",
+      "id": "adr-0027-script-test-scripts",
       "doc": "docs/adr/0027-vite-8-in-apps-web.md",
-      "anchor": "**`apps/web` declares `vite` `^8.3.1` and `@vitejs/plugin-react` `^6.1.1` as devDependencies.**",
-      "method": "config-value",
+      "anchor": "`pnpm test:scripts`",
+      "claim": "`pnpm test:scripts` is a script in ./package.json.",
+      "method": "command",
       "evaluation": "live",
-      "claim": "apps/web/package.json declares vite directly, on major 8.",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "test:scripts"
+        }
+      ],
       "check": {
-        "file": "apps/web/package.json",
-        "regex": "^    \"vite\": \"\\^(\\d+)\\.",
-        "equals": "8"
+        "package": ".",
+        "script": "test:scripts"
       }
     },
     {
-      "id": "adr-0027-web-plugin-react-6",
+      "id": "adr-0027-web-declares-vite",
       "doc": "docs/adr/0027-vite-8-in-apps-web.md",
-      "anchor": "**`apps/web` declares `vite` `^8.3.1` and `@vitejs/plugin-react` `^6.1.1` as devDependencies.**",
+      "anchor": "**`apps/web` declares `vite` and `@vitejs/plugin-react` directly, as devDependencies.**",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "apps/web/package.json declares @vitejs/plugin-react on major 6.",
+      "claim": "apps/web/package.json declares vite in devDependencies. The major is not the decision: scripts/vitest-coverage-pair.test.mjs holds it to plugin-react's vite peer range.",
       "check": {
         "file": "apps/web/package.json",
-        "regex": "^    \"@vitejs/plugin-react\": \"\\^(\\d+)\\.",
-        "equals": "6"
+        "regex": "\"devDependencies\": \\{[^}]*?\\n    \"(vite)\": \"",
+        "equals": "vite"
+      }
+    },
+    {
+      "id": "adr-0027-web-declares-plugin-react",
+      "doc": "docs/adr/0027-vite-8-in-apps-web.md",
+      "anchor": "**`apps/web` declares `vite` and `@vitejs/plugin-react` directly, as devDependencies.**",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "apps/web/package.json declares @vitejs/plugin-react in devDependencies. The major is not the decision: scripts/vitest-coverage-pair.test.mjs holds vite to its peer range.",
+      "check": {
+        "file": "apps/web/package.json",
+        "regex": "\"devDependencies\": \\{[^}]*?\\n    \"(@vitejs/plugin-react)\": \"",
+        "equals": "@vitejs/plugin-react"
       }
     },
     {
@@ -6998,23 +7033,24 @@
       "anchor": "**esbuild is not in the dependency tree, and `allowBuilds` keeps one entry, `unrs-resolver: false`.**",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "allowBuilds denies unrs-resolver and nothing else.",
+      "claim": "Every line of the allowBuilds block in pnpm-workspace.yaml that is not a comment reads `unrs-resolver: false`, so allowBuilds denies unrs-resolver and nothing else; an entry in any other form, quoted or with a trailing comment, fails the check.",
       "check": {
         "file": "pnpm-workspace.yaml",
-        "regex": "^  ([\\w@/.-]+): (?:true|false)$",
-        "equalsAll": ["unrs-resolver"]
+        "regex": "(?<=^allowBuilds:[^\\n]*\\n(?:(?:[ \\t#][^\\n]*)?\\n)*)^[ \\t]+(?!#)(\\S[^\\n]*)$",
+        "equalsAll": ["unrs-resolver: false"]
       }
     },
     {
       "id": "adr-0027-no-esbuild-resolved",
       "doc": "docs/adr/0027-vite-8-in-apps-web.md",
       "anchor": "**esbuild is not in the dependency tree, and `allowBuilds` keeps one entry, `unrs-resolver: false`.**",
-      "method": "file-line",
+      "method": "config-value",
       "evaluation": "live",
-      "claim": "pnpm-lock.yaml resolves no esbuild package: no esbuild@ or @esbuild/*@ key or peer suffix (vite's own peer metadata may still name esbuild).",
+      "claim": "pnpm-lock.yaml resolves no esbuild package: no `esbuild@<version>` or `@esbuild/<platform>@<version>` package key or peer suffix. vite's own peer metadata may still name esbuild, and a package whose name only ends in esbuild does not count.",
       "check": {
-        "path": "pnpm-lock.yaml",
-        "absent": "esbuild@"
+        "file": "pnpm-lock.yaml",
+        "regex": "(?:^ +'?|\\()(@esbuild/[\\w.-]+|esbuild)@\\d",
+        "equalsAll": []
       }
     },
     {
@@ -7023,10 +7059,10 @@
       "anchor": "**`.github/dependabot.yml` gains the `vite` group that ADR 0018 decided**",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "dependabot.yml declares the vite group (vite, @vitejs/*, vitest, @vitest/*, majors included) ahead of minor-and-patch.",
+      "claim": "dependabot.yml declares the vite group (vite, @vitejs/*, vitest, @vitest/*, majors included) in the npm ecosystem's groups, ahead of minor-and-patch.",
       "check": {
         "file": ".github/dependabot.yml",
-        "regex": "^ {6}(vite):\\n {8}patterns: \\['vite', '@vitejs/\\*', 'vitest', '@vitest/\\*'\\]\\n {8}update-types: \\[major, minor, patch\\]\\n(?:[^\\n]*\\n)*? {6}minor-and-patch:$",
+        "regex": "(?<=^  - package-ecosystem: npm\\n(?:(?!  - )[^\\n]*\\n)*?^    groups:\\n(?:(?: {6}[^\\n]*)?\\n)*?)^ {6}(vite):\\n {8}patterns: \\['vite', '@vitejs/\\*', 'vitest', '@vitest/\\*'\\]\\n {8}update-types: \\[major, minor, patch\\]\\n(?: {6}[^\\n]*\\n)*? {6}minor-and-patch:$",
         "equals": "vite"
       }
     },
@@ -8027,12 +8063,25 @@
       "id": "adr-0018-no-vite-group-yet",
       "doc": "docs/adr/0018-dependency-update-policy.md",
       "anchor": "until it merges, `.github/dependabot.yml` carries no vite",
+      "method": "file-line",
+      "evaluation": "historical",
+      "asOf": "bb039fa0a91d85d63566818c2dc97064431c2c18",
+      "claim": "Until the vite 8 migration merges, dependabot.yml has no vite group.",
+      "check": {
+        "path": ".github/dependabot.yml",
+        "absent": "vite:"
+      }
+    },
+    {
+      "id": "adr-0018-vite-group-present",
+      "doc": "docs/adr/0018-dependency-update-policy.md",
+      "anchor": "The vite family gets a group of its own that admits majors, declared ahead of `minor-and-patch`,",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The vite 8 migration has merged (ADR 0027), so dependabot.yml declares the vite group this record gives, ahead of minor-and-patch.",
+      "claim": "The vite 8 migration has merged (ADR 0027), so dependabot.yml declares the vite group this record gives in the npm ecosystem's groups, ahead of minor-and-patch.",
       "check": {
         "file": ".github/dependabot.yml",
-        "regex": "^ {6}(vite):\\n {8}patterns: \\['vite', '@vitejs/\\*', 'vitest', '@vitest/\\*'\\]\\n {8}update-types: \\[major, minor, patch\\]\\n(?:[^\\n]*\\n)*? {6}minor-and-patch:$",
+        "regex": "(?<=^  - package-ecosystem: npm\\n(?:(?!  - )[^\\n]*\\n)*?^    groups:\\n(?:(?: {6}[^\\n]*)?\\n)*?)^ {6}(vite):\\n {8}patterns: \\['vite', '@vitejs/\\*', 'vitest', '@vitest/\\*'\\]\\n {8}update-types: \\[major, minor, patch\\]\\n(?: {6}[^\\n]*\\n)*? {6}minor-and-patch:$",
         "equals": "vite"
       }
     },
