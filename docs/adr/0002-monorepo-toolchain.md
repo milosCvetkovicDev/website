@@ -5,8 +5,12 @@
 Superseded by ADR-0018 (corrected 2026-09-13)
 
 [ADR 0018](0018-dependency-update-policy.md) replaces the pin table below and the sentence proposing
-`22.x` as the tightening of `engines.node`; the rest of this record still stands, read with the
-corrections recorded at the end of it.
+`22.x` as the tightening of `engines.node`. It also retired `apps/playground` and deleted
+`@repo/eslint-config` and `@repo/typescript-config`, so the Context's sentence on five workspaces
+no longer holds and the decision's playground rules no longer apply: `dev:playground` as a filtered
+`dev`; `dev`, `build`, `lint`, `lint:fix`, `typecheck` and `clean` existing in both apps; and the
+playground's `tsc -b` typecheck. The rest of this record still stands, read with the corrections
+recorded at the end of it.
 
 ## Date
 

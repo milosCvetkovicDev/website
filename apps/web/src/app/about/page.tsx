@@ -52,7 +52,7 @@ export default function AboutPage() {
 
         {/* The story */}
         <section className="mb-20">
-          <div className="prose prose-lg dark:prose-invert max-w-none space-y-6">
+          <div className="space-y-6">
             {aboutCopy.story.map((paragraph, index) => (
               <p key={index} className="text-lg leading-relaxed">
                 <StoryText paragraph={paragraph} />
