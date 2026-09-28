@@ -1406,7 +1406,7 @@ describe('how an animation is judged', () => {
   it("finds that only pulse and ping dim, among Tailwind's animations and globals.css's", () => {
     const names = [...vocabulary.animations.keys()];
     expect(names).toEqual(
-      expect.arrayContaining(['spin', 'bounce', 'fade-in', 'blink', 'scale-in']),
+      expect.arrayContaining(['spin', 'bounce', 'fade-in', 'blink', 'highlight-scan']),
     );
     const dimming = names.filter((name) =>
       (vocabulary.animations.get(name) ?? []).some((shorthand) =>
