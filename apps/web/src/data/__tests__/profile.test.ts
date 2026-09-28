@@ -119,8 +119,25 @@ describe('who may read it', () => {
       return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
     });
 
-  const isClientEntry = (source: string) =>
-    /^(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*['"]use client['"]/.test(source);
+  /** Whether the first statement, after any whitespace and comments, is the `'use client'` directive. */
+  const isClientEntry = (source: string): boolean => {
+    // A loop rather than one regex over `(?:\s|//…|/*…*/)*`: CodeQL flags that as exponential
+    // backtracking (js/redos), because its alternatives can match the same text more than one way.
+    let rest = source;
+    for (;;) {
+      rest = rest.trimStart();
+      if (rest.startsWith('//')) {
+        const end = rest.indexOf('\n');
+        rest = end === -1 ? '' : rest.slice(end + 1);
+      } else if (rest.startsWith('/*')) {
+        const end = rest.indexOf('*/', 2);
+        if (end === -1) return false;
+        rest = rest.slice(end + 2);
+      } else {
+        return /^['"]use client['"]/.test(rest);
+      }
+    }
+  };
 
   /** Value imports and re-exports, static or dynamic; `import type` and `export type` bring no code. */
   const specifiers = (source: string) =>
