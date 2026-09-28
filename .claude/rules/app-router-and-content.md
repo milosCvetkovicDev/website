@@ -44,6 +44,25 @@ on `missing` the apex: a typo there would noindex production. Next's router send
 before it applies `headers()`, and those carry none of them: the 308s that strip a trailing slash
 or collapse repeated slashes, and the plain 500 for a malformed percent-encoding.
 
+## Owner placeholders
+
+A value only the owner can supply is left as a registered placeholder, never invented, through
+`apps/web/src/data/owner-todo.ts`, the one convention for it. A typed placeholder is a union branch
+`{ state: typeof OWNER_TODO }`, a gap in prose is `ownerTodo(hint)`, and the marker, `OWNER-TODO`,
+is spelled out in that module and in no other file under `apps/web/src`. Whatever renders the value
+omits the whole sentence, row or block while its marker survives; `e2e/seo-surface.spec.ts` fails
+if any route, `/sitemap.xml` or `/robots.txt` serves it.
+
+The gate is `pnpm --filter web exec vitest run src/data/__tests__/owner-todo.test.ts`, part of
+`pnpm test`. It walks every source in that file's one source list and fails, naming
+`<source>.<path>`, on an unfilled field with no row in `unfilledOwnerFields`, on a row that matches
+no unfilled field, and on a row whose `expires` is missing, a placeholder, not a real `YYYY-MM-DD`
+day, or reached (on the real clock, in UTC). A sibling joins it with one `{ id, value }` entry in
+that list (a data module's export, or the string a generator returns) and one register row per
+unfilled field: `field` as `<source>.<path>` (`case-studies.0.metricDefinition`), a `why`, and an
+`expires` the owner chooses, never an agent. Once a deadline passes, `pnpm test` is red on every
+branch until the owner fills the value or moves the date in a pull request, and that is intended.
+
 ## Quality gates
 
 - The AI-facing refusals are gated. `scripts/ai-refusals.test.mjs` runs under `pnpm test:scripts` and

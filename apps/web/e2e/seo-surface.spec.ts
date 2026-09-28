@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
+import { OWNER_TODO } from '../src/data/owner-todo';
 import {
   CASE_STUDY_ROUTES,
   NOT_FOUND_ROUTE,
@@ -350,6 +351,34 @@ test('the sitemap and robots.txt are served and agree with the routes', async ({
   const body = await robots.text();
   expect(body.toLowerCase()).toContain('user-agent: *');
   expect(body, 'robots.txt must point at the sitemap').toContain('Sitemap:');
+});
+
+test('no route, nor the sitemap or robots.txt, serves an owner placeholder', async ({
+  request,
+}) => {
+  // The publication rule of src/data/owner-todo.ts: whatever renders a value the owner has not
+  // supplied yet omits it rather than printing its marker. A typed placeholder's `state` and every
+  // `ownerTodo(...)` marker both contain OWNER_TODO, so one search of each served body covers both,
+  // flight payload included. The status and a non-empty body are the control: an error page or an
+  // empty response contains no marker either.
+  const served = [
+    ...routes,
+    { path: '/sitemap.xml', status: 200 },
+    { path: '/robots.txt', status: 200 },
+  ];
+  const problems: string[] = [];
+  for (const { path, status } of served) {
+    const response = await request.get(path);
+    const body = await response.text();
+    expect(response.status(), path).toBe(status);
+    expect(body.length, `${path} must serve a body`).toBeGreaterThan(0);
+    const at = body.indexOf(OWNER_TODO);
+    if (at !== -1) problems.push(`${path} serves "${body.slice(Math.max(0, at - 40), at + 60)}"`);
+  }
+  expect(
+    problems,
+    'a placeholder reached served output: omit the sentence, row or block until the owner fills it',
+  ).toEqual([]);
 });
 
 test('the JSON-LD blocks are served and parse, and a case study adds its own two', async ({
