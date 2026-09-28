@@ -47,10 +47,6 @@ expects, and what each workaround depends on.
   `TechArticleJsonLd` and `BreadcrumbListJsonLd` to `json-ld.tsx`; the 2026-09-23 re-sync found them
   through `props-from-source.mjs --check` and excluded them. A new export in `json-ld.tsx` needs the
   same null entry.
-- `CTA` is on `window.Portfolio` but gets no card: the converter's `isComponentName` treats
-  all-caps names as constants and drops it after discovery. The owner chose to leave it
-  bundle-only (2026-09-22) over renaming it in the app or forking `lib/dts.mjs`;
-  `conventions.md` tells the design agent it exists.
 - `docs/<Name>.md` are stubs that only carry `category` (the picker group, for components whose
   source folder gives none) and `keywords`. With an empty body the converter still synthesizes each
   `.prompt.md` from the props, the JSDoc and the preview examples.
