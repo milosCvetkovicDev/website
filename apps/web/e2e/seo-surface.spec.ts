@@ -6,6 +6,8 @@ import {
   STATIC_ROUTES,
   expectedStatus,
 } from './routes';
+import { caseStudies } from '../src/data/case-studies';
+import { formatContentDate } from '../src/lib/content-date';
 
 /**
  * The head every crawler and link-preview bot reads.
@@ -383,5 +385,87 @@ test('the JSON-LD blocks are served and parse, and a case study adds its own two
     ).toEqual(['Person', 'WebSite', 'TechArticle', 'BreadcrumbList']);
     const article = blocks[2];
     expect(new URL(String(article.url)).pathname, `${path}: the article's own URL`).toBe(path);
+  }
+});
+
+/** A `<time>` in a served body: its attribute, its text, and the text node just before it. */
+interface ServedTime {
+  label: string | undefined;
+  datetime: string;
+  text: string;
+}
+
+/**
+ * A case study as served: every `<time>` in its body, and its JSON-LD blocks. The body's scripts are
+ * dropped before the `<time>` elements are read: the RSC flight payload repeats the dates and both
+ * labels, and the JSON-LD's `datePublished` contains one of them, all where no reader sees them, so
+ * a substring match would pass on a page that shows no date at all.
+ */
+async function servedCaseStudy(request: APIRequestContext, slug: string) {
+  const response = await request.get(`/work/${slug}`);
+  expect(response.status(), `/work/${slug} should answer 200`).toBe(200);
+  const html = await response.text();
+  const jsonLd = [
+    ...html.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
+  ].map(([, block]) => JSON.parse(block) as Record<string, unknown>);
+  const body = (html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? '').replace(
+    /<script\b[^>]*>[\s\S]*?<\/script>/gi,
+    '',
+  );
+  const times: ServedTime[] = [
+    ...body.matchAll(/<time\b[^>]*\bdatetime="([^"]*)"[^>]*>([^<]*)<\/time>/gi),
+  ].map((match) => {
+    // The label is a whole text node, the last non-blank one before the element, not a substring.
+    const textNodes = [...body.slice(0, match.index).matchAll(/>([^<]*)</g)]
+      .map(([, text]) => text.trim())
+      .filter(Boolean);
+    return { label: textNodes.at(-1), datetime: match[1], text: match[2] };
+  });
+  return { times, jsonLd };
+}
+
+test('each case study shows its published and updated dates, labelled, as the stored values', async ({
+  request,
+}) => {
+  // #56: Google's publication-dates guidance wants a prominent, labelled date a reader can see, and
+  // one that agrees with the markup. Driven off the data, so a new study is covered without an edit
+  // here. The attribute is the stored value byte for byte; the text is what formatContentDate makes
+  // of it, which src/lib/__tests__/content-date.test.ts pins to the exact string.
+  for (const { slug, publishedAt, updatedAt } of caseStudies) {
+    const { times } = await servedCaseStudy(request, slug);
+    expect(
+      times,
+      `/work/${slug}: exactly two <time> elements, Published then Updated, in the served body`,
+    ).toEqual([
+      { label: 'Published', datetime: publishedAt, text: formatContentDate(publishedAt) },
+      { label: 'Updated', datetime: updatedAt, text: formatContentDate(updatedAt) },
+    ]);
+  }
+});
+
+test("each case study's TechArticle carries real dates, and the ones its page shows", async ({
+  request,
+}) => {
+  // #57 AC 4: marked-up dates that differ from the visible ones are a structured-data policy
+  // violation. The visible line and TechArticleJsonLd read the same two fields today; this is what
+  // keeps a later change to either from separating them.
+  for (const { slug } of caseStudies) {
+    const path = `/work/${slug}`;
+    const { times, jsonLd } = await servedCaseStudy(request, slug);
+    const articles = jsonLd.filter((block) => block['@type'] === 'TechArticle');
+    expect(articles, `${path}: one TechArticle`).toHaveLength(1);
+    const { datePublished, dateModified } = articles[0];
+
+    expect(datePublished, `${path}: datePublished`).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(dateModified, `${path}: dateModified`).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(
+      String(dateModified) >= String(datePublished),
+      `${path}: dateModified ${dateModified} is before datePublished ${datePublished}`,
+    ).toBe(true);
+    const shown = (label: string) => times.find((time) => time.label === label)?.datetime;
+    expect(
+      { datePublished, dateModified },
+      `${path}: the TechArticle's dates must be the ones the page shows`,
+    ).toEqual({ datePublished: shown('Published'), dateModified: shown('Updated') });
   }
 });

@@ -44,6 +44,13 @@ on `missing` the apex: a typo there would noindex production. Next's router send
 before it applies `headers()`, and those carry none of them: the 308s that strip a trailing slash
 or collapse repeated slashes, and the plain 500 for a malformed percent-encoding.
 
+A case study's visible `Published` / `Updated` line, its TechArticle's `datePublished` and
+`dateModified`, and its sitemap `lastmod` (from `updatedAt` alone) all read the same fields,
+`publishedAt` and `updatedAt` in `case-studies.ts`: the line is two `<time dateTime>` elements
+holding the stored values, written out by `formatContentDate()` in `src/lib/content-date.ts` from a
+fixed month table rather than the build machine's locale or zone, and `e2e/seo-surface.spec.ts`
+fails when the served line and the TechArticle disagree.
+
 ## Quality gates
 
 - The AI-facing refusals are gated. `scripts/ai-refusals.test.mjs` runs under `pnpm test:scripts` and
