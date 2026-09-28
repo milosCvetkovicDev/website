@@ -61,8 +61,6 @@ CSS variables, light values in `:root` and dark ones in `.dark`:
 - `TmuxBackground`, and the `HeroSection` and `AnimatedHero` that render it, show the tmux panes
   only from Tailwind's `md` breakpoint (768px) up, as the site does: in a narrower frame that
   background renders nothing.
-- `<CTA />`, the closing "Let's Connect" section with the LinkedIn, GitHub and X buttons, takes no
-  props. It is on `window.Portfolio` but has no card of its own.
 
 ### Brand mark
 
