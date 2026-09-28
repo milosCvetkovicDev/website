@@ -29,11 +29,8 @@ Personal site of Milos Cvetkovic, Senior Full-Stack Engineer. An interactive, an
 ```
 apps/
   web/            Next.js site (src/app routes, src/components, src/data, e2e/)
-  playground/     Vite + React sandbox for experiments
 packages/
-  eslint-config/      shared ESLint presets (not yet wired into the apps)
   prettier-config/    shared Prettier config, referenced by prettier.config.mjs files
-  typescript-config/  shared tsconfig bases (not yet wired into the apps)
 scripts/          @repo/scripts package: CI gates, Vercel build step, flake hunt, tests
 docs/
   adr/            architecture decision records
@@ -54,7 +51,7 @@ pnpm install
 pnpm dev:web
 ```
 
-The site runs on `http://localhost:3000`. `pnpm dev:playground` starts the sandbox.
+The site runs on `http://localhost:3000`.
 
 `pnpm install` runs no dependency build scripts: the packages pnpm 10 would ask about ship prebuilt binaries and are denied in `pnpm-workspace.yaml` ([ADR 0013](docs/adr/0013-dependency-build-scripts-reviewed.md)). Each denial records the version whose script was read, and `pnpm check:allowbuilds` fails CI when that drifts from the lockfile. A checkout from before the setting keeps printing the warning until `pnpm clean && pnpm install`.
 
@@ -68,11 +65,11 @@ CI runs on every pull request and every push to `main` (`.github/workflows/ci.ym
 | `pnpm check:allowbuilds`          | `allowBuilds` entries against the versions the lockfile resolves                                                                    | -                  | yes |
 | `pnpm test:scripts`               | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step, commitlint configs, web server log, flake hunt | -                  | yes |
 | `pnpm format:check`               | Prettier, shared config, Tailwind class order                                                                                       | yes (staged files) | yes |
-| `pnpm lint`                       | ESLint with `--max-warnings 0` in every app                                                                                         | yes (staged files) | yes |
+| `pnpm lint`                       | ESLint with `--max-warnings 0` in `apps/web`                                                                                        | yes (staged files) | yes |
 | commitlint                        | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...); in CI, the PR title and every commit                            | yes                | yes |
-| `pnpm typecheck`                  | `next typegen && tsc --noEmit` (web), `tsc -b` (playground), strict `checkJs` over `scripts/`                                       | -                  | yes |
+| `pnpm typecheck`                  | `next typegen && tsc --noEmit` (web), strict `checkJs` over `scripts/`                                                              | -                  | yes |
 | `pnpm test`                       | Vitest unit tests                                                                                                                   | -                  | yes |
-| `pnpm build`                      | Production builds of both apps                                                                                                      | -                  | yes |
+| `pnpm build`                      | Production build of `apps/web`                                                                                                      | -                  | yes |
 | `pnpm check:build-output`         | Every route in the web build prerendered, with its body file, and no server function outside an allowlist that is empty             | -                  | yes |
 | `pnpm --filter web test:e2e`      | Playwright against the production build; a test that passes only on a retry fails the run                                           | -                  | yes |
 | `scripts/check-webserver-log.mjs` | Anything the web server wrote to stderr during the e2e run, beyond ADR 0015's `NoFallbackError` block                               | -                  | yes |

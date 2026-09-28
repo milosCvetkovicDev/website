@@ -4,7 +4,6 @@
   "scripts": {
     "dev": "turbo dev",
     "dev:web": "turbo dev --filter=web",
-    "dev:playground": "turbo dev --filter=playground",
     "build": "turbo build",
     "lint": "turbo lint",
     "lint:fix": "turbo lint:fix",
