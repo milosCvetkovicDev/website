@@ -328,6 +328,10 @@ function mount(animation: Animation, { inHeading = false } = {}) {
     /** Lets every effect run out, then checks that nothing the hover did is left on the page. */
     expectBackAtRest(after: string) {
       elapse(SETTLE_SECONDS);
+      this.expectAtRestNow(after);
+    },
+    /** Checks, without letting any time pass, that nothing the hover did is left on the page. */
+    expectAtRestNow(after: string) {
       collect();
       expect(visibleText(root), `text after ${after}`).toBe(TEXT);
       expect(markup(root), `markup left behind after ${after}`).toBe(restingMarkup);
@@ -462,6 +466,68 @@ describe('AnimatedText', () => {
     unmountMidHover('magnetic');
   });
 
+  // New text on a mounted variant: what a sighted visitor reads and what the visually hidden copy
+  // says must agree, and a hover must play the new text and come back to it.
+  it.each(ANIMATIONS)('%s: new text replaces the old one everywhere it is drawn', (animation) => {
+    const NEXT = 'Ship it once more';
+    const view = render(<AnimatedText animation={animation}>{TEXT}</AnimatedText>);
+    view.rerender(<AnimatedText animation={animation}>{NEXT}</AnimatedText>);
+    const root = view.container.firstElementChild;
+    if (!(root instanceof HTMLElement)) throw new Error(`${animation}: rendered no element`);
+    vi.spyOn(root, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect(BOX));
+    const hidden = root.querySelector('.sr-only');
+
+    expect(visibleText(root), 'the visible text').toBe(NEXT);
+    if (hidden) expect(hidden.textContent, 'the visually hidden copy').toBe(NEXT);
+    expect(root.querySelector('.animate-pulse'), 'a caret left at rest').toBeNull();
+    fireEvent.mouseEnter(root);
+    fireEvent.mouseMove(root, POINTER);
+    elapse(SETTLE_SECONDS);
+    fireEvent.mouseLeave(root);
+    elapse(SETTLE_SECONDS);
+    expect(visibleText(root), 'the visible text after a hover').toBe(NEXT);
+    expect(root.querySelector('.animate-pulse'), 'a caret left typing').toBeNull();
+    view.unmount();
+  });
+
+  // A character outside the Basic Multilingual Plane is two UTF-16 code units: split between them,
+  // each half would be drawn as a replacement glyph beside a hidden copy that reads correctly.
+  it.each(['wave', 'scatter', 'scramble'] as const)(
+    '%s: a character outside the BMP is drawn whole, at rest and after a hover, and hovers replay',
+    (animation) => {
+      const ROCKET = 'Ship \u{1F680}';
+      const view = render(<AnimatedText animation={animation}>{ROCKET}</AnimatedText>);
+      const root = view.container.firstElementChild;
+      if (!(root instanceof HTMLElement)) throw new Error(`${animation}: rendered no element`);
+      const loneSurrogate =
+        /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+      const drawn = () =>
+        [...root.querySelectorAll('[aria-hidden="true"] *, [aria-hidden="true"]')].map(
+          (el) => el.textContent ?? '',
+        );
+      expect(visibleText(root)).toBe(ROCKET);
+      expect(
+        drawn().filter((text) => loneSurrogate.test(text)),
+        'half a character',
+      ).toEqual([]);
+
+      fireEvent.mouseEnter(root);
+      elapse(SETTLE_SECONDS);
+      fireEvent.mouseLeave(root);
+      elapse(SETTLE_SECONDS);
+      expect(visibleText(root)).toBe(ROCKET);
+
+      // Scatter counts its letters to know when it has finished: counted differently from the
+      // split, its busy flag would never clear and the next hover would do nothing.
+      const atRest = root.outerHTML;
+      fireEvent.mouseEnter(root);
+      elapse(MID_HOVER_SECONDS);
+      expect(root.outerHTML, 'the second hover changed nothing').not.toBe(atRest);
+      elapse(SETTLE_SECONDS);
+      view.unmount();
+    },
+  );
+
   describe('accessible names (#47, AC 3)', () => {
     // jsdom has no Tailwind, so it would lay every letter span out inline and name a heading from the
     // letters run together, which happens to read as the sentence. A browser lays each letter out as
@@ -549,6 +615,42 @@ describe('AnimatedText', () => {
           walk.restingMarkup,
         );
         expectInert(walk, 'after the preference was switched on');
+        walk.expectNothingLiveAfterUnmount();
+      },
+    );
+
+    // A hover already playing when the preference is switched on stops at once, back at rest, rather
+    // than playing on for up to a second (scatter, gravity, morse, the typewriter) after the visitor
+    // asked for less motion. At rest means the text, the markup and the inline styles, so the
+    // rainbow's letter colours are cleared as well; magnetic's own pull is the row below.
+    it.each(ANIMATIONS)(
+      '%s: a preference switched on mid-hover stops the hover at once, back at rest',
+      (animation) => {
+        const walk = mount(animation);
+        walk.enter();
+        elapse(MID_HOVER_SECONDS);
+        expect(walk.startedHere(), 'the hover had already finished').not.toEqual([]);
+
+        act(() => media.set(true));
+        expect(walk.startedHere(), 'the hover played on under reduce').toEqual([]);
+        walk.expectAtRestNow('the preference switched on mid-hover');
+
+        walk.leave();
+        walk.expectBackAtRest('the leave under reduce');
+        walk.expectNothingLiveAfterUnmount();
+      },
+    );
+
+    // `usePrefersReducedMotion` reads `false` until hydration has finished (ADR 0006), and a store
+    // that has not been told of a change keeps its old value. A hover in that window is inert too:
+    // the handlers read the preference from the browser as well.
+    it.each(ANIMATIONS)(
+      '%s: a hover is inert when the browser reports reduce before the hook has caught up',
+      (animation) => {
+        const walk = mount(animation);
+        // Changed without telling the listeners, so the hook still returns `false`.
+        media.reduce = true;
+        expectInert(walk, 'before the hook caught up');
         walk.expectNothingLiveAfterUnmount();
       },
     );

@@ -18,10 +18,11 @@ import { AnimatedText } from '../animated-text';
  * on the visitor's first scroll, wheel, touch, pointer press or key press. A hover is intent too:
  * the first one starts the load. Until GSAP arrives a phase must build nothing and keep its
  * server-rendered state, however long nobody scrolls; a phase that unmounts must never build; and a
- * hover that is still there when GSAP arrives must play then, in the order the events came. A hover whose pointer has already left, or whose
- * component has gone, must not play at all. The first part is what a visitor who hovers before GSAP
- * arrives, and keeps the pointer there, sees; the e2e specs that measure a hover (R17, R19) wait for
- * GSAP with expectGsapLoaded instead, so they never depend on it.
+ * hover that is still there when GSAP arrives must play then, in the order the events came. A hover
+ * whose pointer has already left, or whose component has gone, must not play at all. The first
+ * part is what a visitor who hovers before GSAP arrives, and keeps the pointer there, sees; the e2e
+ * specs that measure a hover (R17, R19) wait for GSAP with expectGsapLoaded instead, so they never
+ * depend on it. Under `reduce` no hover asks for GSAP at all: `lazy-gsap-reduce.test.tsx`.
  *
  * The loader holds one load per page in module state, so this file can only be "before the load"
  * once: it is one walk through that window rather than a test per step. The other hero test files

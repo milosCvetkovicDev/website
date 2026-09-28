@@ -95,6 +95,28 @@ test('each story heading exposes its words, not its letters', async ({ page }) =
   ).toEqual([]);
 });
 
+test('selecting a split headline copies its sentence once, as it is drawn', async ({ page }) => {
+  // The sentence is in the DOM twice: the visually hidden copy assistive technology reads, and the
+  // letters a sighted visitor sees. The hidden one is `select-none`, so a selection, and the copy
+  // made from it, holds the drawn sentence only.
+  await openStory(page);
+  const copied: string[] = [];
+  for (const { text } of SPLIT_HEADINGS) {
+    const selection = await page
+      .getByRole('heading', { level: 2, name: text })
+      .evaluate((heading) => {
+        const range = document.createRange();
+        range.selectNodeContents(heading);
+        const selected = getSelection();
+        selected?.removeAllRanges();
+        selected?.addRange(range);
+        return selected?.toString() ?? '';
+      });
+    copied.push(selection.replace(/\s+/g, ' ').trim());
+  }
+  expect(copied).toEqual(SPLIT_HEADINGS.map(({ text }) => text));
+});
+
 test('each of the six story sections is a named region whose first heading is its title', async ({
   page,
 }) => {
@@ -146,7 +168,9 @@ test('the six story sections are all present and in order', async ({ page }) => 
     // The label a sighted visitor reads, not the visually hidden copy `AnimatedText` puts first for
     // assistive technology: Playwright counts that 1px box as visible, so `.first()` alone would be
     // checking the copy nobody sees.
-    const visibleLabel = page.getByText(label, { exact: true }).and(page.locator(':not(.sr-only)'));
+    const visibleLabel = page
+      .getByText(label, { exact: true })
+      .and(page.locator(':not(.sr-only):not(.sr-only *)'));
     await expect(visibleLabel.first()).toBeVisible();
   }
   // And in document order, which is the outline R15's fix has to name.

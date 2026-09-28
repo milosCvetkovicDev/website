@@ -190,8 +190,10 @@ test('under reduce, entering and moving over any animated text changes nothing d
       });
 
     const changed: string[] = [];
+    const rest = new Map<HTMLElement, string[]>();
     for (const root of roots) {
       const before = snapshot(root);
+      rest.set(root, before);
       const box = root.getBoundingClientRect();
       // Off the box's centre on both axes, so a magnetic pull would have somewhere to go.
       const at = { clientX: box.right, clientY: box.bottom };
@@ -203,6 +205,11 @@ test('under reduce, entering and moving over any animated text changes nothing d
 
       const after = snapshot(root);
       const elements = [root, ...root.querySelectorAll<HTMLElement>('*')];
+      // Compared element by element below, so a node added or removed has to be caught here.
+      if (after.length !== before.length) {
+        changed.push(`${nameOf(root)}: ${before.length} elements became ${after.length}`);
+        continue;
+      }
       for (const [index, el] of elements.entries()) {
         const style = getComputedStyle(el);
         const letter = Boolean(el.textContent?.trim());
@@ -222,6 +229,16 @@ test('under reduce, entering and moving over any animated text changes nothing d
       }
       root.dispatchEvent(new MouseEvent('mouseout', { ...at, bubbles: true }));
       root.dispatchEvent(new MouseEvent('mouseleave', { ...at, bubbles: false }));
+    }
+
+    // Once more, a second after the last hover: longer than the longest effect with motion allowed
+    // (morse, about 0.9 s), so a tween that started late, behind a per-letter delay, is caught too.
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    for (const [root, before] of rest) {
+      const after = snapshot(root);
+      if (after.join('\n') !== before.join('\n')) {
+        changed.push(`${nameOf(root)}: changed within a second of the hovers`);
+      }
     }
     return { count: roots.length, changed };
   });

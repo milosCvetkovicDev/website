@@ -290,29 +290,34 @@ interface HoverSamples {
   colours: (Sample & { shadow: boolean })[];
 }
 
-type FinderWindow = { __findAnimatedText: (text: string) => HTMLElement };
+type FinderWindow = { __findAnimatedText: (text: string) => HTMLElement | null };
 
 /**
  * Installs `__findAnimatedText(text)` in the page, which returns the `AnimatedText` root showing
- * `text`: the only spans in the story that carry `cursor-pointer`, matched on their text or on the
- * visually hidden copy some variants carry. An init script, like the probe, because the site's CSP
- * refuses code built from a string in the page. Must be called before the navigation.
+ * `text`, or null while there is none: the only spans in the story that carry `cursor-pointer`,
+ * matched on their text or on the visually hidden copy some variants carry. Two roots showing the
+ * same text throw, because every step after it would then pick one of them silently. An init
+ * script, like the probe, because the site's CSP refuses code built from a string in the page. Must
+ * be called before the navigation.
  */
 async function installAnimatedTextFinder(page: Page) {
   await page.addInitScript(() => {
     (window as unknown as Record<string, unknown>).__findAnimatedText = (text: string) => {
-      const root = [
+      const roots = [
         ...document.querySelectorAll<HTMLElement>('main section span[class*="cursor-pointer"]'),
-      ].find(
+      ].filter(
         (el) =>
           el.textContent?.trim() === text ||
           el.querySelector('.sr-only')?.textContent?.trim() === text,
       );
-      if (!root) throw new Error(`no animated text "${text}" on the page`);
-      return root;
+      if (roots.length > 1) throw new Error(`${roots.length} animated texts read "${text}"`);
+      return roots[0] ?? null;
     };
   });
 }
+
+/** The root showing `text`, from inside the page, for the steps that need it to be there. */
+type Found = (text: string) => HTMLElement;
 
 /**
  * Opens `/` in one scheme with motion allowed, brings the story section holding the animated `text`
@@ -334,8 +339,13 @@ async function openAnimatedText(
   // The story builds its timelines and the hovers play once GSAP is in (`load-gsap.ts`).
   await expectGsapLoaded(page);
 
+  // Mounted with the page, so a text missing once hydrated is missing for good.
+  await page.waitForFunction(
+    (wanted) => (window as unknown as FinderWindow).__findAnimatedText(wanted) !== null,
+    text,
+  );
   const { target, delta } = await page.evaluate((wanted) => {
-    const find = (window as unknown as FinderWindow).__findAnimatedText;
+    const find = (window as unknown as FinderWindow).__findAnimatedText as Found;
     const section = find(wanted).closest('section');
     if (!section) throw new Error(`"${wanted}" is not inside a section`);
     const bottom = document.documentElement.scrollHeight - innerHeight;
@@ -350,16 +360,19 @@ async function openAnimatedText(
 
   await page.waitForFunction(
     (wanted) => {
-      const find = (window as unknown as FinderWindow).__findAnimatedText;
-      const root = find(wanted);
+      const root = (window as unknown as FinderWindow).__findAnimatedText(wanted);
+      if (!root) return false;
       const section = root.closest('section');
-      const opaque = (from: Element | null) => {
-        for (let el = from; el && el !== section; el = el.parentElement) {
+      const headline = section?.querySelector('h2');
+      // Without it the wait below would be over at once, mid-entrance.
+      if (!headline) throw new Error(`no h2 in the section holding "${wanted}"`);
+      const opaque = (from: Element) => {
+        for (let el: Element | null = from; el && el !== section; el = el.parentElement) {
           if (getComputedStyle(el).opacity !== '1') return false;
         }
         return true;
       };
-      return opaque(root) && opaque(section?.querySelector('h2') ?? null);
+      return opaque(root) && opaque(headline);
     },
     text,
     { timeout: 20_000 },
@@ -373,21 +386,40 @@ async function openAnimatedText(
  * text's own subtree, so a reveal or a resting defect elsewhere on the page cannot answer for it.
  * The visually hidden copy that some variants carry for assistive technology is skipped: nothing
  * draws it.
+ *
+ * The hover counts as played only once a transform or a text shadow differs from what the subtree
+ * showed before it, so an identity matrix an entrance left behind cannot answer for it. A text's
+ * opacity is the product of its own and every ancestor's up to the root, so a wrapper faded around
+ * the text counts as much as the text itself.
  */
 async function sampleWhileHovered(page: Page, text: string): Promise<HoverSamples> {
   return page.evaluate(async (wanted) => {
-    const find = (window as unknown as FinderWindow).__findAnimatedText;
+    const find = (window as unknown as FinderWindow).__findAnimatedText as Found;
     const probe = (window as unknown as ProbeWindow).__contrastProbe;
     const root = find(wanted);
     let played = false;
     const dimmed = new Map<string, number>();
     const colours = new Map<string, Sample & { shadow: boolean }>();
+    const drawn = () =>
+      [root, ...root.querySelectorAll<HTMLElement>('*')].filter((el) => !el.closest('.sr-only'));
+    const motionOf = (el: Element) => {
+      const style = getComputedStyle(el);
+      return `${style.transform} | ${style.textShadow}`;
+    };
+    const atRest = new Map(drawn().map((el) => [el, motionOf(el)]));
+    const opacityOf = (el: Element) => {
+      let opacity = 1;
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        opacity *= Number(getComputedStyle(node).opacity);
+        if (node === root) break;
+      }
+      return opacity;
+    };
 
     const sample = () => {
-      for (const el of [root, ...root.querySelectorAll<HTMLElement>('*')]) {
-        if (el.closest('.sr-only')) continue;
+      for (const el of drawn()) {
         const style = getComputedStyle(el);
-        if (style.transform !== 'none' || style.textShadow !== 'none') played = true;
+        if (motionOf(el) !== (atRest.get(el) ?? 'none | none')) played = true;
         const ownText = [...el.childNodes]
           .filter((node) => node.nodeType === Node.TEXT_NODE)
           .map((node) => node.textContent ?? '')
@@ -395,7 +427,7 @@ async function sampleWhileHovered(page: Page, text: string): Promise<HoverSample
           .trim();
         if (!ownText) continue;
         const what = `${el.tagName.toLowerCase()} "${ownText.slice(0, 24)}"`;
-        const opacity = Number(style.opacity);
+        const opacity = opacityOf(el);
         // 0 exactly is hidden, which is how every reveal starts; anything between is dimmed text.
         if (opacity > 0 && opacity < 1) dimmed.set(what, Math.min(dimmed.get(what) ?? 1, opacity));
         // Computed colours hold no nested parentheses: `rgb(…)`, `lab(…)`, `oklch(…)`.
@@ -466,6 +498,11 @@ for (const colorScheme of colorSchemes) {
       recordContrast(colours);
 
       expect(played, 'the hover did not glitch, so this measured nothing').toBe(true);
+      // Both offsets, drawn: a `var()` that resolved to nothing would drop the whole shadow.
+      expect(
+        colours.filter((sample) => sample.shadow).map((sample) => sample.color),
+        'the glitch drew fewer than its two offset colours',
+      ).toHaveLength(2);
       expect(
         dimmed,
         'the glitch must draw its offsets with no opacity modifier: CLAUDE.md forbids dimming ' +
