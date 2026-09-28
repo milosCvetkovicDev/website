@@ -738,8 +738,6 @@ Detail on the less obvious rows:
 
 This runbook deliberately stops short of the following. None of it is in place; do not assume it is.
 
-- **`apps/playground` is not deployed.** It is a local Vite sandbox (`pnpm dev:playground`) with no
-  Vercel project and no public URL. Only `apps/web` ships.
 - **A Web Analytics page view is checked only by hand.** Since ADR 0026,
   `apps/web/src/components/web-analytics.tsx` mounts Vercel's `<Analytics />` in deployment builds
   only (`VERCEL_ENV` `production` or `preview`), so no local or CI server loads it. After each
