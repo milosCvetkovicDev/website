@@ -54,7 +54,7 @@ from `.nvmrc` and pnpm from `packageManager`; how the `engines.node` range is de
 
 ## Routes (App Router)
 
-`/`, `/about`, `/blog`, `/contact`, `/skills`, `/work`, `/work/[slug]`.
+`/`, `/about`, `/blog`, `/contact`, `/privacy`, `/skills`, `/work`, `/work/[slug]`.
 
 Every route's head comes from `buildMetadata()` in `apps/web/src/lib/metadata.ts`, and every
 static route folder needs its own `opengraph-image`; see `app-router-and-content.md`.

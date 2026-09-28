@@ -6518,24 +6518,24 @@
       "anchor": "| 0026 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0026's record carries the status line \"Accepted\".",
+      "claim": "ADR 0026's record carries the status line \"Accepted (corrected 2026-09-27)\".",
       "check": {
         "file": "docs/adr/0026-vercel-web-analytics.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-09-27)"
       }
     },
     {
       "id": "adr-index-0026-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0026 |",
-      "claim": "The index row for ADR 0026 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0026 gives the record's status line, \"Accepted (corrected 2026-09-27)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0026 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-09-27)"
       }
     },
     {

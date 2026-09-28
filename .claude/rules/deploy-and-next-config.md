@@ -54,7 +54,12 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
   `VERCEL_ENV` in the `build` task's `env` so that it splits the cache key: Turborepo's strict mode
   passes `VERCEL_*` through to `next build` anyway, but leaves an undeclared one out of the hash.
   `VERCEL_ENV` also gates `<WebAnalytics />` in the root layout: Vercel's tracker renders only when
-  it is `production` or `preview`, because nowhere else serves `/_vercel/insights/` (ADR 0026).
+  it is `production` or `preview`, because only a Vercel deployment serves its script (ADR 0026).
+  There it loads from `/<seed>/script.js`, a seed Vercel generates at random for each build and
+  inlines, not from the package's `/_vercel/insights/` default.
+  `app/global-error.tsx` renders it too, and is a client component, where only `NEXT_PUBLIC_*`
+  variables reach, so the config's `env` inlines `VERCEL_ENV` into client bundles at build time;
+  it is not a secret, and dropping that entry silently turns the tracker off on that page.
   Never gate on `VERCEL`: `vercel env pull` writes `VERCEL="1"` into a local `.env.local`.
   Never add `upgrade-insecure-requests`: WebKit applies it to `http://localhost`, which breaks the
   `mobile-safari` project.
@@ -66,7 +71,9 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
   a tracked file and `pnpm format:check` fails on the result. A different `NEXT_DIST_DIR` value would
   need all seven.
 - To point the site at a non-default origin locally, copy the root `.env.example` to
-  `apps/web/.env.local` yourself; the PreToolUse guard blocks agent writes to `.env*`.
+  `apps/web/.env.local` yourself. The PreToolUse guards block an agent's `Edit` or `Write` of that
+  file and the usual shell writes to it, though not every shell write (see the hooks bullet in
+  `claude-code-config.md`).
 - The site is live at `https://miloscvetkovic.dev` since 2026-09-09: Vercel project `portfolio`,
   production from `main`, DNS at Namecheap (`docs/runbooks/deploy.md` has the records and the
   rollback). Merging to `main` deploys; there is no manual step.

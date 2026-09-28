@@ -69,11 +69,19 @@ export function Footer() {
     <footer className="mt-auto border-t border-[var(--border)]">
       <div className="mx-auto max-w-5xl px-6 py-8">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <Logo size={14} />
-            <p className="text-sm text-[var(--muted)]">
-              {new Date().getFullYear()} Milos Cvetkovic. Built with Next.js.
-            </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+            <div className="flex items-center gap-2">
+              <Logo size={14} />
+              <p className="text-sm text-[var(--muted)]">
+                {new Date().getFullYear()} Milos Cvetkovic. Built with Next.js.
+              </p>
+            </div>
+            <Link
+              href="/privacy"
+              className="-my-1 py-1 text-sm text-[var(--muted)] underline underline-offset-4 transition-colors hover:text-[var(--foreground)]"
+            >
+              Privacy
+            </Link>
           </div>
           <div className="flex items-center gap-4">
             {socialLinks.map((link) => (

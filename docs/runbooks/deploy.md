@@ -461,8 +461,14 @@ out, and served `noindex`, while it is a Coming Soon placeholder.
       reduced motion against the production build and fails on any console error, console warning
       or page error, React hydration mismatches and 404s for assets requested on load included.
       Confirm the `e2e` job was green on the deployed commit. The spec targets `next start` on
-      localhost, so anything the hosting layer injects or blocks is outside it: after a
-      Vercel-side change (analytics, headers), open the live `/` once with the console open.
+      localhost, so anything the hosting layer injects or blocks is outside it. On the live site,
+      `.github/workflows/live-check.yml` covers the console, the tracker's script and stored state
+      on desktop Chromium after every production deployment and daily: its `Live site` run on the
+      deployed commit should be green (Actions tab; it is not a pull request check, and a failed
+      run opens an issue). It loads the apex, so a run that starts before the domain points at the
+      new deployment tests the previous one; if it passed within seconds of the deploy, dispatch it
+      again. After a Vercel-side change it does not cover, such as a header, open the live `/`
+      once with the console open.
       Locally: `pnpm --filter web build && CI=true pnpm --filter web test:e2e`. `CI=true` selects
       the production build and the runner hardening, not the port; the run serves 3210, so it works
       while a dev server or another checkout holds 3000.
@@ -733,12 +739,20 @@ This runbook deliberately stops short of the following. None of it is in place; 
 
 - **`apps/playground` is not deployed.** It is a local Vite sandbox (`pnpm dev:playground`) with no
   Vercel project and no public URL. Only `apps/web` ships.
-- **Web Analytics is tested only by hand.** Since ADR 0026, `apps/web/src/components/web-analytics.tsx`
-  mounts Vercel's `<Analytics />` in deployment builds only (`VERCEL_ENV` `production` or `preview`), so
-  no local or CI server loads it and no e2e run shows the tracker working. After a deploy, open the
-  live `/` with DevTools open: it requests `/_vercel/insights/script.js` (`200`), then
-  `/_vercel/insights/view`, and the console stays clean. Page views show on the project's
-  **Analytics** tab.
+- **A Web Analytics page view is checked only by hand.** Since ADR 0026,
+  `apps/web/src/components/web-analytics.tsx` mounts Vercel's `<Analytics />` in deployment builds
+  only (`VERCEL_ENV` `production` or `preview`), so no local or CI server loads it. After each
+  production deployment and daily, `.github/workflows/live-check.yml` checks on the live site that
+  every page loads the tracker's script, logs nothing and stores nothing, but no automated check
+  sees a view reach Vercel or the policy let it through. After a deploy, open the
+  live `/` in an ordinary browser with DevTools open: it requests `/<seed>/script.js` (`200`),
+  then `/<seed>/view`, and the console stays clean. The seed is random and new with each build
+  (`/5f4b0333522bed46/` for `7411024`), inlined through
+  `NEXT_PUBLIC_VERCEL_OBSERVABILITY_CLIENT_CONFIG`, so read it from the `src` of the page's
+  `<script data-sdkn="@vercel/analytics/next">`; the tracker never requests the package's default,
+  `/_vercel/insights/` (ADR 0026, corrected 2026-09-27). A browser
+  driven by automation (`navigator.webdriver` true: Playwright, Chrome DevTools MCP) loads the
+  script but never sends the view. Page views show on the project's **Analytics** tab.
 - **No Speed Insights.** `@vercel/speed-insights` is not installed, so there are no field Core Web
   Vitals.
 - **No error monitoring.** There is no Sentry or equivalent. `apps/web/src/app/error.tsx` is a client
