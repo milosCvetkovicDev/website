@@ -60,7 +60,7 @@ describe('isBuildInput', () => {
       '.github/workflows/ci.yml',
       '.vercelignore',
       'scripts/vercel-ignore-build.mjs',
-      'apps/playground/vite.config.ts',
+      'apps/sandbox/vite.config.ts',
     ]) {
       assert.equal(isBuildInput(path), false, `${path} should not be a build input`);
     }
@@ -78,7 +78,7 @@ describe('isBuildInput', () => {
 
   it('does not mistake a suffix for one of the root manifests', () => {
     assert.equal(isBuildInput('docs/package.json'), false);
-    assert.equal(isBuildInput('apps/playground/turbo.json'), false);
+    assert.equal(isBuildInput('apps/sandbox/turbo.json'), false);
   });
 
   it('reports which of the changed paths are build inputs', () => {
