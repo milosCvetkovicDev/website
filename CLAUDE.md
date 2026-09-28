@@ -89,9 +89,10 @@ Always finish with `pnpm lint`.
 - Pre-commit runs lint-staged (Prettier on the staged files, after ESLint on the apps' TS/JS files);
   commit-msg runs commitlint.
 - CI (`.github/workflows/ci.yml`) has two jobs: `quality` (dependency review on pull requests,
-  install, `check:allowbuilds`, `test:scripts`, `format:check`, `lint`, `typecheck`, `test`, `build`)
-  and `e2e` (Playwright on three projects, then the web-server log check). `main` requires both jobs
-  and `Commit messages`; renaming one of those jobs strands its required check (ADR 0021).
+  install, `check:allowbuilds`, `test:scripts`, `format:check`, `lint`, `typecheck`, `test`, `build`,
+  `check:build-output`) and `e2e` (Playwright on three projects, then the web-server log check).
+  `main` requires both jobs and `Commit messages`; renaming one of those jobs strands its required
+  check (ADR 0021).
 - Pull request titles are linted as the squash commit, with GitHub's ` (#NN)` suffix and without
   commitlint's default ignores, so keep them conventional and short.
 - Warnings are errors. Lint runs with `--max-warnings 0` in both apps, so a warning fails CI.

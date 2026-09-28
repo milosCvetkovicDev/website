@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:allowbuilds": "node scripts/check-allowbuilds-drift.mjs",
+    "check:build-output": "node scripts/check-build-output.mjs",
     "check:docs-drift": "node scripts/check-docs-drift.ts",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "clean": "turbo clean && rm -rf node_modules",

@@ -55,11 +55,12 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm check:build-output
 pnpm --filter web exec playwright install --with-deps chromium webkit   # once per machine
 pnpm --filter web test:e2e
 ```
 
-These are every gate in `.github/workflows/ci.yml`. The first eight commands are the `quality` job;
+These are every gate in `.github/workflows/ci.yml`. The first nine commands are the `quality` job;
 the last two are the `e2e` job, which on CI runs Playwright against the production build
 (`next start`) on port 3000, while the same command locally starts a dev server on port 3210.
 Playwright always starts the server it tests and never attaches to one that is already running, so

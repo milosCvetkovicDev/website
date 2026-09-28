@@ -30,7 +30,9 @@ never reaches a page that declares its own `openGraph`. There are two route hand
 `favicon.ico/route.ts` packs the same mark into an ICO, and `work/[slug]/og-image.png/route.ts`
 draws the case-study card, whose alt text has to name the study, which an `opengraph-image` file's
 single `alt` cannot; the page points og:image at it through `buildMetadata()`'s `image`. All of them
-prerender at build time.
+prerender at build time, and `pnpm check:build-output` (a `quality` step, `ci-and-scripts.md`) fails
+when a route does not: a `GET` handler is dynamic unless it exports `dynamic = 'force-static'`, and
+without it builds as a server function.
 `sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
 `NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
 The security headers come from one static `headers()` entry in `apps/web/next.config.ts` whose
