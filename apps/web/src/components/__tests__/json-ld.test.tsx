@@ -404,10 +404,11 @@ describe('the offline structured-data gate (#55)', () => {
     for (const entry of rendered) {
       try {
         // Every link the block carries points into the site under test: the blocks are rendered
-        // with `NEXT_PUBLIC_SITE_URL` set to https://example.test, so a link that does not start
-        // with it was built from something else.
+        // with `NEXT_PUBLIC_SITE_URL` set to https://example.test, so a link on any other origin
+        // was built from something else. The origin is compared, not a prefix, so a host such as
+        // https://example.test.evil does not pass.
         for (const { at, link } of linksOf(onlyNode(entry))) {
-          if (!link.startsWith('https://example.test')) {
+          if (new URL(link).origin !== 'https://example.test') {
             problems.push(`${entry.source}: ${at} is ${link}, outside the site under test`);
           }
         }
