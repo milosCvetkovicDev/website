@@ -16,8 +16,8 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 - On commit: `.husky/pre-commit` runs `pnpm exec lint-staged`, `.husky/commit-msg` runs
   `pnpm exec commitlint --edit "$1"`. Both source `~/.nvm/nvm.sh` if pnpm is missing and abort with a
   message if it is still not on PATH.
-- lint-staged has a config per package. The root one only runs `prettier --write`; `apps/web` and
-  `apps/playground` run `eslint --fix --max-warnings 0` then `prettier --write` on TS/JS files.
+- lint-staged has a config per package. The root one only runs `prettier --write`; `apps/web` runs
+  `eslint --fix --max-warnings 0` then `prettier --write` on TS/JS files.
 - Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
   `main` never passes through the local hook. `.github/workflows/commitlint.yml`, job
   `Commit messages`, lints three things. The pull request title, twice: as written and with the
