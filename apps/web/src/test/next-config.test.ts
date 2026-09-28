@@ -1,6 +1,7 @@
 /**
- * These assertions read a configuration module and the filesystem, with no DOM in them, and
- * building a jsdom window is the most expensive thing in a test file that does not need one.
+ * These assertions read a configuration module and the filesystem and run git, with no DOM in
+ * them, and building a jsdom window is the most expensive thing in a test file that does not need
+ * one.
  *
  * @vitest-environment node
  */
@@ -48,6 +49,16 @@ function makeTempDir(prefix: string): string {
 afterAll(() => {
   for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
 });
+
+/**
+ * Loads next.config.ts fresh under the current environment. The module reads variables such as
+ * VERCEL_ENV and NEXT_DIST_DIR from `process.env` while it is evaluated, so each case that stubs
+ * one needs its own module instance.
+ */
+async function loadFreshConfig() {
+  vi.resetModules();
+  return (await import('../../next.config')).default;
+}
 
 describe('findWorkspaceRoot', () => {
   it('finds the repository root from the app directory', () => {
@@ -355,24 +366,18 @@ describe('the production alias', () => {
 });
 
 describe('env', () => {
-  // The config reads VERCEL_ENV when it is evaluated, so each case imports a fresh copy.
-  const freshConfig = async () => {
-    vi.resetModules();
-    return (await import('../../next.config')).default;
-  };
-
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
   it('inlines VERCEL_ENV, so the client-side global error page gates analytics like the layout', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
-    expect((await freshConfig()).env).toEqual({ VERCEL_ENV: 'production' });
+    expect((await loadFreshConfig()).env).toEqual({ VERCEL_ENV: 'production' });
   });
 
   it('inlines an empty string when VERCEL_ENV is unset, which the gate reads as off', async () => {
     vi.stubEnv('VERCEL_ENV', undefined);
-    expect((await freshConfig()).env).toEqual({ VERCEL_ENV: '' });
+    expect((await loadFreshConfig()).env).toEqual({ VERCEL_ENV: '' });
   });
 });
 
@@ -522,15 +527,6 @@ describe('the installed Next.js honours agentRules', () => {
     expect(readNext('dist/docs/01-app/02-guides/ai-agents.md')).toMatch(/\bagentRules: false\b/);
   });
 });
-
-/**
- * Loads next.config.ts fresh under the current environment. The module reads
- * `process.env.NEXT_DIST_DIR` while it is evaluated, so each case needs its own module instance.
- */
-async function loadFreshConfig() {
-  vi.resetModules();
-  return (await import('../../next.config')).default;
-}
 
 describe('distDir', () => {
   afterEach(() => {
