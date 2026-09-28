@@ -80,6 +80,9 @@ const eslintConfig = defineConfig([
     // thousands of problems in minified vendor code and fails `pnpm lint` under --max-warnings 0.
     'playwright-report/**',
     'test-results/**',
+    // `test:coverage`'s output directory. Its text-summary reporter writes nothing there, but an
+    // html or lcov reporter would write bundled JS into it.
+    'coverage/**',
     'out/**',
     'build/**',
     'next-env.d.ts',
