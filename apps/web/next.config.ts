@@ -150,9 +150,8 @@ const nextConfig: NextConfig = {
   // `next dev` writes apps/web/AGENTS.md and apps/web/CLAUDE.md when it detects an agent shell and
   // neither file holds Next's current managed block, and this repository neither commits nor
   // ignores them: an untracked, Next-controlled instruction file that Claude Code then loads as
-  // project instructions. Off, per ADR 0019. The docs the
-  // generated file pointed at are still there, version-matched, in
-  // apps/web/node_modules/next/dist/docs.
+  // project instructions. Off, per ADR 0019. The docs the generated file pointed at are still
+  // there, version-matched, in apps/web/node_modules/next/dist/docs.
   agentRules: false,
   // Playwright's local web server sets NEXT_DIST_DIR (apps/web/playwright.config.ts) so that the
   // `next dev` it starts never shares apps/web/.next with a `pnpm dev` running from this same
