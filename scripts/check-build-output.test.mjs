@@ -16,7 +16,9 @@ import { fileURLToPath } from 'node:url';
 
 import {
   ALLOWED_FUNCTIONS,
+  CheckError,
   bodyFile,
+  collectOtherFunctions,
   collectProblems,
   readAppRoutes,
   readPrerender,
@@ -52,6 +54,29 @@ const prerendered = (srcRoute, extra = {}) => ({
   srcRoute,
   ...extra,
 });
+
+/**
+ * The four manifests of what runs outside the App Router's routes, as a function-free Next 16.3.6
+ * build writes them (the encryption key left out, which the check does not read).
+ */
+const CLEAN_OTHER = {
+  functionsConfig: { version: 1, functions: {} },
+  middleware: { version: 3, middleware: {}, sortedMiddleware: [], functions: {} },
+  serverReference: { node: {}, edge: {} },
+  pages: { '/404': 'pages/404.html', '/500': 'pages/500.html' },
+};
+
+/** @param {Partial<Record<keyof typeof CLEAN_OTHER, unknown>>} [overrides] */
+const otherFunctions = (overrides = {}, allowed = /** @type {readonly string[]} */ ([])) => {
+  const manifests = { ...CLEAN_OTHER, ...overrides };
+  return collectOtherFunctions({
+    functionsConfig: JSON.stringify(manifests.functionsConfig),
+    middleware: JSON.stringify(manifests.middleware),
+    serverReference: JSON.stringify(manifests.serverReference),
+    pages: JSON.stringify(manifests.pages),
+    allowed,
+  });
+};
 
 /** @returns {PrerenderManifest} the prerender manifest that matches `APP_ROUTES`, all static */
 const cleanPrerender = () => ({
@@ -159,13 +184,79 @@ describe('readAppRoutes', () => {
 });
 
 describe('readPrerender', () => {
+  /** @param {Record<string, unknown>} entry one `routes` entry, under `/a` */
+  const withRoute = (entry) => JSON.stringify({ routes: { '/a': entry }, dynamicRoutes: {} });
+
   it('refuses a manifest with no `routes` or `dynamicRoutes` object', () => {
     assert.throws(() => readPrerender(JSON.stringify({ dynamicRoutes: {} })), /`routes`/);
     assert.throws(() => readPrerender(JSON.stringify({ routes: {} })), /`dynamicRoutes`/);
+    assert.throws(
+      () => readPrerender(JSON.stringify({ routes: [], dynamicRoutes: {} })),
+      /no `routes` object/,
+    );
   });
 
   it('refuses a manifest that is not JSON', () => {
     assert.throws(() => readPrerender(''), /not JSON/);
+  });
+
+  it('refuses a `routes` or `dynamicRoutes` entry that is not an object', () => {
+    assert.throws(
+      () => readPrerender(JSON.stringify({ routes: { '/a': 1 }, dynamicRoutes: {} })),
+      /`routes` entry \/a is not an object/,
+    );
+    assert.throws(
+      () => readPrerender(JSON.stringify({ routes: {}, dynamicRoutes: { '/b/[x]': null } })),
+      /`dynamicRoutes` entry \/b\/\[x\] is not an object/,
+    );
+  });
+
+  // A renamed or dropped field must stop the check: read as absent, each would pass a function.
+  it('refuses a path with no `compute`, or one it does not know, rather than calling it static', () => {
+    const { compute: _dropped, ...noCompute } = prerendered('/a');
+    assert.throws(() => readPrerender(withRoute(noCompute)), CheckError);
+    assert.throws(() => readPrerender(withRoute(noCompute)), /`compute` undefined/);
+    assert.throws(
+      () => readPrerender(withRoute(prerendered('/a', { compute: 'partial' }))),
+      /`compute` "partial"/,
+    );
+  });
+
+  it('accepts each compute value Next 16 writes', () => {
+    for (const compute of ['static', 'blocking', 'resuming']) {
+      assert.doesNotThrow(() => readPrerender(withRoute(prerendered('/a', { compute }))));
+    }
+  });
+
+  it('refuses a path with no `initialRevalidateSeconds`, or a value that is not false or seconds', () => {
+    const { initialRevalidateSeconds: _dropped, ...noRevalidate } = prerendered('/a');
+    assert.throws(() => readPrerender(withRoute(noRevalidate)), /`initialRevalidateSeconds`/);
+    for (const initialRevalidateSeconds of [true, '60', -1, null]) {
+      assert.throws(
+        () => readPrerender(withRoute(prerendered('/a', { initialRevalidateSeconds }))),
+        /`initialRevalidateSeconds`/,
+      );
+    }
+  });
+
+  it('refuses a path with no `srcRoute` key, and accepts null', () => {
+    const { srcRoute: _dropped, ...noSrcRoute } = prerendered('/a');
+    assert.throws(() => readPrerender(withRoute(noSrcRoute)), /`srcRoute`/);
+    assert.doesNotThrow(() => readPrerender(withRoute(prerendered('/a', { srcRoute: null }))));
+  });
+
+  it('refuses a `routeType` it does not know', () => {
+    assert.throws(
+      () => readPrerender(withRoute(prerendered('/a', { routeType: 'shell' }))),
+      /`routeType` "shell"/,
+    );
+  });
+
+  it('refuses a dynamic route with no `fallback`', () => {
+    assert.throws(
+      () => readPrerender(JSON.stringify({ routes: {}, dynamicRoutes: { '/b/[x]': {} } })),
+      /no `fallback`/,
+    );
   });
 });
 
@@ -268,6 +359,139 @@ describe('collectProblems', () => {
     assert.equal(problems.length, 1);
     assert.match(problems[0], /^\/mcp: .*ALLOWED_FUNCTIONS/);
   });
+
+  it('fails a route that revalidates every 0 s too', () => {
+    const prerender = cleanPrerender();
+    prerender.routes['/about'] = prerendered('/about', { initialRevalidateSeconds: 0 });
+    const { problems } = check({ prerender });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/about .*every 0 s/);
+  });
+
+  it('counts an allowlisted route that revalidates as a function, not as built static', () => {
+    const prerender = cleanPrerender();
+    prerender.routes['/about'] = prerendered('/about', { initialRevalidateSeconds: 60 });
+    const { problems, functions } = check({ prerender, allowed: ['/about'] });
+    assert.deepEqual(problems, []);
+    assert.deepEqual(functions, ['/about']);
+  });
+
+  it('counts an allowlisted route that resumes in a function as one', () => {
+    const prerender = cleanPrerender();
+    prerender.routes['/about'] = prerendered('/about', { compute: 'resuming' });
+    const { problems, functions } = check({ prerender, allowed: ['/about'] });
+    assert.deepEqual(problems, []);
+    assert.deepEqual(functions, ['/about']);
+  });
+
+  it('still requires the prerendered bodies of an allowlisted route', () => {
+    const prerender = cleanPrerender();
+    prerender.routes['/about'] = prerendered('/about', { initialRevalidateSeconds: 60 });
+    const { problems } = check({
+      prerender,
+      allowed: ['/about'],
+      bodies: CLEAN_BODIES.filter((b) => b !== 'about.html'),
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/about .*server\/app\/about\.html/);
+  });
+
+  it('attributes a path whose `srcRoute` is null to the route of the same name', () => {
+    // Earlier Next releases wrote null for a static route; 16.3.6 writes the path itself.
+    const prerender = cleanPrerender();
+    prerender.routes['/about'] = prerendered('/about', { srcRoute: null });
+    assert.deepEqual(check({ prerender }).problems, []);
+  });
+
+  it('refuses a prerendered path that belongs to no App Router route', () => {
+    const prerender = cleanPrerender();
+    prerender.routes['/legacy'] = prerendered('/legacy', { srcRoute: null });
+    assert.throws(() => check({ prerender }), /\/legacy is prerendered for \/legacy/);
+  });
+
+  it('refuses instances whose `srcRoute` names a route the app manifest does not have', () => {
+    // A change in how Next writes `srcRoute` would otherwise leave every instance unclaimed and the
+    // dynamic route, with no instance to check, passing.
+    const prerender = cleanPrerender();
+    prerender.routes['/work/a'] = prerendered('/work/:slug');
+    assert.throws(() => check({ prerender }), /\/work\/a is prerendered for \/work\/:slug/);
+  });
+
+  it('refuses a dynamic route the app manifest does not have', () => {
+    const prerender = cleanPrerender();
+    prerender.dynamicRoutes['/blog/[slug]'] = { fallback: false };
+    assert.throws(() => check({ prerender }), /dynamic route \/blog\/\[slug\] is not in/);
+  });
+
+  it('refuses a path whose `routeType` disagrees with its entry name', () => {
+    const prerender = cleanPrerender();
+    prerender.routes['/robots.txt'] = prerendered('/robots.txt', { routeType: 'page' });
+    assert.throws(() => check({ prerender }), /\/robots\.txt is a "page".*\/robots\.txt\/route/);
+  });
+});
+
+describe('collectOtherFunctions', () => {
+  it('passes the four manifests of a function-free build', () => {
+    assert.deepEqual(otherFunctions(), []);
+  });
+
+  it('fails a proxy.ts, which Next 16 records as the /_middleware function', () => {
+    const problems = otherFunctions({
+      functionsConfig: {
+        version: 1,
+        functions: { '/_middleware': { runtime: 'nodejs', matchers: [{ regexp: '^.*$' }] } },
+      },
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/_middleware: a `proxy\.ts`/);
+  });
+
+  it('fails a function Next configured for a route, unless the route is allowlisted', () => {
+    const functionsConfig = { version: 1, functions: { '/mcp': { maxDuration: 10 } } };
+    assert.match(otherFunctions({ functionsConfig }).join('\n'), /^\/mcp: Next configured it/);
+    assert.deepEqual(otherFunctions({ functionsConfig }, ['/mcp']), []);
+  });
+
+  it('fails Edge middleware and Edge functions', () => {
+    const problems = otherFunctions({
+      middleware: {
+        version: 3,
+        middleware: { '/': { name: 'middleware' } },
+        sortedMiddleware: ['/'],
+        functions: { '/edge': { name: 'edge' } },
+      },
+    });
+    assert.equal(problems.length, 2);
+    assert.match(problems[0], /`middleware`/);
+    assert.match(problems[1], /^\/edge: .*`functions`/);
+  });
+
+  it('fails a Server Action, which runs in a function even from a prerendered page', () => {
+    const problems = otherFunctions({ serverReference: { node: { abc123: {} }, edge: {} } });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^1 Server Action \(.*`node`\)/);
+  });
+
+  it('fails a Pages Router entry other than the static 404 and 500 pages', () => {
+    const problems = otherFunctions({
+      pages: {
+        '/404': 'pages/404.html',
+        '/500': 'pages/500.js',
+        '/api/hello': 'pages/api/hello.js',
+      },
+    });
+    assert.equal(problems.length, 2);
+    assert.match(problems[0], /^\/500: a Pages Router entry/);
+    assert.match(problems[1], /^\/api\/hello: a Pages Router entry/);
+  });
+
+  it('refuses a manifest without the maps it reads', () => {
+    assert.throws(() => otherFunctions({ functionsConfig: { version: 1 } }), /`functions` object/);
+    assert.throws(() => otherFunctions({ middleware: { functions: {} } }), /`middleware` object/);
+    assert.throws(() => otherFunctions({ serverReference: { node: {} } }), /`edge` object/);
+    assert.throws(() => otherFunctions({ pages: { '/404': 1 } }), /\/404 is not a string/);
+    assert.throws(() => otherFunctions({ pages: [] }), /not an object/);
+  });
 });
 
 describe('ALLOWED_FUNCTIONS', () => {
@@ -277,14 +501,22 @@ describe('ALLOWED_FUNCTIONS', () => {
 });
 
 /**
- * Writes an artifact tree to a temporary directory: the two manifests and the body files.
+ * Writes an artifact tree to a temporary directory: BUILD_ID, the six manifests and the body files.
  *
- * @param {{ appRoutes?: Record<string, string> | string | null, prerender?: PrerenderManifest | string | null, bodies?: string[] }} [tree]
+ * @param {{
+ *   appRoutes?: Record<string, string> | string | null,
+ *   prerender?: PrerenderManifest | string | null,
+ *   other?: Partial<Record<keyof typeof CLEAN_OTHER, unknown>>,
+ *   buildId?: string | null,
+ *   bodies?: string[],
+ * }} [tree]
  *   a string is written as the file's text as it is, and `null` leaves the file out
  */
 function writeTree({
   appRoutes = APP_ROUTES,
   prerender = cleanPrerender(),
+  other = {},
+  buildId = 'test-build-id',
   bodies = CLEAN_BODIES,
 } = {}) {
   const root = realpathSync(mkdtempSync(join(realpathSync(tmpdir()), 'build-output-')));
@@ -295,8 +527,14 @@ function writeTree({
     if (value === null) return;
     writeFileSync(join(dist, name), typeof value === 'string' ? value : JSON.stringify(value));
   };
+  const others = { ...CLEAN_OTHER, ...other };
+  manifest('BUILD_ID', buildId);
   manifest('app-path-routes-manifest.json', appRoutes);
   manifest('prerender-manifest.json', prerender);
+  manifest('server/functions-config-manifest.json', others.functionsConfig);
+  manifest('server/middleware-manifest.json', others.middleware);
+  manifest('server/server-reference-manifest.json', others.serverReference);
+  manifest('server/pages-manifest.json', others.pages);
   for (const body of bodies) {
     const path = join(dist, 'server', 'app', body);
     mkdirSync(dirname(path), { recursive: true });
@@ -305,9 +543,21 @@ function writeTree({
   return { root, dist };
 }
 
-/** @param {string[]} args @param {string} [script] */
-const run = (args, script = thisScript) =>
-  spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: { ...process.env } });
+/**
+ * Runs the command, with a deadline so that a child that hangs fails its test instead of holding
+ * `pnpm test:scripts` until the CI job's own timeout.
+ *
+ * @param {string[]} args @param {string} [script]
+ */
+const run = (args, script = thisScript) => {
+  const result = spawnSync(process.execPath, [script, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env },
+    timeout: 30_000,
+  });
+  assert.equal(result.signal, null, `the command was killed (${result.signal}): ${result.stderr}`);
+  return result;
+};
 
 describe('the command', () => {
   /** @param {Parameters<typeof writeTree>[0]} tree @param {(dist: string) => void} body */
@@ -320,11 +570,29 @@ describe('the command', () => {
     }
   };
 
-  it('exits 0 on a clean tree and says what it checked', () => {
+  it('exits 0 on a clean tree and says what it checked, and which build', () => {
     withTree({}, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 0, result.stderr);
       assert.match(result.stdout, /7 routes, 9 prerendered bodies, no server function/);
+      assert.match(result.stdout, /\(BUILD_ID test-build-id, written \d{4}-\d\d-\d\dT[\d:.]+Z\)/);
+    });
+  });
+
+  it('exits 1 on a proxy.ts, which the App Router manifests do not show', () => {
+    const functionsConfig = { version: 1, functions: { '/_middleware': { runtime: 'nodejs' } } };
+    withTree({ other: { functionsConfig } }, (dist) => {
+      const result = run([dist]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /\/_middleware: a `proxy\.ts`/);
+    });
+  });
+
+  it('exits 1 on a Server Action', () => {
+    withTree({ other: { serverReference: { node: { abc: {} }, edge: {} } } }, (dist) => {
+      const result = run([dist]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /1 Server Action/);
     });
   });
 
@@ -348,7 +616,40 @@ describe('the command', () => {
     ['a missing routes manifest', { appRoutes: null }, /app-path-routes-manifest\.json/],
     ['a missing prerender manifest', { prerender: null }, /prerender-manifest\.json/],
     ['an unparseable routes manifest', { appRoutes: '{"/page": ' }, /not JSON/],
-    ['an unparseable prerender manifest', { prerender: 'null' }, /not an object/],
+    [
+      'an unparseable prerender manifest',
+      { prerender: '{"routes":' },
+      /prerender-manifest\.json is not JSON/,
+    ],
+    ['a prerender manifest that is not an object', { prerender: 'null' }, /not an object/],
+    [
+      'a prerender entry without `compute`',
+      {
+        prerender: {
+          routes: { '/': { srcRoute: '/', initialRevalidateSeconds: false } },
+          dynamicRoutes: {},
+        },
+      },
+      /`compute` undefined/,
+    ],
+    [
+      'a missing functions-config manifest',
+      { other: { functionsConfig: null } },
+      /functions-config-manifest\.json/,
+    ],
+    ['a missing middleware manifest', { other: { middleware: null } }, /middleware-manifest\.json/],
+    [
+      'a missing server-reference manifest',
+      { other: { serverReference: null } },
+      /server-reference-manifest\.json/,
+    ],
+    ['a missing pages manifest', { other: { pages: null } }, /pages-manifest\.json/],
+    [
+      'a tree with no BUILD_ID, not a finished build',
+      { buildId: null },
+      /no BUILD_ID.*pnpm --filter web build/,
+    ],
+    ['an empty BUILD_ID', { buildId: '\n' }, /BUILD_ID is empty/],
   ]) {
     it(`exits 2 on ${label}, with a message`, () => {
       withTree(/** @type {Parameters<typeof writeTree>[0]} */ (tree), (dist) => {
@@ -371,8 +672,23 @@ describe('the command', () => {
     }
   });
 
+  it('exits 2 when the build path is a file, not a directory', () => {
+    withTree({}, (dist) => {
+      const result = run([join(dist, 'BUILD_ID')]);
+      assert.equal(result.status, 2);
+      assert.match(result.stderr, /is not a directory/);
+    });
+  });
+
   it('exits 2 on more than one argument', () => {
     const result = run(['a', 'b']);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Usage/);
+  });
+
+  it('exits 2 on an empty argument rather than checking the current directory', () => {
+    // An unset shell variable passed through: `resolve('')` would be the working directory.
+    const result = run(['']);
     assert.equal(result.status, 2);
     assert.match(result.stderr, /Usage/);
   });
@@ -395,6 +711,27 @@ describe('the command', () => {
       writeFileSync(
         importer,
         `await import(${JSON.stringify(thisScript)});\nconsole.log('imported');\n`,
+      );
+      const result = run([], importer);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(result.stdout.trim(), 'imported');
+      assert.equal(result.stderr, '');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('imports cleanly when the process was started from a path that no longer resolves', () => {
+    // `realpathSync(process.argv[1])` throws ENOENT here; the guard must treat it as "not started".
+    const root = realpathSync(mkdtempSync(join(realpathSync(tmpdir()), 'build-output-')));
+    try {
+      const importer = join(root, 'importer.mjs');
+      writeFileSync(
+        importer,
+        "import { rmSync } from 'node:fs';\n" +
+          'rmSync(process.argv[1]);\n' +
+          `await import(${JSON.stringify(thisScript)});\n` +
+          "console.log('imported');\n",
       );
       const result = run([], importer);
       assert.equal(result.status, 0, result.stderr);

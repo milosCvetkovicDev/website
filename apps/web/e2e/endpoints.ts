@@ -1,4 +1,5 @@
-import { CASE_STUDY_ROUTES, STATIC_ROUTES } from './routes';
+import { caseStudies } from '../src/data/case-studies';
+import { STATIC_ROUTES, caseStudyRoute } from './routes';
 
 /**
  * The one manifest of the machine-readable paths this site serves, or is about to.
@@ -24,18 +25,37 @@ import { CASE_STUDY_ROUTES, STATIC_ROUTES } from './routes';
  * works for a dynamic route and a static one alike.
  */
 export function markdownTwinPath(route: string): string {
+  if (!route.startsWith('/') || (route !== '/' && route.endsWith('/'))) {
+    throw new Error(`markdownTwinPath: ${JSON.stringify(route)} is not a route path`);
+  }
   return route === '/' ? '/index.md' : `${route}/index.md`;
 }
+
+/** One case study as JSON (#60), `/work/<slug>/index.json` for the same reason as the twins. */
+export function caseStudyJsonPath(slug: string): string {
+  return `${caseStudyRoute(slug)}/index.json`;
+}
+
+/**
+ * Every case study with each path an agent reads it at. The slugs come from the data file, so a new
+ * case study gets its rows without touching a spec.
+ */
+export const CASE_STUDY_ENDPOINTS = caseStudies.map(({ slug }) => ({
+  slug,
+  route: caseStudyRoute(slug),
+  twin: markdownTwinPath(caseStudyRoute(slug)),
+  json: caseStudyJsonPath(slug),
+}));
 
 /**
  * Every page route with its twin: the static routes and every case study, not the 404. That
  * includes `/privacy` and `/blog`; whether those two ship a twin is #59's decision, and if one does
  * not, #59 drops its row here rather than leaving a declared failure that never flips.
  */
-export const MARKDOWN_TWINS = [...STATIC_ROUTES, ...CASE_STUDY_ROUTES].map((route) => ({
-  route,
-  twin: markdownTwinPath(route),
-}));
+export const MARKDOWN_TWINS = [
+  ...STATIC_ROUTES.map((route) => ({ route, twin: markdownTwinPath(route) })),
+  ...CASE_STUDY_ENDPOINTS.map(({ route, twin }) => ({ route, twin })),
+];
 
 /** The llmstxt.org index of the site (#60). */
 export const LLMS_TXT = '/llms.txt';
@@ -46,13 +66,16 @@ export const LLMS_TXT = '/llms.txt';
  */
 export const CASE_STUDIES_JSON = '/case-studies.json';
 
-/** One case study as JSON (#60), `/work/<slug>/index.json` for the same reason as the twins. */
-export function caseStudyJsonPath(slug: string): string {
-  return `/work/${slug}/index.json`;
-}
-
 /** The Atom feed of the blog's published posts (#61). */
 export const FEED = '/feed.xml';
 
 /** The read-only, stateless MCP server over streamable HTTP (#62), the site's one server function. */
 export const MCP = '/mcp';
+
+/**
+ * The origin the build writes into absolute URLs: `metadataBase` in `src/app/layout.tsx` reads the
+ * same variable with the same fallback. A spec that meets an absolute link compares it with this,
+ * so a link to another host (a preview deployment, localhost) fails rather than matching by path.
+ */
+export const SITE_ORIGIN = new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev')
+  .origin;

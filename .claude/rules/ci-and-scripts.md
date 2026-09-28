@@ -133,10 +133,13 @@ which is the reference there.
   and the prerendered bodies under `server/app`, not the route table Next prints, and fails when a
   route needs a server function (no prerendered path, a dynamic route whose params are not fixed,
   revalidation, or a partially prerendered page) unless it is in the script's `ALLOWED_FUNCTIONS`,
-  when an allowlisted route turns out static or absent, and when a prerendered path has no body
-  file. The allowlist is empty; #62 adds `/mcp`. A route handler without
-  `export const dynamic = 'force-static'` is the failure it exists for: it still serves the right
-  bytes, as a function billed per request. Its parsing is tested in `test:scripts`, which runs
+  when an allowlisted route turns out static or absent, when a prerendered path has no body file,
+  and when the build has a `proxy.ts` or middleware, a Server Action or a Pages Router entry (the
+  four `server/*-manifest.json` files the App Router manifests do not cover). A manifest field it
+  decides on that is missing or holds an unknown value, or a prerendered path it cannot attribute to
+  a route, exits 2 rather than passing. The allowlist is empty; #62 adds `/mcp`. A route handler
+  without `export const dynamic = 'force-static'` is the failure it exists for: it still serves the
+  right bytes, as a function billed per request. Its parsing is tested in `test:scripts`, which runs
   before the build.
   `e2e`: install chromium and webkit, build web, run the Playwright specs on all three projects with
   their output teed into a log, then check that log with `scripts/check-webserver-log.mjs` whenever

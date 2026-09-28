@@ -32,7 +32,8 @@ draws the case-study card, whose alt text has to name the study, which an `openg
 single `alt` cannot; the page points og:image at it through `buildMetadata()`'s `image`. All of them
 prerender at build time, and `pnpm check:build-output` (a `quality` step, `ci-and-scripts.md`) fails
 when a route does not: a `GET` handler is dynamic unless it exports `dynamic = 'force-static'`, and
-without it builds as a server function.
+without it builds as a server function, as a handler that exports any other method does even with it.
+The same check fails a `proxy.ts` and any `'use server'` action.
 `sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
 `NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
 The security headers come from one static `headers()` entry in `apps/web/next.config.ts` whose
