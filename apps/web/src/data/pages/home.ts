@@ -10,7 +10,9 @@ import type { PageRecord, ProseSection } from './types';
 
 /**
  * A story section's closing pair: the headline the section ends on and the line under it. The one
- * paragraph is plain text, because `AnimatedText` animates a string.
+ * paragraph is plain text, because `AnimatedText` animates a string. Exactly one: each phase renders
+ * `paragraphs[0]`, so a second line would reach the twin and not the page. Widening this tuple means
+ * rendering every paragraph in the phases first.
  */
 export interface StoryClosing extends ProseSection {
   paragraphs: readonly [string];
@@ -52,18 +54,17 @@ export const storyClosings = {
   },
 } as const satisfies Record<string, StoryClosing>;
 
-export const homePage: PageRecord = {
+/**
+ * `satisfies` rather than a `PageRecord` annotation, so the title keeps its `{ absolute }` type: a
+ * plain string would go through the root template and read `… | Milos Cvetkovic` twice.
+ */
+export const homePage = {
   path: '/',
   // The root template applies to child segments only, so this is the whole title; `absolute` says so.
   title: { absolute: 'Milos Cvetkovic | Senior Full-Stack Engineer' },
   summary:
     'Senior Full Stack Engineer building AI-native systems: self-healing agents, legacy rescue and cloud architecture in TypeScript, React and NestJS.',
-  sections: [
-    storyClosings.discovery,
-    storyClosings.strategy,
-    storyClosings.execution,
-    storyClosings.gauntlet,
-    storyClosings.loop,
-    storyClosings.complete,
-  ],
-};
+  // Every closing pair, in the order `storyClosings` lists them, which is the story's order: a pair
+  // added there reaches the twin without a second list to remember.
+  sections: Object.values(storyClosings),
+} as const satisfies PageRecord;
