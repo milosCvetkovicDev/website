@@ -31,8 +31,11 @@ never reaches a page that declares its own `openGraph`. There are two route hand
 draws the case-study card, whose alt text has to name the study, which an `opengraph-image` file's
 single `alt` cannot; the page points og:image at it through `buildMetadata()`'s `image`. All of them
 prerender at build time.
-`sitemap.ts`, `robots.ts`, `layout.tsx` and `components/json-ld.tsx` each read
+`sitemap.ts`, `robots.ts`, `layout.tsx`, `components/json-ld.tsx` and `lib/serialise.ts` each read
 `NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
+`src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
+page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own
+(#59). `lib/__tests__/serialise.test.ts` fails when a file under `src/app` writes `text/markdown`.
 The security headers come from one static `headers()` entry in `apps/web/next.config.ts` whose
 source, `/:path*`, matches every path, `/_next/static` assets and the 404s included:
 `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a Content-Security-Policy, a
