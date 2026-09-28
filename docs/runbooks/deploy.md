@@ -545,6 +545,22 @@ pages at rest on two phone viewports; either fails the `e2e` job on any violatio
   59.13.1): it rebuilds that deployment's own commit and takes no git ref, so it **cannot move
   production forward**. If production is behind `main`, see **Catching production up** below.
 
+### The years of experience in January
+
+`apps/web/src/data/profile.ts` computes the years of experience when the site is built (the hero's
+XP row, the Person JSON-LD, the /about description and quick fact), and every route is prerendered.
+After 1 January production keeps last year's figure until a build actually runs in the new year.
+The year is not part of the build's cache key: `turbo.json` hashes the tracked files under
+`apps/web` and `NEXT_PUBLIC_SITE_URL` and `VERCEL_ENV`, so `vercel redeploy`, a deploy hook or a
+dashboard deployment of a commit whose inputs did not change can replay the cached `.next` from the
+previous year. The dependable trigger is the first merge of the year that changes a file under
+`apps/web`. Check it after that deployment:
+
+```bash
+curl -s https://miloscvetkovic.dev/ | grep -o '[0-9]* years · 6 domains'
+# expect: this year minus 2013 (CAREER_START_YEAR), e.g. "14 years · 6 domains" in 2027
+```
+
 ### Catching production up
 
 When production's commit is not `main`'s HEAD — because a build was refused, cancelled or never
