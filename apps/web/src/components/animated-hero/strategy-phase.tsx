@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { storyClosings } from '@/data/pages/home';
 
 const techChoices = [
   {
@@ -349,14 +350,10 @@ export function StrategyPhase() {
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
           <h2 className="mb-3 text-2xl font-bold md:text-4xl">
-            <AnimatedText animation="magnetic">
-              Hype fades. The right tool for the job doesn&apos;t.
-            </AnimatedText>
+            <AnimatedText animation="magnetic">{storyClosings.strategy.heading}</AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            <AnimatedText animation="elastic">
-              I pick technologies that solve the problem, not pad my resume.
-            </AnimatedText>
+            <AnimatedText animation="elastic">{storyClosings.strategy.paragraphs[0]}</AnimatedText>
           </p>
         </div>
       </div>
