@@ -16,6 +16,7 @@ import { LoopPhase } from '../loop-phase';
 import { GameComplete } from '../game-complete';
 import { AnimatedHero } from '..';
 import { cssTransitions, gsapCssConflicts, tweenedElements } from './gsap-css-conflicts';
+import { countTweens, pickTween, progressDriver } from './gsap-tweens';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
 // at import time, so the stub must exist before the imports above are evaluated.
@@ -334,14 +335,14 @@ const tweenedTargets = [
   {
     name: 'GauntletPhase',
     Phase: GauntletPhase,
-    targets: () => [screen.getByText('DEPLOYMENT SUCCESSFUL').closest('.mt-6')],
+    targets: () => [screen.getByText('DEPLOYMENT SUCCESSFUL').closest('[data-gauntlet="deploy"]')],
     count: 1,
     tweens: ['opacity', 'transform'],
   },
   {
     name: 'LoopPhase',
     Phase: LoopPhase,
-    targets: () => [screen.getByText(/^(ERROR DETECTED|RESOLVED)$/).closest('.border')],
+    targets: () => [screen.getByText(/^(ERROR DETECTED|RESOLVED)$/).closest('[data-loop="alert"]')],
     count: 1,
     tweens: ['opacity', 'transform'],
   },
@@ -479,6 +480,9 @@ describe('ExecutionPhase', () => {
     expect(media.listenerCount()).toBe(0);
   });
 
+  /** The stats count: a 3 s tween of a plain object whose onUpdate writes the numbers. */
+  const statsCount = progressDriver(3);
+
   /** Mounts the phase and lets ScrollTrigger measure, which starts the stats count. */
   function mountCounting() {
     const toSpy = vi.spyOn(gsap, 'to');
@@ -486,8 +490,7 @@ describe('ExecutionPhase', () => {
     // A trigger bound to a timeline measures on refresh (GSAP runs one after load in a browser);
     // in jsdom the section is then "in view" and onEnter starts the stats tween on a plain object.
     act(() => ScrollTrigger.refresh());
-    const [statsTarget] = toSpy.mock.calls[0];
-    const statsTween = toSpy.mock.results[0].value;
+    const { target: statsTarget, tween: statsTween } = pickTween(toSpy, statsCount);
     return { ...utils, toSpy, statsTarget, statsTween };
   }
 
@@ -514,7 +517,7 @@ describe('ExecutionPhase', () => {
 
     act(() => enterAgain());
 
-    expect(toSpy).toHaveBeenCalledTimes(2);
+    expect(countTweens(toSpy, statsCount), 'one count per entry').toBe(2);
     expect(gsap.getTweensOf(statsTarget)).toHaveLength(0);
   });
 
@@ -528,8 +531,11 @@ describe('ExecutionPhase', () => {
 
     // Entering again restarts the count, which writes its own numbers back over the totals.
     act(() => enterAgain());
+    expect(countTweens(toSpy, statsCount), 'one count per entry').toBe(2);
+    const { tween: secondCount } = pickTween(toSpy, statsCount, { latest: true });
+    expect(secondCount, 'the re-entry started a count of its own').not.toBe(statsTween);
     act(() => {
-      toSpy.mock.results[1].value.progress(0.5);
+      secondCount.progress(0.5);
     });
     expect(screen.queryByText('00:14:32')).not.toBeInTheDocument();
 
