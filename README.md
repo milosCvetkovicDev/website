@@ -63,6 +63,7 @@ CI runs on every pull request and every push to `main` (`.github/workflows/ci.ym
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --- |
 | dependency review                 | Lockfile dependencies a pull request adds with a known advisory                                                                     | -                  | yes |
 | `pnpm check:allowbuilds`          | `allowBuilds` entries against the versions the lockfile resolves                                                                    | -                  | yes |
+| `pnpm check:adrs`                 | Each ADR's status, title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules            | -                  | yes |
 | `pnpm test:scripts`               | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step, commitlint configs, web server log, flake hunt | -                  | yes |
 | `pnpm format:check`               | Prettier, shared config, Tailwind class order                                                                                       | yes (staged files) | yes |
 | `pnpm lint`                       | ESLint with `--max-warnings 0` in `apps/web`                                                                                        | yes (staged files) | yes |

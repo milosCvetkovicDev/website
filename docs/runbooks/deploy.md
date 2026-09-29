@@ -49,6 +49,7 @@ Before the first deploy, confirm the build is green locally from a clean checkou
 ```bash
 pnpm install --frozen-lockfile
 pnpm check:allowbuilds
+pnpm check:adrs
 pnpm test:scripts
 pnpm format:check
 pnpm lint

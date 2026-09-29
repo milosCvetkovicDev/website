@@ -14,6 +14,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:allowbuilds": "node scripts/check-allowbuilds-drift.mjs",
+    "check:adrs": "node scripts/check-adr-index.mjs",
     "check:build-output": "node scripts/check-build-output.mjs",
     "check:docs-drift": "node scripts/check-docs-drift.ts",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",

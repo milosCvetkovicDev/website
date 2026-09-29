@@ -15,7 +15,8 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 ## Architecture
 
 - `scripts/` at the repository root holds the scripts that run outside the apps:
-  `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `check-build-output.mjs`
+  `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `check-adr-index.mjs`
+  (`pnpm check:adrs`, the ADR records against their index), `check-build-output.mjs`
   (`pnpm check:build-output`, that the web build stays function-free), `vercel-ignore-build.mjs`
   (Vercel's ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log
   check), `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22 runs directly),
@@ -51,6 +52,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `pnpm format`                                                           | Prettier over the whole repo, writing changes                                                                                                                                                               |
 | `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                                           |
 | `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                                                     |
+| `pnpm check:adrs`                                                       | Checks each ADR's status, H1 title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules; exit 1 on a disagreement, 2 if it could not run                         |
 | `pnpm check:build-output [<distDir>]`                                   | After `pnpm --filter web build`: every route in `apps/web/.next` is prerendered with its body file and none needs a server function outside `ALLOWED_FUNCTIONS`; exit 1 on a finding, 2 if it could not run |
 | `pnpm check:docs-drift`                                                 | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                                         |
 | `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/`                                                                                                                                                                   |
@@ -125,8 +127,8 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   (`actions/dependency-review-action`, on pull requests only, straight after checkout; it fails a
   pull request that adds a dependency with a known advisory, dev tooling included, because GitHub's
   dependency graph scopes every `pnpm-lock.yaml` entry `runtime`, the action's default), then
-  install, `check:allowbuilds`, `test:scripts`, `format:check`, `lint`, `typecheck`, `test`, `build`,
-  `check:build-output`. The last reads what `build` left in `apps/web/.next`, the route manifests
+  install, `check:allowbuilds`, `check:adrs`, `test:scripts`, `format:check`, `lint`, `typecheck`,
+  `test`, `build`, `check:build-output`. The last reads what `build` left in `apps/web/.next`, the route manifests
   and the prerendered bodies under `server/app`, not the route table Next prints, and fails when a
   route needs a server function (no prerendered path, a dynamic route whose params are not fixed,
   revalidation, or a partially prerendered page) unless it is in the script's `ALLOWED_FUNCTIONS`,
