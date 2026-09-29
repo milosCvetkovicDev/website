@@ -255,8 +255,8 @@ export function GauntletPhase() {
           </HudPanel>
         </div>
 
-        {/* Deployment Status */}
-        <div ref={deployRef} className="mt-6">
+        {/* Deployment Status. data-gauntlet marks the panels the tests look up. */}
+        <div ref={deployRef} data-gauntlet="deploy" className="mt-6">
           {shownDeploymentStatus !== 'idle' && (
             <div
               className={`rounded-lg border p-6 text-center transition-all duration-500 ${
@@ -320,7 +320,11 @@ export function GauntletPhase() {
         </div>
 
         {/* Achievement */}
-        <div ref={achievementRef} className={`mt-6 ${achievementVisible ? '' : 'opacity-0'}`}>
+        <div
+          ref={achievementRef}
+          data-gauntlet="achievement"
+          className={`mt-6 ${achievementVisible ? '' : 'opacity-0'}`}
+        >
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
               <span className="text-xl">🏆</span>
