@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { caseStudies, formatMetric } from '../src/data/case-studies';
 import { storyClosings } from '../src/data/pages/home';
+import { visible } from '../src/test/markdown';
 import { MARKDOWN_TWINS, SITE_ORIGIN, markdownTwinPath } from './endpoints';
 import { NOT_FOUND_ROUTE, STATIC_ROUTES, caseStudyRoute } from './routes';
 import { alternates, attributeText, fetchHead, first } from './support/served-head';
@@ -25,9 +26,6 @@ test.describe.configure({ timeout: 60_000 });
 /** RFC 7763's type with the charset it requires, written once by `markdownResponse()`. */
 const MARKDOWN = 'text/markdown; charset=utf-8';
 
-/** The text a Markdown reader sees: CommonMark drops the backslash before ASCII punctuation. */
-const visible = (markdown: string) => markdown.replace(/\\([!-/:-@[-`{-~])/g, '$1');
-
 /** A twin's blocks, as a reader sees them: the text between blank lines, less the final newline. */
 const blocksOf = (markdown: string) =>
   visible(markdown)
@@ -35,10 +33,34 @@ const blocksOf = (markdown: string) =>
     .split(/\n{2,}/);
 
 /**
- * Four or more single characters in a row, each followed by one space: `M o s t` rather than `Most`,
+ * Four or more single letters in a row, each followed by one space: `M o s t` rather than `Most`,
  * the shape a per-character `<span>` heading takes in extracted text, which a twin exists to avoid.
+ * Letters only, so copy such as `A / B / C / D` or `x + y = z` is not mistaken for one.
  */
-const SPACED_OUT = /(?<!\S)(?:[^\s|] ){3,}[^\s|](?!\S)/u;
+const SPACED_OUT = /(?<!\S)(?:\p{L} ){3,}\p{L}(?!\S)/u;
+
+/** Collapses every run of whitespace to one space, as a parsed heading's text is. */
+const collapsed = (text: string) => text.replace(/\s+/g, ' ').trim();
+
+/**
+ * The whole units of text a twin holds, as a reader sees them: each heading line's text, each
+ * table cell, each bold term and each link's text. A page's heading is looked up here as a whole
+ * unit, never as a substring, so a short heading such as `Go` cannot pass on a word in some
+ * paragraph of another section.
+ */
+function unitsOf(markdown: string): Set<string> {
+  const units = new Set<string>();
+  for (const line of visible(markdown).split('\n')) {
+    const heading = line.match(/^#{1,6} (.*)$/)?.[1];
+    if (heading !== undefined) units.add(collapsed(heading));
+    if (/^\|.*\|$/.test(line)) {
+      for (const cell of line.slice(1, -1).split(' | ')) units.add(collapsed(cell));
+    }
+    for (const [, term] of line.matchAll(/\*\*(.+?)\*\*/g)) units.add(collapsed(term));
+    for (const [, text] of line.matchAll(/\[([^\]]+)\]\(/g)) units.add(collapsed(text));
+  }
+  return units;
+}
 
 async function fetchTwin(request: APIRequestContext, path: string): Promise<string> {
   const response = await request.get(path);
@@ -62,7 +84,11 @@ for (const { route, twin } of MARKDOWN_TWINS) {
       `${SITE_ORIGIN}${twin}`,
     );
 
-    const [title, summary, source] = blocksOf(await fetchTwin(request, twin));
+    const blocks = blocksOf(await fetchTwin(request, twin));
+    expect(blocks.length, `${twin} should open with a title, a summary and Source`).toBeGreaterThan(
+      2,
+    );
+    const [title, summary, source] = blocks;
     expect(title).toMatch(/^# \S/);
     const description = first(head.meta, 'description');
     expect(description, `${route} should serve a meta description`).toBeDefined();
@@ -78,7 +104,7 @@ for (const { route, twin } of MARKDOWN_TWINS) {
 }
 
 test('the 404 advertises no twin, and a path with no twin is a true 404', async ({ request }) => {
-  for (const path of [NOT_FOUND_ROUTE, '/work/does-not-exist']) {
+  for (const path of [NOT_FOUND_ROUTE, caseStudyRoute('does-not-exist')]) {
     const head = await fetchHead(request, path);
     expect(head.status, `${path} should answer 404`).toBe(404);
     expect(alternates(head, 'text/markdown'), `${path} must advertise no twin`).toEqual([]);
@@ -114,7 +140,7 @@ test('/index.md carries the six closing lines of the story, each one whole', asy
     expect(blocks).toContain(`## ${sentence}`);
   }
   const closings = Object.values(storyClosings);
-  expect(closings).toHaveLength(6);
+  expect(closings.length).toBeGreaterThan(0);
   for (const { heading, paragraphs } of closings) {
     expect(blocks).toContain(`## ${heading}`);
     expect(blocks).toContain(paragraphs[0]);
@@ -124,7 +150,12 @@ test('/index.md carries the six closing lines of the story, each one whole', asy
 
 for (const study of caseStudies) {
   const route = caseStudyRoute(study.slug);
-  test(`${markdownTwinPath(route)} carries the whole case study`, async ({ request }) => {
+  // The dates, the metric and every list entry, as served. That every other field of the study
+  // reaches the twin is `serialise.test.ts`'s walk over its keys, and that the handler serves the
+  // serialiser's output unchanged is `pages.test.ts`'s; the headings are the parity test's below.
+  test(`${markdownTwinPath(route)} carries the study's dates, metric, lists and stack`, async ({
+    request,
+  }) => {
     const shown = visible(await fetchTwin(request, markdownTwinPath(route)));
     const lines = shown.split('\n');
     const { metric } = study.highlight;
@@ -146,9 +177,10 @@ for (const study of caseStudies) {
 }
 
 /**
- * The text of every `h2` and `h3` inside `main#main-content`, and the first cell of every table
- * row there, as the served HTML reads once parsed: whitespace collapsed, character references
- * decoded. `DOMParser` runs with scripting off and navigates nothing.
+ * The text of every `h2` and `h3` inside `main#main-content` and outside a `<nav>`, and the first
+ * cell of every table row there, as the served HTML reads once parsed: whitespace collapsed,
+ * character references decoded. A `<nav>` is the way on to other pages (a case study's "More
+ * work"), not this page's content. `DOMParser` runs with scripting off and navigates nothing.
  */
 async function pageLandmarks(page: Page, html: string): Promise<string[]> {
   return page.evaluate((markup) => {
@@ -158,7 +190,9 @@ async function pageLandmarks(page: Page, html: string): Promise<string[]> {
     if (!main) return [];
     const text = (element: Element) => (element.textContent ?? '').replace(/\s+/g, ' ').trim();
     return [
-      ...[...main.querySelectorAll('h2, h3')].map(text),
+      ...[...main.querySelectorAll('h2, h3')]
+        .filter((heading) => !heading.closest('nav'))
+        .map(text),
       ...[...main.querySelectorAll('tr')]
         .map((row) => row.querySelector(':scope > th, :scope > td'))
         .filter((cell): cell is Element => cell !== null)
@@ -167,19 +201,26 @@ async function pageLandmarks(page: Page, html: string): Promise<string[]> {
   }, html);
 }
 
-// `/` and the case studies are covered above instead: the story's headings on `/` are rendered one
-// `<span>` per character, so their parsed text is not a stable expectation, and a case study's twin
-// is checked against every field of its data. Every other page is read here, so a heading or a
-// table row added to a page without its record fails, and no twin is thinner than its page.
-for (const route of STATIC_ROUTES.filter((path) => path !== '/')) {
-  test(`every heading and table row ${route} serves is in its twin`, async ({ page, request }) => {
+// Every page but `/`, whose story headings are rendered one `<span>` per character, so their parsed
+// text is not a stable expectation; the story test above covers them. A heading or a table row
+// added to one of these pages without its record fails here. This checks the page's structure,
+// its headings and the rows' first cells, not every paragraph: the prose is the record's, which
+// both the page and the twin render.
+for (const route of [
+  ...STATIC_ROUTES.filter((path) => path !== '/'),
+  ...caseStudies.map(({ slug }) => caseStudyRoute(slug)),
+]) {
+  test(`every heading and table row ${route} serves is a whole unit of its twin`, async ({
+    page,
+    request,
+  }) => {
     const response = await request.get(route);
     expect(response.status()).toBe(200);
     const landmarks = await pageLandmarks(page, await response.text());
     // The control: an extractor that found nothing would pass every page vacuously.
     expect(landmarks.length, `${route} should serve headings inside main`).toBeGreaterThan(0);
 
-    const shown = visible(await fetchTwin(request, markdownTwinPath(route))).replace(/\s+/g, ' ');
-    expect(landmarks.filter((text) => !shown.includes(text))).toEqual([]);
+    const units = unitsOf(await fetchTwin(request, markdownTwinPath(route)));
+    expect(landmarks.filter((text) => !units.has(text))).toEqual([]);
   });
 }

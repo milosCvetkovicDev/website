@@ -25,6 +25,18 @@ export function headOf(html: string): string {
   return html.match(/<head(?:\s[^>]*)?>([\s\S]*?)<\/head>/i)?.[1] ?? '';
 }
 
+/**
+ * One attribute's raw value in a tag, or `undefined` when the tag has none. Anchored on the
+ * whitespace before the name, so `data-rel=` never answers for `rel=`. Quoted values only: React
+ * quotes every attribute it writes.
+ */
+function attribute(tag: string, name: string): string | undefined {
+  return tag
+    .match(new RegExp(`\\s${name}=(?:"([^"]*)"|'([^']*)')`, 'i'))
+    ?.slice(1)
+    .find((value) => value !== undefined);
+}
+
 export async function fetchHead(request: APIRequestContext, path: string): Promise<Head> {
   const response = await request.get(path);
   const raw = headOf(await response.text());
@@ -36,13 +48,13 @@ export async function fetchHead(request: APIRequestContext, path: string): Promi
   };
 
   for (const tag of raw.match(/<meta\b[^>]*>/gi) ?? []) {
-    const key = tag.match(/\b(?:name|property)=["']([^"']+)["']/i)?.[1];
-    const content = tag.match(/\bcontent=["']([^"']*)["']/i)?.[1];
+    const key = attribute(tag, 'name') ?? attribute(tag, 'property');
+    const content = attribute(tag, 'content');
     if (key !== undefined && content !== undefined) add(meta, key, content);
   }
   for (const tag of raw.match(/<link\b[^>]*>/gi) ?? []) {
-    const rel = tag.match(/\brel=["']([^"']+)["']/i)?.[1];
-    const href = tag.match(/\bhref=["']([^"']*)["']/i)?.[1];
+    const rel = attribute(tag, 'rel');
+    const href = attribute(tag, 'href');
     if (rel !== undefined && href !== undefined) add(link, rel, href);
   }
   return { raw, status: response.status(), meta, link };
@@ -50,18 +62,20 @@ export async function fetchHead(request: APIRequestContext, path: string): Promi
 
 export const first = (map: Map<string, string[]>, key: string) => map.get(key)?.[0];
 
+/** A media type without its parameters, lower-cased: `Text/Markdown; charset=utf-8` -> `text/markdown`. */
+const mediaType = (value: string) => value.split(';')[0].trim().toLowerCase();
+
 /**
- * The `href` of every `<link>` in the head whose `rel` includes `alternate` and whose `type` is
- * `type`, such as `text/markdown`. `link` is keyed by the whole `rel` and drops the `type`, so this
- * reads the tags again.
+ * The `href` of every `<link>` in the head whose `rel` includes `alternate` and whose media type is
+ * `type`'s, such as `text/markdown`, parameters ignored on both sides. A matching link with no
+ * `href` is left out rather than read as `''`, which would resolve to the site root. `link` is keyed
+ * by the whole `rel` and drops the `type`, so this reads the tags again.
  */
 export function alternates(head: Head, type: string): string[] {
-  const attribute = (tag: string, name: string) =>
-    tag.match(new RegExp(`\\s${name}=["']([^"']*)["']`, 'i'))?.[1];
   return (head.raw.match(/<link\b[^>]*>/gi) ?? [])
     .filter((tag) => (attribute(tag, 'rel') ?? '').toLowerCase().split(/\s+/).includes('alternate'))
-    .filter((tag) => (attribute(tag, 'type') ?? '').toLowerCase() === type)
-    .map((tag) => attribute(tag, 'href') ?? '');
+    .filter((tag) => mediaType(attribute(tag, 'type') ?? '') === mediaType(type))
+    .flatMap((tag) => attribute(tag, 'href') ?? []);
 }
 
 /**
@@ -71,11 +85,14 @@ export function alternates(head: Head, type: string): string[] {
  */
 export function attributeText(value: string): string {
   const named: Record<string, string> = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>' };
-  return value.replace(/&(?:#x([\da-f]+)|#(\d+)|(amp|quot|apos|lt|gt));/gi, (_, hex, dec, name) =>
-    hex
-      ? String.fromCodePoint(parseInt(hex, 16))
-      : dec
-        ? String.fromCodePoint(Number(dec))
-        : named[name.toLowerCase()],
+  return value.replace(
+    /&(?:#x([\da-f]+)|#(\d+)|(amp|quot|apos|lt|gt));/gi,
+    (whole: string, hex?: string, dec?: string, name?: string) => {
+      if (name) return named[name.toLowerCase()];
+      const codePoint = hex ? parseInt(hex, 16) : Number(dec);
+      // Past U+10FFFF, fromCodePoint throws: leave such a reference as written, so the assertion
+      // that reads it fails with the text rather than a RangeError.
+      return codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : whole;
+    },
   );
 }

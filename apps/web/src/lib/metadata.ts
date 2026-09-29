@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { OG_CONTENT_TYPE, OG_SIZE } from './og-image';
-import { markdownTwinPath } from './serialise';
+import { assertPathname, markdownTwinPath } from './pathname';
 
 /**
  * The per-route half of the head. The root layout keeps only what is true of every response, the
@@ -35,10 +35,6 @@ interface PageMetadata {
   image?: { url: string; alt: string };
 }
 
-// A pathname and nothing else: a leading slash, no trailing one (the root aside), no query, no
-// fragment, no origin. A canonical naming any other URL than the route's own is worse than none.
-const PATHNAME = /^\/(?:[\w-]+(?:\/[\w-]+)*)?$/;
-
 export function buildMetadata({
   title,
   description,
@@ -48,9 +44,8 @@ export function buildMetadata({
   index = true,
   image,
 }: PageMetadata): Metadata {
-  if (!PATHNAME.test(path)) {
-    throw new Error(`buildMetadata: "${path}" is not a clean pathname such as /work or /`);
-  }
+  // A canonical naming any other URL than the route's own is worse than none (`pathname.ts`).
+  assertPathname(path, 'buildMetadata');
   const shareTitle = socialTitle ?? (typeof title === 'string' ? title : title.absolute);
 
   return {

@@ -16,7 +16,8 @@ import { workRecord } from './work';
  *
  * Server code only. The story's client components import `./home` directly, and must keep doing so:
  * importing this module would put every record, and the case studies the work record reads, into
- * the home page's client chunk.
+ * the home page's client chunk. `data/__tests__/pages.test.ts` fails on a `'use client'` module
+ * that imports it.
  */
 export const pages = {
   '/': homePage,

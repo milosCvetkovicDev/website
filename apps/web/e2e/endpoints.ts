@@ -1,5 +1,5 @@
 import { caseStudies } from '../src/data/case-studies';
-import { markdownTwinPath } from '../src/lib/serialise';
+import { markdownTwinPath } from '../src/lib/pathname';
 import { STATIC_ROUTES, caseStudyRoute } from './routes';
 
 /**

@@ -12,7 +12,11 @@ export function generateStaticParams() {
 }
 
 export async function GET(_request: Request, { params }: RouteContext<'/work/[slug]/index.md'>) {
-  const study = getCaseStudy((await params).slug);
-  if (!study) throw new Error('index.md: unknown case study');
+  const { slug } = await params;
+  const study = getCaseStudy(slug);
+  // Unreachable while `generateStaticParams` and `getCaseStudy` read one list: `dynamicParams` 404s
+  // any other slug before this runs. If they ever drift, the prerender fails naming the slug,
+  // rather than shipping a twin that answers 404 while its page answers 200.
+  if (!study) throw new Error(`index.md: unknown case study ${JSON.stringify(slug)}`);
   return markdownResponse(caseStudyToMarkdown(study));
 }
