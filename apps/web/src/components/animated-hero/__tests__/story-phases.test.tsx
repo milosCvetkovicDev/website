@@ -1,6 +1,10 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { useLayoutEffect, type ComponentType } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { homePage, storyClosings } from '@/data/pages/home';
 import * as gsapRuntime from '../gsap-runtime';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
 import { requestGsap, runWithGsap, type GsapRuntime } from '../load-gsap';
@@ -10,6 +14,7 @@ import { ExecutionPhase } from '../execution-phase';
 import { GauntletPhase } from '../gauntlet-phase';
 import { LoopPhase } from '../loop-phase';
 import { GameComplete } from '../game-complete';
+import { AnimatedHero } from '..';
 import { cssTransitions, gsapCssConflicts, tweenedElements } from './gsap-css-conflicts';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
@@ -654,4 +659,127 @@ describe.each(phases)('$name, its from-states', ({ Phase }) => {
     );
     expect(rightward).toEqual([]);
   });
+});
+
+// #59 AC 10. Each story section closes on a headline and the line under it, and both are read from
+// the home page record, whose sections `pageToMarkdown` turns into the page's Markdown twin
+// (`data/pages/__tests__/home.test.ts`): what a visitor reads and what the twin carries are one pair
+// of strings. Each pair is found by its place in the markup rather than by its text, so a phase that
+// rendered anything but its record's strings would fail here.
+const closings = [
+  {
+    name: 'DiscoveryPhase',
+    Phase: DiscoveryPhase,
+    closing: storyClosings.discovery,
+    headline: 'h2',
+  },
+  {
+    name: 'StrategyPhase',
+    Phase: StrategyPhase,
+    closing: storyClosings.strategy,
+    headline: 'h2',
+  },
+  {
+    name: 'ExecutionPhase',
+    Phase: ExecutionPhase,
+    closing: storyClosings.execution,
+    headline: 'h2',
+  },
+  {
+    name: 'GauntletPhase',
+    Phase: GauntletPhase,
+    closing: storyClosings.gauntlet,
+    headline: 'h2',
+  },
+  {
+    name: 'LoopPhase',
+    Phase: LoopPhase,
+    closing: storyClosings.loop,
+    headline: 'h2',
+  },
+  // The last section closes inside its terminal, on a paragraph rather than a heading. Whether it
+  // becomes a heading is the page outline's call (#47), not this move's, which changes no markup.
+  {
+    name: 'GameComplete',
+    Phase: GameComplete,
+    closing: storyClosings.complete,
+    headline: 'p.text-xl',
+  },
+];
+
+describe.each(closings)('$name, its closing lines', ({ Phase, closing, headline }) => {
+  beforeEach(() => {
+    // jsdom lays nothing out, so with motion every trigger starts in view and GauntletPhase
+    // schedules timers.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    media.reduce = false;
+    // Asserted last: a throw here must not skip the cleanup above it.
+    expect(media.listenerCount()).toBe(0);
+  });
+
+  // Reduced motion renders every gated block shown; with motion the gated blocks start hidden, but
+  // their text is in the markup from the first render, which is what the served HTML carries.
+  it.each([
+    { motion: 'reduced motion', reduce: true },
+    { motion: 'motion', reduce: false },
+  ])(
+    'renders its headline and the line under it from the home page record, under $motion',
+    ({ reduce }) => {
+      media.reduce = reduce;
+      const { container } = render(<Phase />);
+      const headlines = container.querySelectorAll(headline);
+      expect(headlines, `exactly one ${headline} closes the section`).toHaveLength(1);
+      const line = headlines[0].nextElementSibling;
+      expect(line?.tagName, 'the line under the headline').toBe('P');
+
+      expect(headlines[0].textContent).toBe(closing.heading);
+      // Every paragraph the record holds, so a second line the phase did not render would fail here.
+      expect([line?.textContent]).toEqual([...closing.paragraphs]);
+    },
+  );
+});
+
+it('the closing-line tests cover every pair in the home page record', () => {
+  expect(closings.map(({ closing }) => closing)).toEqual(Object.values(storyClosings));
+});
+
+it('the story renders the closing pairs in the order the home page record lists them', () => {
+  media.reduce = true;
+  try {
+    const { container } = render(<AnimatedHero />);
+    const text = container.textContent ?? '';
+    const positions = homePage.sections.map(({ heading }) => text.indexOf(heading));
+    expect(positions, 'every headline is on the page').not.toContain(-1);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  } finally {
+    cleanup();
+    media.reduce = false;
+  }
+});
+
+it('no module in the story declares a closing line itself', () => {
+  // Every source module beside the phases, read as JSX renders it: entities and escaped quotes
+  // decoded, JSX string expressions such as {' '} unwrapped, line breaks collapsed. Each sentence is
+  // looked for on its own, so restating half of a line is found too.
+  const directory = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const modules = readdirSync(directory).filter((file) => /\.tsx?$/.test(file));
+  expect(modules, 'the check reads the phases').toContain('game-complete.tsx');
+  const sentences = Object.values(storyClosings)
+    .flatMap(({ heading, paragraphs }) => [heading, ...paragraphs])
+    .flatMap((text) => text.split(/(?<=[.!?])\s+/));
+  const restated = modules.flatMap((module) => {
+    const source = readFileSync(join(directory, module), 'utf8')
+      .replace(/\\(['"])/g, '$1')
+      .replace(/&(?:apos|#0*39|#x0*27|rsquo|lsquo);/gi, "'")
+      .replace(/&(?:quot|#0*34|#x0*22|ldquo|rdquo);/gi, '"')
+      .replace(/\{\s*(['"`])((?:(?!\1).)*)\1\s*\}/g, '$2')
+      .replace(/\s+/g, ' ');
+    return sentences.filter((sentence) => source.includes(sentence)).map((s) => `${module}: ${s}`);
+  });
+  expect(restated).toEqual([]);
 });
