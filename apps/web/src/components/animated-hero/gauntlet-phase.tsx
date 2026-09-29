@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, PipelineStage, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { storyClosings } from '@/data/pages/home';
 
 const pipelineStages = [
   { name: 'LINT', duration: 0.5 },
@@ -337,13 +338,11 @@ export function GauntletPhase() {
           className={`mt-16 text-center ${achievementVisible ? '' : 'opacity-0'}`}
         >
           <h2 className="mb-3 text-2xl font-bold md:text-4xl">
-            <AnimatedText animation="glitch">
-              &quot;It worked on my machine&quot; doesn&apos;t fly here.
-            </AnimatedText>
+            <AnimatedText animation="glitch">{storyClosings.gauntlet.heading}</AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
             <AnimatedText animation="highlight">
-              Six gates. Zero shortcuts. Every commit proves itself or dies trying.
+              {storyClosings.gauntlet.paragraphs[0]}
             </AnimatedText>
           </p>
         </div>
