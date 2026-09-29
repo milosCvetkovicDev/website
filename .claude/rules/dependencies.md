@@ -64,8 +64,14 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   security update that moves one without the other.
 - `lighthouse` is pinned exactly in `apps/web/package.json`, and a bump, Dependabot's included,
   means re-reading the audit ids and scoring rules `apps/web/e2e/lighthouse-audits.spec.ts` asserts
-  and its docblock records at 13.4.1: a removed id fails that spec, a changed `notApplicable` rule
-  may not.
+  and its docblock records at 13.4.1. The spec fails on any other version until `LIGHTHOUSE_VERSION`
+  in `apps/web/e2e/support/lighthouse.ts` is updated, because a changed `notApplicable` or scoring
+  rule would not fail it by itself. Its tree brings `@opentelemetry/api`, which pnpm then resolves as
+  `next`'s optional peer (the `(@opentelemetry/api@1.9.1)` suffix on `next`, `@vercel/analytics`
+  and `vitest`), so the production build traces that package beside Next's compiled copy. Next
+  prefers it when it resolves; with no tracer provider registered, both are the same no-op API, and
+  the build stays function-free. Removing lighthouse is what drops the peer again (see the optional
+  peer gotcha below).
 
 ## Gotchas
 
