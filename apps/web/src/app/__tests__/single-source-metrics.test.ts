@@ -66,6 +66,18 @@ const COPY_MODULES = [
   ...PAGE_RECORDS,
 ];
 
+/** The About page and the record that holds its copy, one of which quotes the case studies. */
+const ABOUT_COPY = ['app/about/page.tsx', 'data/pages/about.ts'];
+
+/**
+ * Whether `source` has a value import from the case-study data: a statement at the start of a line,
+ * so a comment that names the module does not count, and not `import type`, which brings no figure
+ * in. Behaviour (the sentence quoting the study's metric) is `data/pages/__tests__/records.test.ts`'s.
+ */
+function importsCaseStudies(source: string): boolean {
+  return /^import\s+(?!type\s)[^;]*?\sfrom\s+'@\/data\/case-studies';/m.test(source);
+}
+
 interface Hit {
   file: string;
   line: number;
@@ -105,8 +117,18 @@ describe('metrics and biography live in one place', () => {
       const source = readFileSync(join(SRC, file), 'utf8');
       expect(source.length, `${file} must be readable and non-empty`).toBeGreaterThan(100);
     }
+    // R33's import half reads ABOUT_COPY, and it only runs once #49 turns R33 into `it`: until then
+    // the literal half fails first. So its files are proven readable here, and inside the scanned
+    // set, or a rename would leave R33 passing as an expected failure and throwing ENOENT later.
+    for (const file of ABOUT_COPY) {
+      expect(COPY_MODULES, `${file} must be one of the scanned copy modules`).toContain(file);
+      const source = readFileSync(join(SRC, file), 'utf8');
+      expect(source.length, `${file} must be readable and non-empty`).toBeGreaterThan(100);
+    }
     // And a literal that really is there, so the search itself is proven to work.
     expect(findLiterals(['Milos Cvetkovic'], ['app/layout.tsx']).length).toBeGreaterThan(0);
+    // And the import check on a module that does import the data, so its pattern is proven too.
+    expect(importsCaseStudies(readFileSync(join(SRC, 'data/pages/about.ts'), 'utf8'))).toBe(true);
   });
 
   it.fails(
@@ -120,17 +142,20 @@ describe('metrics and biography live in one place', () => {
       const restated = findLiterals(rendered);
       expect(
         restated.map(describeHit),
-        'about/page.tsx hard-codes 40% in its timeline, so the About page can contradict /work and ' +
-          'the home page without anything failing. Its 73% is already read from the study.',
+        'the About timeline (data/pages/about.ts) hard-codes 40%, so the About page can contradict ' +
+          '/work and the home page without anything failing. Its 73% is already read from the study.',
       ).toEqual([]);
 
-      // The other half of the same row: the page has to read the figures from somewhere. Forbidding the
-      // literal without requiring the import would be satisfied by deleting the sentence.
-      const about = readFileSync(join(SRC, 'app/about/page.tsx'), 'utf8');
+      // The other half of the same row: the About copy has to read the figures from somewhere.
+      // Forbidding the literal without requiring the import would be satisfied by deleting the
+      // sentence. #59 moved the copy from the page into its record, so either module may hold it.
+      const importers = ABOUT_COPY.filter((file) =>
+        importsCaseStudies(readFileSync(join(SRC, file), 'utf8')),
+      );
       expect(
-        about,
-        'the About page must import the case-study data it quotes figures from',
-      ).toMatch(/from '@\/data\/case-studies'/);
+        importers,
+        `the About copy (${ABOUT_COPY.join(' or ')}) must import the case-study data it quotes figures from`,
+      ).not.toHaveLength(0);
     },
   );
 
@@ -138,9 +163,10 @@ describe('metrics and biography live in one place', () => {
     'R34 (#49): no page, layout or JSON-LD module hard-codes a years-of-experience figure',
     () => {
       // Two numbers ship today for one fact: `13 years` in json-ld.tsx and hero-content.tsx, and
-      // `10+` in about/page.tsx, in its description and its "Years shipping code" stat; /skills adds
-      // its own `2+` for AI. #48 took the figure out of the page descriptions and deleted
-      // skills/layout.tsx, which leaves four hits. Whichever figure is right, it cannot be two.
+      // `10+` in the About record (data/pages/about.ts), in its description and its "Years shipping
+      // code" stat; /skills adds its own `2+` for AI. #48 took the figure out of the page
+      // descriptions and deleted skills/layout.tsx, which leaves four hits. Whichever figure is
+      // right, it cannot be two.
       const yearPatterns = [
         /\b\d{1,2}\+? years\b/,
         /\b\d{1,2}\+? yrs\b/,
