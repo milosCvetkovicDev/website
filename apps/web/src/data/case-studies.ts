@@ -40,22 +40,42 @@ export type MetricDefinition =
   | { state: 'defined'; window: { from: string; to: string }; method: string }
   | { state: typeof OWNER_TODO };
 
-/** Text that can be shown: a string with something in it, and no placeholder marker. */
-function isStatable(text: string | null): text is string {
-  return typeof text === 'string' && text.trim() !== '' && !text.includes(OWNER_TODO);
+/** `text` on one line: every run of whitespace, line breaks included, as one space, ends trimmed. */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
 }
 
-/** `text` trimmed, ending in a stop: its own `.`, `!` or `?`, or an added full stop. */
+/**
+ * Text that can be shown: a string with at least one letter or digit in it, so neither blank nor
+ * bare punctuation, and no placeholder marker.
+ */
+function isStatable(text: string | null): text is string {
+  return typeof text === 'string' && /[\p{L}\p{N}]/u.test(text) && !text.includes(OWNER_TODO);
+}
+
+/** The end of a finished sentence: a stop, `…` included, then any closing quotes or brackets. */
+const FINISHED = /[.!?…]["'’”)\]]*$/;
+
+/**
+ * `text` on one line as a sentence: kept as it is when it already ends like one (`p50.`, `done?"`,
+ * `(median.)`, `and so on…`), otherwise closed with a full stop, which replaces a trailing comma,
+ * semicolon or colon rather than following it.
+ */
 function asSentence(text: string): string {
-  const trimmed = text.trim();
-  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+  const line = oneLine(text);
+  return FINISHED.test(line) ? line : `${line.replace(/\s*[,;:]+$/, '')}.`;
 }
 
 /**
  * The window and the method as sentences, or null when the definition cannot be stated honestly:
- * still the owner's placeholder, a window that is not two real days in order, or a method that is
- * blank or still carries a marker. The data test in `case-studies.test.ts` keeps a stored window
- * real, in order and out of the future, so the null here only keeps a bad edit off the page.
+ * still the owner's placeholder, a window that is not two real days in order, or a method with
+ * nothing statable in it or still carrying a marker. A one-day window reads "Measured on <day>."
+ *
+ * Only the shape and the order are checked here, and no clock is read, so a build's output depends
+ * on its inputs alone (as `formatContentDates` does). "Not in the future" is the data test's rule in
+ * `case-studies.test.ts`, which also fails a defined study that this function would leave unstated.
+ * The days are compared as strings only after `formatContentDate` has accepted both, and it accepts
+ * nothing but zero-padded `YYYY-MM-DD` from the year 2000, where string order is day order.
  */
 function measuredSentences(definition: MetricDefinition): string | null {
   if (definition.state !== 'defined') return null;
@@ -64,25 +84,28 @@ function measuredSentences(definition: MetricDefinition): string | null {
   const shownTo = formatContentDate(to);
   const { method } = definition;
   if (shownFrom === null || shownTo === null || to < from || !isStatable(method)) return null;
-  return `Measured from ${shownFrom} to ${shownTo}. ${asSentence(method)}`;
+  const period =
+    from === to ? `Measured on ${shownFrom}.` : `Measured from ${shownFrom} to ${shownTo}.`;
+  return `${period} ${asSentence(method)}`;
 }
 
 /**
  * The one sentence that says what a headline figure is a fraction of, over what period and how it
  * was measured: the metric's `basis` (#49; `null` until it exists), then the window, then the
  * method. It is the single producer of that sentence, so a page renders it and a serialiser writes
- * it rather than joining the parts again. It takes the basis as a parameter rather than reading
+ * it rather than joining the parts again. Nothing renders it yet: #58 puts it on the case-study page
+ * and in its Markdown twin together. It takes the basis as a parameter rather than reading
  * `CaseStudyMetric`, so it depends on nothing about that interface's shape.
  *
- * Total, and never a half-built string: the basis unchanged while the definition cannot be stated,
- * `null` when there is neither, and never a placeholder marker, an empty part or `undefined`. The
- * window's days come from `formatContentDate`, which reads no locale or timezone.
+ * Total, and never a half-built string: the basis alone, on one line, while the definition cannot be
+ * stated, `null` when there is neither, and never a placeholder marker, an empty part, a line break
+ * or `undefined`. The window's days come from `formatContentDate`, which reads no locale or timezone.
  */
 export function formatMetricScope(
   basis: string | null,
   definition: MetricDefinition,
 ): string | null {
-  const statedBasis = isStatable(basis) ? basis : null;
+  const statedBasis = isStatable(basis) ? oneLine(basis) : null;
   const measured = measuredSentences(definition);
   if (measured === null) return statedBasis;
   return statedBasis === null ? measured : `${asSentence(statedBasis)} ${measured}`;

@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
+import { OWNER_TODO } from '@/data/owner-todo';
 import type { PageRecord, PageSection, Paragraph } from '@/data/pages/types';
 import { buildMetadata } from '../metadata';
 import {
@@ -705,6 +706,10 @@ describe('caseStudyToMarkdown()', () => {
 
     it('never spaces a word out one character at a time', () => {
       expect(twin).not.toMatch(SPACED_OUT);
+    });
+
+    it('serves no owner placeholder, whether or not its metric definition is filled in', () => {
+      expect(twin).not.toContain(OWNER_TODO);
     });
   });
 });
