@@ -49,6 +49,7 @@ Before the first deploy, confirm the build is green locally from a clean checkou
 ```bash
 pnpm install --frozen-lockfile
 pnpm check:allowbuilds
+pnpm check:adrs
 pnpm test:scripts
 pnpm format:check
 pnpm lint
@@ -59,7 +60,7 @@ pnpm --filter web exec playwright install --with-deps chromium webkit   # once p
 pnpm --filter web test:e2e
 ```
 
-These are every gate in `.github/workflows/ci.yml`. The first eight commands are the `quality` job;
+These are every gate in `.github/workflows/ci.yml`. The first nine commands are the `quality` job;
 the last two are the `e2e` job, which on CI runs Playwright against the production build
 (`next start`) on port 3000, while the same command locally starts a dev server on port 3210.
 Playwright always starts the server it tests and never attaches to one that is already running, so
@@ -737,8 +738,6 @@ Detail on the less obvious rows:
 
 This runbook deliberately stops short of the following. None of it is in place; do not assume it is.
 
-- **`apps/playground` is not deployed.** It is a local Vite sandbox (`pnpm dev:playground`) with no
-  Vercel project and no public URL. Only `apps/web` ships.
 - **A Web Analytics page view is checked only by hand.** Since ADR 0026,
   `apps/web/src/components/web-analytics.tsx` mounts Vercel's `<Analytics />` in deployment builds
   only (`VERCEL_ENV` `production` or `preview`), so no local or CI server loads it. After each

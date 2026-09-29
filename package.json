@@ -4,7 +4,6 @@
   "scripts": {
     "dev": "turbo dev",
     "dev:web": "turbo dev --filter=web",
-    "dev:playground": "turbo dev --filter=playground",
     "build": "turbo build",
     "lint": "turbo lint",
     "lint:fix": "turbo lint:fix",
@@ -15,6 +14,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:allowbuilds": "node scripts/check-allowbuilds-drift.mjs",
+    "check:adrs": "node scripts/check-adr-index.mjs",
     "check:docs-drift": "node scripts/check-docs-drift.ts",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "clean": "turbo clean && rm -rf node_modules",

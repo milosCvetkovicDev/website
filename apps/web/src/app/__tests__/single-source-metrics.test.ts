@@ -22,7 +22,7 @@
  * - Likewise the years of experience. `13 years`, `10+ years` and `/skills`' own `2+` contradict each
  *   other today; the assertion is that there is one source, not which number wins.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -31,8 +31,24 @@ import { caseStudies, formatMetric } from '@/data/case-studies';
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
- * Every module that renders page copy: the routes, the root layout and the JSON-LD blocks. `src/data`
- * is excluded by construction — it is where these literals belong.
+ * The page records under `src/data/pages`, one module per route, less `types.ts`, which holds no
+ * copy. They are read from the directory, subfolders included, rather than listed, so a record
+ * added later is scanned without anyone remembering to add it here. A `.tsx` record counts; a
+ * declaration file or a test beside the records does not.
+ */
+const PAGE_RECORDS = readdirSync(join(SRC, 'data/pages'), { recursive: true, encoding: 'utf8' })
+  .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts') && name !== 'types.ts')
+  .filter((name) => !/(^|\/)__tests__\/|\.test\./.test(name))
+  .sort()
+  .map((name) => `data/pages/${name}`);
+
+/**
+ * Every module that renders page copy: the routes, the root layout, the JSON-LD blocks, and the page
+ * records. The rest of `src/data` is excluded by construction — it is where these literals belong.
+ * The page records are not: they hold the copy #59 moves out of the page modules so a page and its
+ * Markdown twin read one source, and the copy is no less page copy for having moved. A metric or a
+ * years figure restated there contradicts the data exactly as it did in the page module, so the
+ * move must not take it out of these rows' sight.
  */
 const COPY_MODULES = [
   'app/layout.tsx',
@@ -47,6 +63,7 @@ const COPY_MODULES = [
   'app/error.tsx',
   'components/json-ld.tsx',
   'components/animated-hero/hero-content.tsx',
+  ...PAGE_RECORDS,
 ];
 
 interface Hit {
