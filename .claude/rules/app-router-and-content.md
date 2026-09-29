@@ -26,16 +26,23 @@ description, a link-preview title or a robots directive.
 drawn by `src/lib/brand-mark.tsx` in `src/app/fonts/geist-mono-600-mark.ttf`), and an
 `opengraph-image.tsx` in the root and in each static route's folder, all over one card design in
 `src/lib/og-image.tsx`. Each folder needs its own: a root image
-never reaches a page that declares its own `openGraph`. There are two route handlers:
-`favicon.ico/route.ts` packs the same mark into an ICO, and `work/[slug]/og-image.png/route.ts`
-draws the case-study card, whose alt text has to name the study, which an `opengraph-image` file's
-single `alt` cannot; the page points og:image at it through `buildMetadata()`'s `image`. All of them
-prerender at build time, and `pnpm check:build-output` (a `quality` step, `ci-and-scripts.md`) fails
-when a route does not: a `GET` handler is dynamic unless it exports `dynamic = 'force-static'`, and
-without it builds as a server function, as a handler that exports any other method does even with it.
+never reaches a page that declares its own `openGraph`. The route handlers: `favicon.ico/route.ts`
+packs the same mark into an ICO; `work/[slug]/og-image.png/route.ts` draws the case-study card,
+whose alt text has to name the study, which an `opengraph-image` file's single `alt` cannot, and the
+page points og:image at it through `buildMetadata()`'s `image`; and the Markdown twins (#59), an
+`index.md/route.ts` in each static route's folder (`app/index.md/route.ts` for `/`) and
+`work/[slug]/index.md/route.ts` for the case studies, with its own `generateStaticParams` and
+`dynamicParams = false`. Each twin handler is three lines that hand a record from `pages` in
+`src/data/pages/index.ts`, or a study, to the serialiser below. `buildMetadata()` advertises the
+twin of every route as `alternates.types['text/markdown']`, so `e2e/markdown-twins.spec.ts` fails a
+route whose twin is not served, and `data/__tests__/pages.test.ts` fails a static route without a
+record or a handler. The sitemap lists no twin. All of them prerender at build time, and
+`pnpm check:build-output` (a `quality` step, `ci-and-scripts.md`) fails when a route does not: a
+`GET` handler is dynamic unless it exports `dynamic = 'force-static'`, and without it builds as a
+server function, as a handler that exports any other method does even with it.
 The same check fails a `proxy.ts` and any `'use server'` action.
 `sitemap.ts`, `robots.ts`, `layout.tsx`, `components/json-ld.tsx` and `lib/serialise.ts` each read
-`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
+`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is still no middleware.
 `src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
 page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own
 (#59). `lib/__tests__/serialise.test.ts` fails when a file under `src/app` writes `text/markdown`.

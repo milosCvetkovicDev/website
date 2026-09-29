@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { OG_CONTENT_TYPE, OG_SIZE } from './og-image';
+import { markdownTwinPath } from './serialise';
 
 /**
  * The per-route half of the head. The root layout keeps only what is true of every response, the
@@ -55,7 +56,10 @@ export function buildMetadata({
   return {
     title,
     description,
-    alternates: { canonical: path },
+    // The canonical, and the route's Markdown twin as `<link rel="alternate" type="text/markdown">`,
+    // which is how an agent reading the HTML finds it (#59). Both come from `path`, so they cannot
+    // name different routes; `e2e/markdown-twins.spec.ts` fails a route whose twin is not served.
+    alternates: { canonical: path, types: { 'text/markdown': markdownTwinPath(path) } },
     openGraph: {
       type,
       url: path,
