@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, QuestItem, TypingCursor } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { storyClosings } from '@/data/pages/home';
 
 const requirements = [
   { id: 'monitoring', label: 'monitoring', delay: 0 },
@@ -202,13 +203,11 @@ export function DiscoveryPhase() {
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
           <h2 className="mb-3 text-2xl font-bold md:text-4xl">
-            <AnimatedText animation="wave">
-              Most bugs live in the gap between what you asked for and what you meant.
-            </AnimatedText>
+            <AnimatedText animation="wave">{storyClosings.discovery.heading}</AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
             <AnimatedText animation="typewriter">
-              I close that gap before writing a single line of code.
+              {storyClosings.discovery.paragraphs[0]}
             </AnimatedText>
           </p>
         </div>

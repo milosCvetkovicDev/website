@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, ActivityEntry } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { storyClosings } from '@/data/pages/home';
 
 const codeLines = [
   { type: 'keyword', content: 'export class', delay: 0 },
@@ -384,13 +385,11 @@ export function ExecutionPhase() {
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
           <h2 className="mb-3 text-2xl font-bold md:text-4xl">
-            <AnimatedText animation="scatter">
-              The bottleneck was never my typing speed.
-            </AnimatedText>
+            <AnimatedText animation="scatter">{storyClosings.execution.heading}</AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
             <AnimatedText animation="blur-reveal">
-              AI writes the syntax. I make the decisions that matter.
+              {storyClosings.execution.paragraphs[0]}
             </AnimatedText>
           </p>
         </div>

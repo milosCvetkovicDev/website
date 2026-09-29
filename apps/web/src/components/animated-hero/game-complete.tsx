@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { storyClosings } from '@/data/pages/home';
 
 export function GameComplete() {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -139,12 +140,12 @@ export function GameComplete() {
               <div className="space-y-4 border-t border-[#30363d] pt-4 text-center">
                 <p className="text-xl font-semibold">
                   <AnimatedText animation="perspective">
-                    This is how I work. Every time.
+                    {storyClosings.complete.heading}
                   </AnimatedText>
                 </p>
                 <p className="text-[var(--muted)]">
                   <AnimatedText animation="magnetic">
-                    Follow along for more engineering deep dives.
+                    {storyClosings.complete.paragraphs[0]}
                   </AnimatedText>
                 </p>
               </div>
