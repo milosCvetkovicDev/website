@@ -1,3 +1,6 @@
+import { formatContentDate } from '@/lib/content-date';
+import { OWNER_TODO } from './owner-todo';
+
 export interface CaseStudyMetric {
   value: number;
   label: string;
@@ -26,6 +29,88 @@ export function formatMetric(metric: CaseStudyMetric): string {
   return `${metric.prefix ?? ''}${metric.value.toFixed(decimals)}${metric.suffix ?? ''}`;
 }
 
+/**
+ * When and how a study's headline figure was measured: the closed window it covers, as two
+ * `YYYY-MM-DD` days, and one line on how the number was produced. What the figure counted and what
+ * it is a fraction of is the metric's own `basis` (#49), not this. The other branch is the owner's
+ * placeholder, registered with a deadline in `owner-todo.ts`; `pnpm typecheck` refuses a read of
+ * `window` or `method` until `state` has been narrowed to `'defined'`.
+ */
+export type MetricDefinition =
+  | { state: 'defined'; window: { from: string; to: string }; method: string }
+  | { state: typeof OWNER_TODO };
+
+/** `text` on one line: every run of whitespace, line breaks included, as one space, ends trimmed. */
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Text that can be shown: a string with at least one letter or digit in it, so neither blank nor
+ * bare punctuation, and no placeholder marker.
+ */
+function isStatable(text: string | null): text is string {
+  return typeof text === 'string' && /[\p{L}\p{N}]/u.test(text) && !text.includes(OWNER_TODO);
+}
+
+/** The end of a finished sentence: a stop, `…` included, then any closing quotes or brackets. */
+const FINISHED = /[.!?…]["'’”)\]]*$/;
+
+/**
+ * `text` on one line as a sentence: kept as it is when it already ends like one (`p50.`, `done?"`,
+ * `(median.)`, `and so on…`), otherwise closed with a full stop, which replaces a trailing comma,
+ * semicolon or colon rather than following it.
+ */
+function asSentence(text: string): string {
+  const line = oneLine(text);
+  return FINISHED.test(line) ? line : `${line.replace(/\s*[,;:]+$/, '')}.`;
+}
+
+/**
+ * The window and the method as sentences, or null when the definition cannot be stated honestly:
+ * still the owner's placeholder, a window that is not two real days in order, or a method with
+ * nothing statable in it or still carrying a marker. A one-day window reads "Measured on <day>."
+ *
+ * Only the shape and the order are checked here, and no clock is read, so a build's output depends
+ * on its inputs alone (as `formatContentDates` does). "Not in the future" is the data test's rule in
+ * `case-studies.test.ts`, which also fails a defined study that this function would leave unstated.
+ * The days are compared as strings only after `formatContentDate` has accepted both, and it accepts
+ * nothing but zero-padded `YYYY-MM-DD` from the year 2000, where string order is day order.
+ */
+function measuredSentences(definition: MetricDefinition): string | null {
+  if (definition.state !== 'defined') return null;
+  const { from, to } = definition.window;
+  const shownFrom = formatContentDate(from);
+  const shownTo = formatContentDate(to);
+  const { method } = definition;
+  if (shownFrom === null || shownTo === null || to < from || !isStatable(method)) return null;
+  const period =
+    from === to ? `Measured on ${shownFrom}.` : `Measured from ${shownFrom} to ${shownTo}.`;
+  return `${period} ${asSentence(method)}`;
+}
+
+/**
+ * The one sentence that says what a headline figure is a fraction of, over what period and how it
+ * was measured: the metric's `basis` (#49; `null` until it exists), then the window, then the
+ * method. It is the single producer of that sentence, so a page renders it and a serialiser writes
+ * it rather than joining the parts again. Nothing renders it yet: #58 puts it on the case-study page
+ * and in its Markdown twin together. It takes the basis as a parameter rather than reading
+ * `CaseStudyMetric`, so it depends on nothing about that interface's shape.
+ *
+ * Total, and never a half-built string: the basis alone, on one line, while the definition cannot be
+ * stated, `null` when there is neither, and never a placeholder marker, an empty part, a line break
+ * or `undefined`. The window's days come from `formatContentDate`, which reads no locale or timezone.
+ */
+export function formatMetricScope(
+  basis: string | null,
+  definition: MetricDefinition,
+): string | null {
+  const statedBasis = isStatable(basis) ? oneLine(basis) : null;
+  const measured = measuredSentences(definition);
+  if (measured === null) return statedBasis;
+  return statedBasis === null ? measured : `${asSentence(statedBasis)} ${measured}`;
+}
+
 export interface CaseStudy {
   slug: string;
   title: string;
@@ -34,6 +119,13 @@ export interface CaseStudy {
   description: string;
   tags: string[];
   highlight: CaseStudyHighlight;
+  /**
+   * When and how `highlight.metric` was measured. It sits here rather than in `highlight` or on
+   * `CaseStudyMetric`: the home page's client featured-work cards take `highlight` as props and
+   * `MetricCounter` spreads the metric into its own, so this prose would be serialised into that
+   * page's payload once per card for no reader.
+   */
+  metricDefinition: MetricDefinition;
   challenge: string;
   approach: string;
   /** Optional: how the system works end to end, as ordered steps. */
@@ -73,6 +165,7 @@ export const caseStudies: CaseStudy[] = [
       status: 'RETIRED',
       metric: { value: 73, suffix: '%', label: 'faster resolution' },
     },
+    metricDefinition: { state: OWNER_TODO },
     title: 'Self-Healing Agent',
     tagline: 'autonomous bug fixing',
     description:
@@ -123,6 +216,7 @@ export const caseStudies: CaseStudy[] = [
       status: 'PRODUCTION',
       metric: { value: 40, suffix: '%', label: 'less complexity' },
     },
+    metricDefinition: { state: OWNER_TODO },
     title: 'Enterprise B2B Platform',
     tagline: 'legacy rescue',
     description:
@@ -180,6 +274,7 @@ export const caseStudies: CaseStudy[] = [
       status: 'PRODUCTION',
       metric: { value: 5, suffix: '×', label: 'faster builds' },
     },
+    metricDefinition: { state: OWNER_TODO },
     title: 'Nx Remote Cache Server',
     tagline: 'faster CI builds',
     description:
