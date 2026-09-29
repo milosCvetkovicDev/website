@@ -707,6 +707,13 @@ const closings = [
   },
 ];
 
+/** An element's text with every descendant matching `selector` left out. */
+function textWithout(root: Element, selector: string): string {
+  const copy = root.cloneNode(true) as Element;
+  copy.querySelectorAll(selector).forEach((node) => node.remove());
+  return copy.textContent ?? '';
+}
+
 describe.each(closings)('$name, its closing lines', ({ Phase, closing, headline }) => {
   beforeEach(() => {
     // jsdom lays nothing out, so with motion every trigger starts in view and GauntletPhase
@@ -737,9 +744,19 @@ describe.each(closings)('$name, its closing lines', ({ Phase, closing, headline 
       const line = headlines[0].nextElementSibling;
       expect(line?.tagName, 'the line under the headline').toBe('P');
 
-      expect(headlines[0].textContent).toBe(closing.heading);
+      // `AnimatedText` draws split text `aria-hidden` beside a visually hidden copy of the whole
+      // text (#47, slice 47d), so `textContent` holds a split line twice. Read both lines both ways
+      // instead: the drawn text a sighted visitor sees, and the text assistive technology reads.
+      expect(textWithout(headlines[0], '.sr-only'), 'the drawn headline').toBe(closing.heading);
+      expect(textWithout(headlines[0], '[aria-hidden="true"]'), 'the spoken headline').toBe(
+        closing.heading,
+      );
       // Every paragraph the record holds, so a second line the phase did not render would fail here.
-      expect([line?.textContent]).toEqual([...closing.paragraphs]);
+      if (!line) throw new Error('no line under the headline');
+      expect([textWithout(line, '.sr-only')], 'the drawn line').toEqual([...closing.paragraphs]);
+      expect([textWithout(line, '[aria-hidden="true"]')], 'the spoken line').toEqual([
+        ...closing.paragraphs,
+      ]);
     },
   );
 });
