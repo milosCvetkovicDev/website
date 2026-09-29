@@ -1,5 +1,22 @@
-import { test, expect } from '@playwright/test';
-import { expectHydrated } from './support/hydration';
+import { test, expect, type Page } from '@playwright/test';
+import { expectHydrated, gotoHydrated } from './support/hydration';
+
+/** The tmux background's pane titles, left to right. */
+const PANE_TITLES = [
+  'kubectl — pods',
+  'psql — slow query log',
+  'gh actions — CI pipeline',
+  'nginx — access + error',
+  'prometheus — alerts',
+];
+
+/**
+ * The tmux background is aria-hidden, so no role query reaches a pane: each pane root carries
+ * `data-tmux-pane` (`src/components/animated-hero/tmux-background.tsx`).
+ */
+const tmuxPanes = (page: Page) => page.locator('[data-tmux-pane]');
+const tmuxPane = (page: Page, title: string) =>
+  tmuxPanes(page).filter({ has: page.getByText(title, { exact: true }) });
 
 test.describe('Hero Section', () => {
   test.beforeEach(async ({ page }) => {
@@ -46,25 +63,16 @@ test.describe('Hero Section', () => {
   });
 
   test('tmux background renders with 5 panes', async ({ page }) => {
-    await expect(page.getByText('kubectl', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('psql', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('gh actions', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('nginx', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('prometheus', { exact: false }).first()).toBeVisible();
+    await expect(tmuxPanes(page)).toHaveCount(5);
+    for (const title of PANE_TITLES) {
+      await expect(tmuxPane(page, title), `the ${title} pane`).toBeVisible();
+    }
   });
 
   test('tmux panes are divided by a 2 px border, with none at the right edge', async ({ page }) => {
-    const titles = [
-      'kubectl — pods',
-      'psql — slow query log',
-      'gh actions — CI pipeline',
-      'nginx — access + error',
-      'prometheus — alerts',
-    ];
     const widths: string[] = [];
-    for (const title of titles) {
-      // The title sits in the pane's title bar, which is the pane's first child.
-      const pane = page.getByText(title, { exact: true }).locator('../..');
+    for (const title of PANE_TITLES) {
+      const pane = tmuxPane(page, title);
       widths.push(await pane.evaluate((el) => getComputedStyle(el).borderRightWidth));
     }
     expect(widths).toEqual(['2px', '2px', '2px', '2px', '0px']);
@@ -167,9 +175,11 @@ test.describe('Hero Section', () => {
     await expect(page.getByRole('link', { name: /connect on linkedin/i })).toBeAttached();
   });
 
-  test('story sections are server-rendered', async ({ page }) => {
-    const response = await page.goto('/');
-    const html = (await response?.text()) ?? '';
+  test('story sections are server-rendered', async ({ request }) => {
+    // The served HTML, read as a crawler reads it, not a second navigation of the page.
+    const response = await request.get('/');
+    expect(response.status()).toBe(200);
+    const html = await response.text();
     // Plain text from four of the six sections (the headlines are split into per-character spans).
     for (const copy of ['TECH TREE', 'CI/CD PIPELINE', 'SELF-HEALING LOG', 'Connect on LinkedIn']) {
       expect(html).toContain(copy);
@@ -183,7 +193,9 @@ test.describe('Hero Section', () => {
     // is the page being unstable — which is what this guard is for. It also makes the measurement
     // independent of machine load, which a run on a busy laptop is not.
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/');
+    // Hydrated before it scrolls, so the measurement starts after the re-render that follows
+    // hydration (under `reduce` the phases switch to their end state in it) and not before it.
+    await gotoHydrated(page, '/');
     // Programmatic scrolling is not user input, so nothing here is discounted as recent input.
     const shiftScore = await page.evaluate(async () => {
       let total = 0;
@@ -242,18 +254,20 @@ test.describe('Hero Section', () => {
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
   });
 
-  test('hero content is SSR-rendered (SEO)', async ({ page }) => {
-    // Check the raw HTML response for SSR content
-    const response = await page.goto('/');
-    const html = await response?.text();
+  test('hero content is SSR-rendered (SEO)', async ({ page, request }) => {
+    // The served HTML, read as a crawler reads it, not a second navigation of the page.
+    const response = await request.get('/');
+    expect(response.status()).toBe(200);
+    const html = await response.text();
 
     expect(html).toContain('This happened at 3am');
     expect(html).toContain('Milos Cvetkovic');
     expect(html).toContain('Full Stack Engineer');
     expect(html).toContain('TypeScript');
     // In the body, not only in the head's description: the subtitle under the headline says it.
-    const body = html?.slice(html.indexOf('<body'));
+    const body = html.slice(html.indexOf('<body'));
     expect(body).toContain('AI-native development');
+    // And on the page the beforeEach hydrated.
     await expect(page.getByText(/specializing in AI-native development/)).toBeVisible();
   });
 

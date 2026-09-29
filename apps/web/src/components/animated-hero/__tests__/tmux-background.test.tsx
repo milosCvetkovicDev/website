@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DISPLAYED_QUERY, TmuxBackground } from '../tmux-background';
 
@@ -120,6 +120,21 @@ describe('TmuxBackground', () => {
     expect(screen.getByText(/prometheus \u2014 alerts/)).toBeInTheDocument();
   });
 
+  // The tree is aria-hidden, so no role query reaches a pane: each pane root and its slot container
+  // carry a data hook instead, in both renderings, and e2e/hero.spec.ts counts the panes by it.
+  it.each([
+    ['animated', false],
+    ['static (reduced motion)', true],
+  ])('marks each of the 5 %s panes and its slot container with a data hook', (_, reduced) => {
+    media.state.reducedMotion = reduced;
+    const { container } = render(<TmuxBackground />);
+    const panes = container.querySelectorAll('[data-tmux-pane]');
+    expect(panes).toHaveLength(5);
+    for (const pane of panes) {
+      expect(pane.querySelectorAll('[data-tmux-slots]')).toHaveLength(1);
+    }
+  });
+
   it('renders the bottom status bar with pane count and uptime', () => {
     render(<TmuxBackground />);
     expect(screen.getByText('5 panes')).toBeInTheDocument();
@@ -168,9 +183,13 @@ describe('TmuxBackground', () => {
     expect(screen.getByText('us-east-1')).toBeInTheDocument();
   });
 
-  it('sets up IntersectionObserver for visibility tracking', () => {
-    render(<TmuxBackground />);
-    expect(mockObserve).toHaveBeenCalled();
+  it('observes its own root for visibility tracking', () => {
+    const { container } = render(<TmuxBackground />);
+    // The root is what scrolls out of view with the hero; observing anything else would pause the
+    // ticks at the wrong moment, or never.
+    const root = container.firstElementChild;
+    expect(root).toHaveAttribute('aria-hidden', 'true');
+    expect(mockObserve).toHaveBeenCalledExactlyOnceWith(root);
   });
 });
 
@@ -225,8 +244,11 @@ describe('AnimatedPane log slots', () => {
   });
 
   function kubectlSlots() {
-    const pane = screen.getByText(/kubectl \u2014 pods/).closest('.flex-col');
-    const slots = pane?.querySelector('.whitespace-nowrap');
+    const panes = [...document.querySelectorAll<HTMLElement>('[data-tmux-pane]')].filter((pane) =>
+      within(pane).queryByText(/kubectl \u2014 pods/),
+    );
+    if (panes.length !== 1) throw new Error(`expected one kubectl pane, found ${panes.length}`);
+    const slots = panes[0].querySelector('[data-tmux-slots]');
     if (!(slots instanceof HTMLElement)) throw new Error('slot container not rendered');
     return slots;
   }

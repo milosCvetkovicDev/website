@@ -94,7 +94,60 @@ test.describe('Featured Work', () => {
     await expect(section.locator('animateMotion, animate')).toHaveCount(0);
   });
 
+  test('renders SMIL animations when motion is allowed', async ({ page }) => {
+    // The twin of the test above, and what makes its zero mean something: the same steps with
+    // motion allowed find each kind of SMIL element that one counts. Packets (<animateMotion>)
+    // render once the section is on screen, and the hovered card's active nodes pulse (<animate>)
+    // (architecture-background.tsx). Motion allowed means the story above runs, so this hovers
+    // only after it settles, as the hover test does and for the same reasons, with the same room.
+    test.setTimeout(60_000);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await gotoHydrated(page, '/');
+    await expectGsapLoaded(page);
+    const section = page.getByRole('region', { name: /featured work/i });
+    await section.scrollIntoViewIfNeeded();
+    await expect(page.getByText('DEPLOYMENT SUCCESSFUL', { exact: true })).toBeVisible({
+      timeout: STORY_SETTLE_TIMEOUT_MS,
+    });
+    await expect(page.getByText('RESOLVED', { exact: true })).toBeVisible({
+      timeout: STORY_SETTLE_TIMEOUT_MS,
+    });
+    const project = featuredProjects[1];
+    const card = section.getByRole('link', { name: project.title, exact: true });
+    await card.hover();
+    await expect(card).toHaveAttribute('data-active', 'true');
+    await expect(section.locator('path[data-active="true"]')).toHaveCount(litCount(project));
+    await expect
+      .poll(() => section.locator('animateMotion, animate').count())
+      .toBeGreaterThanOrEqual(1);
+    // Each kind on its own, so neither can stand in for the other: the pulse alone would carry the
+    // count above with the packets gone.
+    await expect
+      .poll(() => section.locator('animateMotion').count(), {
+        message: 'no packet moves along the lit connections',
+      })
+      .toBeGreaterThanOrEqual(1);
+    await expect
+      .poll(() => section.locator('animate').count(), {
+        message: "the hovered card's active nodes do not pulse",
+      })
+      .toBeGreaterThanOrEqual(1);
+  });
+
   test('the archive page states the same metrics as the home page', async ({ page }) => {
+    // The home page's cards count their metric up while active; under reduced motion MetricCounter
+    // renders the final value at once (metric-counter.tsx), so what is read here is what it settles on.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await gotoHydrated(page, '/');
+    const section = page.getByRole('region', { name: /featured work/i });
+    for (const project of featuredProjects) {
+      const card = section
+        .getByRole('listitem')
+        .filter({ has: page.getByRole('link', { name: project.title, exact: true }) });
+      await expect(card.getByText(formatMetric(project.metric), { exact: true })).toBeVisible();
+      await expect(card.getByText(project.metric.label, { exact: true })).toBeVisible();
+    }
+
     await page.goto('/work');
     for (const project of featuredProjects) {
       await expect(page.getByText(formatMetric(project.metric), { exact: true })).toBeVisible();
