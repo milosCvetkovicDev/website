@@ -60,6 +60,34 @@ or a pair updated before it was published, throws there and fails the prerender.
 future" is a unit-test check against the live clock, not a build check, and it counts a day as
 begun once UTC+14 has reached it: an accepted tolerance of up to 14 hours against the UTC date.
 
+## Owner placeholders
+
+A value only the owner can supply is left as a registered placeholder, never invented, through
+`apps/web/src/data/owner-todo.ts`, the one convention for it. A typed placeholder is a union branch
+`{ state: typeof OWNER_TODO }`, a gap in prose is `ownerTodo(hint)` (the hint on one line, without
+brackets), and the marker, `OWNER-TODO`, is spelled out in that module and in no other file under
+`apps/web/src` or `apps/web/public`. That scan is an exact byte search for the literal typed by hand;
+a marker assembled from pieces gets past it, and only the served-output check below would catch it.
+Whatever renders the value omits the whole sentence, row or block while its marker survives;
+`e2e/seo-surface.spec.ts` fails if any route, `/sitemap.xml`, `/robots.txt` or
+`/manifest.webmanifest` serves it.
+
+The gate is `pnpm --filter web exec vitest run src/data/__tests__/owner-todo.test.ts`, part of
+`pnpm test`. It walks every source in that file's one source list and fails, naming
+`<source>.<path>`, on an unfilled field with no row in `unfilledOwnerFields`, on a value it cannot
+walk (a function, a `Map`, a `Set`, a class instance, a symbol key), on a row that matches no
+unfilled field or repeats another, on a row with a blank `why`, and on a row whose `expires` is
+missing, a placeholder, not a real `YYYY-MM-DD` day, reached, or more than `MAX_EXPIRY_DAYS` (366)
+ahead, on the real clock in UTC. A sibling joins it with one `{ id, value }` entry in that list (a
+data module's export, or the string a generator returns) and one register row per unfilled field:
+`field` as the finding names it, `why`, and an `expires` the owner chooses, never an agent. A typed
+placeholder is `<source>.<path>` (56c's `case-studies.0.metricDefinition`, for example), and each
+marker in a string is `<source>.<path>#<hint>`, so two markers in one string need two rows. The test
+also fails on a module under `src` that imports owner-todo and is neither imported by it for a
+source entry nor named in its `RENDERS_ONLY` list with a reason. Once a deadline passes, `pnpm test`
+is red on every branch until the owner fills the value or moves the date in a pull request, and
+that is intended: the pull request that moves the date is green on its own head.
+
 ## Quality gates
 
 - The AI-facing refusals are gated. `scripts/ai-refusals.test.mjs` runs under `pnpm test:scripts` and
