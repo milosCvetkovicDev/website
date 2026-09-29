@@ -448,7 +448,7 @@ describe('the Bash PreToolUse guard', () => {
     // The Edit|Write guard's other protected paths are not this guard's.
     ['rm -rf node_modules', 0],
     ['rm -rf apps/web/.next', 0],
-    ['rm -rf apps/playground/dist', 0],
+    ['rm -rf apps/web/dist', 0],
     ['echo x > apps/web/.next/x', 0],
 
     // Benign.
@@ -525,7 +525,7 @@ describe('the Edit|Write PreToolUse guard', () => {
     ['$CLAUDE_PROJECT_DIR/pnpm-lock.yaml', 2],
     ['$CLAUDE_PROJECT_DIR/node_modules/next/package.json', 2],
     ['$CLAUDE_PROJECT_DIR/apps/web/.next/build-manifest.json', 2],
-    ['$CLAUDE_PROJECT_DIR/apps/playground/dist/index.html', 2],
+    ['$CLAUDE_PROJECT_DIR/apps/web/dist/index.html', 2],
     ['$CLAUDE_PROJECT_DIR/.env.example', 0],
     ['$CLAUDE_PROJECT_DIR/apps/web/.env.example', 0],
     ['$CLAUDE_PROJECT_DIR/apps/web/src/app/page.tsx', 0],

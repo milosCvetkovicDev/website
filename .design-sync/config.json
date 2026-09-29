@@ -29,7 +29,6 @@
     "ArchitectureBackground": "  activeNodes?: ReadonlyArray<'client' | 'gateway' | 'auth' | 'backend' | 'worker' | 'db' | 'cache' | 'ai' | 'storage'>;",
     "CircuitBackground": "  progressRef: React.RefObject<number>;",
     "CodeLine": "  lineNumber?: number;\n  children: React.ReactNode;\n  className?: string;\n  highlighted?: boolean;",
-    "CTA": "  // Takes no props.",
     "DataStream": "  className?: string;",
     "DiscoveryPhase": "  // Takes no props.",
     "ExecutionPhase": "  // Takes no props.",
@@ -40,7 +39,6 @@
     "HeroContent": "  // Takes no props.",
     "HeroSection": "  children?: React.ReactNode;",
     "HexBadge": "  children: React.ReactNode;\n  className?: string;",
-    "Highlights": "  // Takes no props.",
     "HudPanel": "  children: React.ReactNode;\n  className?: string;\n  title?: React.ReactNode;\n  glow?: boolean;",
     "Logo": "  className?: string;\n  size?: number;",
     "LoopPhase": "  // Takes no props.",
@@ -59,9 +57,6 @@
     "TypingCursor": "  color?: 'accent' | 'white' | 'green';"
   },
   "overrides": {
-    "Highlights": {
-      "cardMode": "column"
-    },
     "DiscoveryPhase": {
       "cardMode": "column",
       "viewport": "1200x1000"

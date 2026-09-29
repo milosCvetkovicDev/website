@@ -14,9 +14,9 @@ Run every node or pnpm command after `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/n
    stacked).
 3. **Verify before committing.** Run every command in the Verification checklist of
    `.github/pull_request_template.md`, which lists the CI gates in order (`pnpm check:allowbuilds`,
-   `pnpm test:scripts`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`,
-   `pnpm build`), plus `pnpm --filter web test:e2e` when `apps/web` UI changed. Run heavy suites
-   one at a time. Keep each command and its real output for the PR body. Stop on a
+   `pnpm check:adrs`, `pnpm test:scripts`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`,
+   `pnpm test`, `pnpm build`), plus `pnpm --filter web test:e2e` when `apps/web` UI changed. Run
+   heavy suites one at a time. Keep each command and its real output for the PR body. Stop on a
    failure: fix it, or report it; never skip or disable a test.
 4. **Commit.** The title is `type(scope): subject`, header at most 100 characters including the
    ` (#NN)` GitHub appends to the squash commit. Main is squash-merged, so the PR title becomes the
