@@ -26,12 +26,14 @@ function tailwindMdWidth(): string | undefined {
  * of `change` listeners per query, so a width change reaches every pane.
  */
 const media = vi.hoisted(() => {
+  /** The query the stub answers with `wide`; pinned to `DISPLAYED_QUERY` by a test below. */
+  const WIDE = '(min-width: 48rem)';
   const state = { reducedMotion: false, wide: true };
   const listeners = new Map<string, Set<() => void>>();
   const matches = (query: string) =>
     query === '(prefers-reduced-motion: reduce)'
       ? state.reducedMotion
-      : query === '(min-width: 48rem)'
+      : query === WIDE
         ? state.wide
         : false;
   const matchMedia = (query: string) => {
@@ -54,6 +56,7 @@ const media = vi.hoisted(() => {
     };
   };
   return {
+    WIDE,
     state,
     listenerCount: (query: string) => listeners.get(query)?.size ?? 0,
     install() {
@@ -65,7 +68,7 @@ const media = vi.hoisted(() => {
     /** Moves the viewport across `md`, as a resize or a rotation does, and tells every listener. */
     setWide(wide: boolean) {
       state.wide = wide;
-      for (const listener of [...(listeners.get('(min-width: 48rem)') ?? [])]) listener();
+      for (const listener of [...(listeners.get(WIDE) ?? [])]) listener();
     },
   };
 });
@@ -135,6 +138,22 @@ describe('TmuxBackground', () => {
     }
   });
 
+  it("fills each static pane's slot container with the first 15 lines of its log", () => {
+    // Only StaticPane fills its slots at render, so this also shows the reduced-motion case above
+    // rendered StaticPane and not AnimatedPane twice.
+    media.state.reducedMotion = true;
+    const { container } = render(<TmuxBackground />);
+    const slotLists = [...container.querySelectorAll('[data-tmux-slots]')];
+    expect(slotLists).toHaveLength(5);
+    for (const slots of slotLists) expect(slots.childElementCount).toBe(15);
+    const kubectl = [...container.querySelectorAll('[data-tmux-pane]')].find(
+      (pane) => within(pane as HTMLElement).queryAllByText(/kubectl \u2014 pods/).length > 0,
+    );
+    expect(kubectl?.querySelector('[data-tmux-slots]')?.firstElementChild?.textContent).toBe(
+      '$ kubectl get pods -n production -w',
+    );
+  });
+
   it('renders the bottom status bar with pane count and uptime', () => {
     render(<TmuxBackground />);
     expect(screen.getByText('5 panes')).toBeInTheDocument();
@@ -191,6 +210,13 @@ describe('TmuxBackground', () => {
     expect(root).toHaveAttribute('aria-hidden', 'true');
     expect(mockObserve).toHaveBeenCalledExactlyOnceWith(root);
   });
+
+  it('disconnects its visibility observer on unmount', () => {
+    const { unmount } = render(<TmuxBackground />);
+    expect(mockDisconnect).not.toHaveBeenCalled();
+    unmount();
+    expect(mockDisconnect).toHaveBeenCalledOnce();
+  });
 });
 
 describe('AnimatedPane log slots', () => {
@@ -244,8 +270,8 @@ describe('AnimatedPane log slots', () => {
   });
 
   function kubectlSlots() {
-    const panes = [...document.querySelectorAll<HTMLElement>('[data-tmux-pane]')].filter((pane) =>
-      within(pane).queryByText(/kubectl \u2014 pods/),
+    const panes = [...document.querySelectorAll<HTMLElement>('[data-tmux-pane]')].filter(
+      (pane) => within(pane).queryAllByText(/kubectl \u2014 pods/).length > 0,
     );
     if (panes.length !== 1) throw new Error(`expected one kubectl pane, found ${panes.length}`);
     const slots = panes[0].querySelector('[data-tmux-slots]');
@@ -318,6 +344,12 @@ describe('AnimatedPane log slots', () => {
   });
 
   describe('below md, where the background is not displayed', () => {
+    it('stubs the same query the component asks for', () => {
+      // Otherwise the stub answers false for the component's query and never notifies it, and every
+      // AnimatedPane test fails on an empty slot list rather than on this.
+      expect(media.WIDE).toBe(DISPLAYED_QUERY);
+    });
+
     it('asks for the same width as the root class, `md:flex`', () => {
       const { container } = render(<TmuxBackground />);
       // Read from the stylesheets, so a changed `md` breakpoint fails here rather than showing the
