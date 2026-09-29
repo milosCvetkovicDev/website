@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
-import { useIsHydrated } from '@/hooks/use-is-hydrated';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const healingTimeline = [
@@ -35,10 +34,11 @@ export function LoopPhase() {
 
   const [visibleEvents, setVisibleEvents] = useState(0);
   const [alertStatus, setAlertStatus] = useState<'error' | 'resolved'>('error');
-  const [showProtocol, setShowProtocol] = useState(false);
+  // Shown to begin with, and hidden for the sequence to reveal only by a build that finds the
+  // section still ahead of the visitor: GauntletPhase's achievement says why.
+  const [showProtocol, setShowProtocol] = useState(true);
   const [gsapUnavailable, setGsapUnavailable] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
-  const hydrated = useIsHydrated();
   // Reduced motion, or no GSAP to run the sequence with: the final state is rendered directly via
   // the derived values below.
   const finished = prefersReducedMotion || gsapUnavailable;
@@ -57,9 +57,11 @@ export function LoopPhase() {
   }, []);
 
   // Only ever called from the ScrollTrigger below, which exists once GSAP has loaded; it passes
-  // GSAP in rather than this callback reaching for a module-level import.
+  // GSAP in rather than this callback reaching for a module-level import. `reveal` is false when
+  // the section was already in view as GSAP built it: the toast and the headline stay as the
+  // visitor saw them, and only the log runs.
   const animateHealing = useCallback(
-    (gsap: Gsap) => {
+    (gsap: Gsap, reveal: boolean) => {
       // Alert pulses
       later(() => {
         gsap.fromTo(
@@ -83,6 +85,7 @@ export function LoopPhase() {
                 // Show protocol notification
                 later(() => {
                   setShowProtocol(true);
+                  if (!reveal) return;
                   gsap.fromTo(
                     protocolRef.current,
                     { opacity: 0, y: 20 },
@@ -122,12 +125,14 @@ export function LoopPhase() {
         const section = sectionRef.current;
         if (!section) return;
         const reached = isAlreadyReached(section);
+        // Hidden for the reveal only while the section is still ahead of the visitor (hero-11).
+        setShowProtocol(reached);
         ctx = gsap.context(() => {
           ScrollTrigger.create({
             trigger: section,
             start: 'top center',
             once: true,
-            onEnter: () => animateHealing(gsap),
+            onEnter: () => animateHealing(gsap, !reached),
           });
 
           // Dashboard fades in
@@ -162,10 +167,10 @@ export function LoopPhase() {
   // With reduced motion, or without GSAP, the timeline is shown complete instead of animating in.
   const shownEvents = finished ? healingTimeline.length : visibleEvents;
   const shownAlertStatus = finished ? 'resolved' : alertStatus;
-  // Hidden for the sequence to reveal only once hydrated, so the served HTML shows the toast and
-  // the headline to a reader without JavaScript, a crawler or print; GauntletPhase's achievement
-  // says why the flip cannot race a reveal or move the layout.
-  const protocolVisible = finished || !hydrated || showProtocol;
+  // Shown until a GSAP build finds the section still below the viewport, so the served HTML and a
+  // page GSAP has not reached keep the toast and the headline; GauntletPhase's achievement says
+  // more.
+  const protocolVisible = finished || showProtocol;
 
   const getEventColor = (type: string) => {
     switch (type) {
@@ -265,7 +270,11 @@ export function LoopPhase() {
         </div>
 
         {/* Protocol Active */}
-        <div ref={protocolRef} className={`mt-6 ${protocolVisible ? '' : 'opacity-0'}`}>
+        <div
+          ref={protocolRef}
+          data-reveal="protocol"
+          className={`mt-6 ${protocolVisible ? '' : 'opacity-0'}`}
+        >
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
               <span className="text-xl">🔄</span>
@@ -280,6 +289,7 @@ export function LoopPhase() {
         {/* Headline */}
         <div
           ref={headlineRef}
+          data-reveal="headline"
           className={`mt-16 text-center ${protocolVisible ? '' : 'opacity-0'}`}
         >
           <h2 className="mb-3 text-2xl font-bold md:text-4xl">
