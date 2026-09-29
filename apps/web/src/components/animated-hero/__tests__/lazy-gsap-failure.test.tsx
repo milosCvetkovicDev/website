@@ -11,12 +11,13 @@ import { AnimatedText } from '../animated-text';
  * The story when GSAP never arrives: the chunk 404s after a deploy, a blocker refuses it, the
  * network drops it twice.
  *
- * Three phases do not server-render their finished state under `no-preference`: Execution's code
- * and counters start empty, and the headlines and toasts of Gauntlet and Loop start at
- * `opacity-0`, revealed only by the sequences GSAP runs (R16 in `e2e/served-html.spec.ts`). Before
- * GSAP was loaded lazily it could not fail on its own, because it shipped in the chunk that
- * hydrates the page. Now it can, and each of the three must then show what it shows under reduced
- * motion rather than stay empty and invisible for the rest of the visit.
+ * Three phases do not render their finished state under `no-preference`: Execution's counters
+ * start empty, and once hydrated its code lines and the headlines and toasts of Gauntlet and Loop
+ * are hidden, revealed only by the sequences GSAP runs (the served HTML shows them, R16 in
+ * `e2e/served-html.spec.ts`). Before GSAP was loaded lazily it could not fail on its own, because
+ * it shipped in the chunk that hydrates the page. Now it can, and each of the three must then show
+ * what it shows under reduced motion rather than stay empty and invisible for the rest of the
+ * visit.
  */
 
 vi.mock('../gsap-runtime', () => {
@@ -74,7 +75,7 @@ describe('when GSAP fails to load', () => {
     );
     const glitch = render(<AnimatedText animation="glitch">PHASE 3</AnimatedText>);
 
-    // Before the load has settled: the server-rendered state, empty counters and hidden headlines.
+    // Before the load has settled: the starting state, empty counters and hidden headlines.
     expect(screen.queryByText('00:14:32')).not.toBeInTheDocument();
     expect(revealContainer(/It worked on my machine/)).toHaveClass('opacity-0');
     expect(revealContainer(/This happened at 3:14am/)).toHaveClass('opacity-0');

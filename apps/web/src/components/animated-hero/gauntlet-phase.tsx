@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, PipelineStage, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { useIsHydrated } from '@/hooks/use-is-hydrated';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const pipelineStages = [
@@ -35,6 +36,7 @@ export function GauntletPhase() {
   const [showAchievement, setShowAchievement] = useState(false);
   const [gsapUnavailable, setGsapUnavailable] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const hydrated = useIsHydrated();
   // Reduced motion, or no GSAP to run the sequence with: the finished pipeline is rendered directly
   // via the derived values below.
   const finished = prefersReducedMotion || gsapUnavailable;
@@ -169,7 +171,7 @@ export function GauntletPhase() {
     if (finished) return;
 
     // GSAP arrives on the visitor's first intent (load-gsap.ts); until then the section keeps its
-    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // starting state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
@@ -220,7 +222,12 @@ export function GauntletPhase() {
   // by stage.
   const shownStageStates = finished ? passedStages : stageStates;
   const shownDeploymentStatus = finished ? 'success' : deploymentStatus;
-  const achievementVisible = finished || showAchievement;
+  // The achievement and the headline are hidden for the sequence to reveal only once hydrated. The
+  // server cannot know whether a sequence will ever run, and a reader without JavaScript, a crawler
+  // or print gets the served HTML and nothing after it, so the served blocks are visible. The flip
+  // happens once, right after hydration and before GSAP can have arrived to start a reveal, and it
+  // changes opacity only, never which rows render, so the layout does not move.
+  const achievementVisible = finished || !hydrated || showAchievement;
 
   return (
     <section

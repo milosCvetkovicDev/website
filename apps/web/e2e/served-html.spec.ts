@@ -4,21 +4,20 @@ import { servedText } from './support/served-text';
 /**
  * What `/` looks like with JavaScript switched off.
  *
- * Row R16 of the RED manifest, fixed by #47, plus the green floor that makes it mean something.
+ * Row R16 of the RED manifest (hero-11, #47), plus the green floor that makes it mean something.
  *
  * The page is prerendered, so a crawler or a reader without JavaScript gets the whole story in the
- * first response — every section, every panel, every line of the code sample. Four of those blocks are
- * nevertheless *invisible* in that response, because their visibility is gated on client state that
- * never arrives: `gauntlet-phase.tsx:324` and `loop-phase.tsx:264` put `opacity-0` on the headline
- * blocks and `:309` / `:249` on the toasts whenever `achievementVisible` / `protocolVisible` is false,
- * and both are false without hydration — `usePrefersReducedMotion`'s server snapshot is `false`
- * (`use-prefers-reduced-motion.ts:17`), so the reduced-motion escape hatch that would have rendered
- * them does not apply either. `execution-phase.tsx:294-297` is the same shape written inline:
- * all 22 code spans are `opacity: complete ? 1 : 0`.
- *
- * So the markup is there and the text is transparent, which is the worst of both worlds: it costs the
- * bytes and delivers nothing. The green test below is what proves the distinction — the sections and
- * panels *are* in the served HTML — so R16 is measuring hidden content rather than absent content.
+ * first response — every section, every panel, every line of the code sample. Some of those
+ * blocks start hidden for an animation to reveal: the closing headline and toast of the Gauntlet
+ * and of the Loop, which a GSAP sequence fades in, and the lines of the Execution code sample,
+ * which its count writes in. That hidden starting state is applied only after hydration
+ * (`useIsHydrated()` in `gauntlet-phase.tsx`, `loop-phase.tsx` and `execution-phase.tsx`), because
+ * without JavaScript no reveal ever runs: the served HTML has to show them at full opacity, or it
+ * costs the bytes and delivers nothing (`docs/adr/0009-animation-performance-rules.md` refused to
+ * drop these sections from the served HTML for what that costs crawlers, no-JS readers, reader
+ * mode, find-in-page and print). The green test below is what proves the distinction — the
+ * sections and panels *are* in the served HTML — so R16 is measuring hidden content rather than
+ * absent content.
  *
  * Two mechanics specific to this file:
  *
@@ -32,7 +31,7 @@ test.describe.configure({ retries: 0 });
 
 test.use({ javaScriptEnabled: false });
 
-/** Blocks whose text is in the response but painted at `opacity: 0` without hydration. */
+/** Blocks that start hidden for a reveal once hydrated, and must be shown before that. */
 const GATED_BLOCKS = [
   { what: "the Gauntlet's closing headline", text: '"It worked on my machine" doesn\'t fly here.' },
   { what: "the Gauntlet's achievement toast", text: 'Achievement Unlocked' },
@@ -94,9 +93,6 @@ test('the hero headline and its paragraph are on top in the served page', async 
 });
 
 test('nothing in the story is painted transparent with JavaScript off', async ({ page }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R16, #47' });
-
   await page.goto('/');
   // No hydration wait: with JavaScript off the marker never flips, so `expectHydrated` would time out.
   //
@@ -127,7 +123,8 @@ test('nothing in the story is painted transparent with JavaScript off', async ({
     if (effective < 1) transparent.push(`${what}: effective opacity ${effective}`);
   }
 
-  // And the code sample, which is the same bug written inline as a style rather than a class.
+  // And the code sample, whose lines carry the same starting state as an inline style rather than a
+  // class. Every `code > span` is a line: the caret, which pulses its opacity, sits after `<code>`.
   const codeSpanOpacities = await page.evaluate(() => {
     const pre = document.querySelector('pre');
     if (!pre) return [] as number[];
@@ -135,11 +132,12 @@ test('nothing in the story is painted transparent with JavaScript off', async ({
       Number(getComputedStyle(span).opacity),
     );
   });
+  expect(codeSpanOpacities.length, 'the code sample has no lines to measure').toBeGreaterThan(0);
   const hiddenSpans = codeSpanOpacities.filter((opacity) => opacity < 1).length;
   if (hiddenSpans > 0) {
     transparent.push(
-      `the Execution code sample: ${hiddenSpans} of ${codeSpanOpacities.length} spans at opacity 0 ` +
-        '(execution-phase.tsx:294-297)',
+      `the Execution code sample: ${hiddenSpans} of ${codeSpanOpacities.length} spans below ` +
+        'opacity 1 (the code lines in execution-phase.tsx)',
     );
   }
 
@@ -147,6 +145,6 @@ test('nothing in the story is painted transparent with JavaScript off', async ({
     transparent,
     'these blocks are server-rendered and then painted transparent, because their visibility is ' +
       'gated on client state that never arrives without hydration. The prerendered response should ' +
-      'show its content; reveal from the animation instead of hiding by default.',
+      'show its content; apply the hidden starting state only once hydrated (useIsHydrated).',
   ).toEqual([]);
 });

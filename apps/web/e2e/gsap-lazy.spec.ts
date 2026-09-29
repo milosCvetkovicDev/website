@@ -23,9 +23,9 @@ import { expectHydrated } from './support/hydration';
  *   Each phase's entrance renders an `opacity: 0` from-state the moment it is built, so a build
  *   that lands late would otherwise blank a section someone is reading, and then replay it or leave
  *   it blank until they scroll on.
- * - When GSAP cannot be fetched, the story shows its finished state. Three phases do not
- *   server-render it (R16 in `served-html.spec.ts`): their headlines stay at `opacity-0` until a
- *   sequence GSAP runs reveals them.
+ * - When GSAP cannot be fetched, the story shows its finished state. Three phases do not render it
+ *   before GSAP arrives: once hydrated, their headlines stay at `opacity-0` until a sequence GSAP
+ *   runs reveals them (the served HTML shows them, R16 in `served-html.spec.ts`).
  */
 
 // No retries: the second case samples every frame for a blink, and a retry would turn an

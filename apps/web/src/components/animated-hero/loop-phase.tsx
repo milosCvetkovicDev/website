@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { useIsHydrated } from '@/hooks/use-is-hydrated';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const healingTimeline = [
@@ -37,6 +38,7 @@ export function LoopPhase() {
   const [showProtocol, setShowProtocol] = useState(false);
   const [gsapUnavailable, setGsapUnavailable] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const hydrated = useIsHydrated();
   // Reduced motion, or no GSAP to run the sequence with: the final state is rendered directly via
   // the derived values below.
   const finished = prefersReducedMotion || gsapUnavailable;
@@ -108,7 +110,7 @@ export function LoopPhase() {
     if (finished) return;
 
     // GSAP arrives on the visitor's first intent (load-gsap.ts); until then the section keeps its
-    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // starting state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
@@ -160,7 +162,10 @@ export function LoopPhase() {
   // With reduced motion, or without GSAP, the timeline is shown complete instead of animating in.
   const shownEvents = finished ? healingTimeline.length : visibleEvents;
   const shownAlertStatus = finished ? 'resolved' : alertStatus;
-  const protocolVisible = finished || showProtocol;
+  // Hidden for the sequence to reveal only once hydrated, so the served HTML shows the toast and
+  // the headline to a reader without JavaScript, a crawler or print; GauntletPhase's achievement
+  // says why the flip cannot race a reveal or move the layout.
+  const protocolVisible = finished || !hydrated || showProtocol;
 
   const getEventColor = (type: string) => {
     switch (type) {

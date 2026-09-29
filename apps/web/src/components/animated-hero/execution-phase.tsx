@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, ActivityEntry } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { useIsHydrated } from '@/hooks/use-is-hydrated';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 const codeLines = [
@@ -100,6 +101,7 @@ export function ExecutionPhase() {
   const [animationComplete, setAnimationComplete] = useState(false);
   const [gsapUnavailable, setGsapUnavailable] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const hydrated = useIsHydrated();
   // Reduced motion, or no GSAP to count with: the finished build is rendered directly via
   // `complete` below.
   const finished = prefersReducedMotion || gsapUnavailable;
@@ -122,7 +124,7 @@ export function ExecutionPhase() {
     };
 
     // GSAP arrives on the visitor's first intent (load-gsap.ts); until then the section keeps its
-    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // starting state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
@@ -250,6 +252,11 @@ export function ExecutionPhase() {
   // whatever the count last put there - but only when the value it renders actually changes, which
   // is why a restarting count resets `animationComplete` above.
   const complete = finished || animationComplete;
+  // The code lines start hidden for the count to write in only once hydrated: the served HTML shows
+  // every line to a reader without JavaScript, a crawler or print. The flip renders a new value, so
+  // React writes it, and it happens once, right after hydration and before GSAP can have arrived to
+  // start a count, so the count still starts from nothing.
+  const codeLinesShown = complete || !hydrated;
 
   const getTokenColor = (type: string) => {
     switch (type) {
@@ -307,18 +314,21 @@ export function ExecutionPhase() {
                       }}
                       className={getTokenColor(line.type)}
                       style={{
-                        opacity: complete ? 1 : 0,
+                        opacity: codeLinesShown ? 1 : 0,
                         transition: 'none',
                       }}
                     >
                       {line.type === 'newline' ? '\n' : line.content}
                     </span>
                   ))}
-                  <span
-                    className="ml-0.5 inline-block h-4 w-2 bg-[var(--accent)]"
-                    style={{ animation: 'pulse 1s ease-in-out infinite' }}
-                  />
                 </code>
+                {/* After the code rather than inside it: the caret is no line of the sample,
+                    and its pulse animates opacity for ever. */}
+                <span
+                  aria-hidden="true"
+                  className="ml-0.5 inline-block h-4 w-2 bg-[var(--accent)]"
+                  style={{ animation: 'pulse 1s ease-in-out infinite' }}
+                />
               </pre>
             </Terminal>
           </div>
