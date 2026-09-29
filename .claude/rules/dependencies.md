@@ -62,6 +62,10 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   `scripts/vitest-coverage-pair.test.mjs` fails `pnpm test:scripts` when the installed vite's major
   is outside the installed plugin-react's `vite` peer range, which is what catches a manual or
   security update that moves one without the other.
+- `lighthouse` is pinned exactly in `apps/web/package.json`, and a bump, Dependabot's included,
+  means re-reading the audit ids and scoring rules `apps/web/e2e/lighthouse-audits.spec.ts` asserts
+  and its docblock records at 13.4.1: a removed id fails that spec, a changed `notApplicable` rule
+  may not.
 
 ## Gotchas
 
