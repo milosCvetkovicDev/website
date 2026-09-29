@@ -19,8 +19,9 @@
  * - The About page's `40%` is **not** established. The owner confirms or drops it in #49, so this file
  *   forbids a hard-coded metric literal rather than asserting a value: it stays correct whichever way
  *   that decision goes.
- * - Likewise the years of experience. `13 years`, `10+ years` and `/skills`' own `2+` contradict each
- *   other today; the assertion is that there is one source, not which number wins.
+ * - Likewise the years of experience. A fixed count and `10+` used to contradict each other; the
+ *   assertion is that there is one source, not which number wins. #49 made that source
+ *   `data/profile.ts`, which derives the total from the year the career started.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +66,12 @@ const COPY_MODULES = [
   'components/animated-hero/hero-content.tsx',
   ...PAGE_RECORDS,
 ];
+
+/**
+ * A years-of-experience figure as copy prints it, and the About fact's label, which names one. The
+ * label is a hit because its row comes whole from `data/profile.ts` (R34 below).
+ */
+const YEAR_PATTERNS = [/\b\d{1,2}\+? years\b/, /\b\d{1,2}\+? yrs\b/, /\bYears shipping code\b/];
 
 /** The About page and the record that holds its copy, one of which quotes the case studies. */
 const ABOUT_COPY = ['app/about/page.tsx', 'data/pages/about.ts'];
@@ -159,34 +166,57 @@ describe('metrics and biography live in one place', () => {
     },
   );
 
-  it.fails(
-    'R34 (#49): no page, layout or JSON-LD module hard-codes a years-of-experience figure',
-    () => {
-      // Two numbers ship today for one fact: `13 years` in json-ld.tsx and hero-content.tsx, and
-      // `10+` in the About record (data/pages/about.ts), in its description and its "Years shipping
-      // code" stat; /skills adds its own `2+` for AI. #48 took the figure out of the page
-      // descriptions and deleted skills/layout.tsx, which leaves four hits. Whichever figure is
-      // right, it cannot be two.
-      const yearPatterns = [
-        /\b\d{1,2}\+? years\b/,
-        /\b\d{1,2}\+? yrs\b/,
-        /\bYears shipping code\b/,
-      ];
-      const hits: Hit[] = [];
-      for (const file of COPY_MODULES) {
-        const source = readFileSync(join(SRC, file), 'utf8');
-        source.split('\n').forEach((text, index) => {
-          const match = yearPatterns.map((pattern) => text.match(pattern)).find(Boolean);
-          if (!match) return;
-          hits.push({ file, line: index + 1, text: text.trim().slice(0, 110), literal: match[0] });
-        });
-      }
+  it('R34 (#49): no page, layout or JSON-LD module hard-codes a years-of-experience figure', () => {
+    // Two numbers used to ship for one fact: a fixed count of years in json-ld.tsx and
+    // hero-content.tsx, and `10+` in the About record (data/pages/about.ts), in its description
+    // and its "Years shipping code" stat. `data/profile.ts` now derives the total from the year the
+    // career started, and every one of those reads it: the stat's whole row, label included, comes
+    // from there, which is why the label is still a hit here if a module spells it out again.
+    // /skills' per-skill badges (`2+` for AI/LLM Integration) are a different fact, one per skill,
+    // and its record holds them as bare figures that the page suffixes, so they are not hits.
+    const hits: Hit[] = [];
+    for (const file of COPY_MODULES) {
+      const source = readFileSync(join(SRC, file), 'utf8');
+      source.split('\n').forEach((text, index) => {
+        const match = YEAR_PATTERNS.map((pattern) => text.match(pattern)).find(Boolean);
+        if (!match) return;
+        hits.push({ file, line: index + 1, text: text.trim().slice(0, 110), literal: match[0] });
+      });
+    }
 
-      expect(
-        hits.map(describeHit),
-        'the years of experience is stated in several places with different values. Put it in ' +
-          'src/data and derive it, so the biography cannot disagree with itself.',
-      ).toEqual([]);
-    },
-  );
+    expect(
+      hits.map(describeHit),
+      'the years of experience is stated in several places with different values. Put it in ' +
+        'src/data and derive it, so the biography cannot disagree with itself.',
+    ).toEqual([]);
+  });
+
+  it('R34 beyond the listed modules: only src/data states a years figure', () => {
+    // COPY_MODULES names the routes and the JSON-LD; a component or helper added later is not on it.
+    // Every module under src outside src/data renders or builds what the pages say, so none of them
+    // may state the figure either. src/data is where it belongs: profile.ts derives it.
+    const modules = readdirSync(SRC, { recursive: true, encoding: 'utf8' })
+      .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts'))
+      .filter((name) => !/(^|\/)(__tests__|test)\/|\.test\./.test(name))
+      .filter((name) => !name.startsWith('data/') || name.startsWith('data/pages/'));
+    expect(modules).toContain('components/animated-hero/hero-content.tsx');
+    expect(modules).not.toContain('data/profile.ts');
+
+    const hits: Hit[] = [];
+    for (const file of modules) {
+      readFileSync(join(SRC, file), 'utf8')
+        .split('\n')
+        .forEach((text, index) => {
+          const match = YEAR_PATTERNS.map((pattern) => text.match(pattern)).find(Boolean);
+          if (match)
+            hits.push({
+              file,
+              line: index + 1,
+              text: text.trim().slice(0, 110),
+              literal: match[0],
+            });
+        });
+    }
+    expect(hits.map(describeHit), 'read the figure from data/profile.ts').toEqual([]);
+  });
 });

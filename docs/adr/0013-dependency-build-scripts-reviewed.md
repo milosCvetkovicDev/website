@@ -2,7 +2,13 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0027
+
+No longer applies: the decision's opening sentence, that `allowBuilds` keeps two entries, the
+two-entry block beneath it, and what its bullets say about esbuild. esbuild left the dependency
+tree with the vite 8 migration, so its entry went under this record's own rule, and `allowBuilds`
+keeps one entry, unrs-resolver. The rest of the decision stands. See
+[ADR 0027](0027-vite-8-in-apps-web.md).
 
 ## Date
 
