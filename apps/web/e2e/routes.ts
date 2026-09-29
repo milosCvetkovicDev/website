@@ -24,8 +24,11 @@ export const NAV_ROUTES = ['/', '/about', '/work', '/skills', '/blog', '/contact
  */
 export const STATIC_ROUTES = [...NAV_ROUTES, '/privacy'] as const;
 
+/** The page route of one case study, `/work/<slug>`. */
+export const caseStudyRoute = (slug: string): string => `/work/${encodeURIComponent(slug)}`;
+
 /** `/work/<slug>` for every case study in the data file. */
-export const CASE_STUDY_ROUTES = caseStudies.map(({ slug }) => `/work/${slug}`);
+export const CASE_STUDY_ROUTES = caseStudies.map(({ slug }) => caseStudyRoute(slug));
 
 /**
  * A path that resolves to no route, so the not-found page renders. `/work/does-not-exist` is the

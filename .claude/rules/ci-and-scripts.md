@@ -16,9 +16,10 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 
 - `scripts/` at the repository root holds the scripts that run outside the apps:
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `check-adr-index.mjs`
-  (`pnpm check:adrs`, the ADR records against their index), `vercel-ignore-build.mjs` (Vercel's
-  ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log check),
-  `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22 runs directly),
+  (`pnpm check:adrs`, the ADR records against their index), `check-build-output.mjs`
+  (`pnpm check:build-output`, that the web build stays function-free), `vercel-ignore-build.mjs`
+  (Vercel's ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log
+  check), `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22 runs directly),
   `docs-drift-patch.mjs` (the docs drift workflow's check on what its agent changed),
   `agent-resume.sh` (the briefing for agent checkpoints, under Working with this repo in Claude
   Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates),
@@ -37,34 +38,35 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 
 ## Commands
 
-| Command                                                                 | What it does                                                                                                                                                                         |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm dev`                                                              | `turbo dev` (`next dev` in `apps/web`)                                                                                                                                               |
-| `pnpm dev:web`                                                          | Next.js dev server on port 3000                                                                                                                                                      |
-| `pnpm build`                                                            | `next build` (web)                                                                                                                                                                   |
-| `pnpm lint`                                                             | ESLint in `apps/web` with `--max-warnings 0`                                                                                                                                         |
-| `pnpm lint:fix`                                                         | `eslint --fix` in `apps/web`, without `--max-warnings 0`                                                                                                                             |
-| `pnpm typecheck`                                                        | `turbo typecheck`: `next typegen && tsc --noEmit` (web), `tsc -p .` (scripts)                                                                                                        |
-| `pnpm test`                                                             | Vitest unit tests (web only)                                                                                                                                                         |
-| `pnpm test:e2e`                                                         | Playwright specs in `apps/web/e2e`; `turbo.json` gives it `dependsOn: ["build"]`, so the root script builds `web` first. Prefer `pnpm --filter web test:e2e` locally, which does not |
-| `pnpm test:e2e:sweep e2e/<spec> [runs] [out-dir]`                       | Runs one spec file N times (10 by default) and summarises every test's outcomes and durations; see `scripts/flake-sweep.sh`                                                          |
-| `pnpm format`                                                           | Prettier over the whole repo, writing changes                                                                                                                                        |
-| `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                    |
-| `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                              |
-| `pnpm check:adrs`                                                       | Checks each ADR's status, H1 title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules; exit 1 on a disagreement, 2 if it could not run  |
-| `pnpm check:docs-drift`                                                 | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                  |
-| `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/`                                                                                                                                            |
-| `scripts/flake-hunt.sh [runs]`                                          | Runs the whole e2e suite N times (30 by default) and ranks specs by failure rate in `flake-hunt/flake-report.json`                                                                   |
-| `pnpm clean`                                                            | `turbo clean` in `apps/web`, then `rm -rf node_modules` at the root                                                                                                                  |
-| `pnpm prepare`                                                          | `husky`; runs on install and is what creates the git hooks                                                                                                                           |
-| `pnpm --filter web test:e2e`                                            | Playwright without going through Turborepo                                                                                                                                           |
-| `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`                       | Playwright on a port other than the default 3210                                                                                                                                     |
-| `pnpm --filter web test:watch`                                          | Vitest in watch mode                                                                                                                                                                 |
-| `pnpm --filter web test:coverage`                                       | Vitest with a v8 coverage text summary; report-only, no threshold, not run in CI                                                                                                     |
-| `pnpm --filter web exec vitest run <path>`                              | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx`                                                                                                              |
-| `pnpm --filter web exec playwright install --with-deps chromium webkit` | Needed once before the first e2e run; the phone projects need webkit                                                                                                                 |
-| `scripts/agent-resume.sh [task-id ...]`                                 | Briefs each `.agent-state/<task-id>.json` checkpoint and checks it against git and gh; exits 1 when one is invalid or cannot be briefed                                              |
-| `scripts/verify-flake.sh <runs> e2e/<spec>`                             | Runs one spec N times into `.verify` with pass rate and p50/p95; exits 0 all passed, 1 any failed, 2 usage, tool or lock error or unmeasured run, 130/129/143 on INT/HUP/TERM        |
+| Command                                                                 | What it does                                                                                                                                                                                                |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                                                              | `turbo dev` (`next dev` in `apps/web`)                                                                                                                                                                      |
+| `pnpm dev:web`                                                          | Next.js dev server on port 3000                                                                                                                                                                             |
+| `pnpm build`                                                            | `next build` (web)                                                                                                                                                                                          |
+| `pnpm lint`                                                             | ESLint in `apps/web` with `--max-warnings 0`                                                                                                                                                                |
+| `pnpm lint:fix`                                                         | `eslint --fix` in `apps/web`, without `--max-warnings 0`                                                                                                                                                    |
+| `pnpm typecheck`                                                        | `turbo typecheck`: `next typegen && tsc --noEmit` (web), `tsc -p .` (scripts)                                                                                                                               |
+| `pnpm test`                                                             | Vitest unit tests (web only)                                                                                                                                                                                |
+| `pnpm test:e2e`                                                         | Playwright specs in `apps/web/e2e`; `turbo.json` gives it `dependsOn: ["build"]`, so the root script builds `web` first. Prefer `pnpm --filter web test:e2e` locally, which does not                        |
+| `pnpm test:e2e:sweep e2e/<spec> [runs] [out-dir]`                       | Runs one spec file N times (10 by default) and summarises every test's outcomes and durations; see `scripts/flake-sweep.sh`                                                                                 |
+| `pnpm format`                                                           | Prettier over the whole repo, writing changes                                                                                                                                                               |
+| `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                                           |
+| `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                                                     |
+| `pnpm check:adrs`                                                       | Checks each ADR's status, H1 title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules; exit 1 on a disagreement, 2 if it could not run                         |
+| `pnpm check:build-output [<distDir>]`                                   | After `pnpm --filter web build`: every route in `apps/web/.next` is prerendered with its body file and none needs a server function outside `ALLOWED_FUNCTIONS`; exit 1 on a finding, 2 if it could not run |
+| `pnpm check:docs-drift`                                                 | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                                         |
+| `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/`                                                                                                                                                                   |
+| `scripts/flake-hunt.sh [runs]`                                          | Runs the whole e2e suite N times (30 by default) and ranks specs by failure rate in `flake-hunt/flake-report.json`                                                                                          |
+| `pnpm clean`                                                            | `turbo clean` in `apps/web`, then `rm -rf node_modules` at the root                                                                                                                                         |
+| `pnpm prepare`                                                          | `husky`; runs on install and is what creates the git hooks                                                                                                                                                  |
+| `pnpm --filter web test:e2e`                                            | Playwright without going through Turborepo                                                                                                                                                                  |
+| `PLAYWRIGHT_PORT=3211 pnpm --filter web test:e2e`                       | Playwright on a port other than the default 3210                                                                                                                                                            |
+| `pnpm --filter web test:watch`                                          | Vitest in watch mode                                                                                                                                                                                        |
+| `pnpm --filter web test:coverage`                                       | Vitest with a v8 coverage text summary; report-only, no threshold, not run in CI                                                                                                                            |
+| `pnpm --filter web exec vitest run <path>`                              | One unit test file, e.g. `src/hooks/__tests__/use-is-hydrated.test.tsx`                                                                                                                                     |
+| `pnpm --filter web exec playwright install --with-deps chromium webkit` | Needed once before the first e2e run; the phone projects need webkit                                                                                                                                        |
+| `scripts/agent-resume.sh [task-id ...]`                                 | Briefs each `.agent-state/<task-id>.json` checkpoint and checks it against git and gh; exits 1 when one is invalid or cannot be briefed                                                                     |
+| `scripts/verify-flake.sh <runs> e2e/<spec>`                             | Runs one spec N times into `.verify` with pass rate and p50/p95; exits 0 all passed, 1 any failed, 2 usage, tool or lock error or unmeasured run, 130/129/143 on INT/HUP/TERM                               |
 
 `pnpm clean` only reaches `apps/web`, because `packages/*` and `scripts` define no `clean` task.
 Their `node_modules` survive it and have to be deleted by hand before a truly cold reinstall.
@@ -126,7 +128,18 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   pull request that adds a dependency with a known advisory, dev tooling included, because GitHub's
   dependency graph scopes every `pnpm-lock.yaml` entry `runtime`, the action's default), then
   install, `check:allowbuilds`, `check:adrs`, `test:scripts`, `format:check`, `lint`, `typecheck`,
-  `test`, `build`.
+  `test`, `build`, `check:build-output`. The last reads what `build` left in `apps/web/.next`, the route manifests
+  and the prerendered bodies under `server/app`, not the route table Next prints, and fails when a
+  route needs a server function (no prerendered path, a dynamic route whose params are not fixed,
+  revalidation, or a partially prerendered page) unless it is in the script's `ALLOWED_FUNCTIONS`,
+  when an allowlisted route turns out static or absent, when a prerendered path has no body file,
+  and when the build has a `proxy.ts` or middleware, a Server Action or a Pages Router entry (the
+  four `server/*-manifest.json` files the App Router manifests do not cover). A manifest field it
+  decides on that is missing or holds an unknown value, or a prerendered path it cannot attribute to
+  a route, exits 2 rather than passing. The allowlist is empty; #62 adds `/mcp`. A route handler
+  without `export const dynamic = 'force-static'` is the failure it exists for: it still serves the
+  right bytes, as a function billed per request. Its parsing is tested in `test:scripts`, which runs
+  before the build.
   `e2e`: install chromium and webkit, build web, run the Playwright specs on all three projects with
   their output teed into a log, then check that log with `scripts/check-webserver-log.mjs` whenever
   the suite ran; the report is uploaded as an artifact on failure or cancellation. Actions are
