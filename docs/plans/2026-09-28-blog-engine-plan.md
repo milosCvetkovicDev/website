@@ -81,7 +81,12 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
       `h1`, both labelled dates as `<time dateTime>`, every block kind, drafts absent from
       `generateStaticParams`, and `force-static` on the card handler. It fails.
 - [ ] **Step 2:** The page, the body component and the card handler, copying the static params of
-      `/work/[slug]` (D6, D7, D8).
+      `/work/[slug]` (D6, D7, D8). Headings get ids from one rule the page and the checker share;
+      the checker then requires a link's `#fragment` to name a heading of the page it goes to, and
+      ids to be unique, not only heading texts. Decide whether `QuoteBlock` needs a `source` for
+      `<cite>`. Export the root title template once and derive the ` | Milos Cvetkovic` suffix
+      from it in `page-metadata.test.ts` and `posts.test.ts`, and settle whether a summary can be
+      the 155-character description.
 - [ ] **Step 3:** The post routes in `routes.ts`, derived from `publishedPosts`; a template contrast
       floor for `/blog/<slug>`; `/blog/does-not-exist` in the unknown-slug lists; `blog.spec.ts`.
 - [ ] **Step 4:** The build table shows the post route and its card as prerendered, not as
@@ -132,7 +137,9 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
   `apps/web/e2e/blog.spec.ts`, `.claude/rules/app-router-and-content.md`
 
 - [ ] **Step 1:** Serialiser tests: every block and inline kind of every fixture post appears in its
-      Markdown, which opens with `# <title>`; the route exports `force-static`. They fail.
+      Markdown, which opens with `# <title>`; the route exports `force-static`. A fixture code
+      block and an inline code piece hold a run of backticks, and the fence and the code span are
+      longer than the run. They fail.
 - [ ] **Step 2:** `postToMarkdown`, the twin route over `publishedPosts` (D10), and the `/blog` twin
       listing the published posts.
 - [ ] **Step 3:** `blog.spec.ts` checks each twin and the post page's one Markdown alternate. This

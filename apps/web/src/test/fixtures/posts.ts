@@ -96,4 +96,4 @@ export const draftPost: DraftPost = {
 };
 
 /** In data order: oldest first, the draft between the two published posts. */
-export const fixturePosts: Post[] = [everyBlockPost, draftPost, hostileTitlePost];
+export const fixturePosts: readonly Post[] = [everyBlockPost, draftPost, hostileTitlePost];

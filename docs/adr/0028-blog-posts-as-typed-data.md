@@ -60,9 +60,13 @@ Four questions had to be settled before any of it could be built.
 6. `apps/web/src/data/__tests__/posts.test.ts` holds the rules, run against `posts` and the
    fixtures. Every slug is unique, in lowercase words joined by hyphens. A published post needs real
    dates, neither in the future, with `updatedAt` no earlier than `publishedAt`; a summary of 50 to
-   300 characters; a served title of at most 60; and a body of non-empty blocks, with headings at
-   level 2 or 3 and no level 3 before the first level 2. Its links go to `https://` URLs or to
-   paths on this site.
+   300 characters; a served title of at most 60; tags that are neither blank nor repeated; and a
+   body of non-empty blocks, with headings at level 2 or 3, no level 3 before the first level 2 and
+   no heading twice. Only a code block may hold a line break, a control or a direction character,
+   and titles, the summary, headings and tags have no stray spaces. Its links say where they go,
+   and go to `https://` URLs or to pages on this site that exist, published posts included. The
+   test also fails when code outside `posts.ts` imports `posts` rather than the index, or a client
+   component imports the module at all, which would bundle the drafts.
 
 ## Consequences
 

@@ -12,12 +12,16 @@
  *   live as `YYYY-MM-DD`. Later, bump `updatedAt` in the commit that changes what the post says,
  *   and only then: it is the date readers and crawlers are shown as the last change.
  * - Every string is plain text and is shown as written: no Markdown, no HTML, no entities. Inline
- *   code and links are pieces of their own; a link goes to an `https://` URL or a path on this site.
+ *   code and links are pieces of their own; a link goes to an `https://` URL or to a page on this
+ *   site. Only a code block may hold a line break.
  * - `src/data/__tests__/posts.test.ts` checks what a published post must hold: a unique slug of
  *   lowercase words and hyphens, real dates that are not in the future with `updatedAt` on or after
  *   `publishedAt`, a summary of 50 to 300 characters, a served title (`metaTitle` when set, then
- *   ` | Milos Cvetkovic`) of at most 60, and a body whose blocks are not empty, with headings at
- *   level 2 or 3 and no level 3 before the first level 2.
+ *   ` | Milos Cvetkovic`) of at most 60, tags that are neither blank nor repeated, and a body whose
+ *   blocks are not empty, with headings at level 2 or 3, no level 3 before the first level 2 and no
+ *   heading twice. Titles, the summary, headings and tags have no spaces at either end or two in a
+ *   row; no text outside a code block holds a line break, a control or a direction character; a
+ *   link's text says where it goes; and a link to this site names a page that exists.
  */
 
 /**
@@ -26,42 +30,51 @@
  */
 export type Inline =
   | string
-  | { code: string }
+  // `never` on the other kind's keys, so a piece that is both code and a link fails typecheck.
+  | { readonly code: string; readonly text?: never; readonly href?: never }
   | {
-      text: string;
-      /** An `https://` URL, or a path on this site such as `/work` or `/blog/<slug>#section`. */
-      href: string;
+      readonly text: string;
+      /**
+       * An `https://` URL, or a path to a page on this site such as `/work` or `/blog/<slug>`. A
+       * `#fragment` is not yet checked against the headings of the page it names.
+       */
+      readonly href: string;
+      readonly code?: never;
     };
 
 /** A section heading. The post's title is the page's one `h1`, so the body starts at level 2. */
 export interface HeadingBlock {
-  kind: 'heading';
-  level: 2 | 3;
-  text: string;
+  readonly kind: 'heading';
+  readonly level: 2 | 3;
+  readonly text: string;
 }
 
 export interface ParagraphBlock {
-  kind: 'paragraph';
-  content: readonly Inline[];
+  readonly kind: 'paragraph';
+  readonly content: readonly Inline[];
 }
 
 /** A bulleted list, or a numbered one when `ordered` is true. Each item is a run of inline pieces. */
 export interface ListBlock {
-  kind: 'list';
-  ordered?: boolean;
-  items: readonly (readonly Inline[])[];
+  readonly kind: 'list';
+  readonly ordered?: boolean;
+  readonly items: readonly (readonly Inline[])[];
 }
 
-/** Code shown as written, line breaks included. `language` names it for a reader, as `ts` does. */
+/**
+ * Code shown as written, line breaks and backticks included, so the Markdown serialiser has to
+ * fence it with more backticks than its longest run (61e). `language` names it for a reader, as
+ * `ts` does: letters, digits, `+`, `#` and `-` only.
+ */
 export interface CodeBlock {
-  kind: 'code';
-  language?: string;
-  code: string;
+  readonly kind: 'code';
+  readonly language?: string;
+  readonly code: string;
 }
 
 export interface QuoteBlock {
-  kind: 'quote';
-  content: readonly Inline[];
+  readonly kind: 'quote';
+  readonly content: readonly Inline[];
 }
 
 /** Every block a post's body is built from; a sixth kind needs a renderer wherever posts render. */
@@ -69,15 +82,15 @@ export type PostBlock = HeadingBlock | ParagraphBlock | ListBlock | CodeBlock | 
 
 interface PostContent {
   /** The `<slug>` in `/blog/<slug>`: lowercase words joined by hyphens. Never change a published one. */
-  slug: string;
+  readonly slug: string;
   /** The page's one `h1`, and its `<title>` unless `metaTitle` is set. */
-  title: string;
+  readonly title: string;
   /** A shorter `<title>`, for a title that would pass 60 characters with ` | Milos Cvetkovic`. */
-  metaTitle?: string;
+  readonly metaTitle?: string;
   /** The post in a sentence or two, 50 to 300 characters, for wherever it is listed rather than read. */
-  summary: string;
-  tags: readonly string[];
-  body: readonly PostBlock[];
+  readonly summary: string;
+  readonly tags: readonly string[];
+  readonly body: readonly PostBlock[];
 }
 
 /**
@@ -85,23 +98,27 @@ interface PostContent {
  * live, and when what it says last changed.
  */
 export interface PublishedPost extends PostContent {
-  draft: false;
-  publishedAt: string;
-  updatedAt: string;
+  readonly draft: false;
+  readonly publishedAt: string;
+  readonly updatedAt: string;
 }
 
 /** A post still being written. It renders nowhere, so its dates are optional until it publishes. */
 export interface DraftPost extends PostContent {
-  draft: true;
-  publishedAt?: string;
-  updatedAt?: string;
+  readonly draft: true;
+  readonly publishedAt?: string;
+  readonly updatedAt?: string;
 }
 
 /** Discriminated on `draft`, so nothing can read a post's dates without first ruling out a draft. */
 export type Post = PublishedPost | DraftPost;
 
-/** Every post, drafts included, in any order. The owner writes them; see the top of this file. */
-export const posts: Post[] = [];
+/**
+ * Every post, drafts included, in any order. The owner writes them; see the top of this file.
+ * `posts.test.ts` fails when a source file other than a test imports `posts` rather than the index,
+ * and when a client component imports this module at all, which would ship the drafts to the browser.
+ */
+export const posts: readonly Post[] = [];
 
 /** Newest first: by publication day, then by the later update, then by slug, so ties are stable. */
 function newestFirst(a: PublishedPost, b: PublishedPost): number {

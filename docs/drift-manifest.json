@@ -7255,7 +7255,7 @@
       "evaluation": "live",
       "check": {
         "path": "apps/web/src/test/fixtures/posts.ts",
-        "contains": "export const fixturePosts: Post[]"
+        "contains": "export const fixturePosts: readonly Post[]"
       }
     },
     {

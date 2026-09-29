@@ -8,7 +8,12 @@
  *
  * @vitest-environment node
  */
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { caseStudies } from '@/data/case-studies';
+import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { formatContentDate, isPublishableContentDate } from '@/lib/content-date';
 import { draftPost, everyBlockPost, fixturePosts, hostileTitlePost } from '@/test/fixtures/posts';
 import {
@@ -27,39 +32,107 @@ import {
 const TITLE_SUFFIX = ' | Milos Cvetkovic';
 /** Google cuts a title at about 600 px, some 60 characters, as page-metadata.test.ts holds. */
 const TITLE_MAX = 60;
+/**
+ * #61's bounds for a summary. They are not a meta description's: 61b decides whether a summary can
+ * double as one, which page-metadata.test.ts holds to 155 characters.
+ */
 const SUMMARY_MIN = 50;
 const SUMMARY_MAX = 300;
 /** Lowercase letters and digits in words joined by single hyphens: the `<slug>` in `/blog/<slug>`. */
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** One character of a URL as RFC 3986 writes it: ASCII, with anything else percent-encoded. */
+const URL_CHARACTER = String.raw`(?:[A-Za-z0-9\-._~!$&'()*+,;=:@/?#]|%[0-9A-Fa-f]{2})`;
 /**
- * An https URL with a host, or a path on this site. Not `//host` or `/\host`, which a browser
- * resolves to another site, and nothing with whitespace or a backslash in it.
+ * An https URL whose host is a dotted name, with an optional port and no user or password, or a
+ * path on this site. Not `//host` or `/\host`, which a browser resolves to another site, and no
+ * character a URL has to percent-encode: whitespace, `<`, `>`, `"`, a backtick, a backslash, a
+ * control or direction character.
  */
-const HREF = /^(?:https:\/\/[^\s/?#\\]+|\/(?![/\\]))[^\s\\]*$/;
+const HREF = new RegExp(
+  String.raw`^(?:https://[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d{1,5})?(?:[/?#]${URL_CHARACTER}*)?|/(?!/)${URL_CHARACTER}*)$`,
+  'i',
+);
+/** Link text that says nothing of where the link goes, as a screen reader's list of links reads it. */
+const VAGUE_LINK_TEXT = /^(?:here|click here|this|that|link|this link|more|read more)[.!:]?$/i;
+/** A code block's language as a Markdown fence's info string and a `language-*` class can carry it. */
+const LANGUAGE = /^[a-z0-9+#-]+$/i;
+/** Marks that reorder or hide text: bidi controls, zero-width space, line and paragraph separators. */
+const INVISIBLE_MARKS = new Set([
+  0x061c, 0x200b, 0x200e, 0x200f, 0x2028, 0x2029, 0x202a, 0x202b, 0x202c, 0x202d, 0x202e, 0x2066,
+  0x2067, 0x2068, 0x2069, 0xfeff,
+]);
 
 const characters = (value: string) => [...value].length;
 
+/**
+ * Whether text holds a line break, a tab or another control, or an invisible mark. Only a code
+ * block may: a line break anywhere else splits the Markdown twin's line where HTML shows a space.
+ */
+const hasInvisible = (value: string) =>
+  [...value].some((character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code < 0x20 || (code >= 0x7f && code <= 0x9f) || INVISIBLE_MARKS.has(code);
+  });
+const INVISIBLE_PROBLEM = 'holds a line break, a control or a direction character';
+
+/** Problems with one line of prose: a title, a summary, a heading or a tag. */
+function lineProblems(value: unknown, what: string): string[] {
+  if (typeof value !== 'string' || !value.trim()) return [`${what} is empty`];
+  if (hasInvisible(value)) return [`${what} ${INVISIBLE_PROBLEM}`];
+  if (value !== value.trim() || value.includes('  ')) {
+    return [`${what} has a space at an end or two in a row`];
+  }
+  return [];
+}
+
+/** The paths on this site a post may link to: the static routes, the case studies, the posts. */
+function pagesFor(list: readonly Post[]): ReadonlySet<string> {
+  return new Set([
+    ...Object.keys(STATIC_ROUTE_UPDATED),
+    ...caseStudies.map(({ slug }) => `/work/${slug}`),
+    ...list.filter((post) => post.draft === false).map(({ slug }) => `/blog/${slug}`),
+  ]);
+}
+
 /** Problems with a run of inline pieces: a paragraph, a quote or one list item. */
-function inlineProblems(pieces: readonly Inline[] | undefined, where: string): string[] {
+function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<string>): string[] {
   if (!Array.isArray(pieces) || pieces.length === 0) return [`${where} is empty`];
   const problems: string[] = [];
   let text = '';
   pieces.forEach((piece: unknown, index) => {
     const at = `${where}, piece ${index + 1}`;
     if (typeof piece === 'string') {
-      text += piece;
+      if (hasInvisible(piece)) problems.push(`${at} ${INVISIBLE_PROBLEM}`);
+      else text += piece;
     } else if (piece && typeof piece === 'object' && 'code' in piece) {
+      // Checked before either kind's rules, so a renderer that tests for `href` first never meets
+      // a link this checker read as code.
+      if ('text' in piece || 'href' in piece) {
+        problems.push(`${at} is both inline code and a link`);
+        return;
+      }
       const { code } = piece as { code: unknown };
-      if (typeof code !== 'string' || !code.trim())
+      if (typeof code !== 'string' || !code.trim()) {
         problems.push(`${at}: the inline code is empty`);
-      else text += code;
+      } else if (hasInvisible(code)) {
+        problems.push(`${at}: the inline code ${INVISIBLE_PROBLEM}`);
+      } else text += code;
     } else if (piece && typeof piece === 'object' && 'href' in piece) {
       const { text: label, href } = piece as { text: unknown; href: unknown };
-      if (typeof label !== 'string' || !label.trim()) problems.push(`${at}: the link has no text`);
-      else text += label;
+      if (typeof label !== 'string' || !label.trim()) {
+        problems.push(`${at}: the link has no text`);
+      } else if (hasInvisible(label)) {
+        problems.push(`${at}: the link text ${INVISIBLE_PROBLEM}`);
+      } else if (VAGUE_LINK_TEXT.test(label.trim())) {
+        problems.push(`${at}: the link text ${JSON.stringify(label)} does not say where it goes`);
+      } else text += label;
       if (typeof href !== 'string' || !HREF.test(href)) {
         problems.push(
           `${at}: the link goes to ${JSON.stringify(href)}, which is neither an https URL nor a path on this site`,
+        );
+      } else if (href.startsWith('/') && !pages.has(href.split(/[?#]/)[0])) {
+        problems.push(
+          `${at}: the link goes to ${JSON.stringify(href)}, which is no page on this site`,
         );
       }
     } else {
@@ -70,33 +143,40 @@ function inlineProblems(pieces: readonly Inline[] | undefined, where: string): s
   return problems;
 }
 
-function blockProblems(block: PostBlock, where: string): string[] {
+function blockProblems(block: PostBlock, where: string, pages: ReadonlySet<string>): string[] {
   switch (block.kind) {
     case 'heading': {
       const problems: string[] = [];
       if (block.level !== 2 && block.level !== 3) {
         problems.push(`${where}: heading level ${String(block.level)} is not 2 or 3`);
       }
-      if (typeof block.text !== 'string' || !block.text.trim()) {
-        problems.push(`${where}: the heading is empty`);
-      }
+      problems.push(...lineProblems(block.text, `${where}: the heading`));
       return problems;
     }
     case 'paragraph':
-      return inlineProblems(block.content, `${where} (paragraph)`);
+      return inlineProblems(block.content, `${where} (paragraph)`, pages);
     case 'quote':
-      return inlineProblems(block.content, `${where} (quote)`);
+      return inlineProblems(block.content, `${where} (quote)`, pages);
     case 'list':
       if (!Array.isArray(block.items) || block.items.length === 0) {
         return [`${where}: the list has no items`];
       }
       return block.items.flatMap((item, index) =>
-        inlineProblems(item, `${where} (list item ${index + 1})`),
+        inlineProblems(item, `${where} (list item ${index + 1})`, pages),
       );
-    case 'code':
-      return typeof block.code === 'string' && block.code.trim()
-        ? []
-        : [`${where}: the code block is empty`];
+    case 'code': {
+      const problems: string[] = [];
+      if (typeof block.code !== 'string' || !block.code.trim()) {
+        problems.push(`${where}: the code block is empty`);
+      }
+      const { language }: { language?: unknown } = block;
+      if (language !== undefined && (typeof language !== 'string' || !LANGUAGE.test(language))) {
+        problems.push(
+          `${where}: the code language ${JSON.stringify(language)} is not a plain name such as ts`,
+        );
+      }
+      return problems;
+    }
     default: {
       const { kind } = block as { kind?: unknown };
       return [`${where}: unknown block kind ${JSON.stringify(kind)}`];
@@ -138,38 +218,83 @@ function dateProblems(post: Post, today: Date): string[] {
 }
 
 /** What a published post must hold before anything renders it. */
-function contentProblems(post: PublishedPost): string[] {
+function contentProblems(post: PublishedPost, pages: ReadonlySet<string>): string[] {
   const problems: string[] = [];
   const name = post.slug;
-  if (!post.title.trim()) problems.push(`${name}: the title is empty`);
-  if (post.metaTitle !== undefined && !post.metaTitle.trim()) {
-    problems.push(`${name}: metaTitle is empty; leave it out to use the title`);
+  problems.push(...lineProblems(post.title, `${name}: the title`));
+  if (post.metaTitle !== undefined) {
+    const [problem] = lineProblems(post.metaTitle, `${name}: metaTitle`);
+    if (problem) {
+      problems.push(
+        problem.endsWith(' is empty') ? `${problem}; leave it out to use the title` : problem,
+      );
+    }
   }
-  const served = `${post.metaTitle ?? post.title}${TITLE_SUFFIX}`;
-  if (characters(served) > TITLE_MAX) {
-    problems.push(
-      `${name}: the served title "${served}" is ${characters(served)} characters, over ${TITLE_MAX}: shorten the title or set a metaTitle`,
-    );
+  const shown: unknown = post.metaTitle ?? post.title;
+  if (typeof shown === 'string') {
+    const served = `${shown}${TITLE_SUFFIX}`;
+    if (characters(served) > TITLE_MAX) {
+      problems.push(
+        `${name}: the served title "${served}" is ${characters(served)} characters, over ${TITLE_MAX}: shorten the title or set a metaTitle`,
+      );
+    }
   }
-  const summary = characters(post.summary.trim());
-  if (summary < SUMMARY_MIN || summary > SUMMARY_MAX) {
-    problems.push(
-      `${name}: the summary is ${summary} characters, outside ${SUMMARY_MIN}-${SUMMARY_MAX}`,
-    );
+  const summaryProblems = lineProblems(post.summary, `${name}: the summary`);
+  problems.push(...summaryProblems);
+  if (summaryProblems.length === 0) {
+    const summary = characters(post.summary);
+    if (summary < SUMMARY_MIN || summary > SUMMARY_MAX) {
+      problems.push(
+        `${name}: the summary is ${summary} characters, outside ${SUMMARY_MIN}-${SUMMARY_MAX}`,
+      );
+    }
+  }
+  const { tags }: { tags: unknown } = post;
+  if (!Array.isArray(tags)) {
+    problems.push(`${name}: tags is not a list`);
+  } else {
+    const seen = new Set<string>();
+    tags.forEach((tag: unknown, index) => {
+      const [problem] = lineProblems(tag, `${name}: tag ${index + 1}`);
+      if (problem) {
+        problems.push(problem);
+        return;
+      }
+      const key = String(tag).toLowerCase();
+      if (seen.has(key)) {
+        problems.push(`${name}: tag ${index + 1}, ${JSON.stringify(tag)}, repeats an earlier tag`);
+      }
+      seen.add(key);
+    });
   }
   if (!Array.isArray(post.body) || post.body.length === 0) {
     problems.push(`${name}: the body has no blocks`);
     return problems;
   }
   // The page's one h1 is the title, so the body's headings start at 2, and a 3 needs a 2 above it:
-  // a skipped level is an axe `heading-order` finding on the post page.
+  // a skipped level is an axe `heading-order` finding on the post page. Two headings with one text
+  // would give their anchors one id.
   let underLevelTwo = false;
-  post.body.forEach((block, index) => {
+  const headings = new Set<string>();
+  post.body.forEach((block: unknown, index) => {
     const where = `${name}: block ${index + 1}`;
-    problems.push(...blockProblems(block, where));
-    if (block.kind === 'heading' && block.level === 2) underLevelTwo = true;
-    if (block.kind === 'heading' && block.level === 3 && !underLevelTwo) {
+    if (!block || typeof block !== 'object') {
+      problems.push(`${where} is not a block`);
+      return;
+    }
+    problems.push(...blockProblems(block as PostBlock, where, pages));
+    const { kind, level, text } = block as { kind?: unknown; level?: unknown; text?: unknown };
+    if (kind !== 'heading') return;
+    if (level === 2) underLevelTwo = true;
+    if (level === 3 && !underLevelTwo) {
       problems.push(`${where}: a level-3 heading comes before any level-2 heading`);
+    }
+    if (typeof text === 'string' && text.trim()) {
+      const key = text.trim().toLowerCase();
+      if (headings.has(key)) {
+        problems.push(`${where}: the heading ${JSON.stringify(text)} repeats an earlier heading`);
+      }
+      headings.add(key);
     }
   });
   return problems;
@@ -179,10 +304,12 @@ function contentProblems(post: PublishedPost): string[] {
  * Every problem with `list` as of `today`, one message each, or none. A slug is checked on every
  * post, since a draft keeps its slug when it is published. A draft is otherwise held only to the
  * dates it gives: it renders nowhere, so its title, summary and body are checked once it is
- * published, in the commit that sets `draft: false`.
+ * published, in the commit that sets `draft: false`. A link to this site has to name a static
+ * route, a case study or a published post in `list`, so a link to a draft is refused too.
  */
 function problemsIn(list: readonly Post[], today: Date): string[] {
   const problems: string[] = [];
+  const pages = pagesFor(list);
   const counts = new Map<string, number>();
   for (const { slug } of list) counts.set(slug, (counts.get(slug) ?? 0) + 1);
   for (const [slug, count] of counts) {
@@ -199,7 +326,54 @@ function problemsIn(list: readonly Post[], today: Date): string[] {
       problems.push(`${post.slug}: draft must be true or false, not ${JSON.stringify(draft)}`);
     }
     problems.push(...dateProblems(post, today));
-    if (post.draft === false) problems.push(...contentProblems(post));
+    if (post.draft === false) problems.push(...contentProblems(post, pages));
+  }
+  return problems;
+}
+
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const POSTS_MODULE = join(SRC, 'data', 'posts');
+
+/**
+ * What one source file does against ADR 0028's third decision: import `posts` itself, or the whole
+ * module as a namespace, rather than the index; or import the module's values into a client
+ * component, which bundles the whole array, drafts and all, into JavaScript sent to the browser.
+ * A type-only import compiles away, so it is always allowed.
+ */
+function postsImportProblems(file: string, source: string): string[] {
+  const problems: string[] = [];
+  const at = relative(SRC, file);
+  const client = /^\s*['"]use client['"]/.test(source);
+  const isPostsModule = (from: string) => {
+    const target = from.startsWith('@/')
+      ? join(SRC, from.slice(2))
+      : from.startsWith('.')
+        ? resolve(dirname(file), from)
+        : '';
+    return target === POSTS_MODULE || target === `${POSTS_MODULE}.ts`;
+  };
+  const statements = source.matchAll(
+    /^(?:import|export)\s+(type\s+)?([^;'"]*?)\s*from\s*['"]([^'"]+)['"]/gm,
+  );
+  for (const [, typeOnly, bindings, from] of statements) {
+    if (typeOnly || !isPostsModule(from)) continue;
+    const names = (/\{([^}]*)\}/.exec(bindings)?.[1] ?? '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter((part) => part && !part.startsWith('type '))
+      .map((part) => part.split(/\s+as\s+/)[0]);
+    if (names.includes('posts') || bindings.includes('*')) {
+      problems.push(`${at}: reads posts itself; read publishedPosts, hasPublishedPosts or getPost`);
+    } else if (client && names.length > 0) {
+      problems.push(`${at}: a client component imports ${from}, which ships the drafts`);
+    }
+  }
+  if (client) {
+    for (const [, from] of source.matchAll(/^import\s*['"]([^'"]+)['"]/gm)) {
+      if (isPostsModule(from)) {
+        problems.push(`${at}: a client component imports ${from}, which ships the drafts`);
+      }
+    }
   }
   return problems;
 }
@@ -212,8 +386,16 @@ const published = (fields: Record<string, unknown>): Post =>
   ({ ...everyBlockPost, ...fields }) as unknown as Post;
 const withBody = (...body: unknown[]): Post => published({ body });
 const paragraph = (...content: unknown[]) => ({ kind: 'paragraph', content });
-const heading = (level: unknown, text = 'A heading') => ({ kind: 'heading', level, text });
-const withLink = (href: string) => withBody(paragraph('See ', { text: 'this', href }, '.'));
+const heading = (level: unknown, text = `A level-${String(level)} heading`) => ({
+  kind: 'heading',
+  level,
+  text,
+});
+const withLink = (href: string, text = 'the linked page') =>
+  withBody(paragraph('See ', { text, href }, '.'));
+const withTags = (...tags: unknown[]) => published({ tags });
+const withCode = (language: unknown, code = 'const fixture = 1;') =>
+  withBody({ kind: 'code', language, code });
 const withTitle = (title: string, metaTitle?: string) =>
   published(metaTitle === undefined ? { title } : { title, metaTitle });
 const summaryOf = (length: number) => published({ summary: 'x'.repeat(length) });
@@ -396,11 +578,123 @@ const defects: [string, Post[], RegExp][] = [
     'https://exa mple.com',
     '/work page',
     '',
+    '/a<b',
+    '/a"b',
+    '/a`b',
+    '/a\u0001b',
+    '/work\u200b',
+    'https://u:p@example.com',
+    'https://miloscvetkovic.dev@evil.example/',
+    'https://localhost:3000/',
+    'https://example.com/\u202egnp.exe',
+    'https://ex\u00e4mple.com',
   ].map((href): [string, Post[], RegExp] => [
     `a link to ${JSON.stringify(href)}`,
     [withLink(href)],
     /, piece 2: the link goes to ".*", which is neither an https URL nor a path on this site$/,
   ]),
+  ...['/wrok', '/work/', '/work/no-such-study', '/blog/no-such-post'].map(
+    (href): [string, Post[], RegExp] => [
+      `a link to ${href}, which is no page`,
+      [withLink(href)],
+      /, piece 2: the link goes to ".*", which is no page on this site$/,
+    ],
+  ),
+  [
+    'a link to a draft',
+    [withLink('/blog/fixture-draft'), draftPost],
+    /, piece 2: the link goes to "\/blog\/fixture-draft", which is no page on this site$/,
+  ],
+  [
+    'a piece that is both inline code and a link',
+    [withBody(paragraph('See ', { code: 'x', text: 'y', href: 'javascript:alert(1)' }, '.'))],
+    /: block 1 \(paragraph\), piece 2 is both inline code and a link$/,
+  ],
+  ...['here', 'Click here.', 'this', 'Read more'].map((text): [string, Post[], RegExp] => [
+    `the link text ${JSON.stringify(text)}`,
+    [withLink('/work', text)],
+    /, piece 2: the link text ".*" does not say where it goes$/,
+  ]),
+  [
+    'a line break in running text',
+    [withBody(paragraph('One line\nand another.'))],
+    /: block 1 \(paragraph\), piece 1 holds a line break, a control or a direction character$/,
+  ],
+  [
+    'a direction override in running text',
+    [withBody(paragraph('Text \u202ereversed.'))],
+    /: block 1 \(paragraph\), piece 1 holds a line break, a control or a direction character$/,
+  ],
+  [
+    'a line break in inline code',
+    [withBody(paragraph('Run ', { code: 'a\nb' }, '.'))],
+    /, piece 2: the inline code holds a line break, a control or a direction character$/,
+  ],
+  [
+    'a tab in link text',
+    [withLink('/work', 'the\twork page')],
+    /, piece 2: the link text holds a line break, a control or a direction character$/,
+  ],
+  [
+    'a line break in a heading',
+    [withBody(heading(2, 'Two\nlines'))],
+    /: block 1: the heading holds a line break, a control or a direction character$/,
+  ],
+  [
+    'a heading with a leading space',
+    [withBody(heading(2, ' Padded'))],
+    /: block 1: the heading has a space at an end or two in a row$/,
+  ],
+  [
+    'a heading that repeats an earlier one',
+    [withBody(heading(2, 'Results'), paragraph('Text.'), heading(2, 'results'))],
+    /: block 3: the heading "results" repeats an earlier heading$/,
+  ],
+  [
+    'a title with two spaces in a row',
+    [withTitle('A  title')],
+    /: the title has a space at an end or two in a row$/,
+  ],
+  [
+    'a title with a line break',
+    [withTitle('A\ntitle')],
+    /: the title holds a line break, a control or a direction character$/,
+  ],
+  [
+    'a metaTitle with a trailing space',
+    [withTitle('A title', 'Short ')],
+    /: metaTitle has a space at an end or two in a row$/,
+  ],
+  [
+    'a summary with a leading space',
+    [published({ summary: ` ${'x'.repeat(SUMMARY_MIN)}` })],
+    /: the summary has a space at an end or two in a row$/,
+  ],
+  ['a missing title', [published({ title: undefined })], /: the title is empty$/],
+  ['a missing summary', [published({ summary: undefined })], /: the summary is empty$/],
+  [
+    'a null metaTitle',
+    [published({ metaTitle: null })],
+    /: metaTitle is empty; leave it out to use the title$/,
+  ],
+  ['tags that are not a list', [published({ tags: 'Fixture' })], /: tags is not a list$/],
+  ['a blank tag', [withTags('Fixture', ' ')], /: tag 2 is empty$/],
+  [
+    'a tag with a leading space',
+    [withTags(' Fixture')],
+    /: tag 1 has a space at an end or two in a row$/,
+  ],
+  [
+    'a tag repeated in another case',
+    [withTags('Testing', 'testing')],
+    /: tag 2, "testing", repeats an earlier tag$/,
+  ],
+  ...['', 'c sharp', 'ts\n# injected', 'ts`'].map((language): [string, Post[], RegExp] => [
+    `the code language ${JSON.stringify(language)}`,
+    [withCode(language)],
+    /: block 1: the code language ".*" is not a plain name such as ts$/,
+  ]),
+  ['a body entry that is not a block', [withBody(null)], /: block 1 is not a block$/],
 ];
 
 const accepted: [string, Post[]][] = [
@@ -424,7 +718,29 @@ const accepted: [string, Post[]][] = [
     '/blog#top',
     'https://example.com',
     'https://a.b/c?d=e#f',
+    '/work?view=all#top',
+    'https://example.com:8443/wiki/A_(b)',
+    'https://example.com/%E2%9C%93',
   ].map((href): [string, Post[]] => [`a link to ${href}`, [withLink(href)]]),
+  ['a link to a published post', [withLink('/blog/fixture-hostile-title'), hostileTitlePost]],
+  [
+    'a title with an emoji joined by zero-width joiners',
+    [withTitle('Fixture \u{1f468}\u200d\u{1f4bb}')],
+  ],
+  ['a tag of two words', [withTags('Web performance', 'Testing')]],
+  ['no tags', [withTags()]],
+  ...['c++', 'c#', 'objective-c', 'TS'].map((language): [string, Post[]] => [
+    `the code language ${language}`,
+    [withCode(language)],
+  ]),
+  ['code with backticks and a fence in it', [withCode('md', '```ts\nconst a = `b`;\n```')]],
+  [
+    'headings with one text at different places in two posts',
+    [
+      withBody(heading(2, 'Results')),
+      { ...hostileTitlePost, body: [{ kind: 'heading', level: 2, text: 'Results' }] },
+    ],
+  ],
 ];
 
 describe('posts', () => {
@@ -526,7 +842,7 @@ describe('the post fixtures', () => {
   it('hold every inline kind, and links of both allowed forms', () => {
     function inlineKind(piece: Inline): 'text' | 'code' | 'link' {
       if (typeof piece === 'string') return 'text';
-      if ('code' in piece) return 'code';
+      if (piece.code !== undefined) return 'code';
       if ('href' in piece) return 'link';
       // Fails typecheck when a kind is added to Inline without being named above.
       return piece satisfies never;
@@ -538,7 +854,7 @@ describe('the post fixtures', () => {
     });
     expect(new Set(pieces.map(inlineKind))).toEqual(new Set(['text', 'code', 'link']));
     const hrefs = pieces.flatMap((piece) =>
-      typeof piece === 'object' && 'href' in piece ? [piece.href] : [],
+      typeof piece === 'object' && piece.href !== undefined ? [piece.href] : [],
     );
     expect(hrefs.some((href) => href.startsWith('/'))).toBe(true);
     expect(hrefs.some((href) => href.startsWith('https://'))).toBe(true);
@@ -566,11 +882,70 @@ describe('problemsIn', () => {
     expect(problemsIn(list, TODAY)).toEqual([]);
   });
 
+  it('refuses a piece that is both code and a link at typecheck, and when a cast lets it through', () => {
+    // @ts-expect-error `never` on the other kind's keys: a piece is code or a link, not both.
+    const mixed: Inline = { code: 'x', text: 'y', href: 'javascript:alert(1)' };
+    expect(problemsIn([withBody(paragraph(mixed))], TODAY)).toEqual([
+      expect.stringMatching(/, piece 1 is both inline code and a link$/),
+    ]);
+  });
+
   it('names every defect in one post, not only the first', () => {
     const problems = problemsIn(
       [published({ slug: 'Bad', summary: 'Short.', body: [], updatedAt: '2026-02-30' })],
       TODAY,
     );
-    expect(problems).toHaveLength(4);
+    expect(problems).toEqual([
+      'Bad: slug "Bad" is not lowercase words joined by single hyphens',
+      'Bad: updatedAt "2026-02-30" is not a real YYYY-MM-DD day from 2000 on',
+      'Bad: the summary is 6 characters, outside 50-300',
+      'Bad: the body has no blocks',
+    ]);
+  });
+});
+
+describe('imports of the posts module', () => {
+  const sources = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter(
+    (name) => /\.tsx?$/.test(name) && !/(?:^|[\\/])(?:__tests__|test)[\\/]/.test(name),
+  );
+
+  it('read the index, never posts itself, and never from a client component', () => {
+    expect(sources.length).toBeGreaterThan(50);
+    expect(sources.map((name) => join('data', 'posts.ts') === name)).toContain(true);
+    const offenders = sources.flatMap((name) =>
+      postsImportProblems(join(SRC, name), readFileSync(join(SRC, name), 'utf8')),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  const page = join(SRC, 'app', 'blog', 'page.tsx');
+  it.each([
+    ['posts by name', "import { posts } from '@/data/posts';"],
+    ['posts under another name', "import { getPost, posts as all } from '../../data/posts';"],
+    ['the module as a namespace', "import * as data from '@/data/posts';"],
+    ['a re-export of posts', "export { posts } from '@/data/posts';"],
+    [
+      'the index into a client component',
+      "'use client';\nimport { publishedPosts } from '@/data/posts';",
+    ],
+    ['the module into a client component for its effects', "'use client';\nimport '@/data/posts';"],
+    [
+      'the index into a client component across lines',
+      "'use client';\nimport {\n  getPost,\n  hasPublishedPosts,\n} from '../../data/posts';",
+    ],
+  ])('names an import of %s', (_, source) => {
+    expect(postsImportProblems(page, source)).toHaveLength(1);
+  });
+
+  it.each([
+    ['the index', "import { getPost, publishedPosts } from '@/data/posts';"],
+    ['types into a client component', "'use client';\nimport type { Post } from '@/data/posts';"],
+    [
+      'a named type into a client component',
+      "'use client';\nimport { type Post } from '@/data/posts';",
+    ],
+    ['posts from another module', "import { posts } from '@/data/other-posts';"],
+  ])('allows an import of %s', (_, source) => {
+    expect(postsImportProblems(page, source)).toEqual([]);
   });
 });
