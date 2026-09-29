@@ -15,6 +15,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
+import { OWNER_TODO } from '@/data/owner-todo';
 import type { PageRecord, PageSection, Paragraph } from '@/data/pages/types';
 import { visible } from '@/test/markdown';
 import { buildMetadata } from '../metadata';
@@ -52,6 +53,13 @@ const FORMATTED_METRIC_FIELDS = new Set([
   'highlight.metric.suffix',
   'highlight.metric.decimals',
 ]);
+
+/**
+ * The study fields the twin leaves out on purpose, because the page does not show them yet. A
+ * metric's scope (`formatMetricScope()`) reaches the page and its twin together in #58; until then
+ * neither shows it, and an unfilled definition's marker must never be served at all.
+ */
+const NOT_ON_THE_PAGE_YET = ['metricDefinition'];
 
 interface Leaf {
   path: string;
@@ -122,7 +130,11 @@ function missingFrom(study: CaseStudy, twin: string): string[] {
   const shown = visible(twin);
   const { metric } = study.highlight;
   const expected: Leaf[] = [
-    ...leaves(study).filter(({ path }) => !FORMATTED_METRIC_FIELDS.has(path)),
+    ...leaves(study).filter(
+      ({ path }) =>
+        !FORMATTED_METRIC_FIELDS.has(path) &&
+        !NOT_ON_THE_PAGE_YET.some((field) => path === field || path.startsWith(`${field}.`)),
+    ),
     { path: 'highlight.metric', text: `${formatMetric(metric)} ${metric.label}` },
   ];
   return expected
@@ -528,6 +540,11 @@ describe('caseStudyToMarkdown()', () => {
     ],
     publishedAt: '2026-09-09',
     updatedAt: '2026-09-25',
+    metricDefinition: {
+      state: 'defined',
+      window: { from: '2025-03-01', to: '2025-08-31' },
+      method: 'Median CI time over the window, before and after.',
+    },
   };
 
   it('renders every field, the page’s section headings and a two-column tech stack', () => {
@@ -582,6 +599,13 @@ describe('caseStudyToMarkdown()', () => {
         '',
       ].join('\n'),
     );
+  });
+
+  it('leaves the metric’s scope out, even when it is defined, until the page shows it (#58)', () => {
+    const twin = caseStudyToMarkdown(STUDY);
+    expect(twin).not.toContain('Median CI time');
+    expect(twin).not.toContain('2025-03-01');
+    expect(twin).not.toContain('Measured from');
   });
 
   it('leaves out an optional section the study does not have', () => {
@@ -681,6 +705,10 @@ describe('caseStudyToMarkdown()', () => {
 
     it('never spaces a word out one character at a time', () => {
       expect(twin).not.toMatch(SPACED_OUT);
+    });
+
+    it('serves no owner placeholder, whether or not its metric definition is filled in', () => {
+      expect(twin).not.toContain(OWNER_TODO);
     });
   });
 });
