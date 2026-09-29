@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { storyClosings } from '@/data/pages/home';
 
 const healingTimeline = [
   {
@@ -280,15 +281,10 @@ export function LoopPhase() {
           className={`mt-16 text-center ${protocolVisible ? '' : 'opacity-0'}`}
         >
           <h2 className="mb-3 text-2xl font-bold md:text-4xl">
-            <AnimatedText animation="morse">
-              This happened at 3:14am. Nobody got paged.
-            </AnimatedText>
+            <AnimatedText animation="morse">{storyClosings.loop.heading}</AnimatedText>
           </h2>
           <p className="text-lg text-[var(--muted)]">
-            <AnimatedText animation="stagger-up">
-              The system diagnosed itself, wrote a fix, and waited for a human to approve.
-              That&apos;s the future I build.
-            </AnimatedText>
+            <AnimatedText animation="stagger-up">{storyClosings.loop.paragraphs[0]}</AnimatedText>
           </p>
         </div>
       </div>

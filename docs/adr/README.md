@@ -28,7 +28,7 @@ perform an operation.
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------- |
 | 0001 | [Record architecture decisions](0001-record-architecture-decisions.md)                                                                   | Superseded by ADR-0012                        | 2026-09-08 |
 | 0002 | [Monorepo toolchain and version pinning](0002-monorepo-toolchain.md)                                                                     | Superseded by ADR-0018 (corrected 2026-09-13) | 2026-09-08 |
-| 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)                                                             | Accepted                                      | 2026-09-08 |
+| 0003 | [Formatting and linting standards](0003-formatting-and-linting-standards.md)                                                             | Superseded by ADR-0018                        | 2026-09-08 |
 | 0004 | [CI pipeline and quality gates](0004-ci-pipeline-and-quality-gates.md)                                                                   | Superseded by ADR-0021                        | 2026-09-08 |
 | 0005 | [Hosting on Vercel](0005-hosting-on-vercel.md)                                                                                           | Superseded by ADR-0016 (corrected 2026-09-13) | 2026-09-08 |
 | 0006 | [Hydration-safe client state](0006-hydration-safe-client-state.md)                                                                       | Accepted (corrected 2026-09-16)               | 2026-09-08 |
@@ -59,8 +59,10 @@ choice; it was carried out on 2026-09-09 and the site is live, see
 one that said no `vercel.json` is added, which [ADR 0016](0016-vercel-deployment-budget.md) replaces;
 the hosting decision itself stands, and the one-line pointer under 0005's status says which part
 went. ADR 0002 is superseded the same partial way: [ADR 0018](0018-dependency-update-policy.md)
-replaces its pin table and the sentence about tightening `engines.node` to `22.x`, while its
-monorepo toolchain decision stands. ADR 0004 is superseded in part too:
+replaces its pin table, the sentence about tightening `engines.node` to `22.x` and its rules for
+`apps/playground`, which ADR 0018 retired, while its monorepo toolchain decision stands. ADR 0003
+is superseded in part by the same record: its clauses about the playground no longer apply, while
+its formatting and linting standards stand. ADR 0004 is superseded in part too:
 [ADR 0021](0021-squash-only-merges-and-required-checks.md) replaces the paragraph of its decision
 that opens "CI is not yet a merge gate", a role ADR 0021 took over when it superseded
 [ADR 0020](0020-branch-protection-on-main.md) in full, while the rest of 0004's decision stands.
@@ -71,7 +73,8 @@ ADR 0023 is superseded in part too: [ADR 0025](0025-production-alias-noindex.md)
 sentence of its first Decision bullet saying there is no second `headers()` entry, since a second
 one now sends `X-Robots-Tag: noindex` on the production alias alone, and the six security headers
 and the rest of 0023's decision stand.
-The bodies of 0002, 0004 and 0005 still describe the state on 2026-09-08, when they were accepted.
+The bodies of 0002, 0003, 0004 and 0005 still describe the state on 2026-09-08, when they were
+accepted.
 A record's decision is never edited afterwards, and its other sections only to correct a claim
 that is untrue, which [ADR 0007](0007-dependency-build-scripts.md) carries an example of.
 
@@ -103,7 +106,15 @@ that is untrue, which [ADR 0007](0007-dependency-build-scripts.md) carries an ex
    in both the record and the table, and add a dated entry under `## Corrections` that quotes the
    text that was wrong, quotes what replaced it, and cites the evidence. `## Corrections` is
    append-only: an error in a correction is fixed by a further entry, never by editing one.
-7. Check that the new record's link in the table resolves and that any link inside the record
-   resolves, because nothing in CI checks links. Then run `pnpm format` and commit on a `docs/`
-   branch with a `docs(adr): ...` message. The pre-commit hook runs lint-staged, which applies
+7. Run `pnpm check:adrs`, which CI's `quality` job also runs. It fails when a record's status, H1
+   title or date disagrees with its row in the table above, when a row's link does not resolve,
+   when a status is not one of the six forms ADR 0012 allows, when a corrected status disagrees
+   with the newest `## Corrections` entry, or when a superseded record's pointer does not link the
+   record that supersedes it, and it never rewrites either side. It reads a record strictly: the
+   first non-blank line is the `# NNNN. Title` H1 (no front matter or HTML comment above it), the
+   headings are written exactly `## Status`, `## Date` and `## Corrections`, the pointer is the
+   paragraph directly beneath the status line, and nothing but this file and `NNNN-*.md` records
+   may sit in `docs/adr`, so a template, a notes file or an image fails it. Nothing checks the
+   links inside a record, so check by hand that each of them resolves. Then run `pnpm format` and commit on a
+   `docs/` branch with a `docs(adr): ...` message. The pre-commit hook runs lint-staged, which applies
    `prettier --write` to `*.md`, so a missed format is corrected before the commit lands.
