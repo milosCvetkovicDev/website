@@ -15,7 +15,8 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 ## Architecture
 
 - `scripts/` at the repository root holds the scripts that run outside the apps:
-  `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `vercel-ignore-build.mjs` (Vercel's
+  `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `check-adr-index.mjs`
+  (`pnpm check:adrs`, the ADR records against their index), `vercel-ignore-build.mjs` (Vercel's
   ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log check),
   `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22 runs directly),
   `docs-drift-patch.mjs` (the docs drift workflow's check on what its agent changed),
@@ -23,7 +24,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates),
   `flake-sweep.sh` (`pnpm test:e2e:sweep`, see `e2e-tests.md`), `verify-flake.sh` (runs one e2e spec N
   times into `.verify`), and the `node:test` suites that `pnpm test:scripts` runs, one for each of
-  those ten plus `docs-drift-workflow.test.mjs`, `ai-refusals.test.mjs`,
+  those eleven plus `docs-drift-workflow.test.mjs`, `ai-refusals.test.mjs`,
   `commitlint-config.test.mjs`, `claude-hooks.test.mjs` (the session hooks in `.claude/hooks`),
   `claude-guards.test.mjs` (the PreToolUse guards in `.claude/settings.json`; it needs `jq` on
   `PATH` and fails without it, which the CI runner meets with its preinstalled `/usr/bin/jq`),
@@ -50,6 +51,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `pnpm format`                                                           | Prettier over the whole repo, writing changes                                                                                                                                        |
 | `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                    |
 | `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                              |
+| `pnpm check:adrs`                                                       | Checks each ADR's status, H1 title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules; exit 1 on a disagreement, 2 if it could not run  |
 | `pnpm check:docs-drift`                                                 | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                  |
 | `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/`                                                                                                                                            |
 | `scripts/flake-hunt.sh [runs]`                                          | Runs the whole e2e suite N times (30 by default) and ranks specs by failure rate in `flake-hunt/flake-report.json`                                                                   |
@@ -123,7 +125,8 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   (`actions/dependency-review-action`, on pull requests only, straight after checkout; it fails a
   pull request that adds a dependency with a known advisory, dev tooling included, because GitHub's
   dependency graph scopes every `pnpm-lock.yaml` entry `runtime`, the action's default), then
-  install, `check:allowbuilds`, `test:scripts`, `format:check`, `lint`, `typecheck`, `test`, `build`.
+  install, `check:allowbuilds`, `check:adrs`, `test:scripts`, `format:check`, `lint`, `typecheck`,
+  `test`, `build`.
   `e2e`: install chromium and webkit, build web, run the Playwright specs on all three projects with
   their output teed into a log, then check that log with `scripts/check-webserver-log.mjs` whenever
   the suite ran; the report is uploaded as an artifact on failure or cancellation. Actions are
