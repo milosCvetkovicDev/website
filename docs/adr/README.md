@@ -106,7 +106,15 @@ that is untrue, which [ADR 0007](0007-dependency-build-scripts.md) carries an ex
    in both the record and the table, and add a dated entry under `## Corrections` that quotes the
    text that was wrong, quotes what replaced it, and cites the evidence. `## Corrections` is
    append-only: an error in a correction is fixed by a further entry, never by editing one.
-7. Check that the new record's link in the table resolves and that any link inside the record
-   resolves, because nothing in CI checks links. Then run `pnpm format` and commit on a `docs/`
-   branch with a `docs(adr): ...` message. The pre-commit hook runs lint-staged, which applies
+7. Run `pnpm check:adrs`, which CI's `quality` job also runs. It fails when a record's status, H1
+   title or date disagrees with its row in the table above, when a row's link does not resolve,
+   when a status is not one of the six forms ADR 0012 allows, when a corrected status disagrees
+   with the newest `## Corrections` entry, or when a superseded record's pointer does not link the
+   record that supersedes it, and it never rewrites either side. It reads a record strictly: the
+   first non-blank line is the `# NNNN. Title` H1 (no front matter or HTML comment above it), the
+   headings are written exactly `## Status`, `## Date` and `## Corrections`, the pointer is the
+   paragraph directly beneath the status line, and nothing but this file and `NNNN-*.md` records
+   may sit in `docs/adr`, so a template, a notes file or an image fails it. Nothing checks the
+   links inside a record, so check by hand that each of them resolves. Then run `pnpm format` and commit on a
+   `docs/` branch with a `docs(adr): ...` message. The pre-commit hook runs lint-staged, which applies
    `prettier --write` to `*.md`, so a missed format is corrected before the commit lands.
