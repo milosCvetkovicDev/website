@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal } from './hud-elements';
 import { AnimatedText } from './animated-text';
+import { social } from '@/data/social';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 
 export function GameComplete() {
@@ -155,7 +156,7 @@ export function GameComplete() {
         {/* transition-colors only: GSAP tweens this link's opacity, transform and box-shadow. */}
         <a
           ref={ctaRef}
-          href="https://www.linkedin.com/in/milos-cvetkovic-dev"
+          href={social.linkedin.href}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-8 inline-flex w-full items-center justify-center rounded-lg bg-[var(--accent)] px-8 py-4 text-lg font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] sm:w-auto"

@@ -4,6 +4,7 @@
  * and maps over what is here, so a page and its twin cannot disagree. Every string is text the
  * page already showed.
  */
+import { social } from '@/data/social';
 import type { PageRecord, PageSection } from './types';
 
 export interface SocialLink {
@@ -20,21 +21,21 @@ export interface SocialLink {
 export const socialLinks = [
   {
     name: 'LinkedIn',
-    href: 'https://www.linkedin.com/in/milos-cvetkovic-dev',
+    href: social.linkedin.href,
     description: 'Engineering insights, career updates, and professional connections.',
     cta: 'Connect on LinkedIn',
     primary: true,
   },
   {
     name: 'GitHub',
-    href: 'https://github.com/milosCvetkovicDev',
+    href: social.github.href,
     description: 'Open-source projects, code contributions, and technical explorations.',
     cta: 'Follow on GitHub',
     primary: false,
   },
   {
     name: 'X / Twitter',
-    href: 'https://x.com/milos_dev',
+    href: social.x.href,
     description: 'Quick takes on engineering, AI, and tech trends.',
     cta: 'Follow on X',
     primary: false,

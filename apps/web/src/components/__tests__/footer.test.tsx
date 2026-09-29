@@ -8,20 +8,23 @@ import { Footer } from '../footer';
  * Row R38 of the RED manifest, fixed by #49, plus the green assertions that are the floor under it. The
  * footer's links were asserted nowhere before this file.
  *
- * The green half deliberately pins the *count and the shape*, not all three names. `footer.tsx:27`
- * still calls the X profile "Twitter", and that string is also the link's `aria-label` (`:86`); #49
- * renames it. Pinning three literal names here would make that rename read as a regression, so the X
- * profile is identified by its `x.com` href and the literal names are kept only for LinkedIn and
- * GitHub — which is the shape the task's Green-on-arrival notes ask for.
+ * The profiles come from `data/social.ts` (#49, AC 15), but the hrefs and names below are literals on
+ * purpose: they are the oracle, and a test that compared the footer with the module it reads could not
+ * notice a profile typed wrong in that module. `data/__tests__/social.test.ts` pins the module itself.
  */
 
-/** The three profiles, by the href that identifies each one whatever its label says today. */
+/** The three profiles, in the order the footer lists them, and the name each link carries. */
 const PROFILES = [
-  { what: 'LinkedIn', href: 'https://www.linkedin.com/in/milos-cvetkovic-dev', name: 'LinkedIn' },
-  { what: 'GitHub', href: 'https://github.com/milosCvetkovicDev', name: 'GitHub' },
-  // No expected name: "Twitter" today, something else after #49.
-  { what: 'the X profile', href: 'https://x.com/milos_dev', name: undefined },
+  { href: 'https://www.linkedin.com/in/milos-cvetkovic-dev', name: 'LinkedIn' },
+  { href: 'https://github.com/milosCvetkovicDev', name: 'GitHub' },
+  { href: 'https://x.com/milos_dev', name: 'X' },
 ];
+
+/**
+ * The start of the X mark's path, the glyph `/contact` draws too. The bird it replaced started
+ * `M22 4s`; pinning the new mark's first command is enough to tell the two apart.
+ */
+const X_MARK_PATH_START = 'M18.244 2.25h3.308';
 
 /**
  * The social links: every footer link except the one to /privacy. Excluding the known internal link,
@@ -32,14 +35,13 @@ const socialLinks = () =>
   screen.getAllByRole('link').filter((link) => link.getAttribute('href') !== '/privacy');
 
 describe('Footer', () => {
-  it('renders exactly three social links, one per profile', () => {
+  it('renders exactly three social links, one per profile, in the shared order', () => {
     render(<Footer />);
 
     const links = socialLinks();
     expect(links).toHaveLength(PROFILES.length);
-    // By href, so a renamed label cannot make this fail and a *missing profile* still does.
-    expect(links.map((link) => link.getAttribute('href')).sort()).toEqual(
-      PROFILES.map(({ href }) => href).sort(),
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(
+      PROFILES.map(({ href }) => href),
     );
   });
 
@@ -55,12 +57,11 @@ describe('Footer', () => {
     }
   });
 
-  it('names the LinkedIn and GitHub links for their platforms', () => {
+  it('names every social link for its platform', () => {
     render(<Footer />);
 
-    // These two names are settled and are not part of R38's rename, so they are pinned literally.
-    for (const { href, name } of PROFILES.filter((profile) => profile.name)) {
-      const link = screen.getByRole('link', { name: name as string });
+    for (const { href, name } of PROFILES) {
+      const link = screen.getByRole('link', { name });
       expect(link).toHaveAttribute('href', href);
     }
   });
@@ -88,26 +89,32 @@ describe('Footer', () => {
     expect(privacy).not.toHaveAttribute('target');
   });
 
-  it.fails('R38 (#49): the copyright line carries a © mark and the X link is named for X', () => {
-    render(<Footer />);
+  it('R38 (#49): the copyright line carries a © mark and the X link is named and drawn for X', () => {
+    const { container } = render(<Footer />);
 
     const problems: string[] = [];
 
-    // The shape, not the year. The footer is a prerendered server component, so `getFullYear()` is
-    // frozen at build time and a test pinning a literal year would pass in jsdom while saying nothing
-    // about what visitors see; what that year should be is #49's decision. `footer.tsx:75` renders
-    // "2026 Milos Cvetkovic. Built with Next.js." — the only thing missing is the mark itself.
+    // The shape, not the year. The footer is a prerendered server component, so the year is whatever
+    // the source says; `footer.tsx` holds it as a constant, the owner's decision, and a test pinning
+    // that literal would only restate it.
     const copyright = screen.getByText(/Milos Cvetkovic\./).textContent ?? '';
     if (!/^© \d{4} Milos Cvetkovic\./.test(copyright.trim())) {
       problems.push(`the copyright line reads "${copyright.trim()}"`);
     }
 
-    // And the label. "Twitter" has not been the name of that product since 2023, and the glyph next to
-    // it (`footer.tsx:41`) is still the old bird.
+    // And the label. "Twitter" has not been the name of that product since 2023.
     const xLink = screen.getByRole('link', { name: /twitter|^x$|x \(formerly twitter\)/i });
     const xName = xLink.getAttribute('aria-label') ?? '';
     if (/twitter/i.test(xName) && !/\bx\b/i.test(xName.replace(/twitter/gi, ''))) {
       problems.push(`the x.com link is still labelled "${xName}"`);
+    }
+
+    // And the glyph beside it, which was the old bird.
+    const xPath = container.querySelector('a[href="https://x.com/milos_dev"] svg path');
+    if (!xPath?.getAttribute('d')?.startsWith(X_MARK_PATH_START)) {
+      problems.push(
+        `the x.com link draws "${xPath?.getAttribute('d')?.slice(0, 16) ?? 'nothing'}…"`,
+      );
     }
 
     expect(problems).toEqual([]);

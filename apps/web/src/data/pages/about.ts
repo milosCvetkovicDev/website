@@ -6,6 +6,7 @@
  * heading and a table needs columns, and the page shows those parts without either.
  */
 import { formatMetric, getCaseStudy } from '@/data/case-studies';
+import { social } from '@/data/social';
 import type { PageRecord, PageSection, Paragraph } from './types';
 
 // The timeline quotes the agent's metric, so it reads it from the study rather than restating it.
@@ -130,9 +131,9 @@ const story: readonly StoryParagraph[] = [
 ];
 
 const connectLinks: readonly ProfileLink[] = [
-  { name: 'LinkedIn', href: 'https://www.linkedin.com/in/milos-cvetkovic-dev', primary: true },
-  { name: 'GitHub', href: 'https://github.com/milosCvetkovicDev', primary: false },
-  { name: 'X / Twitter', href: 'https://x.com/milos_dev', primary: false },
+  { name: 'LinkedIn', href: social.linkedin.href, primary: true },
+  { name: 'GitHub', href: social.github.href, primary: false },
+  { name: 'X / Twitter', href: social.x.href, primary: false },
 ];
 
 /** The rest of what `/about` renders in its main element, in page order, less the `h1` (#58's). */
