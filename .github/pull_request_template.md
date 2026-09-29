@@ -14,7 +14,9 @@
 - [ ] `pnpm typecheck`
 - [ ] `pnpm test`
 - [ ] `pnpm build`
+- [ ] `pnpm check:build-output` (after `pnpm build`: every route prerendered, no server function)
 - [ ] `pnpm --filter web test:e2e` (when the UI changed)
+- [ ] A Google Rich Results Test verdict, pasted here, when the change touches JSON-LD, page metadata or `robots.ts` (the tool has no API, so no gate runs it)
 
 ## Screenshots
 
