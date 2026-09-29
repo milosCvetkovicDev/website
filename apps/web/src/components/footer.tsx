@@ -9,11 +9,15 @@ import { Logo } from './logo';
  */
 const COPYRIGHT_YEAR = 2026;
 
-/** Each profile's mark, keyed by its id in `data/social.ts`, which supplies the name and the URL. */
+/**
+ * Each profile's mark, keyed by its id in `data/social.ts`, which supplies the name and the URL. The
+ * marks are aria-hidden: the link's `aria-label` names it, as the logo's wrapper does.
+ */
 const icons: Record<SocialProfileId, ReactElement> = {
   linkedin: (
     <svg
       xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
       width="20"
       height="20"
       viewBox="0 0 24 24"
@@ -31,6 +35,7 @@ const icons: Record<SocialProfileId, ReactElement> = {
   github: (
     <svg
       xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
       width="20"
       height="20"
       viewBox="0 0 24 24"
@@ -48,6 +53,7 @@ const icons: Record<SocialProfileId, ReactElement> = {
   x: (
     <svg
       xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
       width="20"
       height="20"
       viewBox="0 0 24 24"
@@ -78,8 +84,10 @@ export function Footer() {
             </Link>
           </div>
           <div className="flex items-center gap-4">
+            {/* A plain anchor, as every other external profile link on the site: next/link has no
+                client routing or prefetch to offer a cross-origin URL. */}
             {socialProfiles.map((profile) => (
-              <Link
+              <a
                 key={profile.id}
                 href={profile.href}
                 target="_blank"
@@ -88,7 +96,7 @@ export function Footer() {
                 aria-label={profile.name}
               >
                 {icons[profile.id]}
-              </Link>
+              </a>
             ))}
           </div>
         </div>

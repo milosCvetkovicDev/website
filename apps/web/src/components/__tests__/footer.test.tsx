@@ -57,6 +57,18 @@ describe('Footer', () => {
     }
   });
 
+  it("hides each social link's mark from assistive technology, so the link's label alone names it", () => {
+    render(<Footer />);
+
+    // The label is the whole name; an exposed `<svg>` inside the link can still be announced as an
+    // unnamed graphic by some screen reader and browser pairs.
+    for (const link of socialLinks()) {
+      const marks = link.querySelectorAll('svg');
+      expect(marks.length, `${link.getAttribute('href')} draws a mark`).toBeGreaterThan(0);
+      for (const mark of marks) expect(mark).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
+
   it('names every social link for its platform', () => {
     render(<Footer />);
 
@@ -102,11 +114,15 @@ describe('Footer', () => {
       problems.push(`the copyright line reads "${copyright.trim()}"`);
     }
 
-    // And the label. "Twitter" has not been the name of that product since 2023.
-    const xLink = screen.getByRole('link', { name: /twitter|^x$|x \(formerly twitter\)/i });
-    const xName = xLink.getAttribute('aria-label') ?? '';
-    if (/twitter/i.test(xName) && !/\bx\b/i.test(xName.replace(/twitter/gi, ''))) {
-      problems.push(`the x.com link is still labelled "${xName}"`);
+    // And the label. "Twitter" has not been the name of that product since 2023: the x.com link is
+    // named "X" exactly, and no footer link names Twitter at all.
+    const xName = container
+      .querySelector('a[href="https://x.com/milos_dev"]')
+      ?.getAttribute('aria-label');
+    if (xName !== 'X') problems.push(`the x.com link is labelled "${xName ?? 'nothing'}"`);
+    for (const link of screen.getAllByRole('link')) {
+      const name = link.getAttribute('aria-label') ?? link.textContent ?? '';
+      if (/twitter/i.test(name)) problems.push(`a footer link is labelled "${name}"`);
     }
 
     // And the glyph beside it, which was the old bird.

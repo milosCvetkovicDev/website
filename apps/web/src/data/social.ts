@@ -3,9 +3,11 @@
  * `sameAs`, the Connect page and the calls to action on /about, /skills, /work, the case studies and
  * the home page's closing section all read them from here. Each component still draws its own icon,
  * because they differ in size and stroke; the copy around a link (a card's heading, a button label)
- * stays with the page that shows it.
+ * stays with the page that shows it, but names the platform as `name` here does.
  *
- * `data/__tests__/social.test.ts` fails when a profile URL is written anywhere else under `src`.
+ * `data/__tests__/social.test.ts` fails when a profile's handle, bare, after an `@` or inside its
+ * URL, is written anywhere else under `src` or `public`, and when a labelled link to a profile does
+ * not name that profile's platform. `lib/metadata.ts` builds the Twitter card's `@handle` from here.
  */
 
 export type SocialProfileId = 'linkedin' | 'github' | 'x';

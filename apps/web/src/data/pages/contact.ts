@@ -20,20 +20,22 @@ export interface SocialLink {
 
 export const socialLinks = [
   {
-    name: 'LinkedIn',
+    name: social.linkedin.name,
     href: social.linkedin.href,
     description: 'Engineering insights, career updates, and professional connections.',
     cta: 'Connect on LinkedIn',
     primary: true,
   },
   {
-    name: 'GitHub',
+    name: social.github.name,
     href: social.github.href,
     description: 'Open-source projects, code contributions, and technical explorations.',
     cta: 'Follow on GitHub',
     primary: false,
   },
   {
+    // The page's own copy, kept until the owner answers pages-23 (#49); it names `social.x.name`,
+    // which `data/__tests__/social.test.ts` checks of every labelled profile link.
     name: 'X / Twitter',
     href: social.x.href,
     description: 'Quick takes on engineering, AI, and tech trends.',

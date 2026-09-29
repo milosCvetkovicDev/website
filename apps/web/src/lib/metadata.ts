@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { social } from '@/data/social';
 import { OG_CONTENT_TYPE, OG_SIZE } from './og-image';
 
 /**
@@ -12,7 +13,8 @@ import { OG_CONTENT_TYPE, OG_SIZE } from './og-image';
  */
 
 export const SITE_NAME = 'Milos Cvetkovic';
-export const TWITTER_HANDLE = '@milos_dev';
+/** The Twitter card's `creator`: the X profile's handle from `data/social.ts`, after an `@`. */
+export const TWITTER_HANDLE = `@${social.x.handle}`;
 
 interface PageMetadata {
   /** The route's title. A string goes through the root template (`%s | Milos Cvetkovic`). */
