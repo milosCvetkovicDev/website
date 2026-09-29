@@ -1,0 +1,202 @@
+/**
+ * The helper the phase tests pick their tweens with, run against a stand-in spy. What matters is
+ * that it refuses to guess: a helper that quietly fell back to the first call would bring back the
+ * call-order dependence it replaces. It needs no DOM and no GSAP, so it runs outside jsdom.
+ *
+ * @vitest-environment node
+ */
+import { describe, expect, it, vi } from 'vitest';
+import type { gsap } from '../gsap-runtime';
+import { countTweens, pickTween, progressDriver } from './gsap-tweens';
+
+/** A `gsap.to` stand-in that records its calls and returns a distinct token for each. */
+function toSpy() {
+  let made = 0;
+  return vi.fn<typeof gsap.to>(() => ({ made: ++made }) as unknown as gsap.core.Tween);
+}
+
+const onUpdate = () => {};
+
+describe('pickTween', () => {
+  it('returns the target and tween of the one matching call, wherever it falls', () => {
+    const to = toSpy();
+    const panel = new (class Panel {})();
+    const counter = {};
+    to(panel, { opacity: 1, duration: 0.5 });
+    const counted = to(counter, { duration: 3, onUpdate });
+
+    const picked = pickTween(to, progressDriver(3));
+
+    expect(picked.target).toBe(counter);
+    expect(picked.tween).toBe(counted);
+  });
+
+  it('fails, naming what it looked for and every call it saw, when no call matches', () => {
+    const to = toSpy();
+    to({}, { duration: 0.4, onUpdate });
+
+    expect(() => pickTween(to, progressDriver(0.5))).toThrow(
+      /No gsap\.to call is a 0\.5 s tween of a plain object driven through onUpdate\. The spy saw 1 call: #0 a plain object \{ duration: 0\.4, onUpdate \}/,
+    );
+  });
+
+  it('fails when nothing was called at all', () => {
+    expect(() => pickTween(toSpy(), progressDriver(3))).toThrow(/The spy saw no call\./);
+  });
+
+  it('fails when several calls match and the test did not ask for the latest', () => {
+    const to = toSpy();
+    to({}, { duration: 3, onUpdate });
+    to({}, { duration: 3, onUpdate });
+
+    expect(() => pickTween(to, progressDriver(3))).toThrow(/2 gsap\.to calls \(#0, #1\) are a 3 s/);
+  });
+
+  it('returns the last of several matching calls when asked for the latest', () => {
+    const to = toSpy();
+    const first = {};
+    const second = {};
+    to(first, { duration: 3, onUpdate });
+    to(new (class Span {})(), { opacity: 0 });
+    const restarted = to(second, { duration: 3, onUpdate });
+
+    const picked = pickTween(to, progressDriver(3), { latest: true });
+
+    expect(picked.target).toBe(second);
+    expect(picked.tween).toBe(restarted);
+  });
+
+  it('fails when the matching call threw instead of returning a tween', () => {
+    const to = toSpy();
+    to.mockImplementationOnce(() => {
+      throw new Error('bad target');
+    });
+    expect(() => to({}, { duration: 3, onUpdate })).toThrow('bad target');
+
+    expect(() => pickTween(to, progressDriver(3))).toThrow(
+      /call #0, .* threw instead of returning a tween/,
+    );
+  });
+
+  it('says a matching call has not returned yet, rather than that it threw', () => {
+    const to = toSpy();
+    let message = '';
+    to.mockImplementationOnce(() => {
+      try {
+        pickTween(to, progressDriver(3));
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      return {} as gsap.core.Tween;
+    });
+    to({}, { duration: 3, onUpdate });
+
+    expect(message).toMatch(/call #0, .* has not returned yet/);
+  });
+
+  it('with latest, still fails when no call matches, and when the last match threw', () => {
+    const to = toSpy();
+    to({}, { duration: 1, onUpdate });
+    expect(() => pickTween(to, progressDriver(3), { latest: true })).toThrow(/No gsap\.to call/);
+
+    to({}, { duration: 3, onUpdate });
+    to.mockImplementationOnce(() => {
+      throw new Error('bad target');
+    });
+    expect(() => to({}, { duration: 3, onUpdate })).toThrow('bad target');
+    expect(() => pickTween(to, progressDriver(3), { latest: true })).toThrow(
+      /call #2, .* threw instead of returning a tween/,
+    );
+  });
+
+  it('lists a call whose vars are missing instead of failing on them', () => {
+    const to = toSpy();
+    (to as unknown as (target: unknown) => void)({});
+
+    expect(() => pickTween(to, progressDriver(3))).toThrow(
+      /The spy saw 1 call: #0 a plain object \(vars: undefined\)\./,
+    );
+  });
+
+  it('describes each kind of target and every primitive value in the failure message', () => {
+    class Panel {}
+    const nodeList = new (class NodeList {
+      readonly length = 3;
+    })();
+    const to = toSpy();
+    to(Object.create(null) as object, { duration: Number.NaN });
+    to(new Panel(), { duration: Number.POSITIVE_INFINITY, ease: 'power2.out', paused: true });
+    to(nodeList as unknown as gsap.TweenTarget, { opacity: 0 });
+    to([{}, {}], { opacity: 1 });
+    to('.stage', { opacity: 1 });
+
+    expect(() => pickTween(to, progressDriver(3))).toThrow(
+      'The spy saw 5 calls: ' +
+        '#0 a null-prototype object { duration: NaN }; ' +
+        '#1 a Panel instance { duration: Infinity, ease: "power2.out", paused: true }; ' +
+        '#2 a NodeList of 3 { opacity: 0 }; ' +
+        '#3 an array of 2 { opacity: 1 }; ' +
+        '#4 ".stage" { opacity: 1 }.',
+    );
+  });
+
+  it('describes an element by its tag', () => {
+    class FakeElement {
+      readonly tagName = 'DIV';
+    }
+    vi.stubGlobal('Element', FakeElement);
+    try {
+      const to = toSpy();
+      to(new FakeElement() as unknown as gsap.TweenTarget, { opacity: 1 });
+
+      expect(() => pickTween(to, progressDriver(3))).toThrow(/#0 <div> \{ opacity: 1 \}/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+describe('countTweens', () => {
+  it('counts the matching calls only', () => {
+    const to = toSpy();
+    expect(countTweens(to, progressDriver(3))).toBe(0);
+    to({}, { duration: 3, onUpdate });
+    to(new (class Span {})(), { opacity: 0 });
+    to({}, { duration: 3, onUpdate });
+
+    expect(countTweens(to, progressDriver(3))).toBe(2);
+  });
+});
+
+describe('progressDriver', () => {
+  const { matches } = progressDriver(0.5);
+
+  it('matches a plain object tweened for that long with an onUpdate', () => {
+    expect(matches({}, { duration: 0.5, onUpdate })).toBe(true);
+    expect(matches(Object.create(null), { duration: 0.5, onUpdate })).toBe(true);
+  });
+
+  it('does not match, and does not throw on, a call with no vars object', () => {
+    const loose = matches as (target: unknown, vars: unknown) => boolean;
+    expect(loose({}, undefined)).toBe(false);
+    expect(loose({}, null)).toBe(false);
+    expect(loose({}, 0.5)).toBe(false);
+  });
+
+  it('does not match a tween that leaves its duration to GSAP', () => {
+    expect(matches({}, { onUpdate })).toBe(false);
+  });
+
+  it('does not match a tween of anything but a plain object', () => {
+    class Box {}
+    expect(matches(new Box(), { duration: 0.5, onUpdate })).toBe(false);
+    expect(matches([{}], { duration: 0.5, onUpdate })).toBe(false);
+    expect(matches('.stage', { duration: 0.5, onUpdate })).toBe(false);
+    expect(matches(null, { duration: 0.5, onUpdate })).toBe(false);
+  });
+
+  it('does not match another duration, or a tween with no onUpdate', () => {
+    expect(matches({}, { duration: 0.6, onUpdate })).toBe(false);
+    expect(matches({}, { duration: 0.5 })).toBe(false);
+  });
+});
