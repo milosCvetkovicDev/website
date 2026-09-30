@@ -99,14 +99,19 @@ async function measureInPage({
   // cannot widen the document. Walks the containing-block chain rather than the parent chain: an
   // absolutely positioned box is clipped only by its containing block (the nearest positioned or
   // transformed ancestor) and that block's own clippers, not by static boxes in between, and a
-  // fixed one belongs to the viewport and never widens the document.
+  // fixed one belongs to the viewport and never widens the document. Tailwind 4's `translate-*`,
+  // `scale-*` and `rotate-*` set the individual transform properties rather than `transform`, and
+  // each of them makes a containing block too.
   const cutOff = (start: Element | null, position: string) => {
     let pos = position;
     for (let a = start; a && a !== document.body && a !== root; a = a.parentElement) {
       if (pos === 'fixed') return true;
       const style = getComputedStyle(a);
       const containing =
-        style.position !== 'static' || style.transform !== 'none' || style.filter !== 'none';
+        style.position !== 'static' ||
+        [style.transform, style.translate, style.scale, style.rotate, style.filter].some(
+          (value) => value !== 'none',
+        );
       if (pos === 'absolute' && !containing) continue;
       if (style.overflowX !== 'visible') return true;
       pos = style.position;

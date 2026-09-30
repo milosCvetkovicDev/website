@@ -35,9 +35,10 @@ import {
  * of the walk back up and four seconds at the top: walking is what catches a phase that only
  * overflows once its reveal has run, coming back up catches one whose entrance reverses, and the
  * seconds at either end catch a reveal or a reverse that plays out after the walk has stopped
- * (`REVERSE_MS` has the measurement). The walk starts once GSAP has loaded: walked before it, a section would be
- * measured in its server-rendered state and no reveal would run. Under `reduce` no timeline is
- * built, so the page is read after hydration, walked to the bottom and back, and read at each end.
+ * (`REVERSE_MS` has the measurement). The walk starts once GSAP has loaded: walked before it, a
+ * section would be measured in its server-rendered state and no reveal would run. Under `reduce` no
+ * timeline is built, so the page is read after hydration, walked to the bottom and back, and read
+ * at each end.
  *
  * Every other page route gets the same check at 320px, the width where fixed-width content
  * overflows first, under both motion preferences. No GSAP runs off `/`, so there is nothing to wait
