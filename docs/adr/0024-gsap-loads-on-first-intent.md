@@ -79,6 +79,9 @@ entrances of sections below the fold, and the first of those starts 73 px below 
 - The three headlines the server renders at `opacity-0` (row R16, still an expected failure in
   `served-html.spec.ts`) stay blank until GSAP arrives, which is now after the first intent rather
   than at idle.
+  _Note, 2026-09-30 (#170):_ this bullet was true when the record was accepted and is left as
+  accepted. From #170 on, the served page shows those blocks, and only a GSAP build that finds the
+  section below the viewport hides them for the reveal; R16 passes. The Decision is unchanged.
 - The accessibility gate at rest measures the page after GSAP, because its helper sends intent; the
   page before GSAP is measured by the specs named above instead.
 - The work GSAP does when it arrives, 28 to 38 ms of CPU here and roughly four times that on a Moto
