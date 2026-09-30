@@ -85,9 +85,43 @@ const WHOLE_SEQUENCE_MS = ALL_EVENTS_MS + 1_000;
 const lastEvent = () => screen.queryByText('Awaiting human approval');
 const firstEvent = () => screen.queryByText('NullPointerException in /api/orders');
 const alertLabel = () => screen.getByText(/^(ERROR DETECTED|RESOLVED)$/);
+/** Finds an element by the data hook the phase puts on it, and throws when there is none. */
+function byHook(selector: string): HTMLElement {
+  const element = document.querySelector<HTMLElement>(selector);
+  if (!element) throw new Error(`LoopPhase rendered no ${selector}`);
+  return element;
+}
 /** The panel the alert's reveal tweens, found by its data hook rather than by call order. */
-const alertPanel = () => alertLabel().closest('[data-loop="alert"]') as HTMLElement;
-const protocolToast = () => screen.getByText('SELF-HEALING PROTOCOL ACTIVE').closest('.mt-6');
+const alertPanel = () => byHook('[data-loop="alert"]');
+const protocolToast = () => byHook('[data-reveal="protocol"]');
+const headline = () => byHook('[data-reveal="headline"]');
+/** One timestamp per rendered log row; AnimatedText splits the closing copy, so nothing else matches. */
+const logRows = () => screen.queryAllByText(/^\d\d:\d\d AM$/);
+
+/**
+ * A run that has played to its end, once: every row exactly once, RESOLVED, the toast and the
+ * headline shown, nothing left scheduled and no reveal left writing into the three elements.
+ */
+function expectOneFinishedRun() {
+  expect(logRows(), 'one row per event, none stacked or skipped').toHaveLength(EVENT_COUNT);
+  expect(alertLabel()).toHaveTextContent('RESOLVED');
+  expect(protocolToast()).not.toHaveClass('opacity-0');
+  expect(headline()).not.toHaveClass('opacity-0');
+  expect(vi.getTimerCount(), 'the run left a timer behind').toBe(0);
+}
+
+/** The three elements a timer-built reveal writes into. */
+const revealed = () => [alertPanel(), protocolToast(), headline()];
+
+/** No tween on any of the three, and none of their inline styles left behind. */
+function expectRevealsReverted(when: string) {
+  for (const element of revealed()) {
+    expect(gsap.getTweensOf(element), `${when} left a reveal live`).toHaveLength(0);
+    expect(element.style.opacity, `${when} left an inline opacity behind`).toBe('');
+    expect(element.style.transform, `${when} left an inline transform behind`).toBe('');
+    expect(element).not.toHaveClass('opacity-0');
+  }
+}
 
 /** Mounts the phase and lets ScrollTrigger measure; jsdom lays nothing out, so it starts in view. */
 function mount() {
@@ -109,6 +143,10 @@ let createSpy: MockInstance<typeof ScrollTrigger.create>;
  * allowed again, below), and any second run comes down to the same call: `animateHealing` over
  * whatever the first run left. So the callback the phase last handed `ScrollTrigger.create` is
  * called directly, and the helper throws when there is none rather than passing on a no-op.
+ *
+ * In the browser the rebuild's effect cleanup has already cancelled the old run, so a call from
+ * here during a run is a test of `animateHealing` itself: it must not stack on what is scheduled.
+ * The real rebuild path is driven by the "motion is allowed again" rows at the end of the file.
  */
 function enterAgain() {
   const healing = createSpy.mock.calls.flatMap(([vars], call) => (vars.onEnter ? [call] : []));
@@ -205,6 +243,9 @@ describe('LoopPhase', () => {
     expect(firstEvent(), 'the log must be empty again').not.toBeInTheDocument();
     expect(alertLabel(), 'the alert must be live again').toHaveTextContent('ERROR DETECTED');
     expect(protocolToast(), 'the protocol toast must be hidden again').toHaveClass('opacity-0');
+
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+    expectOneFinishedRun();
   });
 
   it('R21 (#47): an unmount mid-run leaves no live tween and no inline opacity behind', () => {
@@ -232,9 +273,27 @@ describe('LoopPhase', () => {
     );
   });
 
-  it('cancels a run in progress when the section is entered again, instead of stacking a second', () => {
+  it('reverts all three reveals when unmounted after a whole run', () => {
+    const { unmount } = mount();
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+    // The ticker is off, so every reveal is still live and holding its starting inline style.
+    for (const element of revealed()) expect(gsap.getTweensOf(element)).toHaveLength(1);
+    const elements = revealed();
+
+    unmount();
+
+    for (const element of elements) {
+      expect(gsap.getTweensOf(element), 'the unmount left a reveal live').toHaveLength(0);
+      expect(element.style.opacity, 'the unmount left an inline opacity behind').toBe('');
+      expect(element.style.transform, 'the unmount left an inline transform behind').toBe('');
+    }
+  });
+
+  it('cancels a run in progress when the healing sequence starts again, instead of stacking a second', () => {
     mount();
     const oneRun = vi.getTimerCount();
+    // The baseline is the phase's own run, the alert reveal and one timer per row, and nothing else.
+    expect(oneRun, 'the trigger fired on mount and scheduled one run').toBe(EVENT_COUNT + 1);
     // Past the alert's reveal and the first row: timers are pending and a timer has built a reveal.
     act(() => vi.advanceTimersByTime(FIRST_EVENT_MS));
     expect(vi.getTimerCount()).toBe(oneRun - 2);
@@ -249,6 +308,9 @@ describe('LoopPhase', () => {
     expect(firstEvent(), 'the log must be empty again').not.toBeInTheDocument();
     expect(gsap.getTweensOf(alert), 'the aborted run left its alert reveal live').toHaveLength(0);
     expect(alert.style.opacity, 'the aborted run left an inline opacity on the alert').toBe('');
+
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+    expectOneFinishedRun();
   });
 
   it('cancels the running sequence and shows the finished log when reduced motion is switched on', () => {
@@ -266,7 +328,20 @@ describe('LoopPhase', () => {
     expect(ScrollTrigger.getAll()).toHaveLength(0);
     expect(lastEvent()).toBeInTheDocument();
     expect(alertLabel()).toHaveTextContent('RESOLVED');
+    expect(alert).not.toHaveClass('opacity-0');
     expect(protocolToast()).not.toHaveClass('opacity-0');
+    expect(headline()).not.toHaveClass('opacity-0');
+  });
+
+  it('reverts all three reveals and shows the finished state when reduce is switched on after a run', () => {
+    mount();
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+    for (const element of revealed()) expect(gsap.getTweensOf(element)).toHaveLength(1);
+
+    act(() => media.set(true));
+
+    expectRevealsReverted('the switch to reduce');
+    expectOneFinishedRun();
   });
 
   it('starts from an empty log when motion is allowed again after a finished run', () => {
@@ -285,5 +360,77 @@ describe('LoopPhase', () => {
     expect(alertLabel(), 'the alert must start live').toHaveTextContent('ERROR DETECTED');
     expect(protocolToast(), 'the protocol toast must start hidden').toHaveClass('opacity-0');
     expect(vi.getTimerCount(), 'the alert reveal and one timer per row').toBe(EVENT_COUNT + 1);
+
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+    expectOneFinishedRun();
+  });
+
+  it('shows no cancelled run while a rebuilt trigger waits for the section to enter', () => {
+    mount();
+    // Mid-run: three rows, the "Processing..." row, a live alert.
+    act(() => vi.advanceTimersByTime(FIRST_EVENT_MS + 2 * 400));
+    expect(logRows()).toHaveLength(3);
+    act(() => media.set(true));
+
+    // The section moves below the viewport, so the rebuilt trigger waits instead of firing at once.
+    // Nothing is running then, so nothing from the cancelled run may show, finished or not.
+    const section = alertPanel().closest('section');
+    if (!section) throw new Error('LoopPhase rendered no section');
+    const below = vi
+      .spyOn(section, 'getBoundingClientRect')
+      .mockReturnValue(DOMRect.fromRect({ x: 0, y: 5_000, width: 1024, height: 768 }));
+    act(() => media.set(false));
+
+    expect(logRows(), 'the cancelled run left its rows').toHaveLength(0);
+    expect(screen.queryByText('Processing...'), 'a frozen run in progress').not.toBeInTheDocument();
+    expect(alertLabel()).toHaveTextContent('ERROR DETECTED');
+    expect(protocolToast()).toHaveClass('opacity-0');
+    expect(vi.getTimerCount(), 'the rebuilt trigger fired while the section was ahead').toBe(0);
+
+    // The visitor scrolls down to it: the run starts from the same empty state and plays once.
+    below.mockRestore();
+    act(() => ScrollTrigger.refresh());
+    expect(vi.getTimerCount(), 'the alert reveal and one timer per row').toBe(EVENT_COUNT + 1);
+    act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+    expectOneFinishedRun();
+  });
+
+  describe('with the section already in view when motion is allowed again', () => {
+    // isAlreadyReached needs a scrolled page; jsdom lays nothing out, so the section's top is at 0.
+    let scrollY: PropertyDescriptor | undefined;
+    beforeEach(() => {
+      scrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
+    });
+    afterEach(() => {
+      if (scrollY) Object.defineProperty(window, 'scrollY', scrollY);
+      else delete (window as { scrollY?: number }).scrollY;
+    });
+
+    it('restarts the log and the alert, keeps the toast and the headline, and never re-reveals them', () => {
+      mount();
+      act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+      act(() => media.set(true));
+      Object.defineProperty(window, 'scrollY', { configurable: true, value: 1200 });
+
+      act(() => media.set(false));
+      act(() => ScrollTrigger.refresh());
+
+      // The state a first build in view starts from (hero-11): the visitor is reading the toast and
+      // the headline, so they stay, with no inline style from the earlier run's reveals.
+      expect(logRows(), 'the log must start empty').toHaveLength(0);
+      expect(alertLabel()).toHaveTextContent('ERROR DETECTED');
+      expect(vi.getTimerCount(), 'the alert reveal and one timer per row').toBe(EVENT_COUNT + 1);
+      for (const element of [protocolToast(), headline()]) {
+        expect(element).not.toHaveClass('opacity-0');
+        expect(element.style.opacity).toBe('');
+      }
+
+      act(() => vi.advanceTimersByTime(WHOLE_SEQUENCE_MS));
+      expectOneFinishedRun();
+      for (const element of [protocolToast(), headline()]) {
+        expect(gsap.getTweensOf(element), 'a reveal replayed over what was shown').toHaveLength(0);
+        expect(element.style.opacity).toBe('');
+      }
+    });
   });
 });

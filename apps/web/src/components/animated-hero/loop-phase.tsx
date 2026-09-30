@@ -47,11 +47,13 @@ export function LoopPhase() {
   // The sequence is driven by timers the ScrollTrigger callback schedules, and the reveals those
   // timers create run after GSAP has left the context, so `ctx.revert()` never sees them. Both are
   // tracked here instead, and cancelled when a run starts, on unmount and on a reduced-motion
-  // switch, as in GauntletPhase. The reveals are reverted rather than killed: revert restores the
-  // inline styles they set, where kill would freeze them mid-flight and that inline opacity would
-  // beat the class-driven state. A timer that comes due after the commit that removed the section,
-  // but before the cleanup that cancels it, does nothing: its refs are already null, and GSAP would
-  // warn about a null target (runWithGsap).
+  // switch, as in GauntletPhase. The reveals are reverted rather than killed, finished ones as well
+  // as those in flight: revert restores the inline styles they set, where kill would freeze them
+  // mid-flight and that inline opacity would beat the class-driven state, which alone decides
+  // whether the toast and the headline show once the run is over. A timer that comes due after the
+  // commit that removed the section, but before the cleanup that cancels it, does nothing: `later`
+  // checks the section's ref, which is null by then along with the three it contains, where GSAP
+  // would warn about a null target (runWithGsap).
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const revealTweensRef = useRef<gsap.core.Tween[]>([]);
   const later = useCallback((callback: () => void, delayMs: number) => {
@@ -71,7 +73,7 @@ export function LoopPhase() {
   // Only ever called from the ScrollTrigger below, which exists once GSAP has loaded; it passes
   // GSAP in rather than this callback reaching for a module-level import. `reveal` is false when
   // the section was already in view as GSAP built it: the toast and the headline stay as the
-  // visitor saw them, and only the log runs.
+  // visitor saw them, and only the log runs, with the alert's pulse as its first beat.
   const animateHealing = useCallback(
     (gsap: Gsap, reveal: boolean) => {
       // The trigger is `once: true`, but a rebuilt one (motion allowed again) fires in view, so the
@@ -153,6 +155,11 @@ export function LoopPhase() {
         const reached = isAlreadyReached(section);
         // Hidden for the reveal only while the section is still ahead of the visitor (hero-11).
         setShowProtocol(reached);
+        // A rebuild (motion allowed again) must not show a cancelled run's rows or its RESOLVED
+        // banner while the new trigger waits for the section to enter: the log starts empty here,
+        // and animateHealing starts it empty again when the run begins.
+        setVisibleEvents(0);
+        setAlertStatus('error');
         ctx = gsap.context(() => {
           ScrollTrigger.create({
             trigger: section,
