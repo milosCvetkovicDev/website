@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import type { ComponentProps } from 'react';
+import { createRef, type ComponentProps } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap } from '../gsap-runtime';
 import { requestGsap } from '../load-gsap';
@@ -412,23 +412,48 @@ const everyStatusListed: [
   ? true
   : never = true;
 
+/** The bar a stage fills: the first element inside its clipped track. */
+const stageFill = (name: string) =>
+  screen.getByText(name).parentElement?.querySelector<HTMLElement>('.overflow-hidden > div');
+
 describe('PipelineStage', () => {
   afterEach(() => cleanup());
 
-  // GauntletPhase rewrites the fill's width every frame from a GSAP tween on a plain object, so a
-  // transition on width restarts on every frame and the bar trails its own progress: measured in
-  // Chromium, `transition-all duration-500` left the fill at 3-7% when the stage reached 100%, and
-  // full 467-483 ms later. The status colour still eases, which is the change CSS should animate.
+  // hero-12, ADR 0009 rule 2. The fill is drawn by scaling a full-width bar from its left edge, so a
+  // frame of GauntletPhase's progress tween, which writes this transform through the fill ref,
+  // costs no layout. React draws the same transform from `progress`, and never a width.
+  it.each([
+    { progress: 0, transform: 'scaleX(0)' },
+    { progress: 40, transform: 'scaleX(0.4)' },
+    { progress: 100, transform: 'scaleX(1)' },
+  ])(
+    'draws a $progress% fill as $transform from its left edge and hands the fill to fillRef',
+    ({ progress, transform }) => {
+      const fillRef = createRef<HTMLDivElement>();
+      render(
+        <PipelineStage name="UNIT TESTS" status="running" progress={progress} fillRef={fillRef} />,
+      );
+      const fill = stageFill('UNIT TESTS');
+      expect(fill?.style.transform).toBe(transform);
+      expect(fill?.style.width).toBe('');
+      expect(fill).toHaveClass('origin-left');
+      expect(fillRef.current).toBe(fill);
+    },
+  );
+
+  // GauntletPhase rewrites the fill's transform every frame from a GSAP tween on a plain object, so
+  // a transition on it restarts on every frame and the bar trails its own progress: measured in
+  // Chromium on the width the fill was drawn with before, `transition-all duration-500` left it at
+  // 3-7% when the stage reached 100%, and full 467-483 ms later. The status colour still eases,
+  // which is the change CSS should animate.
   it.each(PIPELINE_STATUSES)(
-    'transitions nothing on the fill but its colours, width least of all, while %s',
+    'transitions nothing on the fill but its colours, its transform least of all, while %s',
     async (status) => {
       expect(everyStatusListed).toBe(true);
       render(<PipelineStage name="UNIT TESTS" status={status} progress={40} />);
-      const fill = screen
-        .getByText('UNIT TESTS')
-        .parentElement?.querySelector<HTMLElement>('.overflow-hidden > div');
+      const fill = stageFill('UNIT TESTS');
       // The element React writes the progress to.
-      expect(fill?.style.width).toBe('40%');
+      expect(fill?.style.transform).toBe('scaleX(0.4)');
 
       // What the fill may transition is what `transition-colors` covers in the installed Tailwind,
       // read the same way, so `transition-[inline-size]` or a bare duration fails as well as

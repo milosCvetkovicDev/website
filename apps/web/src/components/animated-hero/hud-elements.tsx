@@ -148,9 +148,11 @@ export function ProgressBar({
             background: `linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.2) ${progress}%, transparent ${progress}%)`,
           }}
         />
+        {/* Scaled from the left edge rather than sized, so a change of progress eases on the
+            compositor without laying the row out on every frame (ADR 0009 rule 2). */}
         <div
-          className={`relative h-full overflow-hidden rounded-full transition-all duration-500 ease-out ${colors[variant]}`}
-          style={{ width: `${progress}%` }}
+          className={`relative h-full origin-left overflow-hidden rounded-full transition-all duration-500 ease-out ${colors[variant]}`}
+          style={{ transform: `scaleX(${progress / 100})` }}
         >
           {/* Static shine effect - no animation to avoid flicker */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -363,15 +365,20 @@ export function CodeLine({
   );
 }
 
-// Pipeline Stage with animated progress
+// Pipeline Stage with animated progress.
+// The fill is a full-width bar scaled from its left edge, never a width, so a frame of progress
+// costs no layout (ADR 0009 rule 2). React draws it from `progress`; GauntletPhase draws a running
+// stage frame by frame through `fillRef`, writing the same transform without re-rendering.
 export function PipelineStage({
   name,
   status,
   progress = 100,
+  fillRef,
 }: {
   name: string;
   status: 'pending' | 'running' | 'passed' | 'failed';
   progress?: number;
+  fillRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const statusColors = {
     pending: 'text-[var(--muted)]',
@@ -400,16 +407,19 @@ export function PipelineStage({
         {name}
       </span>
       <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
-        {/* Colours only: GauntletPhase writes the width on every frame of a stage, and a width
-            transition would restart on each write and trail the progress. */}
+        {/* Colours only: GauntletPhase writes the transform on every frame of a stage, and a
+            transform transition would restart on each write and trail the progress. */}
         <div
-          className={`h-full rounded-full transition-colors duration-500 ${progressColors[status]}`}
-          style={{ width: `${progress}%` }}
-        >
-          {status === 'running' && (
-            <div className="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-          )}
-        </div>
+          ref={fillRef}
+          className={`h-full origin-left rounded-full transition-colors duration-500 ${progressColors[status]}`}
+          style={{ transform: `scaleX(${progress / 100})` }}
+        />
+        {/* A sibling of the fill, not a child: a transformed element contains its absolutely
+            positioned descendants, so inside the fill the shimmer would shrink with the scale
+            instead of sweeping the whole track. */}
+        {status === 'running' && (
+          <div className="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+        )}
       </div>
       <span className={`w-8 text-center ${statusColors[status]}`}>
         <span className={status === 'running' ? 'inline-block animate-spin' : ''}>

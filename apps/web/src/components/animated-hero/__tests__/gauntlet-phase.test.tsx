@@ -1,4 +1,5 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
+import { Profiler, type ReactElement } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
 import { requestGsap } from '../load-gsap';
@@ -67,9 +68,25 @@ const achievement = () =>
 const pendingStages = () => screen.getAllByText('○');
 const passedStages = () => screen.getAllByText('●');
 
+/** The bar a stage fills: the first element inside its clipped track. */
+function stageFill(name: string): HTMLElement {
+  const fill = screen
+    .getByText(name)
+    .parentElement?.querySelector<HTMLElement>('.overflow-hidden > div');
+  if (!fill) throw new Error(`The ${name} stage has no fill.`);
+  return fill;
+}
+
+/** How far the fill is drawn, read from the `scaleX()` in its inline transform. */
+function fillScale(fill: HTMLElement): number {
+  const match = /^scaleX\(([^)]+)\)$/.exec(fill.style.transform);
+  if (!match) throw new Error(`The fill's transform is "${fill.style.transform}", not a scaleX().`);
+  return Number(match[1]);
+}
+
 /** Mounts the phase and lets ScrollTrigger measure; jsdom lays nothing out, so it starts in view. */
-function mount() {
-  const utils = render(<GauntletPhase />);
+function mount(ui: ReactElement = <GauntletPhase />) {
+  const utils = render(ui);
   act(() => ScrollTrigger.refresh());
   return utils;
 }
@@ -197,5 +214,71 @@ describe('GauntletPhase', () => {
     expect(pendingStages()).toHaveLength(STAGE_COUNT);
     expect(screen.queryByText('DEPLOYMENT SUCCESSFUL')).not.toBeInTheDocument();
     expect(vi.getTimerCount()).toBe(STAGE_COUNT + 1);
+  });
+
+  // hero-12. The progress tween draws the stage by writing its fill's transform through a ref, so
+  // its frames cost React nothing: the phase commits when a stage starts running and when it
+  // passes, for the status colour and icon, and at no frame in between.
+  it('draws a running stage through its fill ref and commits nothing until the stage completes', () => {
+    let commits = 0;
+    mount(
+      <Profiler
+        id="gauntlet"
+        onRender={() => {
+          commits += 1;
+        }}
+      >
+        <GauntletPhase />
+      </Profiler>,
+    );
+    const toSpy = vi.spyOn(gsap, 'to');
+    // The first timer starts LINT: one commit shows it running, and its progress tween begins.
+    act(() => vi.advanceTimersByTime(1));
+    const { tween } = pickTween(toSpy, lintProgress);
+    const fill = stageFill('LINT');
+    commits = 0;
+
+    for (let step = 1; step < 10; step += 1) {
+      act(() => {
+        tween.progress(step / 10);
+      });
+      expect(commits, `commits by step ${step} of 10`).toBe(0);
+      expect(fillScale(fill), `the fill at step ${step} of 10`).toBeCloseTo(step / 10, 5);
+    }
+
+    act(() => {
+      tween.progress(1);
+    });
+    expect(commits, 'commits once the stage completes').toBe(1);
+    expect(passedStages()).toHaveLength(1);
+    expect(fillScale(fill)).toBe(1);
+  });
+
+  // React rewrites an inline style only when the value it renders changes, and a running stage
+  // renders an empty fill from start to finish. So what the tween drew is emptied by hand when the
+  // run restarts, and filled by React when the pipeline is shown finished instead.
+  it('empties a half-drawn fill when the run restarts and fills it when reduced motion finishes the run', () => {
+    mount();
+    const toSpy = vi.spyOn(gsap, 'to');
+    const fill = stageFill('LINT');
+    act(() => vi.advanceTimersByTime(1));
+    act(() => {
+      pickTween(toSpy, lintProgress).tween.progress(0.5);
+    });
+    expect(fillScale(fill)).toBeCloseTo(0.5, 5);
+
+    act(() => enterAgain());
+    expect(pendingStages()).toHaveLength(STAGE_COUNT);
+    expect(fillScale(fill)).toBe(0);
+
+    act(() => vi.advanceTimersByTime(1));
+    act(() => {
+      pickTween(toSpy, lintProgress, { latest: true }).tween.progress(0.5);
+    });
+    expect(fillScale(fill)).toBeCloseTo(0.5, 5);
+
+    act(() => media.set(true));
+    expect(passedStages()).toHaveLength(STAGE_COUNT);
+    expect(fillScale(fill)).toBe(1);
   });
 });
