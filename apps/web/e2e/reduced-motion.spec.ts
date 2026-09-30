@@ -120,13 +120,13 @@ test('under reduce, hovering an animated heading moves nothing', async ({ page }
   // in place and no reveal is in flight: any transform seen below was put there by the hover.
   const moved = await page.evaluate(async () => {
     const headings = [...document.querySelectorAll<HTMLElement>('h2, h3')].filter((el) =>
-      el.querySelector('[class*="cursor-pointer"], .relative'),
+      el.querySelector('[data-animation], .relative'),
     );
     if (headings.length === 0) throw new Error('no animated headings found to hover');
 
     const offenders: string[] = [];
     for (const heading of headings) {
-      const target = heading.querySelector<HTMLElement>('[class*="cursor-pointer"]') ?? heading;
+      const target = heading.querySelector<HTMLElement>('[data-animation]') ?? heading;
       // Baseline: nothing may already be transformed before the hover, or this proves nothing.
       target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
       target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
@@ -173,11 +173,9 @@ test('under reduce, entering and moving over any animated text changes nothing d
 
   const { count, changed } = await page.evaluate(async () => {
     // Every `AnimatedText` root, and nothing else: they are the only spans that carry
-    // `cursor-pointer` (the HUD's hoverable rows are divs). Every phase renders its finished state
-    // on mount under `reduce`, so all of them are in place and no reveal is in flight.
-    const roots = [
-      ...document.querySelectorAll<HTMLElement>('main section span[class*="cursor-pointer"]'),
-    ];
+    // `data-animation`. Every phase renders its finished state on mount under `reduce`, so all of
+    // them are in place and no reveal is in flight.
+    const roots = [...document.querySelectorAll<HTMLElement>('main section span[data-animation]')];
     const nameOf = (el: Element) =>
       `${el.tagName.toLowerCase()} "${el.textContent?.trim().slice(0, 30)}"`;
     // What is drawn: every element's transform, opacity, filter, text shadow, colour and text.

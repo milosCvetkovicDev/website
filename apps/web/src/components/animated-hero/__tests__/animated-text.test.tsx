@@ -23,8 +23,8 @@ import { AnimatedText } from '../animated-text';
  *   enters and leaves that re-enters every effect mid-flight;
  * - after unmount no tween is left on any element the effect could have animated, and none on
  *   anything else either (three variants tween a plain object rather than an element), whether the
- *   hover had finished or was still in flight. `magnetic` has no unmount cleanup today, so its
- *   mid-hover row is an expected failure until #47's shared hover hook (slice 47k) kills on unmount.
+ *   hover had finished or was still in flight. `magnetic`'s mid-hover row was an expected failure,
+ *   with no unmount cleanup, until #47's shared hover hook (slice 47k) gave it one.
  *
  * Two more tables pin what #47's slice 47d added (AC 3 and AC 4): a heading around any variant is
  * named for its sentence, at rest and mid-hover, and under `prefers-reduced-motion: reduce` the
@@ -454,17 +454,7 @@ describe('AnimatedText', () => {
     walk.expectNothingLiveAfterUnmount();
   }
 
-  it.each(ANIMATIONS.filter((animation) => animation !== 'magnetic'))(
-    '%s: an unmount mid-hover leaves no tween',
-    unmountMidHover,
-  );
-
-  // Its move and leave tweens are fire-and-forget, with no ref for an unmount cleanup to kill, so
-  // the pull towards the pointer keeps animating a detached node. #47's shared hover hook (slice 47k)
-  // owns kill-on-unmount; the change that gives magnetic one deletes `.fails` here.
-  it.fails('magnetic (#47, 47k): an unmount mid-hover leaves no tween', () => {
-    unmountMidHover('magnetic');
-  });
+  it.each(ANIMATIONS)('%s: an unmount mid-hover leaves no tween', unmountMidHover);
 
   // New text on a mounted variant: what a sighted visitor reads and what the visually hidden copy
   // says must agree, and a hover must play the new text and come back to it.

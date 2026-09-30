@@ -46,9 +46,9 @@ vi.hoisted(() => {
   });
 });
 
-/** The hover target an `AnimatedText` renders: its tag carries `cursor-pointer`. */
+/** The hover target an `AnimatedText` renders: its root names the variant in `data-animation`. */
 const hoverTarget = (view: ReturnType<typeof render>) => {
-  const target = view.container.querySelector<HTMLElement>('[class*="cursor-pointer"]');
+  const target = view.container.querySelector<HTMLElement>('[data-animation]');
   if (!target) throw new Error('AnimatedText rendered no hover target');
   return target;
 };
