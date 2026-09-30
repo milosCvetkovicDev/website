@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
+import { CARD_LINK } from '@/components/card-link';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
 import { workCopy, workRecord } from '@/data/pages/work';
 import { buildMetadata } from '@/lib/metadata';
@@ -14,25 +15,29 @@ function CornerBrackets() {
   return (
     <>
       <svg
-        className="absolute -top-px -left-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        aria-hidden="true"
+        className="absolute -top-px -left-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"
         viewBox="0 0 12 12"
       >
         <path d="M0 6 L0 0 L6 0" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
       <svg
-        className="absolute -top-px -right-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        aria-hidden="true"
+        className="absolute -top-px -right-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"
         viewBox="0 0 12 12"
       >
         <path d="M6 0 L12 0 L12 6" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
       <svg
-        className="absolute -bottom-px -left-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        aria-hidden="true"
+        className="absolute -bottom-px -left-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"
         viewBox="0 0 12 12"
       >
         <path d="M0 6 L0 12 L6 12" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
       <svg
-        className="absolute -right-px -bottom-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        aria-hidden="true"
+        className="absolute -right-px -bottom-px h-3 w-3 text-[var(--accent)] opacity-0 transition-opacity duration-300 group-focus-within:opacity-100 group-hover:opacity-100"
         viewBox="0 0 12 12"
       >
         <path d="M6 12 L12 12 L12 6" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -45,13 +50,20 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
   const meta = project.highlight;
   const isFirst = index === 0;
   const retired = meta.status === 'RETIRED';
+  const descriptionId = `work-${project.slug}-description`;
 
+  // One click, hover and focus target through the title link's overlay (components/card-link.ts),
+  // so every hover affordance below has a focus-within twin for keyboard users.
   return (
-    <Link
-      href={`/work/${project.slug}`}
-      className={`group relative block rounded-lg border border-[var(--border)] bg-[var(--card)]/50 backdrop-blur-sm transition-all duration-300 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/5 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)] ${
+    <div
+      className={`group relative isolate rounded-lg border border-[var(--border)] bg-[var(--card)]/50 backdrop-blur-sm transition-all duration-300 focus-within:border-[var(--accent)]/50 focus-within:bg-[var(--accent)]/5 focus-within:shadow-[0_0_30px_var(--accent-glow)] hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/5 hover:shadow-[0_0_30px_var(--accent-glow)] ${
         isFirst ? 'p-8' : 'p-6'
       }`}
+      style={
+        {
+          '--accent-glow': 'color-mix(in oklab, var(--accent) 10%, transparent)',
+        } as CSSProperties
+      }
     >
       <CornerBrackets />
 
@@ -59,14 +71,14 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span
-            className={`font-mono font-bold text-[var(--muted)] transition-colors group-hover:text-[var(--accent-text)] ${
+            className={`font-mono font-bold text-[var(--muted)] transition-colors group-focus-within:text-[var(--accent-text)] group-hover:text-[var(--accent-text)] ${
               isFirst ? 'text-3xl' : 'text-2xl'
             }`}
           >
             {String(index + 1).padStart(2, '0')}
           </span>
           {meta && (
-            <span className="rounded border border-[var(--border)] px-2 py-0.5 font-mono text-[10px] tracking-wider text-[var(--muted)] transition-colors group-hover:border-[var(--accent)]/30 group-hover:text-[var(--accent-text)]">
+            <span className="rounded border border-[var(--border)] px-2 py-0.5 font-mono text-[10px] tracking-wider text-[var(--muted)] transition-colors group-focus-within:border-[var(--accent)]/30 group-focus-within:text-[var(--accent-text)] group-hover:border-[var(--accent)]/30 group-hover:text-[var(--accent-text)]">
               {meta.category}
             </span>
           )}
@@ -74,6 +86,7 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
         {meta && (
           <div className="flex items-center gap-2">
             <span
+              aria-hidden="true"
               className={`h-1.5 w-1.5 rounded-full ${
                 retired ? 'bg-[var(--muted)]' : 'animate-pulse bg-[var(--status-ok)]'
               }`}
@@ -94,13 +107,20 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
         <div className="min-w-0 flex-1">
           {/* Title */}
           <h2
-            className={`mb-3 flex items-center gap-2 font-semibold transition-colors group-hover:text-[var(--accent-text)] ${
+            className={`mb-3 flex items-center gap-2 font-semibold transition-colors group-focus-within:text-[var(--accent-text)] group-hover:text-[var(--accent-text)] ${
               isFirst ? 'text-2xl md:text-3xl' : 'text-xl'
             }`}
           >
-            {project.title}
+            <Link
+              href={`/work/${project.slug}`}
+              aria-describedby={descriptionId}
+              className={`${CARD_LINK} after:rounded-lg`}
+            >
+              {project.title}
+            </Link>
             <svg
-              className="h-5 w-5 -translate-x-2 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100"
+              aria-hidden="true"
+              className="h-5 w-5 -translate-x-2 opacity-0 transition-all duration-300 group-focus-within:translate-x-0 group-focus-within:opacity-100 group-hover:translate-x-0 group-hover:opacity-100"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -115,7 +135,10 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
           </h2>
 
           {/* Description */}
-          <p className={`mb-4 text-[var(--muted)] ${isFirst ? 'text-lg' : 'text-sm'}`}>
+          <p
+            id={descriptionId}
+            className={`mb-4 text-[var(--muted)] ${isFirst ? 'text-lg' : 'text-sm'}`}
+          >
             {project.description}
           </p>
 
@@ -151,7 +174,7 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
             {project.tags.slice(0, isFirst ? 6 : 4).map((tag) => (
               <span
                 key={tag}
-                className="rounded bg-[var(--accent)]/10 px-2 py-1 font-mono text-xs text-[var(--accent-text)] transition-colors group-hover:bg-[var(--accent)]/20"
+                className="rounded bg-[var(--accent)]/10 px-2 py-1 font-mono text-xs text-[var(--accent-text)] transition-colors group-focus-within:bg-[var(--accent)]/20 group-hover:bg-[var(--accent)]/20"
               >
                 {tag}
               </span>
@@ -162,7 +185,7 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
         {/* Metric highlight */}
         {meta && (
           <div
-            className={`shrink-0 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-4 text-center transition-colors group-hover:border-[var(--accent)]/40 group-hover:bg-[var(--accent)]/10 ${
+            className={`shrink-0 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-4 text-center transition-colors group-focus-within:border-[var(--accent)]/40 group-focus-within:bg-[var(--accent)]/10 group-hover:border-[var(--accent)]/40 group-hover:bg-[var(--accent)]/10 ${
               isFirst ? 'mt-4 lg:mt-0 lg:w-40 lg:self-start' : 'mt-4 w-full'
             }`}
           >
@@ -180,11 +203,12 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
 
       {/* Read more indicator */}
       <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-4">
-        <span className="text-sm text-[var(--muted)] transition-colors group-hover:text-[var(--accent-text)]">
+        <span className="text-sm text-[var(--muted)] transition-colors group-focus-within:text-[var(--accent-text)] group-hover:text-[var(--accent-text)]">
           {workCopy.readMore}
         </span>
         <svg
-          className="h-4 w-4 text-[var(--muted)] transition-all group-hover:translate-x-1 group-hover:text-[var(--accent-text)]"
+          aria-hidden="true"
+          className="h-4 w-4 text-[var(--muted)] transition-all group-focus-within:translate-x-1 group-focus-within:text-[var(--accent-text)] group-hover:translate-x-1 group-hover:text-[var(--accent-text)]"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -199,9 +223,9 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
       </div>
 
       {/* Scan line effect */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-lg opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
         <div
-          className="scan-line [animation-play-state:paused] group-hover:[animation-play-state:running]"
+          className="scan-line [animation-play-state:paused] group-focus-within:[animation-play-state:running] group-hover:[animation-play-state:running]"
           style={
             {
               '--scan-line-color': 'color-mix(in oklab, var(--accent) 20%, transparent)',
@@ -209,7 +233,7 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
           }
         />
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -219,11 +243,14 @@ export default function WorkPage() {
       {/* Subtle grid background */}
       <div
         className="absolute inset-0 opacity-[0.02]"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(139, 92, 246, 0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.5) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-        }}
+        style={
+          {
+            '--grid-line': 'color-mix(in oklab, var(--accent) 50%, transparent)',
+            backgroundImage:
+              'linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px)',
+            backgroundSize: '60px 60px',
+          } as CSSProperties
+        }
       />
 
       <div className="relative mx-auto max-w-5xl px-6">

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeaturedWork } from '../featured-work';
 import { getActiveConnections } from '@/data/architecture-graph';
+import { formatMetric } from '@/data/case-studies';
 import { featuredProjects } from '@/data/featured-projects';
 
 function stubMatchMedia(matches: boolean) {
@@ -120,9 +121,28 @@ describe('FeaturedWork', () => {
     expect(retired).toHaveClass('text-[var(--tmux-bar-text)]');
     expect(retired.previousElementSibling).not.toHaveClass('animate-pulse');
 
+    // A status is a status role, so it takes the ADR 0010 token that /work uses for the same
+    // string, not the tmux chrome's green; a retired one stays neutral.
     const live = screen.getByText('LIVE', { exact: true });
-    expect(live).toHaveClass('text-[var(--tmux-status-ok)]');
-    expect(live.previousElementSibling).toHaveClass('animate-pulse');
+    expect(live).toHaveClass('text-[var(--status-ok)]');
+    expect(live.previousElementSibling).toHaveClass('animate-pulse', 'bg-[var(--status-ok)]');
+  });
+
+  it('colours the active card metric with the status token, undimmed', () => {
+    // Reduced motion, so the counter shows its final value at once.
+    stubMatchMedia(true);
+    const { linkFor } = renderFeaturedWork();
+    const [project] = featuredProjects;
+    const value = () => screen.getByText(formatMetric(project.metric), { exact: true });
+    expect(value()).not.toHaveClass('text-[var(--status-ok)]');
+
+    fireEvent.focus(linkFor(project.title));
+    expect(value()).toHaveClass('text-[var(--status-ok)]');
+    // No alpha on the token and no resting opacity below 100 on the text (ADR 0010).
+    expect(value().className).not.toMatch(/status-ok\)\]\/\d|(^|\s)opacity-\d/);
+    expect(value().parentElement?.querySelector('[aria-hidden="true"]')).toHaveClass(
+      'bg-[var(--status-ok)]',
+    );
   });
 
   it('activates a project and its architecture nodes on keyboard focus', () => {
