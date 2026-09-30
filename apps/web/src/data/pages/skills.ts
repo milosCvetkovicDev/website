@@ -206,10 +206,12 @@ export const skillsRecord: PageRecord = {
     {
       kind: 'list',
       heading: skillsCopy.headings.coreSkills,
-      // The badge's years and the level the bar's accessible name reads out, then the context.
+      // The badge's years and the level the bar's accessible name reads out, then the context. The
+      // level says it is self-assessed here too, as the page's note above the bars does (#58), for a
+      // reader of the twin, which does not carry that note.
       items: coreSkills.map(({ name, years, level, context }) => ({
         term: name,
-        description: `${years} years. Proficiency: ${level}%. ${context}`,
+        description: `${years} years. Self-assessed proficiency: ${level}%. ${context}`,
       })),
     },
     {

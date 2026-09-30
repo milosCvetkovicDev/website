@@ -12,7 +12,7 @@ import {
 import { caseStudies } from '../src/data/case-studies';
 import { coreSkills, skillsCopy } from '../src/data/pages/skills';
 import { workCopy } from '../src/data/pages/work';
-import { productionFigure } from '../src/data/work-stats';
+import { RUNS_IN_PRODUCTION } from '../src/data/work-stats';
 import { formatContentDate } from '../src/lib/content-date';
 import { fetchHead, first } from './support/served-head';
 
@@ -591,37 +591,62 @@ test('/work counts the studies running in production and serves no claim without
   const response = await request.get('/work');
   expect(response.status(), 'GET /work').toBe(200);
   const html = await response.text();
-  // The whole body, flight payload included: the claim is gone, not merely hidden. The context
-  // around a hit is the message, rather than the whole document.
-  const unfinished = html.search(/Left Unfinished/i);
-  expect(
-    unfinished === -1 ? '' : html.slice(Math.max(0, unfinished - 80), unfinished + 40),
-    '/work must not serve "Left Unfinished"',
-  ).toBe('');
+  // Neither withdrawn claim may be served anywhere: not in the raw body (the flight payload, the
+  // meta tags and JSON-LD included), and not in the text a reader sees, where the old bar's value and
+  // label sat in two elements and read "100%In Production". The context around a hit is the
+  // message, rather than the whole document.
+  const withdrawn = [/Left Unfinished/i, /100%\s*in production/i];
+  const pageText = await page.evaluate(
+    (markup) =>
+      new DOMParser().parseFromString(markup, 'text/html').documentElement.textContent ?? '',
+    html,
+  );
+  const around = (haystack: string, pattern: RegExp) => {
+    const at = haystack.search(pattern);
+    return at === -1 ? '' : haystack.slice(Math.max(0, at - 80), at + 40);
+  };
+  for (const pattern of withdrawn) {
+    expect(around(html, pattern), `/work must not serve ${pattern} in its body`).toBe('');
+    expect(around(pageText, pattern), `/work must not show ${pattern} as text`).toBe('');
+  }
 
   // The bar is found by structure from its first label, the Projects count, which the base build
-  // served too, so a missing figure fails on the figure rather than on the lookup. `DOMParser` runs
-  // no scripts, so only real elements answer.
+  // served too, so a missing figure fails on the figure rather than on the lookup. The label must
+  // be the only leaf reading it, so another "Projects" in the page fails as an ambiguous lookup
+  // rather than as a wrong bar. `DOMParser` runs no scripts, so only real elements answer.
   const [firstLabel] = workCopy.stats.map(({ label }) => label);
-  const stats = await page.evaluate(
-    ([markup, label]) => {
+  const statuses = Object.keys(RUNS_IN_PRODUCTION);
+  const served = await page.evaluate(
+    ([markup, label, statusNames]) => {
       const main = new DOMParser()
         .parseFromString(markup, 'text/html')
         .querySelector('main#main-content');
       const text = (element: Element) => (element.textContent ?? '').replace(/\s+/g, ' ').trim();
-      const labelled = [...(main?.querySelectorAll('div') ?? [])].find(
-        (element) => element.children.length === 0 && text(element) === label,
+      const leaves = [...(main?.querySelectorAll('*') ?? [])].filter(
+        (element) => element.children.length === 0,
       );
-      const bar = labelled?.parentElement?.parentElement;
-      if (!bar) return null;
-      return [...bar.children].map((item) => ({
-        pieces: item.children.length,
-        value: item.children[0] ? text(item.children[0]) : '',
-        label: item.children[1] ? text(item.children[1]) : '',
-      }));
+      const labelled = leaves.filter(
+        (element) => element.localName === 'div' && text(element) === label,
+      );
+      // Each card's status badge, independent of the bar: the figure must agree with them.
+      const badges = leaves.map(text).filter((value) => statusNames.includes(value));
+      const bar = labelled.length === 1 ? labelled[0].parentElement?.parentElement : null;
+      return {
+        labelled: labelled.length,
+        badges,
+        stats: bar
+          ? [...bar.children].map((item) => ({
+              pieces: item.children.length,
+              value: item.children[0] ? text(item.children[0]) : '',
+              label: item.children[1] ? text(item.children[1]) : '',
+            }))
+          : null,
+      };
     },
-    [html, firstLabel] as const,
+    [html, firstLabel, statuses] as const,
   );
+  expect(served.labelled, `exactly one "${firstLabel}" label in /work's main`).toBe(1);
+  const { stats } = served;
   expect(stats, `/work must serve a stats bar with a "${firstLabel}" figure`).not.toBeNull();
   const figures = (stats ?? []).map(({ value, label }) => ({ value, label }));
 
@@ -633,10 +658,17 @@ test('/work counts the studies running in production and serves no claim without
     'each figure is a value and a label',
   ).toEqual(workCopy.stats.map(() => 2));
   expect(figures, 'the bar serves the record, in order').toEqual([...workCopy.stats]);
-  expect(
-    figures.map(({ value }) => value),
-    "the bar serves productionFigure()'s count",
-  ).toContain(productionFigure(caseStudies));
+
+  // The served figure agrees with the served cards, counted from their badges rather than from
+  // the source: one badge per project, and the running ones by the classification the code uses.
+  const running = served.badges.filter(
+    (status) => RUNS_IN_PRODUCTION[status as keyof typeof RUNS_IN_PRODUCTION],
+  ).length;
+  expect(served.badges.length, 'a status badge on every served card').toBe(caseStudies.length);
+  expect(figures, "the bar's figures agree with the served cards' badges").toEqual([
+    { value: String(served.badges.length), label: firstLabel },
+    { value: `${running} of ${served.badges.length}`, label: workCopy.stats[1].label },
+  ]);
   for (const { value, label } of figures) {
     expect(value, `"${label}" must not be a bare percentage`).not.toMatch(/%/);
   }

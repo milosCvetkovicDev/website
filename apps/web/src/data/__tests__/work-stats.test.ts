@@ -10,7 +10,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, type CaseStudyHighlight } from '@/data/case-studies';
 import { workCopy } from '@/data/pages/work';
-import { productionFigure, RUNS_IN_PRODUCTION } from '../work-stats';
+import { productionCount, productionFigure, RUNS_IN_PRODUCTION } from '../work-stats';
 
 type Status = CaseStudyHighlight['status'];
 
@@ -24,34 +24,62 @@ const withStatusAt = (index: number, status: Status) =>
     at === index ? { ...study, highlight: { ...study.highlight, status } } : study,
   );
 
+/** Whether a study counts, by the same record the code under test reads. */
+const runs = ({ highlight }: { highlight: { status: Status } }) =>
+  RUNS_IN_PRODUCTION[highlight.status];
+
 describe('productionFigure()', () => {
-  it('counts LIVE and PRODUCTION as running and RETIRED as not, out of every study', () => {
+  it('classifies every status, and nothing can reclassify one at runtime', () => {
+    // A deliberate change detector: moving a status across the line changes a public claim, so it
+    // should take an edit here as well as in work-stats.ts.
     expect(RUNS_IN_PRODUCTION).toEqual({ LIVE: true, PRODUCTION: true, RETIRED: false });
+    expect(Object.isFrozen(RUNS_IN_PRODUCTION)).toBe(true);
+  });
+
+  it('counts LIVE and PRODUCTION as running and RETIRED as not, out of every study', () => {
+    expect(productionCount(withStatuses('PRODUCTION', 'LIVE', 'RETIRED'))).toEqual({
+      running: 2,
+      total: 3,
+    });
+    expect(productionCount(withStatuses('RETIRED'))).toEqual({ running: 0, total: 1 });
+    expect(productionCount(withStatuses('LIVE', 'LIVE'))).toEqual({ running: 2, total: 2 });
+  });
+
+  it('prints the count as "<running> of <total>"', () => {
     expect(productionFigure(withStatuses('PRODUCTION', 'LIVE', 'RETIRED'))).toBe('2 of 3');
-    expect(productionFigure(withStatuses('RETIRED'))).toBe('0 of 1');
-    expect(productionFigure(withStatuses('LIVE', 'LIVE'))).toBe('2 of 2');
+  });
+
+  it('refuses to print a figure that means nothing', () => {
+    expect(() => productionFigure([]), 'no studies: "0 of 0"').toThrow(/no case studies/);
+    // Statuses the type forbids but a cast or untyped data could bring in: one the record does not
+    // classify, and prototype keys, which a plain lookup would read as running.
+    for (const status of ['ARCHIVED', 'constructor', 'toString']) {
+      expect(() => productionFigure(withStatuses('LIVE', status as Status)), status).toThrow(
+        /unclassified status/,
+      );
+    }
   });
 
   it('moves when a study changes status, in either direction', () => {
-    const retired = caseStudies.findIndex(({ highlight }) => highlight.status === 'RETIRED');
-    const running = caseStudies.findIndex(({ highlight }) => highlight.status !== 'RETIRED');
+    const retired = caseStudies.findIndex((study) => !runs(study));
+    const running = caseStudies.findIndex(runs);
     // The control: the site must have one of each for the two flips below to mean anything.
-    expect(retired, 'a retired study to bring back').toBeGreaterThanOrEqual(0);
+    expect(retired, 'a study that does not run, to bring back').toBeGreaterThanOrEqual(0);
     expect(running, 'a running study to retire').toBeGreaterThanOrEqual(0);
 
-    const count = (figure: string) => Number(figure.split(' of ')[0]);
-    const now = count(productionFigure(caseStudies));
-    expect(productionFigure(withStatusAt(retired, 'LIVE'))).toBe(
-      `${now + 1} of ${caseStudies.length}`,
-    );
-    expect(productionFigure(withStatusAt(running, 'RETIRED'))).toBe(
-      `${now - 1} of ${caseStudies.length}`,
-    );
+    const now = productionCount(caseStudies);
+    expect(productionCount(withStatusAt(retired, 'LIVE'))).toEqual({
+      running: now.running + 1,
+      total: caseStudies.length,
+    });
+    expect(productionCount(withStatusAt(running, 'RETIRED'))).toEqual({
+      running: now.running - 1,
+      total: caseStudies.length,
+    });
   });
 
   it('counts out of every study, the number the Projects figure shows', () => {
-    const total = Number(productionFigure(caseStudies).split(' of ')[1]);
-    expect(total).toBe(caseStudies.length);
+    expect(productionCount(caseStudies).total).toBe(caseStudies.length);
     expect(workCopy.stats[0]).toEqual({ value: String(caseStudies.length), label: 'Projects' });
   });
 });
@@ -73,6 +101,8 @@ describe('the /work stats bar', () => {
 
     // What AC 10 asks for: the bar is not a copy of the figure made once, it follows the statuses.
     it('shows the new figure without an edit to the bar', async () => {
+      // The control: with no running study, retiring them all would leave today's figure standing.
+      expect(caseStudies.some(runs), 'a running study to retire').toBe(true);
       vi.resetModules();
       vi.doMock('@/data/case-studies', async (importOriginal) => {
         const actual = await importOriginal<typeof import('@/data/case-studies')>();

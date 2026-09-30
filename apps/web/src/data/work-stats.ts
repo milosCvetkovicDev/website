@@ -9,22 +9,41 @@ import type { CaseStudyHighlight } from './case-studies';
 
 type Status = CaseStudyHighlight['status'];
 
+/** The one field of a study the figure reads. */
+type Counted = readonly { highlight: { status: Status } }[];
+
 /**
  * Which statuses count as running in production. A record over the whole union rather than a list
  * of the running ones, so a status added to `CaseStudyHighlight` fails `pnpm typecheck` here until
- * someone decides which side of the line it falls on.
+ * someone decides which side of the line it falls on. Frozen, so no importer can move the figure.
  */
-export const RUNS_IN_PRODUCTION: Readonly<Record<Status, boolean>> = {
+export const RUNS_IN_PRODUCTION: Readonly<Record<Status, boolean>> = Object.freeze({
   LIVE: true,
   PRODUCTION: true,
   RETIRED: false,
-};
+});
 
 /**
- * How many of the studies run in production, out of all of them: `2 of 3`. The denominator is every
- * study, the same count the bar's Projects figure shows, so the two cannot disagree.
+ * How many of the studies run in production, and out of how many: every study, the same count the
+ * bar's Projects figure shows, so the two cannot disagree. It throws rather than print a figure
+ * that means nothing: for no studies at all ("0 of 0"), and for a status the record does not
+ * classify, which the type forbids but a cast or untyped data can still bring in (a plain lookup
+ * would count it as not running, or as running for a key such as `constructor`).
  */
-export function productionFigure(studies: readonly { highlight: { status: Status } }[]): string {
-  const running = studies.filter(({ highlight }) => RUNS_IN_PRODUCTION[highlight.status]).length;
-  return `${running} of ${studies.length}`;
+export function productionCount(studies: Counted): { running: number; total: number } {
+  if (studies.length === 0) throw new Error('productionCount: there are no case studies to count');
+  let running = 0;
+  for (const { highlight } of studies) {
+    if (!Object.hasOwn(RUNS_IN_PRODUCTION, highlight.status)) {
+      throw new Error(`productionCount: unclassified status ${JSON.stringify(highlight.status)}`);
+    }
+    if (RUNS_IN_PRODUCTION[highlight.status]) running += 1;
+  }
+  return { running, total: studies.length };
+}
+
+/** The count as the bar prints it: `2 of 3`. */
+export function productionFigure(studies: Counted): string {
+  const { running, total } = productionCount(studies);
+  return `${running} of ${total}`;
 }

@@ -58,7 +58,7 @@ function SkillBar({ name, years, level, context }: CoreSkill) {
           aria-valuenow={level}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`${name} proficiency: ${level}%`}
+          aria-label={`${name} self-assessed proficiency: ${level}%`}
         >
           <div
             className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/70 transition-all duration-500"
