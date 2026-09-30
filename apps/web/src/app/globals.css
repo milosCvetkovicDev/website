@@ -307,6 +307,13 @@ main {
   transform: translateY(0);
 }
 
+/* A modal dialog (the phone menu) makes the page behind it inert, but not unscrollable: a swipe on
+   its backdrop scrolled the page, and on `/` the scroll-driven story, behind the open menu. The page
+   stops scrolling while one is open and keeps its position; closing the dialog lifts the lock. */
+html:has(dialog:modal) {
+  overflow: hidden;
+}
+
 /* Focus ring for accessibility */
 .focus-ring:focus-visible {
   outline: 2px solid var(--accent);
