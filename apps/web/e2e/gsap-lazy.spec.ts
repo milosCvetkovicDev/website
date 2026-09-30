@@ -23,9 +23,12 @@ import { expectHydrated } from './support/hydration';
  *   Each phase's entrance renders an `opacity: 0` from-state the moment it is built, so a build
  *   that lands late would otherwise blank a section someone is reading, and then replay it or leave
  *   it blank until they scroll on.
- * - When GSAP cannot be fetched, the story shows its finished state. Three phases do not
- *   server-render it (R16 in `served-html.spec.ts`): their headlines stay at `opacity-0` until a
- *   sequence GSAP runs reveals them.
+ * - A reload with the blocks a sequence reveals in view (the Execution code, the Gauntlet and Loop
+ *   toasts and closing headlines) keeps them: the served page shows them (R16 in
+ *   `served-html.spec.ts`), and only a GSAP build that finds their section still below the
+ *   viewport hides them for the reveal.
+ * - When GSAP cannot be fetched, the story shows its finished state. Three phases do not render it
+ *   before GSAP arrives: their counters start empty and their pipeline and log unrun.
  */
 
 // No retries: the second case samples every frame for a blink, and a retry would turn an
@@ -239,6 +242,118 @@ for (const { phase, label, top } of IN_VIEW) {
   });
 }
 
+// The blocks a sequence reveals, which the served page shows (R16 in `served-html.spec.ts`), each
+// with the section it sits in. A reload puts one of them in view before hydration, and neither
+// hydration nor the GSAP build that follows at once (the page is already scrolled) may hide it.
+const SERVED_IN_VIEW = [
+  { phase: 'Execution', label: 'PHASE 3', texts: ['export class'] },
+  { phase: 'Gauntlet', label: 'PHASE 4', texts: ['Achievement Unlocked', "doesn't fly here"] },
+  { phase: 'Loop', label: 'PHASE 5', texts: ['SELF-HEALING PROTOCOL ACTIVE', 'Nobody got paged'] },
+];
+
+for (const { phase, label, texts } of SERVED_IN_VIEW) {
+  test(`${phase}: a reload with its revealed blocks in view never hides what the served page showed`, async ({
+    page,
+  }) => {
+    // From the document's first frame to 1.5 s after GSAP has arrived, each block's effective
+    // opacity (its own times every ancestor's) while it is in the viewport: whether it was seen at
+    // full opacity, and anything lower it fell to after that.
+    await page.addInitScript(
+      ([watched, loadedMark]) => {
+        type Watch = { text: string; element?: Element; seen: boolean; lowest: number };
+        const state = {
+          watches: watched.map((text): Watch => ({ text, seen: false, lowest: 1 })),
+          done: false,
+        };
+        (window as unknown as { revealWatch: typeof state }).revealWatch = state;
+        /** The innermost element whose text holds `text`. */
+        const find = (text: string) => {
+          let found: Element | undefined;
+          for (const element of document.querySelectorAll('section *')) {
+            if (element.textContent?.includes(text)) found = element;
+          }
+          return found?.closest('section') ? found : undefined;
+        };
+        const effectiveOpacity = (element: Element) => {
+          let opacity = 1;
+          for (let node: Element | null = element; node; node = node.parentElement) {
+            opacity *= Number(getComputedStyle(node).opacity);
+          }
+          return opacity;
+        };
+        const started = performance.now();
+        const frame = () => {
+          const loaded = performance.getEntriesByName(loadedMark, 'mark')[0];
+          const now = performance.now();
+          if ((loaded && now - loaded.startTime > 1_500) || now - started > 20_000) {
+            state.done = true;
+            return;
+          }
+          for (const watch of state.watches) {
+            if (!watch.element?.isConnected) watch.element = find(watch.text);
+            if (!watch.element) continue;
+            const rect = watch.element.getBoundingClientRect();
+            if (rect.height === 0 || rect.bottom <= 0 || rect.top >= innerHeight) continue;
+            const opacity = effectiveOpacity(watch.element);
+            if (opacity > 0.99) watch.seen = true;
+            else if (watch.seen) watch.lowest = Math.min(watch.lowest, opacity);
+          }
+          requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+      },
+      [texts, GSAP_LOADED_MARK] as const,
+    );
+
+    await page.goto('/');
+    await expectHydrated(page);
+    // The first block half-way down the viewport, scrolled with the wheel as a visitor scrolls.
+    const distance = await page.evaluate(
+      ([sectionLabel, text]) => {
+        const section = [...document.querySelectorAll('section')].find((candidate) =>
+          candidate.textContent?.includes(sectionLabel),
+        );
+        const block = [...(section?.querySelectorAll('*') ?? [])]
+          .filter((element) => element.textContent?.includes(text))
+          .at(-1);
+        if (!block) throw new Error(`no block holds ${text}`);
+        return Math.round(block.getBoundingClientRect().top - innerHeight / 2);
+      },
+      [label, texts[0]] as const,
+    );
+    await page.mouse.move(640, 360);
+    await page.mouse.wheel(0, distance);
+    await page.waitForFunction((target) => Math.abs(scrollY - target) < 2, distance);
+
+    await page.reload();
+    await expectHydrated(page);
+    await waitForGsapLoadedMark(page);
+    await page.waitForFunction(
+      () => (window as unknown as { revealWatch: { done: boolean } }).revealWatch.done,
+    );
+    const watches = await page.evaluate(() =>
+      (
+        window as unknown as {
+          revealWatch: { watches: { text: string; seen: boolean; lowest: number }[] };
+        }
+      ).revealWatch.watches.map(({ text, seen, lowest }) => ({ text, seen, lowest })),
+    );
+
+    expect(
+      await page.evaluate(() => scrollY),
+      'the reload did not restore the scroll position, so this case proves nothing',
+    ).toBeGreaterThan(0);
+    expect(
+      watches.filter(({ seen }) => !seen).map(({ text }) => text),
+      'these blocks were never in view at full opacity, so this case proves nothing about them',
+    ).toEqual([]);
+    expect(
+      watches.filter(({ lowest }) => lowest < 0.99),
+      `${phase} hid a block the visitor could already see after the reload`,
+    ).toEqual([]);
+  });
+}
+
 test('when GSAP cannot be fetched, the story shows its finished state', async ({ page }) => {
   let refused = 0;
   await routeScripts(page, async (route) => {
@@ -264,7 +379,7 @@ test('when GSAP cannot be fetched, the story shows its finished state', async ({
     'Achievement Unlocked',
     'SELF-HEALING PROTOCOL ACTIVE',
   ]) {
-    const reveal = page.locator('div.mt-6, div.mt-16').filter({ hasText: text }).last();
+    const reveal = page.locator('[data-reveal]').filter({ hasText: text });
     await expect(reveal, `${text} should be shown`).toHaveCSS('opacity', '1');
   }
   // Execution's finished build: every line of code, the full counters.

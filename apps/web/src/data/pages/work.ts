@@ -1,4 +1,5 @@
 import { caseStudies, formatMetric } from '@/data/case-studies';
+import { social } from '@/data/social';
 import type { InlineLink, PageRecord, ProseSection } from './types';
 
 /**
@@ -28,10 +29,7 @@ export const workCopy = {
   cta: {
     heading: 'Like what you see?',
     text: 'I share engineering deep dives, project updates, and lessons learned. Connect with me to follow along.',
-    link: {
-      text: 'Connect on LinkedIn',
-      href: 'https://www.linkedin.com/in/milos-cvetkovic-dev',
-    },
+    link: { text: 'Connect on LinkedIn', href: social.linkedin.href },
   },
 } satisfies {
   eyebrow: string;
