@@ -52,6 +52,17 @@ updates:
       vite:
         patterns: ['vite', '@vitejs/*', 'vitest', '@vitest/*']
         update-types: [major, minor, patch]
+      # lighthouse is pinned exactly in apps/web/package.json, and the Lighthouse audit spec fails
+      # on any version other than LIGHTHOUSE_VERSION in apps/web/e2e/support/lighthouse.ts until
+      # someone re-reads the audit ids and scoring rules it asserts (.claude/rules/dependencies.md).
+      # A bump is red by design, so it arrives alone rather than inside minor-and-patch, where it
+      # would hold every other minor and patch bump. Majors are included so that every lighthouse
+      # bump uses this one group. `lighthouse` is the only direct dependency of that name;
+      # packages such as lighthouse-logger are transitive and move with it. It sits ahead of
+      # minor-and-patch for the same first-match reason as vite.
+      lighthouse:
+        patterns: ['lighthouse']
+        update-types: [major, minor, patch]
       minor-and-patch:
         update-types: [minor, patch]
     commit-message:
