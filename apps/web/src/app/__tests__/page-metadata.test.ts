@@ -12,6 +12,7 @@
 import type { Metadata } from 'next';
 import { describe, expect, it } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
+import { publishedPosts } from '@/data/posts';
 import { metadata as home } from '../page';
 import { metadata as about } from '../about/page';
 import { metadata as blog } from '../blog/page';
@@ -19,6 +20,7 @@ import { metadata as contact } from '../contact/page';
 import { metadata as privacy } from '../privacy/page';
 import { metadata as skills } from '../skills/page';
 import { metadata as work } from '../work/page';
+import { generateMetadata as postMetadata } from '../blog/[slug]/page';
 import { generateMetadata } from '../work/[slug]/page';
 
 const TITLE_MAX = 60;
@@ -60,6 +62,26 @@ describe('page titles and descriptions', () => {
       expect([...String(metadata.description)].length).toBeLessThanOrEqual(DESCRIPTION_MAX);
     },
   );
+
+  // Every published post, read from the index the page reads: none until the owner publishes the
+  // first, and `blog/__tests__/post-page.test.tsx` proves the same metadata over the fixtures
+  // meanwhile. A post's summary is its description (#61, 61b), so a published summary has to fit
+  // in 155 characters here, although `posts.test.ts` lets a summary run to 300 for the lists and
+  // the feed, which show it whole.
+  it('every published post fits a results page, under a title no other route has', async () => {
+    const taken = new Set(routes.map(([, metadata]) => served(metadata.title)));
+    for (const { slug } of publishedPosts) {
+      const metadata = await postMetadata({ params: Promise.resolve({ slug }) });
+      const title = served(metadata.title);
+      expect([...title].length, title).toBeLessThanOrEqual(TITLE_MAX);
+      const description = String(metadata.description);
+      expect([...description].length, `${slug}: ${description}`).toBeLessThanOrEqual(
+        DESCRIPTION_MAX,
+      );
+      expect(taken.has(title), `${slug}: ${title}`).toBe(false);
+      taken.add(title);
+    }
+  });
 
   it('no two routes share a title', () => {
     const titles = routes.map(([, metadata]) => served(metadata.title));

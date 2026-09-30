@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { PAGE_ROUTES, expectedStatus } from './routes';
+import { PAGE_ROUTES, POST_ROUTES, expectedStatus } from './routes';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 // The rule map and the result readers are shared with e2e/mobile/accessibility.spec.ts: only
@@ -132,6 +132,11 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
   '/work/enterprise-b2b-platform': 40,
   '/work/nx-remote-cache': 35,
   '/no-such-page': 8,
+  // Every published post (#61, 61b): a template floor, not a measurement, since no post is
+  // published yet. A post page draws its title, the two labelled dates, the back link and the
+  // footer before any body text, and a fixture post measured well over it locally. Re-measure when
+  // the first post lands, and set that post's own floor under its count as the routes above are.
+  ...Object.fromEntries(POST_ROUTES.map((route) => [route, 8])),
 };
 
 /**
@@ -197,6 +202,9 @@ const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }
   '/work/enterprise-b2b-platform': { light: 0, dark: 0 },
   '/work/nx-remote-cache': { light: 0, dark: 0 },
   '/no-such-page': { light: 0, dark: 0 },
+  // Every published post (#61, 61b): plain text on the page background, no blur or gradient
+  // behind it, so zero. Re-measure with the floor above when the first post lands.
+  ...Object.fromEntries(POST_ROUTES.map((route) => [route, { light: 0, dark: 0 }])),
 };
 
 /**

@@ -53,7 +53,7 @@ There is no shared ESLint or TypeScript config package (ADR 0018): `apps/web` li
 
 ## Routes (App Router)
 
-`/`, `/about`, `/blog`, `/contact`, `/privacy`, `/skills`, `/work`, `/work/[slug]`.
+`/`, `/about`, `/blog`, `/blog/[slug]`, `/contact`, `/privacy`, `/skills`, `/work`, `/work/[slug]`.
 
 Every route's head comes from `buildMetadata()` in `apps/web/src/lib/metadata.ts`, and every
 static route folder needs its own `opengraph-image`; see `app-router-and-content.md`.

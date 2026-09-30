@@ -48,9 +48,10 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
   React hydration mismatches included, so a stray `console.warn` fails the `e2e` job. Its routes come
   from `apps/web/e2e/routes.ts`, the one list the accessibility gate reads too: the seven static
-  routes, every case study derived from `src/data/case-studies.ts`, and a 404. `/` is also walked
-  down through the story and back up (light scheme only), so the scroll-driven GSAP callbacks and the
-  timers they schedule are watched too. The reduced-motion pass cannot cover those: every phase
+  routes, every case study derived from `src/data/case-studies.ts`, every published post derived
+  from `src/data/posts.ts` (none yet), and a 404. `/` is also walked down through the story and back
+  up (light scheme only), so the scroll-driven GSAP callbacks and the timers they schedule are
+  watched too. The reduced-motion pass cannot cover those: every phase
   effect returns early under `reduce`.
 - Accessibility is gated. `apps/web/e2e/accessibility.spec.ts` runs axe-core with the rule set
   behind Lighthouse's accessibility category (kept in `e2e/axe.ts`) on all eleven routes in
@@ -188,12 +189,12 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   `pnpm --filter web clean`. Two local suites in the _same_ checkout on different ports also share
   it, so do not overlap them; two different checkouts are fine, they have their own.
 - The CI e2e log prints a three-line `[WebServer] Error: Internal: NoFallbackError` stack once for
-  every request of an unknown `/work/*` slug, so several times per run, and still passes. It is the
-  internal signal that routes such a slug to the site-level 404, and `not-found-shell`, `not-found`,
-  `console-clean` and `hydration-marker` all request `/work/does-not-exist`; the response is a
-  correct 404 and no browser console entry results. Do not chase it:
-  `scripts/check-webserver-log.mjs` allowlists exactly that message with its stack frames and fails
-  the job on any other `[WebServer]` line. The Vercel production log carries no such line, because
+  every request of an unknown `/work/*` or `/blog/*` slug, so several times per run, and still
+  passes. It is the internal signal that routes such a slug to the site-level 404, and
+  `not-found-shell`, `not-found`, `console-clean` and `hydration-marker` all request
+  `/work/does-not-exist` and `/blog/does-not-exist`; the response is a correct 404 and no browser
+  console entry results. Do not chase it: `scripts/check-webserver-log.mjs` allowlists exactly that
+  message with its stack frames and fails the job on any other `[WebServer]` line. The Vercel production log carries no such line, because
   the platform answers an unknown path from the cached static 404 without invoking the route
   (`docs/adr/0015-static-case-study-params.md`).
 - Claude Code's in-app Browser pane logs React error #418 (hydration mismatch) on every page of the
