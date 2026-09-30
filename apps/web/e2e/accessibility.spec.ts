@@ -166,12 +166,21 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * The two that are not zero are the two surfaces the audit already found, and between them they account
  * for every undecidable node on the site — 167 of them, against 103 and 8 decided.
  *
- * `/` gets a margin of a few nodes and the others do not, for a measured reason rather than out of
- * caution: the hero's tmux chrome animates its tab labels and status line through `opacity`, and axe
- * skips a node at `opacity: 0`, so the count depends on which frame the audit samples. Two consecutive
- * dark-theme runs gave 111 and 112. `/work` and the nine zeroes are static and were identical across
- * every run. Never widen a margin to quieten a failure: read the nodes the message names first, because
- * a genuinely new blurred surface looks exactly like this.
+ * `/` gets a margin of a few nodes and the others do not. The reason this comment gave until #180 was
+ * wrong: the tmux chrome's tab labels, pane titles and status lines are static, and its clock changes
+ * its text, never its node count. The count varied because of the tmux background's log stream. Its
+ * five panes start after an idle callback plus up to 2 s, then each adds a line about every 400-850
+ * ms and never settles, and axe answers every slot holding text with `incomplete` (`bgOverlap`: the
+ * background sits under the hero island). So the count was a constant plus however many lines had
+ * streamed when axe collected its nodes: 119 and 120 in the runs that failed, CI's among them, and
+ * 128-140 after an extra 3 s. The at-rest pass on `/` now leaves the stream out (`TMUX_LOG_STREAM`,
+ * below). Without it the count measured 112 in both schemes, six production-build runs a scheme on
+ * 2026-09-30, the same 112 nodes every run. The margin over that stays, by the owner's decision on
+ * #180 of 2026-09-30, until #47's slices 47c and 47e, #49's 49d and #58's 58a have landed, so that
+ * none of them has to raise a budget; a pull request of its own then lowers it to the re-measured
+ * constant. `/work` and the nine zeroes are static and were identical across every run. Never widen
+ * a margin to quieten a failure: read the nodes the message names first, because a genuinely new
+ * blurred surface looks exactly like this.
  *
  * The positive control at the bottom of this file proves the comparison can fail at all.
  */
@@ -188,6 +197,104 @@ const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }
   '/work/nx-remote-cache': { light: 0, dark: 0 },
   '/no-such-page': { light: 0, dark: 0 },
 };
+
+/**
+ * The tmux background's log stream on `/`: the slot container in each of its five panes
+ * (`AnimatedPane` in `tmux-background.tsx`), which the at-rest pass on `/` excludes from the audit.
+ *
+ * Its node count is a clock reading, not a property of the page: the panes write a line into their
+ * slots about every 400-850 ms for as long as the page is open, and axe cannot decide any slot that
+ * holds text. What leaves the audit is pure decoration, which WCAG 1.4.3 exempts from contrast; that
+ * it sits under `aria-hidden` is part of the evidence, not the exemption, since `aria-hidden` alone
+ * exempts nothing (see the top of this file). The tab bar, the pane titles and status bars, the
+ * clock and the hero island stay audited. Two alternatives were measured on #180 and refused.
+ * Excluding the whole background stops auditing static chrome that is already deterministic.
+ * Pausing the clock, as `no-js-text.spec.ts` does, freezes the stream but breaks this pass:
+ * `expectGsapLoaded` never sees its mark, axe's own timers never fire, and the story's closing panel
+ * rests visible instead of transparent.
+ *
+ * An exclusion is only as narrow as what matches it, so `expectTmuxLogStreamIsDecoration` checks
+ * the matches before every audit that uses it.
+ */
+const TMUX_LOG_STREAM = '[data-tmux-slots]';
+
+// A link, a button, a heading or a landmark, by element and by role: none may sit in the stream.
+const NOT_DECORATION = [
+  'a',
+  '[role="link"]',
+  'button',
+  '[role="button"]',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  '[role="heading"]',
+  'header',
+  'footer',
+  'main',
+  'nav',
+  'aside',
+  'section',
+  'form',
+  'search',
+  '[role="banner"]',
+  '[role="contentinfo"]',
+  '[role="main"]',
+  '[role="navigation"]',
+  '[role="complementary"]',
+  '[role="region"]',
+  '[role="form"]',
+  '[role="search"]',
+].join(', ');
+
+/**
+ * The guard on `TMUX_LOG_STREAM`. It matches exactly the five slot containers; each sits under an
+ * `aria-hidden="true"` ancestor; each holds only bare slot divs, a `div` with text and an inline
+ * style and nothing else, which is all `AnimatedPane` creates; and none contains a link, button,
+ * heading or landmark. The count comes first, so a pane that lost the attribute, or an element
+ * elsewhere that gained it, fails before anything is excluded.
+ */
+async function expectTmuxLogStreamIsDecoration(page: Page) {
+  const containers = page.locator(TMUX_LOG_STREAM);
+  await expect(
+    containers,
+    `${TMUX_LOG_STREAM} must match the five log-stream slot containers of the tmux background ` +
+      'and nothing else: the at-rest pass on / excludes whatever it matches.',
+  ).toHaveCount(5);
+  const problems = await containers.evaluateAll(
+    (elements, notDecoration) =>
+      elements.flatMap((container, index) => {
+        const name = `slot container ${index + 1} of ${elements.length}`;
+        const found: string[] = [];
+        if (!container.parentElement?.closest('[aria-hidden="true"]')) {
+          found.push(`${name} has no aria-hidden="true" ancestor`);
+        }
+        for (const node of container.childNodes) {
+          const bareSlot =
+            node instanceof HTMLDivElement &&
+            node.childElementCount === 0 &&
+            node.getAttributeNames().every((attribute) => attribute === 'style');
+          if (bareSlot) continue;
+          const shown =
+            node instanceof Element
+              ? node.outerHTML.slice(0, 120)
+              : `the text ${JSON.stringify(node.textContent)}`;
+          found.push(`${name} holds ${shown}, which is not a bare slot div`);
+        }
+        const named = container.querySelector(notDecoration);
+        if (named) found.push(`${name} contains ${named.outerHTML.slice(0, 120)}`);
+        return found;
+      }),
+    NOT_DECORATION,
+  );
+  expect(
+    problems,
+    `the at-rest pass on / excludes ${TMUX_LOG_STREAM} as decoration, so it must hold only log ` +
+      'lines under aria-hidden: whatever else sits there would go unaudited.',
+  ).toEqual([]);
+}
 
 const colorSchemes = ['light', 'dark'] as const;
 
@@ -299,8 +406,10 @@ test.describe('Accessibility', () => {
         page,
       }) => {
         await openPage(page, path, colorScheme);
+        // `/` only, and only this pass: the log stream is guarded, then left out (TMUX_LOG_STREAM).
+        if (path === '/') await expectTmuxLogStreamIsDecoration(page);
 
-        const results = await audit(page);
+        const results = await audit(page, path === '/' ? [TMUX_LOG_STREAM] : []);
         await test.info().attach('axe-results', {
           body: JSON.stringify(
             { violations: results.violations, incomplete: results.incomplete },

@@ -74,14 +74,22 @@ export const LIGHTHOUSE_AXE_OPTIONS: AxeRunOptions = {
   },
 };
 
-export const audit = (page: Page) =>
-  new AxeBuilder({ page })
+/**
+ * Runs the rule set over the whole page. `exclude` takes selectors out of it on top of the dev
+ * server's indicator. Only the `/` at-rest pass in `accessibility.spec.ts` passes one, and that
+ * test proves what it excludes is decoration before it audits: an exclusion nothing checks would
+ * hide whatever came to sit under the selector.
+ */
+export const audit = (page: Page, exclude: readonly string[] = []) => {
+  const builder = new AxeBuilder({ page })
     // AxeBuilder keeps the reference and its other setters write into it: never hand it the constant.
     .options(structuredClone(LIGHTHOUSE_AXE_OPTIONS))
     // The dev server's tools indicator, a custom element with a shadow root that never ships.
     // Without this a local run against `next dev` audits a different DOM from CI.
-    .exclude('nextjs-portal')
-    .analyze();
+    .exclude('nextjs-portal');
+  for (const selector of exclude) builder.exclude(selector);
+  return builder.analyze();
+};
 
 export const passingNodes = (results: AxeResults, ruleId: string) =>
   results.passes.find(({ id }) => id === ruleId)?.nodes.length ?? 0;
