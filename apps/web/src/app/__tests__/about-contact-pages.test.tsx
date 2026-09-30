@@ -10,6 +10,7 @@ import {
   timeline,
   type StoryParagraph,
 } from '@/data/pages/about';
+import { connectorSnippets } from '@/data/mcp-server';
 import { contactCopy, socialLinks } from '@/data/pages/contact';
 
 /**
@@ -128,6 +129,8 @@ describe('/contact', () => {
       contactCopy.closing.lead,
       contactCopy.closing.text,
       contactCopy.closing.link.text,
+      contactCopy.agents.heading,
+      contactCopy.agents.intro,
     ]) {
       expect(main, `/contact must render "${text}"`).toContain(text);
     }
@@ -147,5 +150,25 @@ describe('/contact', () => {
     });
 
     expect(errors, 'rendering /contact must not log an error').not.toHaveBeenCalled();
+  });
+
+  // #62: the snippets are text to copy, so each is a plain `pre` holding exactly what
+  // `data/mcp-server.ts` renders. It scrolls sideways on a phone, so the keyboard has to reach it,
+  // and a focusable element needs a role and a name: its caption, which starts with the client.
+  it('renders each connector snippet as a named region the keyboard can reach', () => {
+    render(<ContactPage />);
+    expect(
+      screen.getByRole('heading', { level: 2, name: contactCopy.agents.heading }),
+    ).toBeInTheDocument();
+
+    const regions = screen.getAllByRole('region');
+    expect(regions).toHaveLength(connectorSnippets.length);
+    connectorSnippets.forEach(({ client, code }, index) => {
+      const region = regions[index];
+      expect(region.tagName, client).toBe('PRE');
+      expect(region, client).toHaveAttribute('tabindex', '0');
+      expect(region, client).toHaveAccessibleName(expect.stringMatching(new RegExp(`^${client}`)));
+      expect(region.textContent, client).toBe(code);
+    });
   });
 });

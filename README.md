@@ -12,6 +12,43 @@ Personal site of Milos Cvetkovic, Senior Full-Stack Engineer. An interactive, an
 
 [https://miloscvetkovic.dev](https://miloscvetkovic.dev), deployed on Vercel from `main` and live since 2026-09-09. The exact steps, DNS records and verification checks are in [docs/runbooks/deploy.md](docs/runbooks/deploy.md).
 
+## Connect an agent
+
+<!-- connector-snippets:start -->
+
+Claude Code:
+
+```bash
+claude mcp add --transport http portfolio https://miloscvetkovic.dev/mcp
+```
+
+Cursor, in `.cursor/mcp.json` or `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "portfolio": {
+      "url": "https://miloscvetkovic.dev/mcp"
+    }
+  }
+}
+```
+
+VS Code, in `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "portfolio": {
+      "type": "http",
+      "url": "https://miloscvetkovic.dev/mcp"
+    }
+  }
+}
+```
+
+<!-- connector-snippets:end -->
+
 ## Stack
 
 | Layer     | Choice                                                                                                  |

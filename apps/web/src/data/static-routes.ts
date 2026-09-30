@@ -9,7 +9,7 @@ import { experienceFigureSince } from './profile';
  * From git, the last commit to change what each route visibly says: `/` and /work 2026-09-25 (the
  * self-healing agent's RETIRED badge and past-tense copy), /about and /skills 2026-09-28 (#49: the
  * years of experience read from data/profile.ts, and the Next.js version dropped from /skills),
- * /contact 2026-09-23 (d1da60f, #116, which changed the hero subtitle and the eyebrows) and /blog
+ * /contact 2026-09-30 (#62, the "Connect an agent" section and its connector snippets) and /blog
  * 2026-01-27 (696c2ef). The later commits to /blog changed only formatting, colour tokens, metadata
  * or Open Graph images. /privacy was added on 2026-09-27.
  *
@@ -27,7 +27,7 @@ export const STATIC_ROUTE_UPDATED = {
   '/work': '2026-09-25',
   '/skills': '2026-09-28',
   '/blog': '2026-01-27',
-  '/contact': '2026-09-23',
+  '/contact': '2026-09-30',
   '/privacy': '2026-09-27',
 } as const satisfies Record<string, string>;
 
