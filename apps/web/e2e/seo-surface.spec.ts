@@ -9,7 +9,7 @@ import {
   STATIC_ROUTES,
   expectedStatus,
 } from './routes';
-import { caseStudies } from '../src/data/case-studies';
+import { caseStudies, formatMetric } from '../src/data/case-studies';
 import { formatContentDate } from '../src/lib/content-date';
 import { fetchHead, first } from './support/served-head';
 
@@ -448,6 +448,71 @@ test('the Person schema, the hero and the /about description carry one derived y
       ? `the build predates 1 January: it states ${served} years, the clock gives ${expected}; rebuild`
       : `yearsOfExperience() gives ${expected}`,
   ).toBe(expected);
+});
+
+/**
+ * A word as a reader counts one: a run of text between spaces that holds a letter or a digit, so
+ * `Next.js` is one word and a dash standing between two spaces is none.
+ */
+const wordCount = (text: string) =>
+  text.split(/\s+/).filter((token) => /[\p{L}\p{N}]/u.test(token)).length;
+
+test('/about answers three questions, each in one paragraph of 40 to 80 words that restates no case-study metric (#58)', async ({
+  page,
+  request,
+}) => {
+  // #58 AC 13. A question-shaped heading with a short answer under it is the unit an extractor can
+  // lift whole, so the served HTML, which no crawler runs, has to carry it. The browser's
+  // `DOMParser` reads the response, as `servedCaseStudy()` below does: the RSC flight payload
+  // repeats every heading inside a script, and parsed, a script's text is never an element. What
+  // is asserted is the shape (the `<h2>`, the `<p>` that is its next element, the answer's length)
+  // and the absence of a metric, not the wording, which is the owner's to edit. No FAQPage, HowTo
+  // or speakable markup goes with it: `scripts/ai-refusals.test.mjs` fails on those strings
+  // anywhere under apps/web/src.
+  const response = await request.get('/about');
+  expect(response.status(), 'GET /about').toBe(200);
+  const headings = await page.evaluate(
+    (markup) => {
+      const doc = new DOMParser().parseFromString(markup, 'text/html');
+      const text = (element: Element | null) =>
+        (element?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      return [...doc.body.querySelectorAll('h2')].map((heading) => ({
+        question: text(heading),
+        next: heading.nextElementSibling?.localName ?? null,
+        answer: text(heading.nextElementSibling),
+      }));
+    },
+    await response.text(),
+  );
+  // The control: a parser that found no heading at all would find no question either.
+  expect(headings.length, '/about should serve its section headings').toBeGreaterThan(0);
+
+  const questions = headings.filter(({ question }) => question.endsWith('?'));
+  expect(
+    questions.map(({ question }) => question),
+    '/about serves exactly three h2s that end in a question mark',
+  ).toHaveLength(3);
+
+  // Every metric as it renders: `formatMetric` is the one function that turns the data into copy,
+  // so an answer quoting a figure would have to restate its output.
+  const metrics = caseStudies.map(({ highlight }) => formatMetric(highlight.metric));
+  expect(metrics, 'the case studies must define metrics for the check below').not.toHaveLength(0);
+  for (const { question, next, answer } of questions) {
+    expect.soft(next, `"${question}" is followed by a paragraph`).toBe('p');
+    const words = wordCount(answer);
+    expect
+      .soft(words, `"${question}" is answered in at least 40 words: "${answer}"`)
+      .toBeGreaterThanOrEqual(40);
+    expect
+      .soft(words, `"${question}" is answered in at most 80 words: "${answer}"`)
+      .toBeLessThanOrEqual(80);
+    expect
+      .soft(
+        metrics.filter((metric) => answer.includes(metric)),
+        `"${question}" restates a case-study metric, which is the study's to state`,
+      )
+      .toEqual([]);
+  }
 });
 
 /** A date the served body shows: its `<dt>` label, then the `<time>` in the `<dd>` after it. */

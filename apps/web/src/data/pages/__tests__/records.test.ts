@@ -11,7 +11,15 @@
 import { describe, expect, it } from 'vitest';
 import { formatMetric, getCaseStudy } from '@/data/case-studies';
 import { pageToMarkdown } from '@/lib/serialise';
-import { aboutCopy, aboutRecord, beliefs, credentials, facts, timeline } from '@/data/pages/about';
+import {
+  aboutCopy,
+  aboutRecord,
+  beliefs,
+  credentials,
+  facts,
+  questions,
+  timeline,
+} from '@/data/pages/about';
 import { contactCopy, contactRecord, socialLinks } from '@/data/pages/contact';
 
 /** The values that appear more than once in `values`. */
@@ -41,6 +49,16 @@ describe('page records', () => {
     expect(markdown).toContain(`\n\n${aboutCopy.storyClose}\n\n`);
   });
 
+  it('writes each About question as its own heading, its whole answer the one paragraph under it', () => {
+    // #58: the twin carries the unit the page serves, a question and an answer that stands alone.
+    // How many there are and how long each answer is, the served page's spec checks.
+    expect(questions.length).toBeGreaterThan(0);
+    const markdown = pageToMarkdown(aboutRecord);
+    for (const { question, answer } of questions) {
+      expect(markdown).toContain(`\n\n## ${question}\n\n${answer}\n\n`);
+    }
+  });
+
   it('writes each link as an absolute URL', () => {
     const contact = pageToMarkdown(contactRecord);
     expect(contact).toMatch(/\[View My Work\]\(https?:\/\/[^)]+\/work\)/);
@@ -61,6 +79,7 @@ describe('page records', () => {
   });
 
   it('keys every list the pages render by a value no other entry shares', () => {
+    expect(repeats(questions.map(({ question }) => question)), 'questions').toEqual([]);
     expect(repeats(timeline.map(({ year }) => year)), 'timeline years').toEqual([]);
     expect(repeats(beliefs.map(({ title }) => title)), 'belief titles').toEqual([]);
     expect(repeats(facts.map(({ label }) => label)), 'fact labels').toEqual([]);

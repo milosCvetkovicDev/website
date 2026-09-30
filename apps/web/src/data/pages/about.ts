@@ -1,7 +1,7 @@
 /**
  * The copy `/about` renders, and the page record its Markdown twin reads (#59). The page keeps the
  * layout, the classes and its `h1`, and maps over what is here, so a page and its twin cannot
- * disagree. Every string is text the page already showed, with two exceptions that only the twin
+ * disagree. Every string is text the page shows, with two exceptions that only the twin
  * reads: the `Quick facts` heading and the timeline's column names. Every record section needs a
  * heading and a table needs columns, and the page shows those parts without either.
  */
@@ -37,6 +37,12 @@ export interface Fact {
 export interface Credential {
   readonly icon: string;
   readonly text: string;
+}
+
+/** A question a visitor asks, as a heading, and its answer in one self-contained paragraph. */
+export interface Question {
+  readonly question: string;
+  readonly answer: string;
 }
 
 /** A profile the closing call to action links to; the primary one is the filled button. */
@@ -133,6 +139,33 @@ const story: readonly StoryParagraph[] = [
   ],
 ];
 
+/**
+ * Three questions a visitor asks, answered after the story (#58). A question-shaped heading with a
+ * short answer under it is the unit a text extractor can lift whole, so each answer stands on its
+ * own in 40 to 80 words (`e2e/seo-surface.spec.ts` counts them in the served HTML) and restates no
+ * case-study figure: a metric is the study's to state. The pattern is the visible text alone, with
+ * no structured data for it: ADR 0017 refuses that markup, and `scripts/ai-refusals.test.mjs`
+ * fails on its type name anywhere under `src`, comments included. The self-healing agent is
+ * retired, so it is in the past tense.
+ */
+export const questions: readonly Question[] = [
+  {
+    question: 'What does Milos Cvetkovic build?',
+    answer:
+      'Two kinds of system. The first is the legacy platform nobody wants to touch: I introduce boundaries one module at a time, so every pull request ships value while the architecture improves underneath it. The second is AI that does that work for me — a self-healing agent that watched production, diagnosed errors and opened pull requests a person reviewed and merged.',
+  },
+  {
+    question: 'What stack does he work in?',
+    answer:
+      'TypeScript end to end. React and Next.js on the front, NestJS, Node and Bun with Elysia behind it, PostgreSQL for state. Infrastructure is Azure — Container Apps, Blob Storage, Log Analytics — described in Terraform and shipped through GitHub Actions with Nx. The AI work runs on the Claude Agent SDK. Clean Architecture and domain-driven design are the habits underneath all of it.',
+  },
+  {
+    question: 'What was the self-healing agent, exactly?',
+    answer:
+      'A service on Azure that watched production logs, read the codebase, and when something broke, diagnosed the error and opened a pull request with a fix. It ran on Bun and Elysia with the Claude Agent SDK, and it shipped with limits: a daily cap, a budget cap, confidence thresholds, CI retries capped at three attempts and a kill switch. A person reviewed and merged every fix.',
+  },
+];
+
 const connectLinks: readonly ProfileLink[] = [
   { name: social.linkedin.name, href: social.linkedin.href, primary: true },
   { name: social.github.name, href: social.github.href, primary: false },
@@ -171,6 +204,11 @@ const sections: readonly PageSection[] = [
     heading: aboutCopy.eyebrow,
     paragraphs: [aboutCopy.lede, ...story.map(plainText), aboutCopy.storyClose],
   },
+  ...questions.map(({ question, answer }): PageSection => ({
+    kind: 'prose',
+    heading: question,
+    paragraphs: [answer],
+  })),
   {
     kind: 'list',
     heading: aboutCopy.factsHeading,

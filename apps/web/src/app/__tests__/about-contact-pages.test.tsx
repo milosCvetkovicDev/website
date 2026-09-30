@@ -7,6 +7,7 @@ import {
   beliefs,
   credentials,
   facts,
+  questions,
   timeline,
   type StoryParagraph,
 } from '@/data/pages/about';
@@ -47,6 +48,7 @@ describe('/about', () => {
       aboutCopy.connect.heading,
       aboutCopy.connect.text,
       ...aboutCopy.story.map(readAs),
+      ...questions.flatMap(({ question, answer }) => [question, answer]),
       ...timeline.flatMap(({ year, role, company, highlight, description }) => [
         year,
         role,

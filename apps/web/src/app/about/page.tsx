@@ -4,6 +4,7 @@ import {
   beliefs,
   credentials,
   facts,
+  questions,
   timeline,
   type StoryParagraph,
 } from '@/data/pages/about';
@@ -62,6 +63,16 @@ export default function AboutPage() {
               {aboutCopy.storyClose}
             </p>
           </div>
+        </section>
+
+        {/* Questions a visitor asks: each heading's next element is its whole answer (#58) */}
+        <section className="mb-20 space-y-12">
+          {questions.map(({ question, answer }) => (
+            <div key={question}>
+              <h2 className="mb-4 text-2xl font-bold">{question}</h2>
+              <p className="text-lg leading-relaxed">{answer}</p>
+            </div>
+          ))}
         </section>
 
         {/* Quick facts */}
