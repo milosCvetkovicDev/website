@@ -43,8 +43,21 @@ const LLMS_FULL_TXT = '/llms-full.txt';
 /** llmstxt.org's advice, and #60's bound: the whole file fits any context window. */
 const LLMS_TXT_MAX_BYTES = 10_240;
 
-/** An llmstxt.org list line, `- [name](url)` with an optional `: note`; its URL. */
-const LLMS_TXT_LINK = /^- \[(?:[^\]\\]|\\.)+\]\((\S+)\)(?::\s.*)?$/;
+/** An llmstxt.org list line as #60 writes every one, `- [name](url): note`; its URL as written. */
+const LLMS_TXT_LINK = /^- \[(?:[^\]\\]|\\.)+\]\((\S+)\): \S.*$/;
+
+/** Every Markdown link destination in a body, as written (backslash escapes included). */
+const MARKDOWN_LINK = /\]\(((?:\\.|[^\s()\\])+)\)/g;
+
+/** A destination as the URL it names: the serialiser escapes `(`, `)` and `\` with a backslash. */
+const unescapeDestination = (written: string) => written.replace(/\\([\\()])/g, '$1');
+
+/** The media type each kind of link in `/llms.txt` must answer with. */
+function expectedType(path: string): RegExp {
+  if (path.endsWith('.md')) return /^text\/markdown; ?charset=utf-8$/i;
+  if (path.endsWith('.json')) return /^application\/json\b/i;
+  return /^text\/html\b/i;
+}
 
 /** The MCP protocol revision #62 targets. */
 const MCP_PROTOCOL_VERSION = '2026-07-28';
@@ -209,28 +222,57 @@ test(`#60: ${LLMS_TXT} opens with one H1 and a blockquote and links every case s
 });
 
 // #60 AC 4: an agent that follows the index must never land on a 404, so every link in it is
-// requested, by its path on this server once it has been checked to name this site's origin.
-test(`#60: every link in ${LLMS_TXT} answers 200`, async ({ request }) => {
+// requested, by its path on this server once it has been checked to name this site's origin: each
+// section line, which must be on this site, and any on-site link in the facts block above them (an
+// off-site profile link there is not requested). Each must answer with its own media type, one at a
+// time, so a growing index cannot fan out against the test server.
+test(`#60: every link in ${LLMS_TXT} answers 200 with its media type`, async ({ request }) => {
   const response = await request.get(LLMS_TXT);
   expect(response.status()).toBe(200);
-  const lines = (await response.text()).split('\n');
+  const body = await response.text();
+  const lines = body.split('\n');
   const sectionStart = lines.findIndex((line) => line.startsWith('## '));
   expect(sectionStart, `${LLMS_TXT} has link sections`).toBeGreaterThan(0);
   const listed = lines.slice(sectionStart).filter((line) => line.trim() && !/^## /.test(line));
 
-  const paths: string[] = [];
+  const problems: string[] = [];
+  const paths = new Set<string>();
+  const parse = (written: string, where: string): URL | undefined => {
+    const href = unescapeDestination(written);
+    try {
+      return new URL(href);
+    } catch {
+      problems.push(`${where}: ${href} is not an absolute URL`);
+      return undefined;
+    }
+  };
   for (const line of listed) {
-    const href = LLMS_TXT_LINK.exec(line)?.[1];
-    expect(href, `every line of a section is a - [name](url) link: ${line}`).toBeDefined();
-    const url = new URL(href as string);
-    expect(url.origin, `${href} is absolute on ${SITE_ORIGIN}`).toBe(SITE_ORIGIN);
-    paths.push(url.pathname);
+    const written = LLMS_TXT_LINK.exec(line)?.[1];
+    if (written === undefined) {
+      problems.push(`not a - [name](url): note line: ${line}`);
+      continue;
+    }
+    const url = parse(written, line);
+    if (!url) continue;
+    if (url.origin !== SITE_ORIGIN) problems.push(`${line}: not on ${SITE_ORIGIN}`);
+    else paths.add(url.pathname);
   }
-  expect(paths.length, `${LLMS_TXT} links something`).toBeGreaterThan(0);
-  const statuses = await Promise.all(
-    paths.map(async (path) => [path, (await request.get(path)).status()] as const),
-  );
-  expect(statuses, 'every link answers').toEqual(paths.map((path) => [path, 200]));
+  for (const [, written] of lines.slice(0, sectionStart).join('\n').matchAll(MARKDOWN_LINK)) {
+    const url = parse(written, 'the facts block');
+    if (url?.origin === SITE_ORIGIN) paths.add(url.pathname);
+  }
+  expect(problems, `${LLMS_TXT}'s links`).toEqual([]);
+  expect(paths.size, `${LLMS_TXT} links something`).toBeGreaterThan(0);
+
+  const answers: string[] = [];
+  for (const path of paths) {
+    const linked = await request.get(path);
+    const type = contentType(linked);
+    if (linked.status() !== 200 || !expectedType(path).test(type)) {
+      answers.push(`${path}: ${linked.status()} ${type}`);
+    }
+  }
+  expect(answers, 'every link answers 200 with its media type').toEqual([]);
 });
 
 test(`#60: ${LLMS_FULL_TXT} is a 404, deliberately not served`, async ({ request }) => {

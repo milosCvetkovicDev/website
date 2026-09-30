@@ -164,11 +164,14 @@ function without(route) {
     if ((entry.srcRoute ?? path) === route) delete prerender.routes[path];
   }
   delete prerender.dynamicRoutes[route];
-  const gone =
-    {
-      '/llms.txt': /^llms\.txt\.body$/,
-      '/case-studies.json': /^case-studies\.json\.body$/,
-    }[route] ?? /\/index\.json\.body$/;
+  /** @type {Record<string, RegExp>} */
+  const bodiesOf = {
+    '/llms.txt': /^llms\.txt\.body$/,
+    '/case-studies.json': /^case-studies\.json\.body$/,
+    '/work/[slug]/index.json': /\/index\.json\.body$/,
+  };
+  const gone = bodiesOf[route];
+  if (!gone) assert.fail(`without(): no body pattern for ${route}`);
   return { appRoutes, prerender, bodies: CLEAN_BODIES.filter((b) => !gone.test(b)) };
 }
 

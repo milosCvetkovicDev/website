@@ -22,6 +22,7 @@ import { SITE_NAME } from '../metadata';
 import { markdownTwinPath } from '../pathname';
 import {
   EXCLUDED_FROM_LLMS_TXT,
+  LLMS_TXT_MAX_BYTES,
   LLMS_TXT_OWNER_COPY,
   siteIndexToLlmsTxt,
   type LlmsTxtOwnerCopy,
@@ -222,17 +223,49 @@ describe('the served composition', () => {
     expect(lines[2]).toBe(`## ${SECTIONS[0]}`);
   });
 
+  it('serves each written fact while another is still a placeholder', () => {
+    const [written, linked] = FILLED.facts;
+    const body = siteIndexToLlmsTxt({
+      copy: { summary: FILLED.summary, facts: [written, ownerTodo('the third fact'), linked] },
+    });
+    expect(body).not.toContain(OWNER_TODO);
+    expect(linesOf(body).slice(1, 5)).toEqual([
+      `> ${FILLED.summary}`,
+      written,
+      `A second one, with [a link](${ORIGIN}/about).`,
+      `## ${SECTIONS[0]}`,
+    ]);
+  });
+
   it('fails rather than serve a marker that reached it from any other source', () => {
+    const [study, ...rest] = caseStudies;
+    const studies = [{ ...study, description: `${study.description} ${ownerTodo('a stray gap')}` }];
+    expect(() => siteIndexToLlmsTxt({ studies: [...studies, ...rest] })).toThrow(OWNER_TODO);
+    // The draft-complete composition is never served, so it carries whatever the gate must see.
+    expect(siteIndexToLlmsTxt({ includeUnfilled: true, studies })).toContain(
+      ownerTodo('a stray gap'),
+    );
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'fails rather than list a case study whose metric value is %s, as its JSON does',
+    (value) => {
+      const [study] = caseStudies;
+      const highlight = { ...study.highlight, metric: { ...study.highlight.metric, value } };
+      const studies = [{ ...study, highlight }];
+      expect(() => siteIndexToLlmsTxt({ studies })).toThrow(
+        `siteIndexToLlmsTxt(${study.slug}): the metric value ${value} is not finite`,
+      );
+    },
+  );
+
+  it(`fails rather than serve ${MAX_BYTES} bytes or more`, () => {
+    expect(LLMS_TXT_MAX_BYTES).toBe(MAX_BYTES);
     const [study] = caseStudies;
-    const { description } = study;
-    study.description = `${description} ${ownerTodo('a stray gap')}`;
-    try {
-      expect(() => siteIndexToLlmsTxt()).toThrow(OWNER_TODO);
-      // The draft-complete composition is never served, so it carries whatever the gate must see.
-      expect(siteIndexToLlmsTxt({ includeUnfilled: true })).toContain(ownerTodo('a stray gap'));
-    } finally {
-      study.description = description;
-    }
+    const long = { ...study, description: 'A sentence that keeps going. '.repeat(400) };
+    expect(() => siteIndexToLlmsTxt({ studies: [long] })).toThrow(
+      `not under ${MAX_BYTES}: the whole index has to fit a context window`,
+    );
   });
 });
 
@@ -292,9 +325,13 @@ describe('EXCLUDED_FROM_LLMS_TXT', () => {
 describe('the origin', () => {
   it('comes from NEXT_PUBLIC_SITE_URL, as metadataBase’s does', () => {
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://staging.example.dev');
-    for (const { links } of sectionsOf(siteIndexToLlmsTxt())) {
-      for (const link of links) expect(link?.url).toMatch(/^https:\/\/staging\.example\.dev\//);
-    }
+    const body = siteIndexToLlmsTxt({ copy: FILLED });
+    const urls = sectionsOf(body).flatMap(({ links }) => links.map((link) => link?.url));
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) expect(url).toMatch(/^https:\/\/staging\.example\.dev\//);
+    // An on-site link in the facts block follows it too.
+    expect(body).toContain('[a link](https://staging.example.dev/about)');
+    expect(body).not.toContain(ORIGIN);
   });
 });
 

@@ -32,12 +32,21 @@ export type OwnerTodoMarker = `${typeof OWNER_TODO}(${string})`;
 /**
  * Marks a gap in a drafted sentence, naming what the owner has to supply. The hint is plain words on
  * one line with no brackets, since a finding names the gap by it and the marker ends at the first `)`.
+ * Nor does it hold Markdown syntax (a backslash, a backtick, `*`, `_`, `[`, `]`, `<`, `>`, `|`, `~`
+ * or `&`), a tab or a run of spaces: a generated Markdown source such as `/llms.txt`'s draft escapes
+ * or collapses those, and its finding would then name a hint that no register row spells.
  */
 export function ownerTodo(hint: string): OwnerTodoMarker {
   if (hint.trim() === '' || /[()\r\n]/.test(hint)) {
     throw new Error(
       `ownerTodo(${JSON.stringify(hint)}): the hint says what the owner supplies, on one line, ` +
         'without brackets',
+    );
+  }
+  if (/[\\`*_[\]<>|~&\t]| {2,}/.test(hint)) {
+    throw new Error(
+      `ownerTodo(${JSON.stringify(hint)}): the hint is plain words, with no Markdown syntax, tab ` +
+        'or run of spaces',
     );
   }
   return `${OWNER_TODO}(${hint})`;

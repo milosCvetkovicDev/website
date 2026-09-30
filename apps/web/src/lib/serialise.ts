@@ -490,6 +490,12 @@ export const LLMS_TXT_OWNER_COPY: LlmsTxtOwnerCopy = {
  */
 export const EXCLUDED_FROM_LLMS_TXT: readonly StaticRoute[] = hasPublishedPosts ? [] : ['/blog'];
 
+/**
+ * llmstxt.org's advice and #60's bound: the whole index fits any context window. The prerender
+ * fails at it, so no path that skips the tests can serve a larger file.
+ */
+export const LLMS_TXT_MAX_BYTES = 10_240;
+
 /** One `- [name](url): note` line of an llms.txt link list, its URL absolute on this site. */
 function llmsTxtLink(name: string, path: string, note: string, what: string): string {
   const label = nonEmpty(text(name).trim(), `siteIndexToLlmsTxt: the link text of ${what}`);
@@ -512,15 +518,22 @@ function llmsTxtSection(title: string, links: readonly string[]): string {
  * `includeUnfilled` is the draft-complete composition: the owner's placeholders stand in their
  * blocks instead of the fallback and the omission, so the owner-todo gate can find them. It is
  * never served; the served composition fails the prerender rather than carry a marker from any
- * source. `copy` is for tests. `lib/__tests__/llms-txt.test.ts` pins both compositions line by line.
+ * source, or grow to `LLMS_TXT_MAX_BYTES`. Each fact paragraph is shown or left out on its own, so
+ * a written one is served while another is still a placeholder. `copy` and `studies` are for tests.
+ * `lib/__tests__/llms-txt.test.ts` pins both compositions line by line.
  */
 export function siteIndexToLlmsTxt({
   includeUnfilled = false,
   copy = LLMS_TXT_OWNER_COPY,
-}: { includeUnfilled?: boolean; copy?: LlmsTxtOwnerCopy } = {}): string {
+  studies = caseStudies,
+}: {
+  includeUnfilled?: boolean;
+  copy?: LlmsTxtOwnerCopy;
+  studies?: readonly CaseStudy[];
+} = {}): string {
   const shown = (value: unknown) => includeUnfilled || !JSON.stringify(value).includes(OWNER_TODO);
   const summary = shown(copy.summary) ? copy.summary : homePage.summary;
-  const facts = shown(copy.facts) ? copy.facts : [];
+  const facts = copy.facts.filter(shown);
   const excluded: readonly string[] = EXCLUDED_FROM_LLMS_TXT;
 
   const body = document([
@@ -529,14 +542,21 @@ export function siteIndexToLlmsTxt({
     ...facts.map((value, index) => paragraph(value, `siteIndexToLlmsTxt: fact ${index + 1}`)),
     llmsTxtSection(
       'Case studies',
-      caseStudies.map(({ slug, title, description, highlight: { metric } }) =>
-        llmsTxtLink(
+      studies.map(({ slug, title, description, highlight: { metric } }) => {
+        // formatMetric() writes a figure it cannot render as an em dash; a note with no figure in
+        // it fails the prerender instead, as the same study's JSON does.
+        if (!Number.isFinite(metric.value)) {
+          throw new Error(
+            `siteIndexToLlmsTxt(${slug}): the metric value ${metric.value} is not finite`,
+          );
+        }
+        return llmsTxtLink(
           title,
           markdownTwinPath(`/work/${slug}`),
           `${formatMetric(metric)} ${metric.label}. ${description}`,
           `the case study ${slug}`,
-        ),
-      ),
+        );
+      }),
     ),
     llmsTxtSection(
       'Site pages',
@@ -558,7 +578,7 @@ export function siteIndexToLlmsTxt({
         'Every case study as one JSON array: the fields its page shows, its metric as the cards render it, and the URLs of its page and its Markdown twin.',
         '/case-studies.json',
       ),
-      ...caseStudies.map(({ slug, title }) =>
+      ...studies.map(({ slug, title }) =>
         llmsTxtLink(
           `${title} as JSON`,
           `/work/${slug}/index.json`,
@@ -574,6 +594,13 @@ export function siteIndexToLlmsTxt({
     throw new Error(
       `siteIndexToLlmsTxt: the served body still holds ${OWNER_TODO}, never served: ` +
         `"${body.slice(Math.max(0, at - 40), at + 60)}"`,
+    );
+  }
+  const bytes = new TextEncoder().encode(body).length;
+  if (bytes >= LLMS_TXT_MAX_BYTES) {
+    throw new Error(
+      `siteIndexToLlmsTxt: the body is ${bytes} bytes, not under ${LLMS_TXT_MAX_BYTES}: ` +
+        'the whole index has to fit a context window',
     );
   }
   return body;

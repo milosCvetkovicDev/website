@@ -137,9 +137,9 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   four `server/*-manifest.json` files the App Router manifests do not cover). It also fails a build
   that lacks a route handler in its `REQUIRED_ROUTES` (`/llms.txt` and the case-study JSON since
   #60; #59's twins are not listed yet), builds one as a page, allowlists one as a function, or
-  where a dynamic one prerendered no path or other params than the page above it (`/work/[slug]`). A manifest field it
-  decides on that is missing or holds an unknown value, or a prerendered path it cannot attribute to
-  a route, exits 2 rather than passing. The allowlist is empty; #62 adds `/mcp`. A route handler
+  where a dynamic one prerendered no path or other params than the page above it
+  (`/work/[slug]`). A manifest field it decides on that is missing or holds an unknown value, or a
+  prerendered path it cannot attribute to a route, exits 2 rather than passing. The allowlist is empty; #62 adds `/mcp`. A route handler
   without `export const dynamic = 'force-static'` is the failure it exists for: it still serves the
   right bytes, as a function billed per request. Its parsing is tested in `test:scripts`, which runs
   before the build.

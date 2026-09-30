@@ -54,8 +54,9 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   false, ADR 0028) and `## Machine-readable representations` (the case-study JSON), with every URL
   absolute and no `## Optional` section. The blockquote and the facts block are owner copy
   (`LLMS_TXT_OWNER_COPY`): until they are filled the served file takes the home record's summary as
-  its blockquote and leaves the facts out, and the prerender fails if a marker survives anywhere
-  else. The root layout's head carries one `<link rel="describedby">` to its absolute URL, on
+  its blockquote and leaves out each fact paragraph still unfilled, and the prerender fails if a
+  marker survives anywhere else, a metric value is not finite, or the body reaches
+  `LLMS_TXT_MAX_BYTES`. The root layout's head carries one `<link rel="describedby">` to its absolute URL, on
   every route, the 404 included. `lib/__tests__/llms-txt.test.ts` checks the shape of both the
   served and the owner-draft compositions, every twin, figure and listed route, and that the file
   stays under 10240 bytes. There is no `/llms-full.txt` (ADR 0017 refuses it).
@@ -106,8 +107,8 @@ begun once UTC+14 has reached it: an accepted tolerance of up to 14 hours agains
 
 A value only the owner can supply is left as a registered placeholder, never invented, through
 `apps/web/src/data/owner-todo.ts`, the one convention for it. A typed placeholder is a union branch
-`{ state: typeof OWNER_TODO }`, a gap in prose is `ownerTodo(hint)` (the hint on one line, without
-brackets), and the marker, `OWNER-TODO`, is spelled out in that module and in no other file under
+`{ state: typeof OWNER_TODO }`, a gap in prose is `ownerTodo(hint)` (the hint plain words on one
+line, without brackets or Markdown syntax), and the marker, `OWNER-TODO`, is spelled out in that module and in no other file under
 `apps/web/src` or `apps/web/public`. That scan is an exact byte search for the literal typed by hand;
 a marker assembled from pieces gets past it, and only the served-output check below would catch it.
 Whatever renders the value omits the whole sentence, row or block while its marker survives;

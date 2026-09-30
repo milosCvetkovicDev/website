@@ -131,7 +131,9 @@ test('every route, a 404 included, serves one absolute describedby link to /llms
   for (const target of targets) {
     const response = await request.get(target);
     expect(response.status(), target).toBe(200);
-    expect(response.headers()['content-type'] ?? '', target).toMatch(/^text\/plain\b/);
+    expect(response.headers()['content-type'] ?? '', target).toMatch(
+      /^text\/plain; ?charset=utf-8$/i,
+    );
   }
 });
 
