@@ -2,6 +2,7 @@
 // NEXT_PUBLIC_SITE_URL and the case-study data, and `JSON.stringify` alone would let a `</script>`
 // in any of them end the script element early.
 import type { CaseStudy } from '@/data/case-studies';
+import { yearsOfExperience } from '@/data/profile';
 import { socialProfiles } from '@/data/social';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
@@ -41,8 +42,9 @@ export function PersonJsonLd() {
         name: 'Milos Cvetkovic',
         url: siteUrl,
         jobTitle: 'Senior Full Stack Engineer & Architect',
-        description:
-          'Senior Full Stack Engineer & Architect with 13 years of experience building AI-native systems, self-healing agents, and cloud-native architecture.',
+        // The total is career experience, read from the profile; the AI-native work is the recent
+        // part of it (the About timeline starts it in 2025), so the sentence keeps the two apart.
+        description: `Senior Full Stack Engineer & Architect with ${yearsOfExperience()} years of experience in software engineering, now building AI-native systems, self-healing agents, and cloud-native architecture.`,
         knowsAbout: [
           'TypeScript',
           'React',

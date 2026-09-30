@@ -29,9 +29,6 @@ minimumReleaseAge: 1440
 # deny a script a later release adds rather than letting pnpm report it as a new decision.
 # `pnpm check:allowbuilds` enforces both that and the reviewed versions below; CI runs it.
 allowBuilds:
-  # `node install.js`: checks the @esbuild/<platform> binary pnpm already installed and downloads
-  # one only if it is missing. Reviewed at 0.27.2.
-  esbuild: false
   # `node postinstall.js`: calls napi-postinstall's `checkAndPreparePackage(packageJson, true)`,
   # which checks the @unrs/resolver-binding-<platform> binary and downloads one only if it is
   # missing. 1.11.1 reached the same function through the `napi-postinstall <name> <version> check`

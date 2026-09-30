@@ -75,6 +75,13 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Check the build output is function-free
+        # Reads the manifests and prerendered bodies the Build step left in apps/web/.next, so it has
+        # to come after it; its parsing is tested with the other scripts in `pnpm test:scripts`. A
+        # route handler without `export const dynamic = 'force-static'` still serves the right
+        # bytes, as a server function: this step is what notices (scripts/check-build-output.mjs).
+        run: pnpm check:build-output
+
   e2e:
     # Required-check name: main's branch protection requires this exact string (ADR 0021).
     # Renaming the job strands that check and blocks every PR until the protection is updated.

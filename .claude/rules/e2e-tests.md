@@ -107,7 +107,13 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 - Verified defects that an open task will fix are recorded as expected failures, `test.fail()` in
   Playwright and `it.fails` in Vitest, each naming its manifest row and fixing issue (see
   `.claude/epics/audit-remediation-2026-09/43.md`). An expected failure that passes fails the run, so
-  the pull request that fixes the defect deletes the annotation in the same change.
+  the pull request that fixes the defect deletes the annotation in the same change. The
+  machine-readable endpoints follow the same rule without a manifest row: `e2e/endpoints.ts` is the
+  one list of their paths, and `e2e/machine-readable.spec.ts` holds one `test.fail()` per endpoint,
+  its title and `fixed-by` annotation naming the issue that ships it (#59 to #62). Its
+  `expectNotServedYet` requires the 404 before it calls `test.fail()`, so a 5xx or a server that
+  never answered fails the run instead of passing as the expected failure; the change that ships an
+  endpoint deletes that call.
 - The two gate specs opt out of those retries: `e2e/console-clean.spec.ts` and
   `e2e/accessibility.spec.ts` both set `test.describe.configure({ retries: 0 })`, and so does every
   spec that carries an expected failure. A retry would turn an intermittent console message or axe

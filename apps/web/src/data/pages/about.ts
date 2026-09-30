@@ -6,6 +6,7 @@
  * heading and a table needs columns, and the page shows those parts without either.
  */
 import { formatMetric, getCaseStudy } from '@/data/case-studies';
+import { experienceFact, yearsOfExperience } from '@/data/profile';
 import { social } from '@/data/social';
 import type { PageRecord, PageSection, Paragraph } from './types';
 
@@ -106,8 +107,10 @@ export const beliefs: readonly Belief[] = [
   },
 ];
 
+// The first fact is the years of experience, whole from the profile: its figure is derived there,
+// and its label names the figure, so neither is spelled out in this module (R34).
 export const facts: readonly Fact[] = [
-  { label: 'Years shipping code', value: '10+' },
+  experienceFact(),
   { label: 'Production systems rescued', value: '12' },
   { label: 'Teams led', value: '4' },
   { label: 'Morning coffee required', value: '2 cups' },
@@ -208,7 +211,6 @@ const sections: readonly PageSection[] = [
 export const aboutRecord: PageRecord = {
   path: '/about',
   title: 'About — Senior Full-Stack Engineer',
-  summary:
-    'I fix the systems everyone else gave up on: 10+ years rescuing legacy codebases, now building AI agents that fix their own bugs. Based in Belgrade.',
+  summary: `I fix the systems everyone else gave up on: ${yearsOfExperience()} years rescuing legacy codebases, now building AI agents that fix their own bugs. Based in Belgrade.`,
   sections,
 };

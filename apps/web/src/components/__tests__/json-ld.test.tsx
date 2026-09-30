@@ -2,7 +2,9 @@ import { render } from '@testing-library/react';
 import type { ComponentType, ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
+import { yearsOfExperience } from '@/data/profile';
 import { socialProfiles } from '@/data/social';
+import { yearsClausesAboutAi, yearsFigures } from '@/test/experience-claims';
 
 /**
  * The JSON-LD blocks.
@@ -254,6 +256,38 @@ describe('the JSON-LD blocks', () => {
       'https://github.com/milosCvetkovicDev',
       'https://x.com/milos_dev',
     ]);
+  });
+
+  it('describes the Person by the derived years of career experience, not as AI-native work (#49)', async () => {
+    // The description used to put the whole career down as AI-native work, which the site's own
+    // timeline (AI from 2025) and /skills (AI/LLM Integration, 2+) contradict, and printed a fixed
+    // count that goes stale every January. A later year proves the figure is read from the profile.
+    const descriptionIn = async () => {
+      const { PersonJsonLd } = await importWithSiteUrl('https://example.test');
+      const { container, unmount } = render(<PersonJsonLd />);
+      const [person] = jsonLdBlocks(container).map(
+        (body) => JSON.parse(body) as { description: string },
+      );
+      unmount();
+      return person.description;
+    };
+
+    const today = await descriptionIn();
+    expect(today).toContain(`${yearsOfExperience()} years of experience`);
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2031-06-15T12:00:00Z'));
+      const later = await descriptionIn();
+      expect(later).toContain('18 years of experience');
+      for (const description of [today, later]) {
+        // One figure, and the clause that states it names no AI work.
+        expect(yearsFigures(description)).toHaveLength(1);
+        expect(yearsClausesAboutAi(description)).toEqual([]);
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('R32 (#48): a site URL containing </script> does not close the script element early', async () => {
