@@ -116,6 +116,17 @@ describe('caseStudies', () => {
     expect(new Set(caseStudies.map((study) => study.slug)).size).toBe(caseStudies.length);
   });
 
+  it('gives every study a URL-safe slug and a non-empty title and description', () => {
+    // The slug is a path segment and part of the card's description id, which aria-describedby
+    // reads as a space-separated list; the title is the card link's whole accessible name and the
+    // description its accessible description.
+    for (const { slug, title, description } of caseStudies) {
+      expect(slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+      expect(title.trim(), slug).not.toBe('');
+      expect(description.trim(), slug).not.toBe('');
+    }
+  });
+
   it('dates every study with real calendar dates, none in the future, updated no earlier than published', () => {
     // The live clock is deliberate: "not in the future" is a statement about the day the suite runs.
     // Google's publication-dates guidance forbids a future date, and the page now shows these.
