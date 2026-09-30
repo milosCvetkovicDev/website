@@ -94,19 +94,31 @@ test('every case study states the headline metric its cards advertise, and its b
     const { metric } = study.highlight;
     const value = formatMetric(metric);
 
-    // Through `formatMetric`, which is the one function that turns the data into copy: a page that
-    // hard-coded "73%" would satisfy a literal assertion while still being able to drift from the data.
-    if ((await page.getByText(value, { exact: false }).count()) === 0) {
-      missing.push(`/work/${study.slug}: does not state its metric value "${value}"`);
+    // The figure, its label and its basis together, in the one panel that states them: three
+    // strings found anywhere on the page would pass with the label in "More work" and the basis
+    // in the footer. The value goes through `formatMetric`, which is the one function that turns
+    // the data into copy: a page that hard-coded "73%" would satisfy a literal assertion while
+    // still being able to drift from the data.
+    const panel = page.getByRole('region', { name: 'Headline result' });
+    if ((await panel.count()) !== 1) {
+      missing.push(`/work/${study.slug}: has no single "Headline result" panel`);
+      continue;
     }
-    if ((await page.getByText(metric.label, { exact: false }).count()) === 0) {
-      missing.push(`/work/${study.slug}: does not state its metric label "${metric.label}"`);
+    const parts = [
+      ['value', value],
+      ['label', metric.label],
+      ['basis', metric.basis],
+    ] as const;
+    for (const [part, text] of parts) {
+      const shown = panel.getByText(text, { exact: true });
+      if ((await shown.count()) !== 1 || !(await shown.isVisible())) {
+        missing.push(`/work/${study.slug}: its panel does not show its metric ${part} "${text}"`);
+      }
     }
-    // The basis is what makes the figure checkable: what it counted, against what. It is on the
-    // page whole, as the data states it, and visible rather than merely in the markup.
-    const basis = page.getByText(metric.basis, { exact: true });
-    if ((await basis.count()) !== 1 || !(await basis.isVisible())) {
-      missing.push(`/work/${study.slug}: does not show its metric basis "${metric.basis}" once`);
+    // The basis is what makes the figure checkable: what it counted, against what. It is printed
+    // once on the page, so a second producer (#58's scope sentence) replaces this one, not joins it.
+    if ((await page.getByText(metric.basis, { exact: false }).count()) !== 1) {
+      missing.push(`/work/${study.slug}: prints its metric basis more than once`);
     }
   }
 

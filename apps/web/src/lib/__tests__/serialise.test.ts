@@ -78,8 +78,9 @@ function leaves(value: unknown, path = ''): Leaf[] {
 }
 
 /**
- * The fields each shown on one fact line of the twin, by the label that line opens with. The first
- * key that owns a path wins, so the basis, which sits inside the metric, comes before it.
+ * The fields each shown on one fact line of the twin, by the label that line opens with. The most
+ * specific key that owns a path wins, so the basis, which sits inside the metric, is looked for on
+ * its own line whatever order these keys are in.
  */
 const FACT_LINES: Record<string, string> = {
   tagline: 'Tagline',
@@ -117,7 +118,9 @@ function region(shown: string, path: string): string {
   if (owns('title')) return line('# ');
   if (owns('slug')) return line('Source: ');
   if (owns('description')) return shown.split('\n\n')[1] ?? '';
-  const fact = Object.keys(FACT_LINES).find(owns);
+  const [fact] = Object.keys(FACT_LINES)
+    .filter(owns)
+    .sort((a, b) => b.length - a.length);
   if (fact) return line(`- ${FACT_LINES[fact]}: `);
   const section = Object.keys(SECTIONS).find(owns);
   if (section) {
@@ -620,6 +623,20 @@ describe('caseStudyToMarkdown()', () => {
     expect(twin).not.toContain('Measured from');
   });
 
+  it('escapes Markdown in the basis, which is free prose, and still shows it whole', () => {
+    const basis = '*Median* CI time for `nx build` [all_projects], against <none> ~ ever | 1 & 2.';
+    const study: CaseStudy = {
+      ...STUDY,
+      highlight: { ...STUDY.highlight, metric: { ...STUDY.highlight.metric, basis } },
+    };
+    const twin = caseStudyToMarkdown(study);
+    expect(twin).toContain(
+      '\n- Basis: \\*Median\\* CI time for \\`nx build\\` \\[all\\_projects\\], against \\<none\\> \\~ ever \\| 1 & 2.\n',
+    );
+    expect(visible(twin)).toContain(`\n- Basis: ${basis}\n`);
+    expect(missingFrom(study, twin)).toEqual([]);
+  });
+
   it('leaves out an optional section the study does not have', () => {
     const required: CaseStudy = { ...STUDY, howItWorks: undefined, lessons: undefined };
     const twin = caseStudyToMarkdown(required);
@@ -701,11 +718,13 @@ describe('caseStudyToMarkdown()', () => {
       expect(missingFrom(study, twin)).toEqual([]);
     });
 
-    it('renders its metric through formatMetric(), and its basis on the next line', () => {
+    it('renders its metric through formatMetric(), and its basis once, on the next line', () => {
       const { metric } = study.highlight;
       expect(visible(twin)).toContain(
         `- Metric: ${formatMetric(metric)} ${metric.label}\n- Basis: ${metric.basis}\n`,
       );
+      // One producer: #58's scope sentence replaces this line rather than repeating the basis.
+      expect(visible(twin).split(metric.basis)).toHaveLength(2);
     });
 
     it('lists the tech stack as a Category | Items table, one row per category', () => {

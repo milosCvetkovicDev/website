@@ -23,11 +23,21 @@ function agentMetric(study: CaseStudy | undefined = getCaseStudy(AGENT)) {
   return study.highlight.metric;
 }
 
-/** The 2025 timeline entry's description: the paragraph under its role's heading. */
+/**
+ * The 2025 timeline entry's description. An entry is its role's heading, then the quoted highlight,
+ * then the description, as siblings: each step is checked, so a markup change fails here by name
+ * instead of reading some other paragraph.
+ */
 function agentEntryText(): string {
   const role = screen.getByRole('heading', { level: 3, name: 'AI-Native Engineer' });
-  const description = role.parentElement?.querySelector('p:last-of-type');
-  if (!description) throw new Error('the 2025 entry must have a description under its role');
+  const highlight = role.nextElementSibling;
+  if (highlight?.tagName !== 'P' || !highlight.textContent?.startsWith('"')) {
+    throw new Error('the 2025 entry must have its quoted highlight right after its role');
+  }
+  const description = highlight.nextElementSibling;
+  if (description?.tagName !== 'P' || description.nextElementSibling !== null) {
+    throw new Error('the 2025 entry must end with its description, right after the highlight');
+  }
   return description.textContent ?? '';
 }
 

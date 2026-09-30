@@ -36,8 +36,6 @@ export const AsOnTheSite = () => {
         value: 73,
         suffix: '%',
         label: 'errors resolved autonomously',
-        basis:
-          'Production errors the agent diagnosed and fixed in a pull request the team merged, out of all the production errors it monitored.',
       },
       activeNodes: ['client', 'gateway', 'worker', 'ai'] as const,
     },
@@ -53,8 +51,6 @@ export const AsOnTheSite = () => {
         value: 40,
         suffix: '%',
         label: 'less complexity',
-        basis:
-          'Complexity of the codebase after its module-by-module move to Clean Architecture, against the legacy codebase before it.',
       },
       activeNodes: ['client', 'gateway', 'backend', 'db'] as const,
     },
@@ -70,8 +66,6 @@ export const AsOnTheSite = () => {
         value: 5,
         suffix: '×',
         label: 'faster builds',
-        basis:
-          'CI build time with the remote cache, against the same pipelines rebuilding the entire monorepo on every run.',
       },
       activeNodes: ['client', 'gateway', 'worker', 'storage'] as const,
     },
@@ -93,8 +87,6 @@ export const DarkTheme = () => {
         value: 73,
         suffix: '%',
         label: 'errors resolved autonomously',
-        basis:
-          'Production errors the agent diagnosed and fixed in a pull request the team merged, out of all the production errors it monitored.',
       },
       activeNodes: ['client', 'gateway', 'worker', 'ai'] as const,
     },

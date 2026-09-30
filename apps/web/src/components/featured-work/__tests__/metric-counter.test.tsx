@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, formatMetric } from '@/data/case-studies';
+import { featuredProjects } from '@/data/featured-projects';
 import { MetricCounter } from '../metric-counter';
 
 function stubMatchMedia(matches: boolean) {
@@ -92,15 +93,20 @@ describe('MetricCounter', () => {
     expect(frames.cancel).toHaveBeenCalled();
   });
 
-  it("shows a study's figure and label, not its basis, when the card spreads the whole metric", () => {
-    // featured-work.tsx spreads `highlight.metric` in, basis included (#49): the counter prints the
-    // figure the card advertises, and the basis stays the case-study page's.
+  it("shows every featured card's figure and label as the card spreads them in", () => {
+    // featured-work.tsx spreads `project.metric` in: the counter prints the figure the card
+    // advertises, and never the study's basis, which featured-projects.ts does not pass (#49).
     stubAnimationFrames();
-    const [{ highlight }] = caseStudies;
-    const { container } = render(<MetricCounter {...highlight.metric} active={false} />);
-    expect(screen.getByText(formatMetric(highlight.metric))).toBeInTheDocument();
-    expect(screen.getByText(highlight.metric.label)).toBeInTheDocument();
-    expect(container).not.toHaveTextContent(highlight.metric.basis);
+    expect(featuredProjects, 'the home page must feature some project').not.toHaveLength(0);
+    for (const { slug, metric } of featuredProjects) {
+      const { container, unmount } = render(<MetricCounter {...metric} active={false} />);
+      expect(container, slug).toHaveTextContent(formatMetric(metric));
+      expect(container, slug).toHaveTextContent(metric.label);
+      const basis = caseStudies.find((study) => study.slug === slug)?.highlight.metric.basis;
+      expect(basis, slug).toBeTruthy();
+      expect(container.innerHTML, slug).not.toContain(basis);
+      unmount();
+    }
   });
 
   it('never animates under reduced motion', () => {

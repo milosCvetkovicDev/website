@@ -171,6 +171,9 @@ describe('caseStudies', () => {
       expect(basis, slug).toMatch(/\p{L}/u);
       expect(basis, slug).not.toMatch(/[\r\n]/);
       expect(basis, slug).not.toContain(OWNER_TODO);
+      // "Against what baseline" is half of the contract: a basis names the whole it is a fraction
+      // of ("out of") or the state it is compared with ("against"), or it is only a description.
+      expect(basis, slug).toMatch(/\b(?:against|out of)\b/);
     }
   });
 

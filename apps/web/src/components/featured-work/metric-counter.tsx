@@ -5,8 +5,8 @@ import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { formatMetric, type CaseStudyFigure } from '@/data/case-studies';
 
 /**
- * The figure alone: a card spreads its study's whole metric in, and the basis that comes with it is
- * the case-study page's to print, not the counter's.
+ * The figure alone: a card spreads its project's metric in, which `featured-projects.ts` builds
+ * without the study's basis. The basis is the case-study page's to print, not the counter's.
  */
 interface MetricCounterProps extends CaseStudyFigure {
   active: boolean;

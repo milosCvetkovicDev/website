@@ -127,8 +127,13 @@ export default async function CaseStudyPage({ params }: PageProps) {
         </header>
 
         {/* The headline figure the study's cards on / and /work advertise, printed as they print it,
-            with the basis that says what it counted (#49). */}
-        <div className="mb-12 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-6">
+            with the basis that says what it counted (#49). A named region rather than a heading:
+            landmark navigation reaches it, and markdown-twins.spec.ts, which requires every h2 and
+            h3 in main to be a section of the twin, is not asked to find one. */}
+        <section
+          aria-label="Headline result"
+          className="mb-12 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-6"
+        >
           <p>
             <span className="block font-mono text-4xl font-bold text-[var(--accent-text)]">
               {formatMetric(metric)}
@@ -138,7 +143,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
             </span>
           </p>
           <p className="mt-4 leading-relaxed text-[var(--muted)]">{metric.basis}</p>
-        </div>
+        </section>
 
         {/* The Challenge */}
         <section className="mb-12">
