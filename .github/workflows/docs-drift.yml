@@ -60,7 +60,7 @@ permissions:
   contents: read
 
 env:
-  CLAUDE_CODE_VERSION: '2.1.273'
+  CLAUDE_CODE_VERSION: '2.1.285'
   DOCS_DRIFT_ASSIGNEE: milosCvetkovicDev
   DOCS_DRIFT_TITLE: 'docs: correct the drift check-docs-drift found'
 
@@ -247,8 +247,12 @@ jobs:
           # user, project and local settings files (so no project hooks), and confines the file
           # tools to the checkout. --tools names the only tools that exist. In dontAsk mode a call
           # no rule allows is refused, so edits land only in docs/** and the body file. The deny
-          # rules repeat the parts that matter most, in case a flag changes meaning.
+          # rules repeat the parts that matter most, in case a flag changes meaning. The task is
+          # drafting against a written spec with a check after it, which Sonnet 5.5 at high effort
+          # does for less than Opus; the `sonnet` alias names Sonnet 5.5 from Claude Code 2.1.284.
           claude -p "$prompt" \
+            --model sonnet \
+            --effort high \
             --restricted \
             --strict-mcp-config \
             --settings '{"disableAllHooks": true}' \

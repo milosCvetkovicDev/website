@@ -1,3 +1,4 @@
+import { social } from '@/data/social';
 import type { InlineLink, PageRecord } from './types';
 
 /**
@@ -174,10 +175,7 @@ export const skillsCopy = {
   cta: {
     prompt: 'Want to see these skills in action?',
     work: { text: 'View My Work', href: '/work' },
-    linkedIn: {
-      text: 'Follow on LinkedIn',
-      href: 'https://www.linkedin.com/in/milos-cvetkovic-dev',
-    },
+    linkedIn: { text: 'Follow on LinkedIn', href: social.linkedin.href },
   },
 } satisfies {
   eyebrow: string;
