@@ -14,9 +14,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
-import { OWNER_TODO } from '@/data/owner-todo';
+import { OWNER_TODO, ownerTodo } from '@/data/owner-todo';
 import { markdownTwinPath } from '../pathname';
-import { caseStudiesToJson, caseStudyToJson } from '../serialise';
+import { caseStudiesToJson, caseStudyToJson, jsonResponse } from '../serialise';
 
 const ORIGIN = 'https://miloscvetkovic.dev';
 const APP = join(dirname(fileURLToPath(import.meta.url)), '../../app');
@@ -92,6 +92,16 @@ describe.each(caseStudies.map((study) => [study.slug, study] as const))(
       }
     });
 
+    it('serves its metric definition as the data states it, or null while it is the placeholder', () => {
+      // The data test requires every defined study to be statable, so only the placeholder is null.
+      const definition = study.metricDefinition;
+      expect(caseStudyToJson(study).metricDefinition).toStrictEqual(
+        definition.state === 'defined'
+          ? { ...definition, method: definition.method.replace(/\s+/g, ' ').trim() }
+          : null,
+      );
+    });
+
     it('renders the highlight’s metric through formatMetric, beside its raw parts', () => {
       const { highlight } = caseStudyToJson(study);
       expect(highlight).toStrictEqual({
@@ -128,13 +138,50 @@ describe('caseStudyToJson', () => {
     ).toBeNull();
   });
 
-  it('renders a metric that is not a finite number as an em dash, never NaN', () => {
+  it('serves the method on one line, as the page’s sentence states it', () => {
     const [study] = caseStudies;
-    const broken = {
+    const padded = defined(study, '  The median time\n from alert  to resolved incident.\n');
+    expect(caseStudyToJson(padded).metricDefinition).toStrictEqual({
+      ...padded.metricDefinition,
+      method: 'The median time from alert to resolved incident.',
+    });
+  });
+
+  it('serves a definition whose window ends before it starts as null', () => {
+    const [study] = caseStudies;
+    const inverted = {
       ...study,
-      highlight: { ...study.highlight, metric: { ...study.highlight.metric, value: Number.NaN } },
+      metricDefinition: {
+        ...defined(study).metricDefinition,
+        window: { from: '2026-03-27', to: '2026-01-05' },
+      },
     } satisfies CaseStudy;
-    expect(caseStudyToJson(broken).highlight.metric.formatted).toBe('—');
+    expect(caseStudyToJson(inverted).metricDefinition).toBeNull();
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'fails, naming the study, rather than serve a metric value of %s that JSON writes as null',
+    (value) => {
+      const [study] = caseStudies;
+      const broken = {
+        ...study,
+        highlight: { ...study.highlight, metric: { ...study.highlight.metric, value } },
+      } satisfies CaseStudy;
+      expect(() => caseStudyToJson(broken)).toThrow(`caseStudyToJson(${study.slug})`);
+      expect(() => caseStudyToJson(broken)).toThrow('not finite');
+    },
+  );
+
+  it('fails, naming the study, rather than serve a placeholder marker in any other field', () => {
+    const [study] = caseStudies;
+    const drafted = {
+      ...study,
+      lessons: [`Lesson ${ownerTodo('the lesson')}.`],
+    } satisfies CaseStudy;
+    expect(() => caseStudyToJson(drafted)).toThrow(`caseStudyToJson(${study.slug})`);
+    expect(() => caseStudyToJson({ ...study, description: ownerTodo('the summary') })).toThrow(
+      OWNER_TODO,
+    );
   });
 
   it('takes its origin from NEXT_PUBLIC_SITE_URL, as metadataBase does', () => {
@@ -144,6 +191,21 @@ describe('caseStudyToJson', () => {
     expect(url).toBe(`https://preview.example.com/work/${study.slug}`);
     expect(markdown).toBe(`https://preview.example.com/work/${study.slug}/index.md`);
   });
+});
+
+describe('jsonResponse', () => {
+  it('serves a JSON value as its text, with the JSON content type', async () => {
+    const response = jsonResponse([{ a: 1 }]);
+    expect(response.headers.get('content-type')).toBe('application/json');
+    expect(await response.text()).toBe('[{"a":1}]');
+  });
+
+  it.each([undefined, () => 1, Symbol('x')])(
+    'fails rather than serve an empty body for %s, which JSON cannot write',
+    (value) => {
+      expect(() => jsonResponse(value)).toThrow('is not a JSON value');
+    },
+  );
 });
 
 describe('the JSON handlers', () => {

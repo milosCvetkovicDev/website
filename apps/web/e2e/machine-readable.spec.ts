@@ -1,4 +1,5 @@
-import { expect, test, type APIResponse } from '@playwright/test';
+import { expect, test, type APIRequestContext, type APIResponse } from '@playwright/test';
+import { OWNER_TODO } from '../src/data/owner-todo';
 import {
   CASE_STUDIES_JSON,
   CASE_STUDY_ENDPOINTS,
@@ -51,6 +52,20 @@ function expectNotServedYet(response: APIResponse, path: string, issue: string):
   ).toBe(404);
   test.fail();
   expect(response.status(), `${path} is not served`).toBe(200);
+}
+
+/**
+ * A JSON endpoint's document, after its status, its content type and the owner-placeholder rule
+ * (`src/data/owner-todo.ts`: a marker never reaches served output) have been checked on the bytes,
+ * each failure naming the path.
+ */
+async function servedJson(request: APIRequestContext, path: string): Promise<unknown> {
+  const response = await request.get(path);
+  expect(response.status(), `${path} is served`).toBe(200);
+  expect(contentType(response), `${path} is JSON`).toMatch(/^application\/json\b/);
+  const body = await response.text();
+  expect(body, `${path} serves no owner placeholder`).not.toContain(OWNER_TODO);
+  return JSON.parse(body) as unknown;
 }
 
 /** Whether `href` points at `path` on this site: root-relative, or absolute on `SITE_ORIGIN`. */
@@ -169,22 +184,31 @@ test(`#60: ${LLMS_TXT} opens with one H1 and a blockquote and links every case s
 });
 
 test(`#60: ${CASE_STUDIES_JSON} is a JSON array of every case study`, async ({ request }) => {
-  const response = await request.get(CASE_STUDIES_JSON);
-  expect(response.status()).toBe(200);
-  expect(contentType(response)).toMatch(/^application\/json\b/);
-
-  const entries: unknown = await response.json();
+  const entries = await servedJson(request, CASE_STUDIES_JSON);
   expect(Array.isArray(entries), 'the body is an array').toBe(true);
   for (const entry of entries as unknown[]) {
-    // #60: each entry is a case study's fields plus its absolute `url` and `markdown` twin URL.
-    expect(entry, 'every entry is an object').toEqual(
+    // #60: each entry is a case study's fields plus its absolute `url` and `markdown` twin URL, its
+    // metric with the rendering the cards show, and its metric definition or null, never a marker.
+    expect(entry, 'every entry is a case study').toEqual(
       expect.objectContaining({
         slug: expect.any(String),
         title: expect.any(String),
+        highlight: expect.objectContaining({
+          metric: expect.objectContaining({
+            value: expect.any(Number),
+            formatted: expect.any(String),
+          }),
+        }),
         url: expect.any(String),
         markdown: expect.any(String),
       }),
     );
+    const { metricDefinition } = entry as { metricDefinition: unknown };
+    expect(
+      metricDefinition === null ||
+        (typeof metricDefinition === 'object' && !Array.isArray(metricDefinition)),
+      `metricDefinition is null or an object, not ${JSON.stringify(metricDefinition)}`,
+    ).toBe(true);
   }
   const typed = entries as { slug: string; url: string; markdown: string }[];
   expect(typed.map(({ slug }) => slug).sort()).toEqual(
@@ -192,6 +216,7 @@ test(`#60: ${CASE_STUDIES_JSON} is a JSON array of every case study`, async ({ r
   );
 
   // The derived URLs are absolute on this site and name what it serves: the study's page and twin.
+  const linked: string[] = [];
   for (const { slug, route, twin } of CASE_STUDY_ENDPOINTS) {
     const entry = typed.find((study) => study.slug === slug);
     if (!entry) throw new Error(`${CASE_STUDIES_JSON} has no entry for ${slug}`);
@@ -204,32 +229,40 @@ test(`#60: ${CASE_STUDIES_JSON} is a JSON array of every case study`, async ({ r
         true,
       );
       expect(isSitePath(href, path), `${said} should be ${path}`).toBe(true);
-      expect((await request.get(path)).status(), `${path} is served`).toBe(200);
+      linked.push(path);
     }
   }
+  const statuses = await Promise.all(
+    linked.map(async (path) => [path, (await request.get(path)).status()] as const),
+  );
+  expect(statuses, 'every linked page and twin is served').toEqual(
+    linked.map((path) => [path, 200]),
+  );
 });
 
 for (const { slug, json } of CASE_STUDY_ENDPOINTS) {
   test(`#60: ${json} is the case study as JSON`, async ({ request }) => {
-    const response = await request.get(json);
-    expect(response.status()).toBe(200);
-    expect(contentType(response)).toMatch(/^application\/json\b/);
-    const entry: unknown = await response.json();
+    const entry = await servedJson(request, json);
     expect(entry).toMatchObject({ slug });
 
     // One study, one representation: the document is the array's entry for the same slug.
-    const list = (await (await request.get(CASE_STUDIES_JSON)).json()) as { slug: string }[];
+    const list = (await servedJson(request, CASE_STUDIES_JSON)) as { slug: string }[];
     expect(entry).toEqual(list.find((study) => study.slug === slug));
   });
 }
 
 // ADR 0015: the params are fixed at build time, so a slug with no study is a routing-level 404, as
-// the page's and the twin's are, rather than a document rendered on demand.
-test(`#60: ${caseStudyJsonPath(UNKNOWN_SLUG)} is a 404`, async ({ request }) => {
-  expect(CASE_STUDY_ENDPOINTS.map(({ slug }) => slug)).not.toContain(UNKNOWN_SLUG);
-  const response = await request.get(caseStudyJsonPath(UNKNOWN_SLUG));
-  expect(response.status()).toBe(404);
-});
+// the page's and the twin's are, rather than a document rendered on demand. Slugs are
+// case-sensitive, so a study's slug in capitals is unknown too. Neither 404 is served as JSON.
+const [{ slug: KNOWN_SLUG }] = CASE_STUDY_ENDPOINTS;
+for (const slug of [UNKNOWN_SLUG, KNOWN_SLUG.toUpperCase()]) {
+  test(`#60: ${caseStudyJsonPath(slug)} is a 404`, async ({ request }) => {
+    expect(CASE_STUDY_ENDPOINTS.map((endpoint) => endpoint.slug)).not.toContain(slug);
+    const response = await request.get(caseStudyJsonPath(slug));
+    expect(response.status()).toBe(404);
+    expect(contentType(response)).not.toMatch(/^application\/json\b/);
+  });
+}
 
 test(`#61: ${FEED} is an Atom feed`, async ({ request }) => {
   const response = await request.get(FEED);

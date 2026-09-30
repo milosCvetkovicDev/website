@@ -21,6 +21,7 @@ import {
   bodyFile,
   collectOtherFunctions,
   collectProblems,
+  paramsSibling,
   readAppRoutes,
   readPrerender,
 } from './check-build-output.mjs';
@@ -382,6 +383,66 @@ describe('collectProblems', () => {
     assert.match(problems[0], /^\/work\/\[slug\]\/index\.json: .*REQUIRED_ROUTES.*no path/);
   });
 
+  it('fails a required dynamic route that drops a param its page serves, naming the path', () => {
+    // `/work/b` answers 200 while its JSON would be a 404: at least one path is not enough.
+    const prerender = cleanPrerender();
+    delete prerender.routes['/work/b/index.json'];
+    const { problems } = check({
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => b !== 'work/b/index.json.body'),
+    });
+    assert.equal(problems.length, 1);
+    assert.match(
+      problems[0],
+      /^\/work\/\[slug\]\/index\.json: .*nothing for \/work\/b, which \/work\/\[slug\] serves/,
+    );
+  });
+
+  it('fails a required dynamic route that prerenders a param its page does not serve', () => {
+    const prerender = cleanPrerender();
+    prerender.routes['/work/c/index.json'] = prerendered('/work/[slug]/index.json');
+    const { problems } = check({ prerender, bodies: [...CLEAN_BODIES, 'work/c/index.json.body'] });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/work\/\[slug\]\/index\.json: .*prerendered \/work\/c, which/);
+  });
+
+  it('fails a required route rebuilt as a page, which serves HTML', () => {
+    const appRoutes = Object.fromEntries(
+      Object.entries(APP_ROUTES).map(([entry, route]) =>
+        route === '/case-studies.json' ? ['/case-studies.json/page', route] : [entry, route],
+      ),
+    );
+    const { problems } = check({
+      appRoutes,
+      bodies: [
+        ...CLEAN_BODIES.filter((b) => b !== 'case-studies.json.body'),
+        'case-studies.json.html',
+      ],
+    });
+    assert.equal(problems.length, 1);
+    assert.match(
+      problems[0],
+      /^\/case-studies\.json: .*REQUIRED_ROUTES.*a page, not a route handler/,
+    );
+  });
+
+  it('fails a required route that is also allowlisted as a function, even with no path', () => {
+    // The allowlist would accept its function finding, and the required check must not.
+    const prerender = cleanPrerender();
+    delete prerender.routes['/case-studies.json'];
+    const { problems, functions } = check({
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => b !== 'case-studies.json.body'),
+      allowed: ['/case-studies.json'],
+    });
+    assert.deepEqual(functions, ['/case-studies.json']);
+    assert.equal(problems.length, 1);
+    assert.match(
+      problems[0],
+      /^\/case-studies\.json: .*both REQUIRED_ROUTES and ALLOWED_FUNCTIONS/,
+    );
+  });
+
   it('fails a dynamic route that renders unknown params on demand', () => {
     const prerender = cleanPrerender();
     prerender.dynamicRoutes['/work/[slug]'] = { fallback: null };
@@ -578,6 +639,21 @@ describe('ALLOWED_FUNCTIONS', () => {
   it('is empty: nothing in this site needs a server function until #62 adds /mcp', () => {
     assert.deepEqual([...ALLOWED_FUNCTIONS], []);
   });
+});
+
+describe('paramsSibling', () => {
+  for (const [route, sibling] of [
+    ['/work/[slug]/index.json', '/work/[slug]'],
+    ['/work/[slug]/og-image.png', '/work/[slug]'],
+    ['/a/[x]/b/[y]/c/d', '/a/[x]/b/[y]'],
+    ['/work/[slug]', null],
+    ['/case-studies.json', null],
+    ['/', null],
+  ]) {
+    it(`gives ${JSON.stringify(sibling)} for ${route}`, () => {
+      assert.equal(paramsSibling(/** @type {string} */ (route)), sibling);
+    });
+  }
 });
 
 describe('REQUIRED_ROUTES', () => {

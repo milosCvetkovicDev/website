@@ -42,9 +42,10 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   `generateStaticParams` and `dynamicParams = false`. Both return `caseStudiesToJson()` or
   `caseStudyToJson()` from the serialiser: every `CaseStudy` field as the data holds it, the
   metric with its `formatMetric()` text as `formatted`, a metric definition that cannot be stated
-  as `null` (never a marker), and the absolute `url` of the page and `markdown` of its twin.
-  `lib/__tests__/case-studies-json.test.ts` fails when an entry's keys are not the study's own
-  plus those two, and calls both handlers.
+  as `null` (never a marker) and a stated one with its method on one line, and the absolute `url`
+  of the page and `markdown` of its twin. The prerender fails on a metric value that is not finite
+  and on a marker in any other field. `lib/__tests__/case-studies-json.test.ts` fails when an
+  entry's keys are not the study's own plus those two, and calls both handlers.
 
 `buildMetadata()` advertises the twin of every route that calls it as
 `alternates.types['text/markdown']`, at the path `markdownTwinPath()` in `src/lib/pathname.ts`
@@ -59,7 +60,7 @@ All of the route handlers prerender at build time, and `pnpm check:build-output`
 `dynamic = 'force-static'`, and without it builds as a server function, as a handler that exports
 any other method does even with it. The same check fails a `proxy.ts` and any `'use server'`
 action, and a build that lacks a route in its `REQUIRED_ROUTES` (the JSON handlers above) or
-prerendered no path for one. `sitemap.ts`, `robots.ts`, `layout.tsx`, `components/json-ld.tsx`
+prerendered no path for one, or other slugs for `/work/[slug]/index.json` than for the page. `sitemap.ts`, `robots.ts`, `layout.tsx`, `components/json-ld.tsx`
 and `lib/serialise.ts` each read `NEXT_PUBLIC_SITE_URL`, falling back to
 `https://miloscvetkovic.dev`. There is no middleware.
 `src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the

@@ -2,11 +2,13 @@ import {
   caseStudies,
   formatMetric,
   formatMetricScope,
+  oneLine,
   type CaseStudy,
   type CaseStudyHighlight,
   type CaseStudyMetric,
   type MetricDefinition,
 } from '@/data/case-studies';
+import { OWNER_TODO } from '@/data/owner-todo';
 import type { InlineLink, Paragraph, PageRecord, PageSection } from '@/data/pages/types';
 import { assertPathname, markdownTwinPath } from './pathname';
 
@@ -37,9 +39,19 @@ export function markdownResponse(body: string): Response {
   return new Response(body, { headers: { 'Content-Type': MARKDOWN_CONTENT_TYPE } });
 }
 
-/** A value as a JSON response, with the one content type every JSON representation is served with. */
+/**
+ * A value as a JSON response, with the one content type every JSON representation is served with.
+ * A value JSON cannot write (`undefined`, a function) throws rather than serve an empty body as
+ * JSON, and so does a BigInt or a cycle, with `JSON.stringify`'s own error; each fails the prerender.
+ */
 export function jsonResponse(value: unknown): Response {
-  return new Response(JSON.stringify(value), { headers: { 'Content-Type': JSON_CONTENT_TYPE } });
+  const body = JSON.stringify(value);
+  if (typeof body !== 'string') {
+    throw new Error(
+      `jsonResponse: ${typeof value} is not a JSON value, so there is no body to serve`,
+    );
+  }
+  return new Response(body, { headers: { 'Content-Type': JSON_CONTENT_TYPE } });
 }
 
 /**
@@ -374,13 +386,16 @@ export type CaseStudyJson = Omit<CaseStudy, 'highlight' | 'metricDefinition'> & 
 };
 
 /**
- * A metric definition as it may be served: as it stands once `formatMetricScope()`, the one producer
- * of its sentence, could state it, and `null` while it is the owner's placeholder or holds nothing
- * statable, because a placeholder marker never reaches served output (`data/owner-todo.ts`).
+ * A metric definition as it may be served: its window, and its method on one line as the page's
+ * sentence states it, once `formatMetricScope()`, the one producer of that sentence, could state
+ * it. Called with no basis, it returns `null` exactly when the definition cannot be stated. It is
+ * `null` while the definition is the owner's placeholder, has a window that is not two days in
+ * order, or has a method with nothing statable in it, because a placeholder marker never reaches
+ * served output (`data/owner-todo.ts`) and the JSON states nothing the page would not.
  */
 function statedDefinition(definition: MetricDefinition): StatedMetricDefinition | null {
   return definition.state === 'defined' && formatMetricScope(null, definition) !== null
-    ? definition
+    ? { ...definition, method: oneLine(definition.method) }
     : null;
 }
 
@@ -393,9 +408,16 @@ function statedDefinition(definition: MetricDefinition): StatedMetricDefinition 
  * `lib/__tests__/case-studies-json.test.ts` fails when a study holds a key the JSON does not carry.
  */
 export function caseStudyToJson(caseStudy: CaseStudy): CaseStudyJson {
-  const { highlight, metricDefinition } = caseStudy;
-  const page = `/work/${caseStudy.slug}`;
-  return {
+  const { highlight, metricDefinition, slug } = caseStudy;
+  // JSON writes NaN and Infinity as `null`, which `CaseStudyMetricJson` says a value never is, so
+  // the prerender fails instead; `data/__tests__/case-studies.test.ts` fails such a data edit first.
+  if (!Number.isFinite(highlight.metric.value)) {
+    throw new Error(
+      `caseStudyToJson(${slug}): the metric value ${highlight.metric.value} is not finite`,
+    );
+  }
+  const page = `/work/${slug}`;
+  const entry: CaseStudyJson = {
     ...caseStudy,
     highlight: {
       ...highlight,
@@ -405,6 +427,12 @@ export function caseStudyToJson(caseStudy: CaseStudy): CaseStudyJson {
     url: absoluteUrl(page),
     markdown: absoluteUrl(markdownTwinPath(page)),
   };
+  // Every other field is served as the data holds it, so a registered `ownerTodo()` in its prose
+  // would reach the JSON: the prerender fails rather than publish it (`data/owner-todo.ts`).
+  if (JSON.stringify(entry).includes(OWNER_TODO)) {
+    throw new Error(`caseStudyToJson(${slug}): a field still holds ${OWNER_TODO}, never served`);
+  }
+  return entry;
 }
 
 /** Every case study as JSON, in the data module's order: the body of `/case-studies.json`. */
