@@ -181,11 +181,18 @@ export function SectionProgress({
                   // stages of a process that has to be advanced through.
                   aria-current={index === activeSection ? 'location' : undefined}
                 >
-                  {/* Dot */}
+                  {/* Dot. `data-state` is what paints it: every dot up to the active one is lit,
+                      and the `data-[state=lit]` variant swaps the border fill for the accent, so
+                      the state a test reads and the colour on screen come from one attribute and
+                      cannot disagree. The glow stays on the current dot alone, which
+                      `aria-current` on the button names. */}
                   <div
-                    className={`relative h-3 w-3 rounded-full transition-all duration-300 ${
-                      index <= activeSection ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'
-                    } ${index === activeSection ? 'shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_60%,transparent)]' : ''}`}
+                    data-state={index <= activeSection ? 'lit' : 'unlit'}
+                    className={`relative h-3 w-3 rounded-full bg-[var(--border)] transition-all duration-300 data-[state=lit]:bg-[var(--accent)] ${
+                      index === activeSection
+                        ? 'shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_60%,transparent)]'
+                        : ''
+                    }`}
                   />
 
                   {/* Label, revealed to the pointer and to the keyboard alike: without the
@@ -213,6 +220,7 @@ export function SectionProgress({
           <div className="h-full w-full bg-[var(--border)]" />
           <div
             ref={progressLineRef}
+            data-progress="line"
             className="absolute top-0 w-full bg-[var(--accent)] will-change-[height]"
             style={{
               height: `${(activeSection / (sections.length - 1)) * 100}%`,
@@ -227,6 +235,7 @@ export function SectionProgress({
         <div className="h-1 bg-[var(--border)]">
           <div
             ref={mobileProgressRef}
+            data-progress="bar"
             className="h-full bg-[var(--accent)] will-change-[width]"
             style={{ width: '0%', transition: 'none' }}
           />

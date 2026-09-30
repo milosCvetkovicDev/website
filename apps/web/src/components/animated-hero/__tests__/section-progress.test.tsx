@@ -110,10 +110,17 @@ function resizeViewportTo(height: number) {
   settle();
 }
 
-const mobileBar = () => document.querySelector<HTMLElement>('.will-change-\\[width\\]');
-const progressLine = () => document.querySelector<HTMLElement>('.will-change-\\[height\\]');
+const mobileBar = () => document.querySelector<HTMLElement>('[data-progress="bar"]');
+const progressLine = () => document.querySelector<HTMLElement>('[data-progress="line"]');
 const dotButton = (label: string) => screen.getByRole('button', { name: `Go to ${label} section` });
-const dot = (label: string) => dotButton(label).firstElementChild;
+
+/** The dot inside a button: the element whose `data-state` is what paints its fill. */
+function dot(label: string) {
+  const found = dotButton(label).querySelector('[data-state]');
+  if (!found) throw new Error(`the ${label} button holds no dot carrying data-state`);
+  return found;
+}
+
 const currentDots = () =>
   screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-current'));
 
@@ -146,8 +153,8 @@ describe('SectionProgress', () => {
     scrollWindowTo(STORY_TOP + STORY_RANGE / 4);
 
     expect(readout).toHaveTextContent('[02/07] DISCOVER');
-    expect(dot('DISCOVER')).toHaveClass('bg-[var(--accent)]');
-    expect(dot('PLAN')).toHaveClass('bg-[var(--border)]');
+    expect(dot('DISCOVER')).toHaveAttribute('data-state', 'lit');
+    expect(dot('PLAN')).toHaveAttribute('data-state', 'unlit');
     expect(mobileBar()?.style.width).toBe('25%');
     expect(progressLine()?.style.height).toBe(`${(1 / 6) * 100}%`);
 
@@ -165,9 +172,14 @@ describe('SectionProgress', () => {
     settle();
 
     expect(screen.getByText('[04/07] BUILD')).toBeInTheDocument();
-    expect(dot('BUILD')).toHaveClass('bg-[var(--accent)]');
+    expect(dot('BUILD')).toHaveAttribute('data-state', 'lit');
     // The dot after it stays unlit: reaching a section is not the same as lighting them all.
-    expect(dot('TEST')).toHaveClass('bg-[var(--border)]');
+    expect(dot('TEST')).toHaveAttribute('data-state', 'unlit');
+    // The attribute is what paints the fill, through a `data-[state=lit]` variant, so a lit dot
+    // and an unlit one that are both off the current section carry the same classes: nothing but
+    // `data-state` can colour one differently from what it says.
+    expect(dot('DISCOVER')).toHaveAttribute('data-state', 'lit');
+    expect(dot('DISCOVER').className).toBe(dot('TEST').className);
     expect(mobileBar()?.style.width).toBe('50%');
     expect(progressLine()?.style.height).toBe('50%');
   });

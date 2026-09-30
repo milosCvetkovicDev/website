@@ -88,11 +88,10 @@ describe('HeroContent', () => {
 
   it('renders the player card header dots (decorative)', () => {
     const { container } = render(<HeroContent />);
-    // Three colored dots in the card header, inside an aria-hidden div
-    const decorativeHeader = container.querySelector('[aria-hidden="true"]');
-    expect(decorativeHeader).toBeInTheDocument();
-    // Should have 3 dot divs inside
-    const dots = decorativeHeader?.querySelectorAll('.rounded-full');
-    expect(dots).toHaveLength(3);
+    // The three window controls in the card header are decoration, so the row that holds them is
+    // hidden from assistive technology as a whole.
+    const controls = container.querySelector('[data-window-controls]');
+    expect(controls).toHaveAttribute('aria-hidden', 'true');
+    expect(controls?.querySelectorAll('[data-window-dot]')).toHaveLength(3);
   });
 });
