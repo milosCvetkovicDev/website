@@ -7,11 +7,12 @@ import { expectHydrated } from './support/hydration';
  * Rows R14 and R15 of the RED manifest, both fixed by #47. These are the two accessibility defects no
  * axe rule can catch, which is why they are a role-and-name spec rather than another audit pass:
  *
- * - R14. `AnimatedText` splits its text into one `inline-block` span per character
- *   (`animated-text.tsx:176-206`, `:338-368`, `:1089-1119`). Accessible-name computation joins the
- *   spans without separators in the DOM sense but the rendered result reads as spaced letters to a
- *   screen reader, so the Discovery, Execution and Loop `h2`s announce as `M o s t b u g s …`. No axe
- *   rule looks at this: `empty-heading` only asks whether there is text at all.
+ * - R14, fixed by slice 47d and kept as its guard. `AnimatedText` splits its text into one
+ *   `inline-block` span per character, and accessible-name computation puts a space around every box
+ *   that is not inline, so the Discovery, Execution and Loop `h2`s announced as `M o s t b u g s …`.
+ *   No axe rule looks at this: `empty-heading` only asks whether there is text at all. The split copy
+ *   is now `aria-hidden`, beside a visually hidden copy holding the sentence whole (`SplitText` in
+ *   `animated-text.tsx`).
  * - R15. Each phase is a bare `<section>` with no accessible name, so it maps to no role at all — a
  *   `<section>` becomes a `region` only once it is named — and `getByRole('region', { name })` resolves
  *   nothing. `heading-order` only checks for level jumps, and every phase's own `h2` is its *closing*
@@ -41,7 +42,7 @@ const PHASES = [
 
 /**
  * The three phase-closing `h2`s whose text `AnimatedText` splits into one span per character: the
- * `wave`, `scatter` and `morse` variants (`animated-text.tsx:176-206`, `:338-368`, `:1089-1119`).
+ * `wave`, `scatter` and `morse` variants (`SplitText` in `animated-text.tsx`).
  */
 const SPLIT_HEADINGS = [
   {
@@ -65,8 +66,6 @@ async function openStory(page: Page) {
 }
 
 test('each story heading exposes its words, not its letters', async ({ page }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R14, #47' });
   await openStory(page);
 
   const missing: string[] = [];
@@ -91,9 +90,31 @@ test('each story heading exposes its words, not its letters', async ({ page }) =
   expect(
     missing,
     'each character of these headings is its own inline-block span (animated-text.tsx), so the ' +
-      'computed accessible name reads as spaced letters. Keep the per-character animation and give ' +
-      'the heading a single text alternative.',
+      'computed accessible name reads as spaced letters unless that split copy is aria-hidden ' +
+      'beside a visually hidden copy of the whole sentence (SplitText), with no aria-label.',
   ).toEqual([]);
+});
+
+test('selecting a split headline copies its sentence once, as it is drawn', async ({ page }) => {
+  // The sentence is in the DOM twice: the visually hidden copy assistive technology reads, and the
+  // letters a sighted visitor sees. The hidden one is `select-none`, so a selection, and the copy
+  // made from it, holds the drawn sentence only.
+  await openStory(page);
+  const copied: string[] = [];
+  for (const { text } of SPLIT_HEADINGS) {
+    const selection = await page
+      .getByRole('heading', { level: 2, name: text })
+      .evaluate((heading) => {
+        const range = document.createRange();
+        range.selectNodeContents(heading);
+        const selected = getSelection();
+        selected?.removeAllRanges();
+        selected?.addRange(range);
+        return selected?.toString() ?? '';
+      });
+    copied.push(selection.replace(/\s+/g, ' ').trim());
+  }
+  expect(copied).toEqual(SPLIT_HEADINGS.map(({ text }) => text));
 });
 
 test('each of the six story sections is a named region whose first heading is its title', async ({
@@ -137,14 +158,20 @@ test('each of the six story sections is a named region whose first heading is it
 });
 
 test('the six story sections are all present and in order', async ({ page }) => {
-  // Green, and the floor under both rows above: R14 and R15 would both start passing on a page that
-  // had stopped rendering the story, and an unexpected pass fails the run. This says the sections are
-  // there and it is only their naming that is missing.
+  // Green, and the floor under both rows above: R15 would start passing on a page that had stopped
+  // rendering the story, and an unexpected pass fails the run. This says the sections are there and
+  // it is only their naming that is missing.
   await openStory(page);
 
   const labels = PHASES.map(({ label }) => label);
   for (const label of labels) {
-    await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
+    // The label a sighted visitor reads, not the visually hidden copy `AnimatedText` puts first for
+    // assistive technology: Playwright counts that 1px box as visible, so `.first()` alone would be
+    // checking the copy nobody sees.
+    const visibleLabel = page
+      .getByText(label, { exact: true })
+      .and(page.locator(':not(.sr-only):not(.sr-only *)'));
+    await expect(visibleLabel.first()).toBeVisible();
   }
   // And in document order, which is the outline R15's fix has to name.
   const order = await page.evaluate((wanted) => {
