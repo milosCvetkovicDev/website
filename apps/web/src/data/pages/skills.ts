@@ -158,6 +158,12 @@ export const skillsCopy = {
     differentiators: 'What makes the difference',
     toolkit: 'The full toolkit',
   },
+  /**
+   * The line above the proficiency bars (#58): what the bars' levels and the badges' years are, so
+   * neither reads as a measurement. The issue's draft, for the owner to sign off.
+   */
+  coreSkillsNote:
+    'Self-assessed depth, not a measurement. The years count from my first production work in each.',
   staySharp: {
     heading: 'How I stay sharp',
     paragraphs: [
@@ -181,6 +187,7 @@ export const skillsCopy = {
   eyebrow: string;
   intro: RichParagraph;
   headings: Record<'coreSkills' | 'differentiators' | 'toolkit', string>;
+  coreSkillsNote: string;
   staySharp: { heading: string; paragraphs: readonly RichParagraph[] };
   // The page renders `work` through `next/link` and `linkedIn` as an external `<a target="_blank">`.
   cta: {

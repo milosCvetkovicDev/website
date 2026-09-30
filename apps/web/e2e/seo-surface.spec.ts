@@ -10,6 +10,9 @@ import {
   expectedStatus,
 } from './routes';
 import { caseStudies } from '../src/data/case-studies';
+import { coreSkills, skillsCopy } from '../src/data/pages/skills';
+import { workCopy } from '../src/data/pages/work';
+import { productionFigure } from '../src/data/work-stats';
 import { formatContentDate } from '../src/lib/content-date';
 import { fetchHead, first } from './support/served-head';
 
@@ -576,3 +579,109 @@ for (const { slug, publishedAt, updatedAt } of caseStudies) {
     ).toEqual({ datePublished: shown('Published'), dateModified: shown('Updated') });
   });
 }
+
+test('/work counts the studies running in production and serves no claim without a denominator (#58)', async ({
+  page,
+  request,
+}) => {
+  // #58 AC 10. The stats bar read "100% In Production" and "0 Left Unfinished", two literals no
+  // record stood behind: the first went false when the self-healing agent was retired, and the
+  // second had no denominator at all. The figure is now productionFigure() over the studies'
+  // statuses, and "Left Unfinished" is gone until the owner supplies what it would count.
+  const response = await request.get('/work');
+  expect(response.status(), 'GET /work').toBe(200);
+  const html = await response.text();
+  // The whole body, flight payload included: the claim is gone, not merely hidden. The context
+  // around a hit is the message, rather than the whole document.
+  const unfinished = html.search(/Left Unfinished/i);
+  expect(
+    unfinished === -1 ? '' : html.slice(Math.max(0, unfinished - 80), unfinished + 40),
+    '/work must not serve "Left Unfinished"',
+  ).toBe('');
+
+  // The bar is found by structure from its first label, the Projects count, which the base build
+  // served too, so a missing figure fails on the figure rather than on the lookup. `DOMParser` runs
+  // no scripts, so only real elements answer.
+  const [firstLabel] = workCopy.stats.map(({ label }) => label);
+  const stats = await page.evaluate(
+    ([markup, label]) => {
+      const main = new DOMParser()
+        .parseFromString(markup, 'text/html')
+        .querySelector('main#main-content');
+      const text = (element: Element) => (element.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const labelled = [...(main?.querySelectorAll('div') ?? [])].find(
+        (element) => element.children.length === 0 && text(element) === label,
+      );
+      const bar = labelled?.parentElement?.parentElement;
+      if (!bar) return null;
+      return [...bar.children].map((item) => ({
+        pieces: item.children.length,
+        value: item.children[0] ? text(item.children[0]) : '',
+        label: item.children[1] ? text(item.children[1]) : '',
+      }));
+    },
+    [html, firstLabel] as const,
+  );
+  expect(stats, `/work must serve a stats bar with a "${firstLabel}" figure`).not.toBeNull();
+  const figures = (stats ?? []).map(({ value, label }) => ({ value, label }));
+
+  // Each figure and its label stay two elements, the figure drawn large and the label small. (Axe
+  // cannot decide either at rest, over the page's grid background, so they count against /work's
+  // incomplete budget in accessibility.spec.ts, not its floor.)
+  expect(
+    (stats ?? []).map(({ pieces }) => pieces),
+    'each figure is a value and a label',
+  ).toEqual(workCopy.stats.map(() => 2));
+  expect(figures, 'the bar serves the record, in order').toEqual([...workCopy.stats]);
+  expect(
+    figures.map(({ value }) => value),
+    "the bar serves productionFigure()'s count",
+  ).toContain(productionFigure(caseStudies));
+  for (const { value, label } of figures) {
+    expect(value, `"${label}" must not be a bare percentage`).not.toMatch(/%/);
+  }
+});
+
+test('/skills says above its proficiency bars that they are self-assessed (#58)', async ({
+  page,
+  request,
+}) => {
+  // #58 AC 11, the /skills half: the bars show a level out of 100 and the badges a number of years,
+  // and nothing on the page said what either was a measure of. The line sits between the section's
+  // heading and the bars, in the served HTML, so a reader without JavaScript meets it first.
+  const response = await request.get('/skills');
+  expect(response.status(), 'GET /skills').toBe(200);
+  const served = await page.evaluate(
+    ([markup, heading]) => {
+      const main = new DOMParser()
+        .parseFromString(markup, 'text/html')
+        .querySelector('main#main-content');
+      const text = (element: Element) => (element.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const h2 = [...(main?.querySelectorAll('h2') ?? [])].find(
+        (element) => text(element) === heading,
+      );
+      const note = h2?.nextElementSibling;
+      const bars = note?.nextElementSibling;
+      return {
+        heading: Boolean(h2),
+        note: note ? { tag: note.localName, text: text(note) } : null,
+        skillsAfterNote: bars ? [...bars.querySelectorAll('h3')].map(text) : [],
+      };
+    },
+    [await response.text(), skillsCopy.headings.coreSkills] as const,
+  );
+
+  expect(served.heading, `/skills must serve the "${skillsCopy.headings.coreSkills}" h2`).toBe(
+    true,
+  );
+  expect(served.note, 'the paragraph straight after the heading is the note').toEqual({
+    tag: 'p',
+    text: skillsCopy.coreSkillsNote,
+  });
+  expect(skillsCopy.coreSkillsNote, 'the note says the levels are not measured').toMatch(
+    /self-assessed/i,
+  );
+  expect(served.skillsAfterNote, 'the bars follow the note, every core skill among them').toEqual(
+    coreSkills.map(({ name }) => name),
+  );
+});
