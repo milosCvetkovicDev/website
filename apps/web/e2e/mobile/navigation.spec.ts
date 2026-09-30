@@ -542,9 +542,23 @@ test.describe('the mobile header', () => {
       });
     const point = { x: 20, y: PHONE.height - 100 };
 
-    // The control: with the menu closed, the same swipe scrolls the page.
-    await swipe(point.x, point.y);
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    // The control: with the menu closed, the same swipe scrolls the page. A gesture made in the
+    // first moments after hydration can be lost: on CI (never locally) one left scrollY at 0 for
+    // 10 s with the menu closed, the class of post-hydration scroll loss `/` has shown before. So
+    // the control swipes again until the page has moved, and records how many swipes that took.
+    // Only the control repeats; the swipes with the menu open below are measured once.
+    let controlSwipes = 0;
+    await expect(async () => {
+      controlSwipes += 1;
+      await swipe(point.x, point.y);
+      expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    }).toPass({ intervals: [250, 500, 1000], timeout: 10_000 });
+    if (controlSwipes > 1) {
+      test.info().annotations.push({
+        type: 'control swipes',
+        description: `${controlSwipes} swipes before the closed-menu page scrolled`,
+      });
+    }
     const before = await page.evaluate(() => window.scrollY);
 
     await openMenu(page);
