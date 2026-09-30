@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { yearsOfExperience } from '@/data/profile';
 import { HeroContent } from '../hero-content';
 
 describe('HeroContent', () => {
@@ -15,8 +16,25 @@ describe('HeroContent', () => {
     expect(screen.getByText('Milos Cvetkovic')).toBeInTheDocument();
     expect(screen.getByText('Full Stack Engineer & Architect')).toBeInTheDocument();
     expect(screen.getByText('AI-Native Development')).toBeInTheDocument();
-    expect(screen.getByText(/13 years/)).toBeInTheDocument();
+    expect(
+      screen.getByText(`${yearsOfExperience()} years · 6 domains · 3 clouds`),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Building at Obsidian 22/)).toBeInTheDocument();
+  });
+
+  it('reads the years of experience from the profile, not from a number of its own (#49)', () => {
+    // A later year proves the figure is derived: a hard-coded count would still print this year's.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2031-06-15T12:00:00Z'));
+      render(<HeroContent />);
+      const xp = screen.getByText('XP').nextElementSibling;
+      expect(xp, 'the XP term is followed by its definition').not.toBeNull();
+      expect(xp?.textContent).toBe(`${yearsOfExperience()} years · 6 domains · 3 clouds`);
+      expect(xp?.textContent).toMatch(/^18 years/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('renders all 8 skill tags', () => {
@@ -54,7 +72,7 @@ describe('HeroContent', () => {
     const dl = document.querySelector('dl');
     expect(dl).toBeInTheDocument();
 
-    // 4 PLAYER_STATS entries + 1 hardcoded STATUS row = 5 dt elements
+    // 4 player stat rows + 1 hardcoded STATUS row = 5 dt elements
     const dts = document.querySelectorAll('dt');
     expect(dts).toHaveLength(5);
 

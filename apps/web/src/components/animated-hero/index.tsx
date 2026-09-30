@@ -34,9 +34,9 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
   // and the phases build their timelines when it arrives. preloadGsap() arms that wait here as well
   // as in the phases because under reduced motion a phase mounted on the client, after a soft
   // navigation to `/`, returns before asking for it (on a hard load the hydration pass still asks,
-  // with the reduced-motion hook's server snapshot, false), and the hover effects in
-  // animated-text.tsx still use it under `reduce`. Leaving `/` before any intent takes the wait
-  // down again, so the next page's first scroll does not fetch GSAP for nothing.
+  // with the reduced-motion hook's server snapshot, false). The hover effects in animated-text.tsx
+  // never ask under `reduce`. Leaving `/` before any intent takes the wait down again, so the next
+  // page's first scroll does not fetch GSAP for nothing.
   useEffect(() => {
     preloadGsap();
     return disarmGsapIntent;
