@@ -93,6 +93,27 @@ test(`AC 1: POST ${MCP} answers server/discover for ${PROTOCOL_VERSION}, naming 
   expectNoCorsGrant(response);
 });
 
+test(`POST ${MCP} carries the six static security headers, like every other path`, async ({
+  request,
+}) => {
+  // `security-headers.spec.ts` proves them on a page, a case study, a chunk and a 404, all GETs.
+  // This is the site's only server function, so a `headers()` source narrowed to page routes would
+  // strip them from the one route that runs code per request. Their values are next-config.test.ts's.
+  const response = await post(request, MCP, { method: 'tools/list' });
+  expect(response.status()).toBe(200);
+  const headers = response.headers();
+  const missing = [
+    'x-content-type-options',
+    'x-frame-options',
+    'referrer-policy',
+    'content-security-policy',
+    'permissions-policy',
+    'cross-origin-opener-policy',
+  ].filter((name) => headers[name] === undefined);
+  expect(missing, 'the `/:path*` entry in next.config.ts must cover /mcp').toEqual([]);
+  expect(headers['x-content-type-options']).toBe('nosniff');
+});
+
 test(`AC 2 and 3: tools/list names three read-only tools, cacheably, and hands out no session`, async ({
   request,
 }) => {

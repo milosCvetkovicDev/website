@@ -66,8 +66,9 @@ without authentication, and it is the one route on this site that runs per reque
   stateless fallback, which mints no session either.
 - **Read-only.** Three tools, in `apps/web/src/app/mcp/tools.ts`: `search_case_studies({ query })`
   over the titles, tags, highlights and tech stacks, where each query word must begin a word there
-  (so `go` does not match a word that merely contains it), ignoring case and accents; `get_case_study({ slug })`, which answers an
-  unknown slug with an error result naming the known ones; and `get_tech_stack()`, every
+  (so `go` does not match a word that merely contains it), ignoring case and accents;
+  `get_case_study({ slug })`, which answers an unknown slug with an error result naming the known
+  ones; and `get_tech_stack()`, every
   tech-stack category with the slugs each item appears in. Each has a title and the annotations
   `readOnlyHint: true` and `destructiveHint: false`. Their payloads are `caseStudyToJson()` and
   `caseStudiesToJson()`, the serialiser `/case-studies.json` uses, so no fact is written twice.
