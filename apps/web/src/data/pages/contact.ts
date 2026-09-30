@@ -34,8 +34,8 @@ export const socialLinks = [
     primary: false,
   },
   {
-    // The page's own copy, kept until the owner answers pages-23 (#49); it names `social.x.name`,
-    // which `data/__tests__/social.test.ts` checks of every labelled profile link.
+    // The page's own copy, kept by the owner's pages-23 decision (2026-09-29, #49); it names
+    // `social.x.name`, which `data/__tests__/social.test.ts` checks of every labelled profile link.
     name: 'X / Twitter',
     href: social.x.href,
     description: 'Quick takes on engineering, AI, and tech trends.',

@@ -136,7 +136,7 @@ const story: readonly StoryParagraph[] = [
 const connectLinks: readonly ProfileLink[] = [
   { name: social.linkedin.name, href: social.linkedin.href, primary: true },
   { name: social.github.name, href: social.github.href, primary: false },
-  // The page's own copy, as on /contact, until the owner answers pages-23 (#49).
+  // The page's own copy, as on /contact, kept by the owner's pages-23 decision (2026-09-29, #49).
   { name: 'X / Twitter', href: social.x.href, primary: false },
 ];
 
