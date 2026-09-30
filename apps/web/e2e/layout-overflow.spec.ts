@@ -1,6 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
-import { expectGsapLoaded } from './support/gsap';
+import { expect, test } from '@playwright/test';
 import { expectHydrated } from './support/hydration';
+import { SAMPLE_MS, expectMotion, expectNoOverflow, measureOverflow } from './support/overflow';
 
 /**
  * `/` must not scroll sideways at the tablet and desktop widths either.
@@ -13,15 +13,16 @@ import { expectHydrated } from './support/hydration';
  * 774px at a 768px viewport, 826px at 820px and 1082px at 1080px. It now rises in from `y: 20`, and
  * `story-phases.test.tsx` refuses a positive `x` in any phase's from-state.
  *
- * Four widths, under `no-preference`, sampled on every animation frame rather than read once, and
- * each part of that matters:
+ * Four widths, under `no-preference`, sampled on every animation frame rather than read once
+ * (`e2e/support/overflow.ts`), and each part of that matters:
  *
- * - From the moment GSAP is in, for two seconds. GSAP arrives on the visitor's first intent
- *   (`load-gsap.ts`), and until then no timeline exists and no from-state is rendered, so the
- *   sampling sends that intent and waits for GSAP first: taken straight after hydration it would
- *   read the server-rendered page and pass for the wrong reason. After that, a single read can
- *   still land between the frame a timeline is built and the frame its tweens first render, so the
- *   worst of every frame in the window is what is asserted.
+ * - From hydration until GSAP is in, and for two seconds after. GSAP arrives on the visitor's first
+ *   intent (`load-gsap.ts`), and until then no timeline exists and no from-state is rendered, so
+ *   the window sends that intent and keeps sampling until GSAP has built the story and 2 s beyond:
+ *   a read taken straight after hydration alone would see the server-rendered page and pass for the
+ *   wrong reason, and a single read after that can still land between the frame a timeline is
+ *   built and the frame its tweens first render. The worst of every frame is what is asserted, and
+ *   because sampling starts at hydration, the frames in which the timelines are built are read too.
  * - Again after scrolling past the Execution phase and back to the top. The phase's
  *   `toggleActions` end in `reverse`, so scrolling back above the section plays its entrance
  *   backwards and puts the from-state on screen again: the finding measured the overflow there
@@ -41,113 +42,14 @@ import { expectHydrated } from './support/hydration';
 
 // No retries. These were expected failures, and they stay a guard a retry cannot turn into a green
 // "flaky" run.
-test.describe.configure({ retries: 0 });
+//
+// 60 s rather than the 30 s default: the test waits up to `GSAP_SETTLE_TIMEOUT_MS` (17 s) for GSAP
+// and then samples three more windows, two of them 2 s long, so on a loaded runner the default
+// would end it as a bare "Test timeout" rather than with a message naming the cause. It measured
+// about 5 to 6 s per width.
+test.describe.configure({ retries: 0, timeout: 60_000 });
 
 const DESKTOP_WIDTHS = [768, 820, 1024, 1080];
-
-/** How long each sampling window runs. */
-const SAMPLE_MS = 2_000;
-
-/**
- * The fewest frames a window may read and still count. At 60 frames a second a window reads about
- * 120; one that read almost none was starved rather than clean, and says nothing either way.
- */
-const MIN_FRAMES = 10;
-
-/** One sampling window: its worst overflow, the frames it read, and who was past the edge then. */
-interface Overflow {
-  worst: number;
-  frames: number;
-  offenders: string[];
-}
-
-/**
- * Samples `scrollWidth - clientWidth` on every animation frame: first, when `walk` is set, while
- * scrolling down until the Execution phase has left the top of the viewport and then back up to
- * the top, and then for `SAMPLE_MS` wherever the page is. Each part reports its own worst frame,
- * with the elements reaching past the right edge on it, so a failure names the offender and the
- * moment.
- *
- * The walk moves three quarters of a viewport per step and waits two frames per step, so every
- * ScrollTrigger on the way fires and React commits between moves, as for a visitor scrolling.
- */
-async function sampleOverflow(page: Page, walk: boolean) {
-  return page.evaluate(
-    async ({ walk, sampleMs }) => {
-      const root = document.documentElement;
-      const nextFrame = () =>
-        new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      const reachingPastTheEdge = () => {
-        const viewport = root.clientWidth;
-        const wide: string[] = [];
-        for (const el of document.querySelectorAll<HTMLElement>('body *')) {
-          const box = el.getBoundingClientRect();
-          if (box.right <= viewport + 1) continue;
-          // A fixed decoration that is off-canvas does not make the document scroll.
-          if (getComputedStyle(el).position === 'fixed') continue;
-          const className = typeof el.className === 'string' ? el.className.slice(0, 90) : '';
-          wide.push(`  ${el.tagName.toLowerCase()}.${className} right=${Math.round(box.right)}`);
-        }
-        return wide.slice(0, 6);
-      };
-      const emptyWindow = (): Overflow => ({ worst: 0, frames: 0, offenders: [] });
-      const sample = async (into: Overflow) => {
-        await nextFrame();
-        into.frames += 1;
-        const overflow = root.scrollWidth - root.clientWidth;
-        if (overflow > into.worst) {
-          into.worst = overflow;
-          into.offenders = reachingPastTheEdge();
-        }
-      };
-
-      let walked: Overflow | null = null;
-      if (walk) {
-        walked = emptyWindow();
-        const code = document.querySelector('[aria-label="ErrorAnalyzer source"]');
-        const execution = code?.closest('section');
-        if (!execution) throw new Error('no section holds the ErrorAnalyzer source on this page');
-        const step = Math.max(1, Math.round(window.innerHeight * 0.75));
-        let steps = 0;
-        while (execution.getBoundingClientRect().bottom > 0) {
-          if (++steps > 200) throw new Error('the walk did not pass Execution in 200 steps');
-          const before = window.scrollY;
-          window.scrollTo({ top: before + step, behavior: 'instant' });
-          await sample(walked);
-          await sample(walked);
-          if (window.scrollY === before) {
-            throw new Error('the page ended before the Execution phase left the viewport');
-          }
-        }
-        while (window.scrollY > 0) {
-          if (++steps > 400) throw new Error('the walk did not get back to the top in 400 steps');
-          window.scrollTo({ top: Math.max(0, window.scrollY - step), behavior: 'instant' });
-          await sample(walked);
-          await sample(walked);
-        }
-      }
-
-      const settled = emptyWindow();
-      const end = performance.now() + sampleMs;
-      while (performance.now() < end) await sample(settled);
-      return { walked, settled };
-    },
-    { walk, sampleMs: SAMPLE_MS },
-  );
-}
-
-/** Fails when a window saw any overflow, or read too few frames to have looked. */
-function expectNoOverflow(seen: Overflow, clientWidth: number, when: string) {
-  expect(
-    seen.frames,
-    `${when}: only ${seen.frames} animation frames were read`,
-  ).toBeGreaterThanOrEqual(MIN_FRAMES);
-  expect(
-    seen.worst,
-    `/ overflowed its ${clientWidth}px viewport by up to ${seen.worst}px ${when}. ` +
-      `Elements reaching past the right edge on that frame:\n${seen.offenders.join('\n')}`,
-  ).toBe(0);
-}
 
 for (const width of DESKTOP_WIDTHS) {
   test(`/ does not scroll sideways at ${width}px`, async ({ page }) => {
@@ -155,31 +57,31 @@ for (const width of DESKTOP_WIDTHS) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/');
     await expectHydrated(page);
-    // The from-state only exists once GSAP has loaded and the Execution phase has built its
-    // timeline.
-    await expectGsapLoaded(page);
     // Guard the guard: under `reduce` no from-state is ever rendered and this whole file is green
     // for the wrong reason.
-    expect(
-      await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
-      'this assertion only means something with motion allowed',
-    ).toBe(false);
-    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    await expectMotion(page, 'no-preference');
 
-    const atRest = await sampleOverflow(page, false);
-    expectNoOverflow(atRest.settled, clientWidth, `in the ${SAMPLE_MS} ms after GSAP loaded`);
-
-    const afterTheStory = await sampleOverflow(page, true);
-    if (!afterTheStory.walked) throw new Error('the walk past the Execution phase did not run');
-    expectNoOverflow(
-      afterTheStory.walked,
-      clientWidth,
-      'while scrolling past the Execution phase and back to the top',
-    );
-    expectNoOverflow(
-      afterTheStory.settled,
-      clientWidth,
-      `in the ${SAMPLE_MS} ms after returning to the top`,
-    );
+    const seen = await measureOverflow(page, [
+      {
+        kind: 'gsap',
+        label: `from hydration until GSAP had built the story, and ${SAMPLE_MS} ms after`,
+        ms: SAMPLE_MS,
+      },
+      {
+        kind: 'walk',
+        label: 'while scrolling down past the Execution phase',
+        // The Execution phase is the section holding the code sample, found by its accessible
+        // name as the phone spec finds it.
+        to: { pastSectionOf: '[aria-label="ErrorAnalyzer source"]' },
+      },
+      { kind: 'walk', label: 'while scrolling back to the top', to: 'top' },
+      {
+        kind: 'settle',
+        label: `in the ${SAMPLE_MS} ms after returning to the top`,
+        ms: SAMPLE_MS,
+      },
+    ]);
+    expectNoOverflow(seen, '/');
+    expect(seen[1]?.moved, 'the walk past the Execution phase did not move').toBeGreaterThan(0);
   });
 }
