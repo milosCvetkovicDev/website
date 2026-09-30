@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
@@ -27,6 +27,7 @@ const healingTimeline = [
 
 export function LoopPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const dashboardRef = useRef<HTMLDivElement>(null);
   const alertRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -187,18 +188,20 @@ export function LoopPhase() {
   return (
     <section
       ref={sectionRef}
+      aria-labelledby={titleId}
       className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
     >
       <div className="w-full max-w-3xl">
-        {/* Phase Header */}
-        <div className="mb-8 flex items-center gap-3">
+        {/* Phase Header: the section's heading and its name, ahead of the panels. The space keeps
+            "PHASE 5" and the title apart in that name; a flex row lays it out as nothing. */}
+        <h2 id={titleId} className="mb-8 flex items-center gap-3">
           <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="elastic">PHASE 5</AnimatedText>
-          </span>
+          </span>{' '}
           <AnimatedText animation="wave" className="font-mono text-sm text-[var(--muted)]">
             THE LOOP
           </AnimatedText>
-        </div>
+        </h2>
 
         {/* Dashboard */}
         <div ref={dashboardRef}>

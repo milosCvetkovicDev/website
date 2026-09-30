@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, QuestItem, TypingCursor } from './hud-elements';
 import { AnimatedText } from './animated-text';
@@ -16,6 +16,7 @@ const requirements = [
 
 export function DiscoveryPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const chatRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<HTMLDivElement>(null);
   const questRef = useRef<HTMLDivElement>(null);
@@ -108,18 +109,20 @@ export function DiscoveryPhase() {
   return (
     <section
       ref={sectionRef}
+      aria-labelledby={titleId}
       className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
     >
       <div className="w-full max-w-5xl">
-        {/* Phase Header */}
-        <div className="mb-8 flex items-center gap-3">
+        {/* Phase Header: the section's heading and its name, ahead of the panels. The space keeps
+            "PHASE 1" and the title apart in that name; a flex row lays it out as nothing. */}
+        <h2 id={titleId} className="mb-8 flex items-center gap-3">
           <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="morse">PHASE 1</AnimatedText>
-          </span>
+          </span>{' '}
           <AnimatedText animation="highlight" className="font-mono text-sm text-[var(--muted)]">
             DISCOVERY
           </AnimatedText>
-        </div>
+        </h2>
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Chat Interface */}

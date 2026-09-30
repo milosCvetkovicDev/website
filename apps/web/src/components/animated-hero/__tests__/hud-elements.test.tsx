@@ -8,7 +8,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap } from '../gsap-runtime';
 import { requestGsap } from '../load-gsap';
-import { DataStream, PipelineStage, StatDisplay } from '../hud-elements';
+import { DataStream, HudPanel, PipelineStage, StatDisplay } from '../hud-elements';
 import { cssTransitions } from './gsap-css-conflicts';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers
@@ -444,4 +444,22 @@ describe('PipelineStage', () => {
       expect(transitioned).toContain('background-color');
     },
   );
+});
+
+describe('HudPanel', () => {
+  afterEach(cleanup);
+
+  // Eight titled panels in the story each drew an "ACTIVE" beside their title, and each one was
+  // announced: decoration a screen-reader user heard eight times over (#47, hero-10).
+  it('keeps the ACTIVE indicator beside its title away from assistive technology', () => {
+    render(<HudPanel title="QUEST LOG">content</HudPanel>);
+
+    const active = screen.getByText('ACTIVE');
+    const hidden = active.closest('[aria-hidden="true"]');
+    expect(hidden, 'the ACTIVE label is inside an aria-hidden element').not.toBeNull();
+    // The dot beside it is the same indicator, so it goes with it.
+    expect(hidden?.querySelector('.rounded-full')).not.toBeNull();
+    // The title is the panel's content and stays exposed.
+    expect(screen.getByText('QUEST LOG').closest('[aria-hidden="true"]')).toBeNull();
+  });
 });

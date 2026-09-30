@@ -704,8 +704,8 @@ const closings = [
     closing: storyClosings.loop,
     headline: 'h2',
   },
-  // The last section closes inside its terminal, on a paragraph rather than a heading. Whether it
-  // becomes a heading is the page outline's call (#47), not this move's, which changes no markup.
+  // The last section closes inside its terminal, on a paragraph rather than a heading: its one
+  // heading is its title, SESSION COMPLETE (#47, hero-10).
   {
     name: 'GameComplete',
     Phase: GameComplete,
@@ -746,8 +746,18 @@ describe.each(closings)('$name, its closing lines', ({ Phase, closing, headline 
     ({ reduce }) => {
       media.reduce = reduce;
       const { container } = render(<Phase />);
-      const headlines = container.querySelectorAll(headline);
+      // Each section is named by its title, an h2 of its own at the top (#47, hero-10): the closing
+      // headline is the one match that is not the title, and it comes below it.
+      const labelledBy = container.querySelector('section')?.getAttribute('aria-labelledby');
+      const title = labelledBy ? document.getElementById(labelledBy) : null;
+      expect(title?.tagName, 'the section is named by a heading of its own').toBe('H2');
+      if (!title) throw new Error('no heading names the section');
+      const headlines = [...container.querySelectorAll(headline)].filter((el) => el !== title);
       expect(headlines, `exactly one ${headline} closes the section`).toHaveLength(1);
+      expect(
+        title.compareDocumentPosition(headlines[0]) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'the title comes before the closing headline',
+      ).toBeTruthy();
       const line = headlines[0].nextElementSibling;
       expect(line?.tagName, 'the line under the headline').toBe('P');
 

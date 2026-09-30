@@ -13,11 +13,14 @@ import { expectHydrated } from './support/hydration';
  *   No axe rule looks at this: `empty-heading` only asks whether there is text at all. The split copy
  *   is now `aria-hidden`, beside a visually hidden copy holding the sentence whole (`SplitText` in
  *   `animated-text.tsx`).
- * - R15. Each phase is a bare `<section>` with no accessible name, so it maps to no role at all — a
- *   `<section>` becomes a `region` only once it is named — and `getByRole('region', { name })` resolves
- *   nothing. `heading-order` only checks for level jumps, and every phase's own `h2` is its *closing*
- *   statement at the bottom, so Strategy announces `h3 TECH TREE` and `h3 SYNERGIES DETECTED` before
- *   its `h2`, and `game-complete.tsx` has no heading at all.
+ * - R15, fixed by slice 47e and kept as its guard. Each phase was a bare `<section>` with no
+ *   accessible name, so it mapped to no role at all — a `<section>` becomes a `region` only once it is
+ *   named — and `getByRole('region', { name })` resolved nothing. `heading-order` only checks for
+ *   level jumps, and every phase's own `h2` was its *closing* statement at the bottom, so Strategy
+ *   announced `h3 TECH TREE` and `h3 SYNERGIES DETECTED` before its `h2`, and `game-complete.tsx` had
+ *   no heading at all. Each phase's header row (`PHASE n` and its title) is now an `h2` the
+ *   `<section>` is `aria-labelledby`, and `SESSION COMPLETE` is the closing section's. The closing
+ *   statements stay `h2`s too, which R14 above queries.
  *
  * This is the one file that queries by accessible name deliberately, against the query-cost note in
  * CLAUDE.md: the name *is* the subject here.
@@ -120,8 +123,6 @@ test('selecting a split headline copies its sentence once, as it is drawn', asyn
 test('each of the six story sections is a named region whose first heading is its title', async ({
   page,
 }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R15, #47' });
   await openStory(page);
 
   const problems: string[] = [];
@@ -151,31 +152,37 @@ test('each of the six story sections is a named region whose first heading is it
 
   expect(
     problems,
-    'the six phase sections (discovery-phase.tsx:104, strategy-phase.tsx:148, ' +
-      'execution-phase.tsx:269, gauntlet-phase.tsx:216, loop-phase.tsx:166, game-complete.tsx:105) ' +
-      "have no accessible name, and each phase's own h2 is its closing statement at the bottom.",
+    'each story <section> is aria-labelledby the h2 its header row is (PHASE n and the title), ' +
+      'or SESSION COMPLETE in the closing section, and that heading comes before its panels.',
   ).toEqual([]);
 });
 
 test('the six story sections are all present and in order', async ({ page }) => {
-  // Green, and the floor under both rows above: R15 would start passing on a page that had stopped
-  // rendering the story, and an unexpected pass fails the run. This says the sections are there and
-  // it is only their naming that is missing.
+  // The floor under the rows above, written while R15 was an expected failure (one that starts
+  // passing fails the run, and so would a page that stopped rendering the story): the sections are
+  // there, each showing its title, in the order a sighted visitor reads them, which is the outline
+  // R15 holds the names to.
   await openStory(page);
 
   const labels = PHASES.map(({ label }) => label);
+  // Inside the story's sections only: the section progress dots beside the story carry the same
+  // titles (`section-progress.tsx`), and they come first in the document, so a page-wide search
+  // would find every title there and say nothing about the sections.
+  const sections = page.locator('section');
   for (const label of labels) {
     // The label a sighted visitor reads, not the visually hidden copy `AnimatedText` puts first for
     // assistive technology: Playwright counts that 1px box as visible, so `.first()` alone would be
     // checking the copy nobody sees.
-    const visibleLabel = page
+    const visibleLabel = sections
       .getByText(label, { exact: true })
       .and(page.locator(':not(.sr-only):not(.sr-only *)'));
     await expect(visibleLabel.first()).toBeVisible();
   }
   // And in document order, which is the outline R15's fix has to name.
   const order = await page.evaluate((wanted) => {
-    const text = document.body.innerText;
+    const text = [...document.querySelectorAll('section')]
+      .map((section) => section.innerText)
+      .join('\n');
     return wanted.map((label) => text.indexOf(label));
   }, labels);
   expect(order.every((index) => index >= 0)).toBe(true);

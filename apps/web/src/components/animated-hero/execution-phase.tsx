@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, ActivityEntry } from './hud-elements';
 import { AnimatedText } from './animated-text';
@@ -81,6 +81,7 @@ const AnimatedProgressBar = ({
 
 export function ExecutionPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const codeRef = useRef<HTMLDivElement>(null);
   const statsRef = useRef<HTMLDivElement>(null);
   const activityRef = useRef<HTMLDivElement>(null);
@@ -288,18 +289,20 @@ export function ExecutionPhase() {
   return (
     <section
       ref={sectionRef}
+      aria-labelledby={titleId}
       className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
     >
       <div className="w-full max-w-5xl">
-        {/* Phase Header */}
-        <div className="mb-8 flex items-center gap-3">
+        {/* Phase Header: the section's heading and its name, ahead of the panels. The space keeps
+            "PHASE 3" and the title apart in that name; a flex row lays it out as nothing. */}
+        <h2 id={titleId} className="mb-8 flex items-center gap-3">
           <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
             <AnimatedText animation="glitch">PHASE 3</AnimatedText>
-          </span>
+          </span>{' '}
           <AnimatedText animation="stagger-up" className="font-mono text-sm text-[var(--muted)]">
             EXECUTION
           </AnimatedText>
-        </div>
+        </h2>
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Code Streaming */}

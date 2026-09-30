@@ -363,7 +363,9 @@ async function openAnimatedText(
       const root = (window as unknown as FinderWindow).__findAnimatedText(wanted);
       if (!root) return false;
       const section = root.closest('section');
-      const headline = section?.querySelector('h2');
+      // The closing headline, the section's last h2: its first is the title in the header row
+      // (#47, hero-10), which no entrance fades.
+      const headline = [...(section?.querySelectorAll('h2') ?? [])].at(-1);
       // Without it the wait below would be over at once, mid-entrance.
       if (!headline) throw new Error(`no h2 in the section holding "${wanted}"`);
       const opaque = (from: Element) => {

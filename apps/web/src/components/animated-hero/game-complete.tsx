@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal } from './hud-elements';
 import { AnimatedText } from './animated-text';
@@ -10,6 +10,7 @@ import { storyClosings } from '@/data/pages/home';
 
 export function GameComplete() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const terminalRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLAnchorElement>(null);
 
@@ -110,17 +111,19 @@ export function GameComplete() {
   return (
     <section
       ref={sectionRef}
+      aria-labelledby={titleId}
       className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
     >
       <div className="w-full max-w-xl text-center">
         <div ref={terminalRef}>
           <Terminal className="text-left">
             <div className="space-y-4">
-              <div className="border-b border-[#30363d] py-4 text-center">
+              {/* The closing section's heading and its name. */}
+              <h2 id={titleId} className="border-b border-[#30363d] py-4 text-center">
                 <span className="text-lg font-bold text-[var(--status-ok)]">
                   <AnimatedText animation="scramble">SESSION COMPLETE</AnimatedText>
                 </span>
-              </div>
+              </h2>
 
               <div className="space-y-2 py-4">
                 <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[var(--muted)]">
