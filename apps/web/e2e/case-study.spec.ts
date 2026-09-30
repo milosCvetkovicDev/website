@@ -36,6 +36,13 @@ test('every case study renders its title, description and a link back to /work',
     const back = page.getByRole('link', { name: /Back to Work/i });
     await expect(back).toHaveCount(1);
     await expect(back).toHaveAttribute('href', '/work');
+
+    // The closing CTA reads `social.linkedin.href` (#49); the literal is the oracle.
+    const connect = page.getByRole('link', { name: 'Connect on LinkedIn', exact: true });
+    await expect(connect).toHaveAttribute(
+      'href',
+      'https://www.linkedin.com/in/milos-cvetkovic-dev',
+    );
   }
 });
 
