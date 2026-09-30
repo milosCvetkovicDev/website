@@ -77,11 +77,15 @@ function leaves(value: unknown, path = ''): Leaf[] {
   return value === undefined ? [] : [{ path, text: String(value) }];
 }
 
-/** The fields each shown on one fact line of the twin, by the label that line opens with. */
+/**
+ * The fields each shown on one fact line of the twin, by the label that line opens with. The first
+ * key that owns a path wins, so the basis, which sits inside the metric, comes before it.
+ */
 const FACT_LINES: Record<string, string> = {
   tagline: 'Tagline',
   'highlight.category': 'Category',
   'highlight.status': 'Status',
+  'highlight.metric.basis': 'Basis',
   'highlight.metric': 'Metric',
   tags: 'Tags',
   publishedAt: 'Published',
@@ -526,7 +530,14 @@ describe('caseStudyToMarkdown()', () => {
     highlight: {
       category: 'DEVOPS',
       status: 'PRODUCTION',
-      metric: { value: 4.96, prefix: '~', suffix: '×', decimals: 1, label: 'faster builds' },
+      metric: {
+        value: 4.96,
+        prefix: '~',
+        suffix: '×',
+        decimals: 1,
+        label: 'faster builds',
+        basis: 'CI time with the cache, against every run rebuilding everything.',
+      },
     },
     challenge: 'Every CI run rebuilt the entire monorepo.',
     approach: 'I built a cache server.',
@@ -560,6 +571,7 @@ describe('caseStudyToMarkdown()', () => {
         '- Category: DEVOPS',
         '- Status: PRODUCTION',
         '- Metric: \\~5.0× faster builds',
+        '- Basis: CI time with the cache, against every run rebuilding everything.',
         '- Tags: Bun, Elysia',
         '- Published: 2026-09-09',
         '- Updated: 2026-09-25',
@@ -689,9 +701,11 @@ describe('caseStudyToMarkdown()', () => {
       expect(missingFrom(study, twin)).toEqual([]);
     });
 
-    it('renders its metric through formatMetric()', () => {
+    it('renders its metric through formatMetric(), and its basis on the next line', () => {
       const { metric } = study.highlight;
-      expect(visible(twin)).toContain(`- Metric: ${formatMetric(metric)} ${metric.label}\n`);
+      expect(visible(twin)).toContain(
+        `- Metric: ${formatMetric(metric)} ${metric.label}\n- Basis: ${metric.basis}\n`,
+      );
     });
 
     it('lists the tech stack as a Category | Items table, one row per category', () => {

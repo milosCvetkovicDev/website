@@ -64,7 +64,10 @@ export const timeline: readonly TimelineEntry[] = [
     year: '2021',
     role: 'JavaScript Tech Lead',
     company: 'Enterprise SaaS',
-    highlight: '40% reduction in bug reports after architecture overhaul',
+    // No figure until the owner sources one (#49, pages-3): the percentage this line used to state
+    // is established by no study, and the enterprise study's figure counts complexity, not bug
+    // reports. A figure here would be read from a study through formatMetric(), as 2025's is.
+    highlight: 'Fewer bug reports after architecture overhaul',
     description:
       'Inherited a codebase where "temporary fixes" had calcified into permanent nightmares. Introduced Clean Architecture. Watched bug reports drop. Trained the next generation of leads.',
   },

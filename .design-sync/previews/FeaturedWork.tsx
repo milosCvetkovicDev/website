@@ -32,7 +32,13 @@ export const AsOnTheSite = () => {
       tags: ['Claude Agent SDK', 'Bun', 'Elysia', 'Azure'],
       category: 'AI AGENT',
       status: 'RETIRED' as const,
-      metric: { value: 73, suffix: '%', label: 'faster resolution' },
+      metric: {
+        value: 73,
+        suffix: '%',
+        label: 'errors resolved autonomously',
+        basis:
+          'Production errors the agent diagnosed and fixed in a pull request the team merged, out of all the production errors it monitored.',
+      },
       activeNodes: ['client', 'gateway', 'worker', 'ai'] as const,
     },
     {
@@ -43,7 +49,13 @@ export const AsOnTheSite = () => {
       tags: ['React', 'Node.js', 'PostgreSQL', 'Terraform'],
       category: 'PLATFORM',
       status: 'PRODUCTION' as const,
-      metric: { value: 40, suffix: '%', label: 'less complexity' },
+      metric: {
+        value: 40,
+        suffix: '%',
+        label: 'less complexity',
+        basis:
+          'Complexity of the codebase after its module-by-module move to Clean Architecture, against the legacy codebase before it.',
+      },
       activeNodes: ['client', 'gateway', 'backend', 'db'] as const,
     },
     {
@@ -54,7 +66,13 @@ export const AsOnTheSite = () => {
       tags: ['Bun', 'Elysia', 'Azure Blob Storage'],
       category: 'DEVOPS',
       status: 'PRODUCTION' as const,
-      metric: { value: 5, suffix: '×', label: 'faster builds' },
+      metric: {
+        value: 5,
+        suffix: '×',
+        label: 'faster builds',
+        basis:
+          'CI build time with the remote cache, against the same pipelines rebuilding the entire monorepo on every run.',
+      },
       activeNodes: ['client', 'gateway', 'worker', 'storage'] as const,
     },
   ];
@@ -71,7 +89,13 @@ export const DarkTheme = () => {
       tags: ['Claude Agent SDK', 'Bun', 'Elysia', 'Azure'],
       category: 'AI AGENT',
       status: 'RETIRED' as const,
-      metric: { value: 73, suffix: '%', label: 'faster resolution' },
+      metric: {
+        value: 73,
+        suffix: '%',
+        label: 'errors resolved autonomously',
+        basis:
+          'Production errors the agent diagnosed and fixed in a pull request the team merged, out of all the production errors it monitored.',
+      },
       activeNodes: ['client', 'gateway', 'worker', 'ai'] as const,
     },
   ];

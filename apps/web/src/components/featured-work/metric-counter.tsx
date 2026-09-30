@@ -2,9 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
-import { formatMetric, type CaseStudyMetric } from '@/data/case-studies';
+import { formatMetric, type CaseStudyFigure } from '@/data/case-studies';
 
-interface MetricCounterProps extends CaseStudyMetric {
+/**
+ * The figure alone: a card spreads its study's whole metric in, and the basis that comes with it is
+ * the case-study page's to print, not the counter's.
+ */
+interface MetricCounterProps extends CaseStudyFigure {
   active: boolean;
 }
 

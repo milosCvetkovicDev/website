@@ -74,8 +74,8 @@ describe('the day the printed figure took effect', () => {
     // `/` and /about change what they say every January with no commit, so their sitemap lastmod
     // has to move with the figure; the other routes keep the dates recorded by hand.
     const today = (await import('../static-routes')).STATIC_ROUTE_UPDATED;
-    expect(today['/']).toBe('2026-09-25');
-    expect(today['/about']).toBe('2026-09-28');
+    expect(today['/']).toBe('2026-09-30');
+    expect(today['/about']).toBe('2026-09-30');
 
     vi.resetModules();
     vi.useFakeTimers({ toFake: ['Date'] });

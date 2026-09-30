@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { BreadcrumbListJsonLd, TechArticleJsonLd } from '@/components/json-ld';
-import { adjacentCaseStudies, caseStudies, getCaseStudy } from '@/data/case-studies';
+import { adjacentCaseStudies, caseStudies, formatMetric, getCaseStudy } from '@/data/case-studies';
 import { social } from '@/data/social';
 import { formatContentDates } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
@@ -64,6 +64,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
     caseStudy.publishedAt,
     caseStudy.updatedAt,
   );
+  const { metric } = caseStudy.highlight;
 
   return (
     <div className="py-16 md:py-24">
@@ -124,6 +125,20 @@ export default async function CaseStudyPage({ params }: PageProps) {
             ))}
           </div>
         </header>
+
+        {/* The headline figure the study's cards on / and /work advertise, printed as they print it,
+            with the basis that says what it counted (#49). */}
+        <div className="mb-12 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-6">
+          <p>
+            <span className="block font-mono text-4xl font-bold text-[var(--accent-text)]">
+              {formatMetric(metric)}
+            </span>{' '}
+            <span className="mt-1 block font-mono text-xs tracking-wider text-[var(--muted)] uppercase">
+              {metric.label}
+            </span>
+          </p>
+          <p className="mt-4 leading-relaxed text-[var(--muted)]">{metric.basis}</p>
+        </div>
 
         {/* The Challenge */}
         <section className="mb-12">
