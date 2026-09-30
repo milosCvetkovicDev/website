@@ -521,58 +521,45 @@ test.describe('the mobile header', () => {
     expect(focus.index, `Tab from <body> went to ${focus.name}`).toBeGreaterThanOrEqual(0);
   });
 
-  // A modal dialog makes the page inert, but not unscrollable: a swipe on the backdrop chained to
-  // the document and moved the page (and on `/`, the scroll-driven story) behind the open menu.
-  // Chromium only, for the real touch-scroll gesture its DevTools protocol can synthesise.
-  test('a swipe on the backdrop does not scroll the page behind the open menu', async ({
+  // A modal dialog makes the page inert, but not unscrollable: scrolling over the backdrop chained
+  // to the document and moved the page (and on `/`, the scroll-driven story) behind the open menu.
+  // `html:has(dialog:modal)` stops that for every kind of scroll. The row scrolls with the wheel,
+  // which moves the page on every runner: a touch gesture synthesised over the DevTools protocol
+  // (`Input.synthesizeScrollGesture`) scrolled it on macOS but never on CI's Linux Chromium, where
+  // even the closed-menu control stayed at scrollY 0 for 10 s. Mobile WebKit has no wheel.
+  test('scrolling over the backdrop does not scroll the page behind the open menu', async ({
     page,
     browserName,
   }) => {
-    test.skip(browserName !== 'chromium', 'Input.synthesizeScrollGesture is a Chromium protocol');
+    test.skip(browserName !== 'chromium', 'Playwright does not support the wheel on mobile WebKit');
     await page.setViewportSize(PHONE);
     await open(page, '/about');
-    const cdp = await page.context().newCDPSession(page);
-    const swipe = (x: number, y: number) =>
-      cdp.send('Input.synthesizeScrollGesture', {
-        x,
-        y,
-        yDistance: -300,
-        gestureSourceType: 'touch',
-        speed: 2000,
-      });
+    const scrollAt = async (x: number, y: number) => {
+      await page.mouse.move(x, y);
+      await page.mouse.wheel(0, 300);
+    };
+    const scrollY = () => page.evaluate(() => window.scrollY);
     const point = { x: 20, y: PHONE.height - 100 };
 
-    // The control: with the menu closed, the same swipe scrolls the page. A gesture made in the
-    // first moments after hydration can be lost: on CI (never locally) one left scrollY at 0 for
-    // 10 s with the menu closed, the class of post-hydration scroll loss `/` has shown before. So
-    // the control swipes again until the page has moved, and records how many swipes that took.
-    // Only the control repeats; the swipes with the menu open below are measured once.
-    let controlSwipes = 0;
-    await expect(async () => {
-      controlSwipes += 1;
-      await swipe(point.x, point.y);
-      expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-    }).toPass({ intervals: [250, 500, 1000], timeout: 10_000 });
-    if (controlSwipes > 1) {
-      test.info().annotations.push({
-        type: 'control swipes',
-        description: `${controlSwipes} swipes before the closed-menu page scrolled`,
-      });
-    }
-    const before = await page.evaluate(() => window.scrollY);
+    // The control: with the menu closed, the same scroll moves the page.
+    await scrollAt(point.x, point.y);
+    await expect.poll(scrollY).toBeGreaterThan(0);
+    const before = await scrollY();
 
     await openMenu(page);
-    await swipe(point.x, point.y);
-    await swipe(PHONE.width - 40, PHONE.height - 100);
-    expect(await page.evaluate(() => window.scrollY), 'the page scrolled behind the menu').toBe(
-      before,
+    await scrollAt(point.x, point.y);
+    await scrollAt(PHONE.width - 40, PHONE.height - 100);
+    // Give a scroll that did chain the frames it needs to land before measuring.
+    await page.evaluate(
+      () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
     );
+    expect(await scrollY(), 'the page scrolled behind the menu').toBe(before);
     await expect(menuDialog(page)).toHaveJSProperty('open', true);
 
     // Closed again, the page scrolls as before.
     await closeButton(page).tap();
-    await swipe(point.x, point.y);
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
+    await scrollAt(point.x, point.y);
+    await expect.poll(scrollY).toBeGreaterThan(before);
   });
 
   test('a case-study route marks a header nav link as the current page', async ({ page }) => {
