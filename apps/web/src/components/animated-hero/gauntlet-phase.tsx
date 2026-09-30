@@ -233,6 +233,11 @@ export function GauntletPhase() {
       cancelBuild();
       ctx?.revert();
       cancelSequence();
+      // Back to the run's starting state, which the finished render hides. Once motion is allowed
+      // again, a section not yet re-entered would otherwise show the interrupted stage running,
+      // with no tween behind it, until its trigger fires.
+      setStageStates(pendingStages);
+      setDeploymentStatus('idle');
     };
   }, [animatePipeline, cancelSequence, finished]);
 

@@ -203,6 +203,35 @@ describe('GauntletPhase', () => {
     expect(vi.getTimerCount()).toBe(STAGE_COUNT + 1);
   });
 
+  // Motion allowed again while the section is out of reach: the rebuilt trigger has not fired, so
+  // nothing restarts the run. The stage reduced motion interrupted must not be left running, its
+  // spinner and shimmer over an empty fill with no tween behind them: the run is back to pending.
+  it('leaves no stage running when motion is allowed again before the section is entered', () => {
+    mount();
+    const toSpy = vi.spyOn(gsap, 'to');
+    act(() => vi.advanceTimersByTime(1));
+    act(() => {
+      pickTween(toSpy, lintProgress).tween.progress(0.5);
+    });
+    expect(screen.getAllByText('◐')).toHaveLength(1);
+
+    act(() => media.set(true));
+    // The visitor scrolls back above the section: the trigger rebuilt next finds it still ahead.
+    const section = document.querySelector('section');
+    if (!section) throw new Error('The phase renders no section.');
+    vi.spyOn(section, 'getBoundingClientRect').mockReturnValue(
+      DOMRect.fromRect({ x: 0, y: 5 * window.innerHeight, width: 1024, height: 900 }),
+    );
+    act(() => media.set(false));
+    act(() => ScrollTrigger.refresh());
+
+    expect(vi.getTimerCount(), 'the run has not restarted').toBe(0);
+    expect(screen.queryAllByText('◐')).toHaveLength(0);
+    expect(pendingStages()).toHaveLength(STAGE_COUNT);
+    expect(fillScale(stageFill('LINT'))).toBe(0);
+    expect(screen.queryByText('DEPLOYMENT SUCCESSFUL')).not.toBeInTheDocument();
+  });
+
   // hero-12. The progress tween draws the stage by writing its fill's transform through a ref, so
   // its frames cost React nothing: the phase commits when a stage starts running and when it
   // passes, for the status colour and icon, and at no frame in between.
