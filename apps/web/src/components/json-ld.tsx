@@ -3,6 +3,7 @@
 // in any of them end the script element early.
 import type { CaseStudy } from '@/data/case-studies';
 import { yearsOfExperience } from '@/data/profile';
+import { socialProfiles } from '@/data/social';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
 
@@ -60,11 +61,8 @@ export function PersonJsonLd() {
           'Legacy Modernization',
           'DevOps',
         ],
-        sameAs: [
-          'https://www.linkedin.com/in/milos-cvetkovic-dev',
-          'https://github.com/milosCvetkovicDev',
-          'https://x.com/milos_dev',
-        ],
+        // The profiles the footer and the pages link to, from their one source (#49).
+        sameAs: socialProfiles.map(({ href }) => href),
       }}
     />
   );
