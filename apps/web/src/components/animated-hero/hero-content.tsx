@@ -109,7 +109,7 @@ function SkillTags() {
       {SKILL_TAGS.map((tag) => (
         <li
           key={tag}
-          className="rounded-[3px] border border-[var(--accent)]/20 bg-transparent px-[9px] py-[3px] font-mono text-[var(--muted)] transition-all duration-200 hover:border-[var(--accent)]/40 hover:text-[var(--accent-text)]"
+          className="rounded-[3px] border border-[var(--accent)]/20 bg-transparent px-[9px] py-[3px] font-mono text-[var(--muted)] transition-colors duration-200 hover:border-[var(--accent)]/40 hover:text-[var(--accent-text)]"
           style={{
             fontSize: '10px',
           }}
