@@ -9,7 +9,9 @@ import {
   STATIC_ROUTES,
   expectedStatus,
 } from './routes';
-import { caseStudies, formatMetric } from '../src/data/case-studies';
+import { caseStudies } from '../src/data/case-studies';
+import { questions } from '../src/data/pages/about';
+import { restatedMetrics, wordCount } from '../src/test/answer-copy';
 import { formatContentDate } from '../src/lib/content-date';
 import { fetchHead, first } from './support/served-head';
 
@@ -450,13 +452,6 @@ test('the Person schema, the hero and the /about description carry one derived y
   ).toBe(expected);
 });
 
-/**
- * A word as a reader counts one: a run of text between spaces that holds a letter or a digit, so
- * `Next.js` is one word and a dash standing between two spaces is none.
- */
-const wordCount = (text: string) =>
-  text.split(/\s+/).filter((token) => /[\p{L}\p{N}]/u.test(token)).length;
-
 test('/about answers three questions, each in one paragraph of 40 to 80 words that restates no case-study metric (#58)', async ({
   page,
   request,
@@ -464,11 +459,12 @@ test('/about answers three questions, each in one paragraph of 40 to 80 words th
   // #58 AC 13. A question-shaped heading with a short answer under it is the unit an extractor can
   // lift whole, so the served HTML, which no crawler runs, has to carry it. The browser's
   // `DOMParser` reads the response, as `servedCaseStudy()` below does: the RSC flight payload
-  // repeats every heading inside a script, and parsed, a script's text is never an element. What
-  // is asserted is the shape (the `<h2>`, the `<p>` that is its next element, the answer's length)
-  // and the absence of a metric, not the wording, which is the owner's to edit. No FAQPage, HowTo
-  // or speakable markup goes with it: `scripts/ai-refusals.test.mjs` fails on those strings
-  // anywhere under apps/web/src.
+  // repeats every heading inside a script, and parsed, a script's text is never an element. The
+  // served question headings are the `questions` of the page record, in order, so a stray `<h2>`
+  // ending in `?` elsewhere on the page fails rather than being counted; each is followed by a
+  // `<p>` holding its answer. Words and metrics are measured by `src/test/answer-copy.ts`, the
+  // helpers the unit test on the data uses. No FAQPage, HowTo or speakable markup goes with it:
+  // `scripts/ai-refusals.test.mjs` fails on those strings anywhere under apps/web/src.
   const response = await request.get('/about');
   expect(response.status(), 'GET /about').toBe(200);
   const headings = await page.evaluate(
@@ -487,17 +483,16 @@ test('/about answers three questions, each in one paragraph of 40 to 80 words th
   // The control: a parser that found no heading at all would find no question either.
   expect(headings.length, '/about should serve its section headings').toBeGreaterThan(0);
 
-  const questions = headings.filter(({ question }) => question.endsWith('?'));
+  expect(questions, 'the page record asks three questions').toHaveLength(3);
+  const served = headings.filter(({ question }) => question.endsWith('?'));
   expect(
-    questions.map(({ question }) => question),
-    '/about serves exactly three h2s that end in a question mark',
-  ).toHaveLength(3);
+    served.map(({ question }) => question),
+    "/about serves exactly its record's questions as the h2s that end in a question mark",
+  ).toEqual(questions.map(({ question }) => question));
 
-  // Every metric as it renders: `formatMetric` is the one function that turns the data into copy,
-  // so an answer quoting a figure would have to restate its output.
-  const metrics = caseStudies.map(({ highlight }) => formatMetric(highlight.metric));
+  const metrics = caseStudies.map(({ highlight }) => highlight.metric);
   expect(metrics, 'the case studies must define metrics for the check below').not.toHaveLength(0);
-  for (const { question, next, answer } of questions) {
+  for (const { question, next, answer } of served) {
     expect.soft(next, `"${question}" is followed by a paragraph`).toBe('p');
     const words = wordCount(answer);
     expect
@@ -508,7 +503,7 @@ test('/about answers three questions, each in one paragraph of 40 to 80 words th
       .toBeLessThanOrEqual(80);
     expect
       .soft(
-        metrics.filter((metric) => answer.includes(metric)),
+        restatedMetrics(answer, metrics),
         `"${question}" restates a case-study metric, which is the study's to state`,
       )
       .toEqual([]);

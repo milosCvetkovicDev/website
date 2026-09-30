@@ -75,8 +75,10 @@ export default function AboutPage() {
           ))}
         </section>
 
-        {/* Quick facts */}
+        {/* Quick facts. The heading is for screen readers: without it the grid would sit under the
+            last question in the heading outline (#58). */}
         <section className="mb-20">
+          <h2 className="sr-only">{aboutCopy.factsHeading}</h2>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {facts.map((fact) => (
               <div

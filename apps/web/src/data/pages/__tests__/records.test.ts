@@ -9,8 +9,9 @@
  * the timeline reads from the case study.
  */
 import { describe, expect, it } from 'vitest';
-import { formatMetric, getCaseStudy } from '@/data/case-studies';
+import { caseStudies, formatMetric, getCaseStudy } from '@/data/case-studies';
 import { pageToMarkdown } from '@/lib/serialise';
+import { restatedMetrics, wordCount } from '@/test/answer-copy';
 import {
   aboutCopy,
   aboutRecord,
@@ -49,10 +50,35 @@ describe('page records', () => {
     expect(markdown).toContain(`\n\n${aboutCopy.storyClose}\n\n`);
   });
 
+  it('asks three About questions, each answered in 40 to 80 words that restate no metric', () => {
+    // #58 AC 13, checked on the data so a copy edit fails here first; the served page's spec in
+    // `e2e/seo-surface.spec.ts` measures the same with the same helpers, as a reader gets it.
+    expect(questions).toHaveLength(3);
+    const metrics = caseStudies.map(({ highlight }) => highlight.metric);
+    expect(
+      metrics.length,
+      'the case studies must define metrics for the check below',
+    ).toBeGreaterThan(0);
+    for (const { question, answer } of questions) {
+      expect(question, 'a question ends in a question mark').toMatch(/\?$/);
+      const words = wordCount(answer);
+      expect(words, `"${question}" is answered in 40 to 80 words`).toBeGreaterThanOrEqual(40);
+      expect(words, `"${question}" is answered in 40 to 80 words`).toBeLessThanOrEqual(80);
+      expect(restatedMetrics(`${question} ${answer}`, metrics), `"${question}"`).toEqual([]);
+    }
+  });
+
+  it("names the agent's stack in the About answer as its case study lists it", () => {
+    const study = getCaseStudy('self-healing-agent');
+    const listed = new Set(study?.techStack.flatMap(({ items }) => items));
+    const agentAnswer = questions.find(({ question }) => /self-healing agent/.test(question));
+    const named = /ran on (.+?) and (.+?) with the (.+?),/.exec(agentAnswer?.answer ?? '');
+    expect(named, 'the agent answer names a runtime, a framework and an SDK').not.toBeNull();
+    for (const name of named?.slice(1) ?? []) expect(listed).toContain(name);
+  });
+
   it('writes each About question as its own heading, its whole answer the one paragraph under it', () => {
     // #58: the twin carries the unit the page serves, a question and an answer that stands alone.
-    // How many there are and how long each answer is, the served page's spec checks.
-    expect(questions.length).toBeGreaterThan(0);
     const markdown = pageToMarkdown(aboutRecord);
     for (const { question, answer } of questions) {
       expect(markdown).toContain(`\n\n## ${question}\n\n${answer}\n\n`);
@@ -80,6 +106,11 @@ describe('page records', () => {
 
   it('keys every list the pages render by a value no other entry shares', () => {
     expect(repeats(questions.map(({ question }) => question)), 'questions').toEqual([]);
+    // A question that repeated another heading would give the twin two identical `##` headings.
+    expect(
+      repeats(aboutRecord.sections.map(({ heading }) => heading)),
+      '/about section headings',
+    ).toEqual([]);
     expect(repeats(timeline.map(({ year }) => year)), 'timeline years').toEqual([]);
     expect(repeats(beliefs.map(({ title }) => title)), 'belief titles').toEqual([]);
     expect(repeats(facts.map(({ label }) => label)), 'fact labels').toEqual([]);
