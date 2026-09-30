@@ -1459,19 +1459,12 @@ interface KnownDefect {
  * The violations present when this guard landed. Each is an expected failure until the change that
  * fixes it deletes the entry, which it has to: an expected failure that passes fails the run. Adding
  * an entry ships a known defect on purpose, so it names what fixes it. #47 is the hero task of the
- * audit remediation epic (.claude/epics/audit-remediation-2026-09/47.md): R12, R13 and R17 are its
- * expected-failure rows in e2e/hero-contrast.spec.ts, and hero-2 and critic-8 its findings.
+ * audit remediation epic (.claude/epics/audit-remediation-2026-09/47.md): R12 and R13 are its
+ * expected-failure rows in e2e/hero-contrast.spec.ts, and hero-2 its finding. DIM1, the glitch
+ * variant's two copies at `opacity-70` (critic-8), was fixed with R17 by #47's slice 47d; ids are
+ * not reused.
  */
 const KNOWN_DEFECTS: KnownDefect[] = [
-  {
-    id: 'DIM1',
-    file: 'src/components/animated-hero/animated-text.tsx',
-    component: 'GlitchText',
-    tokens: ['opacity-70'],
-    sites: 2,
-    fixedBy: 'R17, #47',
-    why: 'the two aria-hidden copies of its text drawn while it glitches on hover (critic-8)',
-  },
   {
     id: 'DIM2',
     file: 'src/components/featured-work/architecture-background.tsx',
