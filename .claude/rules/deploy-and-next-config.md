@@ -28,6 +28,22 @@ on `missing` the apex: a typo there would noindex production. Next's router send
 before it applies `headers()`, and those carry none of them: the 308s that strip a trailing slash
 or collapse repeated slashes, and the plain 500 for a malformed percent-encoding.
 
+The same file negotiates the Markdown twins (#59,
+`docs/adr/0030-generated-endpoints-as-static-route-handlers.md`). `rewrites()` returns one
+`beforeFiles` rule per route in `MARKDOWN_ROUTES` (the keys of `STATIC_ROUTE_UPDATED` plus
+`/work/<slug>` per case study), each a literal source with `/` among them, keyed on an `accept`
+header matching `.*text/markdown.*` and rewriting to `markdownTwinPath(route)`. Never widen a source
+to `/:path*`: a Markdown-asking request for `robots.txt`, the sitemap, an Open Graph image or a
+`/_next/static` chunk would then be rewritten to an `index.md` that does not exist. The match reads
+no q-value and is case-sensitive, so `text/markdown;q=0` still gets Markdown; ranking q-values needs
+the middleware ADR 0017 refuses. `varyOnAccept()` appends one `headers()` entry per route and per
+twin with `Vary: Accept`, after the two entries above, which stay as they are. A Markdown response
+carries Next's own `Vary` and `Accept` both; on an HTML page Next's App Router handler sets its
+`Vary` after `headers()`, so `Accept` is absent there under `next start`, and ADR 0030 says why that
+direction is harmless. `src/test/next-config.test.ts` pins the rules through
+`unstable_getResponseFromNextConfig` and fails when the negotiated routes and the twin handlers
+under `src/app` differ; `e2e/markdown-negotiation.spec.ts` checks them on the wire.
+
 ## Gotchas
 
 - `apps/web/next.config.ts` pins `turbopack.root` (which is also the file tracing root) to the
@@ -39,6 +55,12 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
   evaluated as `<projectDir>/next.config.compiled.js`, so the starting directory is whatever Next
   was invoked on, not this file, and `next info` from a subdirectory then resolves outside the
   repository. `apps/web/src/test/next-config.test.ts` pins all of this.
+- `apps/web/next.config.ts` imports `src/data/static-routes.ts`, `src/data/case-studies.ts` and
+  `src/lib/pathname.ts` for the negotiated routes. Next's config loader compiles every module it
+  requires with the same options and no file name, so an `@/` import becomes `./src/...`, right
+  only beside the config: every module that chain reaches imports by relative path. The last test
+  in `src/test/next-config.test.ts` loads the config through that loader in a child process and
+  fails on an alias there, which Vitest's own `resolve.alias` would hide.
 - `apps/web/next.config.ts` also sends the security headers (ADR 0023), and its CSP allows this
   origin only: a script, stylesheet, font, image (a `data:` one included) or connection from
   anywhere else is refused, and the browser logs the refusal as a console error.

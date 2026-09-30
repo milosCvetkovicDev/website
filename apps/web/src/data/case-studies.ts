@@ -1,4 +1,8 @@
-import { formatContentDate } from '@/lib/content-date';
+// Relative, not `@/lib/...`: `next.config.ts` imports this module to derive the routes that
+// negotiate a Markdown twin, and Next's config loader turns an `@/` import into `./src/...`, a path
+// that is right only beside the config, so the alias fails here (`src/test/next-config.test.ts`
+// loads the config through that loader to catch it).
+import { formatContentDate } from '../lib/content-date';
 import { OWNER_TODO } from './owner-todo';
 
 export interface CaseStudyMetric {
