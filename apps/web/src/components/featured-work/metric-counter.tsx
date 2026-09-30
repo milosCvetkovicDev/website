@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { formatMetric, type CaseStudyMetric } from '@/data/case-studies';
 
@@ -9,11 +9,6 @@ interface MetricCounterProps extends CaseStudyMetric {
 }
 
 const DURATION_MS = 900;
-// The active glow: the accent token mixed down, handed to the shadow utility through a custom
-// property.
-const ACCENT_GLOW = {
-  '--accent-glow': 'color-mix(in oklab, var(--accent) 15%, transparent)',
-} as CSSProperties;
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 
 /**
@@ -64,9 +59,8 @@ export function MetricCounter({ active, ...metric }: MetricCounterProps) {
   return (
     <div
       className={`shrink-0 rounded border border-[var(--tmux-border)]/50 bg-[var(--background)]/80 p-4 text-center transition-all duration-300 lg:w-40 ${
-        active ? 'border-[var(--accent)] shadow-[0_0_15px_var(--accent-glow)]' : ''
+        active ? 'border-[var(--accent)] shadow-[0_0_15px] shadow-(color:--accent)/15' : ''
       }`}
-      style={ACCENT_GLOW}
     >
       <div
         className={`mb-1 font-mono text-2xl font-bold tracking-tight tabular-nums transition-colors duration-300 lg:text-3xl ${

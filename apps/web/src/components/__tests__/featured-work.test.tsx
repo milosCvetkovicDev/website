@@ -43,7 +43,8 @@ const linkByAccessibleName = (title: string) => screen.getByRole('link', { name:
 // Resolving once gives up two things getByRole did for free, so linkFor takes them back: it
 // normalises whitespace the way an accessible name is normalised, rather than trusting how the
 // JSX happens to wrap; and it refuses an ambiguous name instead of quietly binding to whichever
-// element came last, which matters because the section also renders "view all work" links.
+// element came last, which matters because the section also renders the "VIEW ARCHIVE" and
+// "Explore All Projects" links to /work.
 function renderFeaturedWork() {
   const utils = render(<FeaturedWork projects={featuredProjects} />);
   const byName = new Map<string, HTMLElement[]>();
@@ -136,13 +137,25 @@ describe('FeaturedWork', () => {
     const value = () => screen.getByText(formatMetric(project.metric), { exact: true });
     expect(value()).not.toHaveClass('text-[var(--status-ok)]');
 
-    fireEvent.focus(linkFor(project.title));
+    const link = linkFor(project.title);
+    act(() => link.focus());
+    expect(link).toHaveFocus();
     expect(value()).toHaveClass('text-[var(--status-ok)]');
-    // No alpha on the token and no resting opacity below 100 on the text (ADR 0010).
-    expect(value().className).not.toMatch(/status-ok\)\]\/\d|(^|\s)opacity-\d/);
-    expect(value().parentElement?.querySelector('[aria-hidden="true"]')).toHaveClass(
-      'bg-[var(--status-ok)]',
-    );
+    // No alpha on the token and no opacity of any kind on the text or on anything between it and
+    // the card, which would dim it just the same (ADR 0010).
+    const card = link.closest('.isolate');
+    expect(card).not.toBeNull();
+    const dimming: string[] = [];
+    for (let element: Element | null = value(); element; element = element.parentElement) {
+      for (const token of element.classList) {
+        if (/status-ok\)\]\/|opacity/.test(token)) dimming.push(token);
+      }
+      if (element === card) break;
+    }
+    expect(dimming).toEqual([]);
+    const dot = value().parentElement?.querySelector('[aria-hidden="true"]') ?? null;
+    expect(dot).not.toBeNull();
+    expect(dot).toHaveClass('bg-[var(--status-ok)]', 'animate-pulse');
   });
 
   it('activates a project and its architecture nodes on keyboard focus', () => {

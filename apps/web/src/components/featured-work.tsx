@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type CSSProperties } from 'react';
+import { useState } from 'react';
 import type { ArchitectureNode } from '@/data/architecture-graph';
 import type { FeaturedProject } from '@/data/featured-projects';
 import { CARD_LINK } from './card-link';
@@ -48,12 +48,6 @@ interface ProjectCardProps {
   onFocusChange: (focused: boolean) => void;
 }
 
-// The accent glow of an active card and of the archive link: the accent token mixed down, rather
-// than a hard-coded violet, handed to the shadow utility through a custom property.
-const ACCENT_GLOW = {
-  '--accent-glow': 'color-mix(in oklab, var(--accent) 10%, transparent)',
-} as CSSProperties;
-
 function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }: ProjectCardProps) {
   const descriptionId = `featured-${project.slug}-description`;
   const retired = project.status === 'RETIRED';
@@ -63,10 +57,9 @@ function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }:
     <div
       className={`relative isolate rounded border bg-[var(--card)]/75 p-6 backdrop-blur-md transition-all duration-500 ${
         isActive
-          ? 'border-[var(--accent)]/50 shadow-[0_0_30px_var(--accent-glow)]'
+          ? 'border-[var(--accent)]/50 shadow-[0_0_30px] shadow-(color:--accent)/10'
           : 'border-[var(--tmux-border)]/30'
       }`}
-      style={ACCENT_GLOW}
     >
       <CornerBrackets active={isActive} />
 
@@ -122,7 +115,7 @@ function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }:
               onMouseLeave={() => onHoverChange(false)}
               onFocus={() => onFocusChange(true)}
               onBlur={() => onFocusChange(false)}
-              className={`${CARD_LINK} rounded after:rounded`}
+              className={`${CARD_LINK} after:rounded`}
             >
               {project.title}
             </Link>
@@ -266,8 +259,7 @@ export function FeaturedWork({ projects }: FeaturedWorkProps) {
           </p>
           <Link
             href="/work"
-            className={`inline-flex items-center gap-2 rounded border border-[var(--tmux-border)] bg-[var(--card)]/75 px-8 py-4 font-mono text-sm text-[var(--tmux-bar-text-bright)] backdrop-blur-md transition-all duration-300 hover:border-[var(--accent)] hover:text-[var(--tmux-pane-title-text)] hover:shadow-[0_0_20px_var(--accent-glow)] ${FOCUS_RING}`}
-            style={ACCENT_GLOW}
+            className={`inline-flex items-center gap-2 rounded border border-[var(--tmux-border)] bg-[var(--card)]/75 px-8 py-4 font-mono text-sm text-[var(--tmux-bar-text-bright)] backdrop-blur-md transition-all duration-300 hover:border-[var(--accent)] hover:text-[var(--tmux-pane-title-text)] hover:shadow-[0_0_20px] hover:shadow-(color:--accent)/10 ${FOCUS_RING}`}
           >
             <span>Explore All Projects</span>
             <svg

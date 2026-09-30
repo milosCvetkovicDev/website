@@ -46,12 +46,16 @@ const MAX_LINK_NAME = 80;
 const linkFor = (page: Page, slug: string) => page.locator(`a[href="/work/${slug}"]`).first();
 
 /**
- * The archive card for one case study: the `group` element its hover and focus variants key off,
- * which holds the link. The link carries only the title, so the status and the rest of the card are
- * found through this.
+ * The archive card for one case study: the link's nearest `group` ancestor, which is the element its
+ * hover and focus variants key off (the unit test's `closest('.group')`). The link carries only the
+ * title, so the status and the rest of the card are found through this. Walking up from the link
+ * rather than filtering every `div.group` that contains it keeps one card even if a wrapper around
+ * the list ever takes the `group` class too.
  */
 const cardFor = (page: Page, slug: string) =>
-  page.locator('div.group').filter({ has: page.locator(`a[href="/work/${slug}"]`) });
+  linkFor(page, slug).locator(
+    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " group ")][1]',
+  );
 
 /**
  * The first study whose badge carries a status colour. A retired study's badge is neutral on both
@@ -144,21 +148,65 @@ test.describe(() => {
 
   test('a click anywhere on a /work card opens its case study', async ({ page }) => {
     // The pointer floor above clicks the title, which is inside the link however the card is built.
-    // This one clicks the metric, far from the title: the title link's ::after overlay is the hit
-    // area for the whole card, so the click still navigates. It is a real pointer click at
-    // coordinates, because Playwright's own click on the metric would refuse to press an element
-    // that the overlay covers, which is exactly the behaviour this checks.
-    const [study] = caseStudies;
-    await gotoHydrated(page, '/work');
-    const metric = cardFor(page, study.slug).getByText(study.highlight.metric.label, {
-      exact: true,
-    });
-    await metric.scrollIntoViewIfNeeded();
-    const box = await metric.boundingBox();
-    if (!box) throw new Error('the metric label has no box to click');
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(page).toHaveURL(new RegExp(`/work/${study.slug}$`));
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(study.title);
+    // This one proves the title link's ::after overlay is the hit area of every whole card, the first
+    // card's wide layout and the others' stacked one alike: hit-testing a grid of points across the
+    // card, the midpoints of its 1px border ring, and points just outside it, then one real click on
+    // each card far from its title. The real click is at coordinates because Playwright's own click
+    // on a covered element refuses to press it, which is exactly the behaviour this checks.
+    await page.setViewportSize({ width: 1280, height: 1400 });
+    for (const { slug, title } of caseStudies) {
+      await gotoHydrated(page, '/work');
+      const card = cardFor(page, slug);
+      await expect(card).toHaveCount(1);
+      const { misses, farPoint } = await card.evaluate((element) => {
+        const link = element.querySelector('h2 a');
+        // Instant, whatever the page's scroll-behavior, with the card's top clear of the fixed site
+        // header, which would otherwise answer for the points along the card's top edge.
+        window.scrollTo({
+          top: window.scrollY + element.getBoundingClientRect().top - 160,
+          behavior: 'instant',
+        });
+        const box = element.getBoundingClientRect();
+        if (box.bottom > window.innerHeight) {
+          throw new Error(`the card is ${box.height}px tall and does not fit the viewport`);
+        }
+        const hitsLink = (x: number, y: number) =>
+          document.elementFromPoint(x, y)?.closest('a') === link;
+        const failures: string[] = [];
+        // Inside, 12px clear of the rounded corners: a 7x7 grid covers index, status, description,
+        // tags, metric and the read-more row.
+        for (let i = 0; i <= 6; i += 1) {
+          for (let j = 0; j <= 6; j += 1) {
+            const x = box.left + 12 + ((box.width - 24) * i) / 6;
+            const y = box.top + 12 + ((box.height - 24) * j) / 6;
+            if (!hitsLink(x, y)) failures.push(`inside (${i}, ${j}) misses the link`);
+          }
+        }
+        // The border ring itself, half a pixel in from each edge's midpoint, and 6px outside it.
+        const cx = box.left + box.width / 2;
+        const cy = box.top + box.height / 2;
+        const edges: [string, number, number, number, number][] = [
+          ['top', cx, box.top + 0.5, cx, box.top - 6],
+          ['bottom', cx, box.bottom - 0.5, cx, box.bottom + 6],
+          ['left', box.left + 0.5, cy, box.left - 6, cy],
+          ['right', box.right - 0.5, cy, box.right + 6, cy],
+        ];
+        for (const [edge, x, y, outX, outY] of edges) {
+          if (!hitsLink(x, y)) failures.push(`the ${edge} border misses the link`);
+          // Just outside the edge: the overlay must not escape its card.
+          if (hitsLink(outX, outY)) failures.push(`6px past the ${edge} edge still hits the link`);
+        }
+        return {
+          misses: failures,
+          farPoint: { x: box.right - 16, y: box.bottom - 16 },
+        };
+      });
+      expect(misses, slug).toEqual([]);
+      // The bottom-right corner, the read-more arrow's row: as far from the title as the card goes.
+      await page.mouse.click(farPoint.x, farPoint.y);
+      await expect(page).toHaveURL(new RegExp(`/work/${slug}$`));
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(title);
+    }
   });
 });
 
@@ -189,29 +237,37 @@ test('the first /work card link is named for its title alone', async ({ page }) 
   ).toBeLessThan(MAX_LINK_NAME);
 });
 
+/** The reveals the affordance tests measure on one card, and the overlay's focus outline. */
+function cardAffordance(page: Page, slug: string) {
+  const card = cardFor(page, slug);
+  const link = linkFor(page, slug);
+  return {
+    card,
+    link,
+    brackets: card.locator(':scope > svg'),
+    arrow: card.getByRole('heading', { level: 2 }).locator('svg'),
+    overlayOutline: () =>
+      link.evaluate((element) => {
+        const after = getComputedStyle(element, '::after');
+        return { style: after.outlineStyle, width: after.outlineWidth };
+      }),
+  };
+}
+
 test('hover and keyboard focus both show the first /work card affordance', async ({ page }) => {
   // Before R36's fix the whole card was the link, so focusing it lit every group-hover: reveal
   // through the link itself. With the link reduced to the title, the reveals key off the card, and
-  // each needs a focus twin or keyboard users lose them. The corner brackets and the title arrow
-  // are the reveals measured here, and the focus outline is drawn on the link's overlay so it frames
-  // the card.
+  // each needs a keyboard-focus twin or keyboard users lose them. The corner brackets and the title
+  // arrow are the reveals measured here, and the focus outline is drawn on the link's overlay so it
+  // frames the card.
   const [study] = caseStudies;
   await gotoHydrated(page, '/work');
-  const card = cardFor(page, study.slug);
-  const link = linkFor(page, study.slug);
-  const brackets = card.locator(':scope > svg');
-  const arrow = card.getByRole('heading', { level: 2 }).locator('svg');
+  const { card, link, brackets, arrow, overlayOutline } = cardAffordance(page, study.slug);
   await expect(brackets).toHaveCount(4);
   await expect(arrow).toHaveCount(1);
 
-  const overlayOutline = () =>
-    link.evaluate((element) => {
-      const after = getComputedStyle(element, '::after');
-      return { style: after.outlineStyle, width: after.outlineWidth };
-    });
-
-  // At rest: nothing revealed, no outline. Only the style is compared here: Chromium reports the
-  // initial `medium` width, 3px, for an outline whose style is none.
+  // At rest: nothing revealed, no outline. Only the style is compared here:
+  // Chromium reports the initial `medium` width, 3px, for an outline whose style is none.
   await card.scrollIntoViewIfNeeded();
   await expect(brackets.first()).toHaveCSS('opacity', '0');
   await expect(arrow).toHaveCSS('opacity', '0');
@@ -237,6 +293,38 @@ test('hover and keyboard focus both show the first /work card affordance', async
   for (const bracket of await brackets.all()) await expect(bracket).toHaveCSS('opacity', '1');
   await expect(arrow).toHaveCSS('opacity', '1');
   await expect.poll(overlayOutline).toEqual({ style: 'solid', width: '2px' });
+
+  // Forced colors (Windows High Contrast) paints no box-shadow, which is why the indicator is an
+  // outline: it must still be drawn there.
+  await page.emulateMedia({ forcedColors: 'active' });
+  await expect(link).toBeFocused();
+  await expect.poll(async () => (await overlayOutline()).style).toBe('solid');
+});
+
+test('a mouse-focused /work card link does not keep its card lit', async ({ page }) => {
+  // Chromium and Firefox focus a link on mousedown, so a Cmd- or Ctrl-click that opens a case study
+  // in a new tab leaves the title link focused on /work. The reveals follow keyboard focus
+  // (:focus-visible), not any focus, so once the pointer leaves the card goes back to rest, as it
+  // does in Safari, which never focuses a clicked link. The click here has its default prevented,
+  // which leaves the page and the focus exactly where that background-tab click leaves them.
+  const [study] = caseStudies;
+  await gotoHydrated(page, '/work');
+  const { card, link, brackets, arrow, overlayOutline } = cardAffordance(page, study.slug);
+  await page.evaluate(() =>
+    window.addEventListener('click', (event) => event.preventDefault(), { capture: true }),
+  );
+
+  await card.scrollIntoViewIfNeeded();
+  await link.click();
+  await expect(link, 'the premise: Chromium focuses a link it clicks').toBeFocused();
+  expect(await link.evaluate((element) => element.matches(':focus-visible'))).toBe(false);
+  await expect(page).toHaveURL(/\/work$/);
+
+  await page.mouse.move(0, 0);
+  await expect(link).toBeFocused();
+  for (const bracket of await brackets.all()) await expect(bracket).toHaveCSS('opacity', '0');
+  await expect(arrow).toHaveCSS('opacity', '0');
+  expect((await overlayOutline()).style).toBe('none');
 });
 
 test('a case study status reads as one colour on / and on /work, in both themes', async ({
