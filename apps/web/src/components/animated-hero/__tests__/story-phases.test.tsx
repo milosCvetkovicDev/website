@@ -624,10 +624,11 @@ describe('GameComplete', () => {
   });
 });
 
-// #46 AC10. A from-state is drawn the moment its timeline is built, before any trigger fires, so an
-// element that starts to the right of where it belongs widens the page by that much for as long as
-// it waits: the Execution stats panel's `x: 30` measured 774 px at a 768 px viewport (row R11).
-// Every entrance, the timer-driven reveals included, starts in place or from the left.
+// The audit's hero-v1 finding, fixed in #125. A from-state is drawn the moment its timeline is
+// built, before any trigger fires, so an element that starts to the right of where it belongs
+// widens the page by that much for as long as it waits: the Execution stats panel's `x: 30`
+// measured 774 px at a 768 px viewport (row R11). Every entrance, the timer-driven reveals
+// included, starts in place or from the left.
 describe.each(phases)('$name, its from-states', ({ Phase }) => {
   beforeEach(() => {
     media.reduce = false;
