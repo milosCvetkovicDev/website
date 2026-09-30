@@ -112,10 +112,9 @@ export function HeroSection({ children }: { children?: ReactNode }) {
         }`}
       >
         <span
-          className="font-mono tracking-[0.2em] uppercase"
+          className="font-mono tracking-[0.2em] text-[var(--accent-text)] uppercase"
           style={{
             fontSize: '9px',
-            color: 'rgba(139, 92, 246, 0.7)',
             textShadow: '0 1px 10px rgba(0,0,0,0.9)',
           }}
         >
