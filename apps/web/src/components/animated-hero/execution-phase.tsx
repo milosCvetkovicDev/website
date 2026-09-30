@@ -7,7 +7,8 @@ import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { storyClosings } from '@/data/pages/home';
 
-const codeLines = [
+/** The code sample, one span per entry; exported so the served-story test counts the same lines. */
+export const codeLines = [
   { type: 'keyword', content: 'export class', delay: 0 },
   { type: 'class', content: ' ErrorAnalyzer ', delay: 0.1 },
   { type: 'punctuation', content: '{', delay: 0.15 },
@@ -100,6 +101,9 @@ export function ExecutionPhase() {
   // Single state update at the end of animation for final render
   const [animationComplete, setAnimationComplete] = useState(false);
   const [gsapUnavailable, setGsapUnavailable] = useState(false);
+  // The code lines are shown to begin with, and hidden for the count to type in only by a build
+  // that finds the section still ahead of the visitor (hero-11; GauntletPhase's achievement).
+  const [linesHidden, setLinesHidden] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   // Reduced motion, or no GSAP to count with: the finished build is rendered directly via
   // `complete` below.
@@ -123,7 +127,7 @@ export function ExecutionPhase() {
     };
 
     // GSAP arrives on the visitor's first intent (load-gsap.ts); until then the section keeps its
-    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // starting state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
@@ -135,6 +139,10 @@ export function ExecutionPhase() {
         const section = sectionRef.current;
         if (!section) return;
         const reached = isAlreadyReached(section);
+        // A section the visitor can already see keeps its code lines, and its count leaves them
+        // alone; one still ahead of them hides the lines for the count to type in.
+        const typeLines = !reached;
+        setLinesHidden(typeLines);
         ctx = gsap.context(() => {
           const tl = gsap.timeline({
             scrollTrigger: {
@@ -182,6 +190,7 @@ export function ExecutionPhase() {
                       if (comboCountRef.current) comboCountRef.current.textContent = `x${combo}`;
 
                       // Show/hide code line spans directly
+                      if (!typeLines) return;
                       codeSpansRef.current.forEach((span, i) => {
                         if (span) {
                           span.style.opacity = i < visibleLineCount ? '1' : '0';
@@ -251,6 +260,11 @@ export function ExecutionPhase() {
   // whatever the count last put there - but only when the value it renders actually changes, which
   // is why a restarting count resets `animationComplete` above.
   const complete = finished || animationComplete;
+  // The code lines are shown until a GSAP build finds the section still below the viewport, so the
+  // served HTML and a page GSAP has not reached keep them. That build renders a new value, so React
+  // writes the hidden state, before the section can be entered and a count start; a count that
+  // did start first would write every line again on its next frame anyway.
+  const codeLinesShown = complete || !linesHidden;
 
   const getTokenColor = (type: string) => {
     switch (type) {
@@ -308,18 +322,21 @@ export function ExecutionPhase() {
                       }}
                       className={getTokenColor(line.type)}
                       style={{
-                        opacity: complete ? 1 : 0,
+                        opacity: codeLinesShown ? 1 : 0,
                         transition: 'none',
                       }}
                     >
                       {line.type === 'newline' ? '\n' : line.content}
                     </span>
                   ))}
-                  <span
-                    className="ml-0.5 inline-block h-4 w-2 bg-[var(--accent)]"
-                    style={{ animation: 'pulse 1s ease-in-out infinite' }}
-                  />
                 </code>
+                {/* After the code rather than inside it: the caret is no line of the sample,
+                    and its pulse animates opacity for ever. */}
+                <span
+                  aria-hidden="true"
+                  className="ml-0.5 inline-block h-4 w-2 bg-[var(--accent)]"
+                  style={{ animation: 'pulse 1s ease-in-out infinite' }}
+                />
               </pre>
             </Terminal>
           </div>
