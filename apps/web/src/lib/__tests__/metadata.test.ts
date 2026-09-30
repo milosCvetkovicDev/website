@@ -55,6 +55,12 @@ describe('buildMetadata()', () => {
     });
   });
 
+  it('credits the card to the X handle, read from the one social source', () => {
+    // A literal on purpose: `TWITTER_HANDLE` is built from `data/social.ts` (#49), and comparing it with
+    // that module would pass with the handle typed wrong there.
+    expect(TWITTER_HANDLE).toBe('@milos_dev');
+  });
+
   it('returns a complete Twitter card with the route’s own title and description', () => {
     expect(about.twitter).toEqual({
       card: 'summary_large_image',
