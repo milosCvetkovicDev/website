@@ -1,6 +1,10 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { useLayoutEffect, type ComponentType } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { homePage, storyClosings } from '@/data/pages/home';
 import * as gsapRuntime from '../gsap-runtime';
 import { gsap, ScrollTrigger } from '../gsap-runtime';
 import { requestGsap, runWithGsap, type GsapRuntime } from '../load-gsap';
@@ -10,7 +14,9 @@ import { ExecutionPhase } from '../execution-phase';
 import { GauntletPhase } from '../gauntlet-phase';
 import { LoopPhase } from '../loop-phase';
 import { GameComplete } from '../game-complete';
+import { AnimatedHero } from '..';
 import { cssTransitions, gsapCssConflicts, tweenedElements } from './gsap-css-conflicts';
+import { countTweens, pickTween, progressDriver } from './gsap-tweens';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
 // at import time, so the stub must exist before the imports above are evaluated.
@@ -329,14 +335,14 @@ const tweenedTargets = [
   {
     name: 'GauntletPhase',
     Phase: GauntletPhase,
-    targets: () => [screen.getByText('DEPLOYMENT SUCCESSFUL').closest('.mt-6')],
+    targets: () => [screen.getByText('DEPLOYMENT SUCCESSFUL').closest('[data-gauntlet="deploy"]')],
     count: 1,
     tweens: ['opacity', 'transform'],
   },
   {
     name: 'LoopPhase',
     Phase: LoopPhase,
-    targets: () => [screen.getByText(/^(ERROR DETECTED|RESOLVED)$/).closest('.border')],
+    targets: () => [screen.getByText(/^(ERROR DETECTED|RESOLVED)$/).closest('[data-loop="alert"]')],
     count: 1,
     tweens: ['opacity', 'transform'],
   },
@@ -474,6 +480,9 @@ describe('ExecutionPhase', () => {
     expect(media.listenerCount()).toBe(0);
   });
 
+  /** The stats count: a 3 s tween of a plain object whose onUpdate writes the numbers. */
+  const statsCount = progressDriver(3);
+
   /** Mounts the phase and lets ScrollTrigger measure, which starts the stats count. */
   function mountCounting() {
     const toSpy = vi.spyOn(gsap, 'to');
@@ -481,8 +490,7 @@ describe('ExecutionPhase', () => {
     // A trigger bound to a timeline measures on refresh (GSAP runs one after load in a browser);
     // in jsdom the section is then "in view" and onEnter starts the stats tween on a plain object.
     act(() => ScrollTrigger.refresh());
-    const [statsTarget] = toSpy.mock.calls[0];
-    const statsTween = toSpy.mock.results[0].value;
+    const { target: statsTarget, tween: statsTween } = pickTween(toSpy, statsCount);
     return { ...utils, toSpy, statsTarget, statsTween };
   }
 
@@ -509,7 +517,7 @@ describe('ExecutionPhase', () => {
 
     act(() => enterAgain());
 
-    expect(toSpy).toHaveBeenCalledTimes(2);
+    expect(countTweens(toSpy, statsCount), 'one count per entry').toBe(2);
     expect(gsap.getTweensOf(statsTarget)).toHaveLength(0);
   });
 
@@ -523,8 +531,11 @@ describe('ExecutionPhase', () => {
 
     // Entering again restarts the count, which writes its own numbers back over the totals.
     act(() => enterAgain());
+    expect(countTweens(toSpy, statsCount), 'one count per entry').toBe(2);
+    const { tween: secondCount } = pickTween(toSpy, statsCount, { latest: true });
+    expect(secondCount, 'the re-entry started a count of its own').not.toBe(statsTween);
     act(() => {
-      toSpy.mock.results[1].value.progress(0.5);
+      secondCount.progress(0.5);
     });
     expect(screen.queryByText('00:14:32')).not.toBeInTheDocument();
 
@@ -654,4 +665,144 @@ describe.each(phases)('$name, its from-states', ({ Phase }) => {
     );
     expect(rightward).toEqual([]);
   });
+});
+
+// #59 AC 10. Each story section closes on a headline and the line under it, and both are read from
+// the home page record, whose sections `pageToMarkdown` turns into the page's Markdown twin
+// (`data/pages/__tests__/home.test.ts`): what a visitor reads and what the twin carries are one pair
+// of strings. Each pair is found by its place in the markup rather than by its text, so a phase that
+// rendered anything but its record's strings would fail here.
+const closings = [
+  {
+    name: 'DiscoveryPhase',
+    Phase: DiscoveryPhase,
+    closing: storyClosings.discovery,
+    headline: 'h2',
+  },
+  {
+    name: 'StrategyPhase',
+    Phase: StrategyPhase,
+    closing: storyClosings.strategy,
+    headline: 'h2',
+  },
+  {
+    name: 'ExecutionPhase',
+    Phase: ExecutionPhase,
+    closing: storyClosings.execution,
+    headline: 'h2',
+  },
+  {
+    name: 'GauntletPhase',
+    Phase: GauntletPhase,
+    closing: storyClosings.gauntlet,
+    headline: 'h2',
+  },
+  {
+    name: 'LoopPhase',
+    Phase: LoopPhase,
+    closing: storyClosings.loop,
+    headline: 'h2',
+  },
+  // The last section closes inside its terminal, on a paragraph rather than a heading. Whether it
+  // becomes a heading is the page outline's call (#47), not this move's, which changes no markup.
+  {
+    name: 'GameComplete',
+    Phase: GameComplete,
+    closing: storyClosings.complete,
+    headline: 'p.text-xl',
+  },
+];
+
+/** An element's text with every descendant matching `selector` left out. */
+function textWithout(root: Element, selector: string): string {
+  const copy = root.cloneNode(true) as Element;
+  copy.querySelectorAll(selector).forEach((node) => node.remove());
+  return copy.textContent ?? '';
+}
+
+describe.each(closings)('$name, its closing lines', ({ Phase, closing, headline }) => {
+  beforeEach(() => {
+    // jsdom lays nothing out, so with motion every trigger starts in view and GauntletPhase
+    // schedules timers.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    media.reduce = false;
+    // Asserted last: a throw here must not skip the cleanup above it.
+    expect(media.listenerCount()).toBe(0);
+  });
+
+  // Reduced motion renders every gated block shown; with motion the gated blocks start hidden, but
+  // their text is in the markup from the first render, which is what the served HTML carries.
+  it.each([
+    { motion: 'reduced motion', reduce: true },
+    { motion: 'motion', reduce: false },
+  ])(
+    'renders its headline and the line under it from the home page record, under $motion',
+    ({ reduce }) => {
+      media.reduce = reduce;
+      const { container } = render(<Phase />);
+      const headlines = container.querySelectorAll(headline);
+      expect(headlines, `exactly one ${headline} closes the section`).toHaveLength(1);
+      const line = headlines[0].nextElementSibling;
+      expect(line?.tagName, 'the line under the headline').toBe('P');
+
+      // `AnimatedText` draws split text `aria-hidden` beside a visually hidden copy of the whole
+      // text (#47, slice 47d), so `textContent` holds a split line twice. Read both lines both ways
+      // instead: the drawn text a sighted visitor sees, and the text assistive technology reads.
+      expect(textWithout(headlines[0], '.sr-only'), 'the drawn headline').toBe(closing.heading);
+      expect(textWithout(headlines[0], '[aria-hidden="true"]'), 'the spoken headline').toBe(
+        closing.heading,
+      );
+      // Every paragraph the record holds, so a second line the phase did not render would fail here.
+      if (!line) throw new Error('no line under the headline');
+      expect([textWithout(line, '.sr-only')], 'the drawn line').toEqual([...closing.paragraphs]);
+      expect([textWithout(line, '[aria-hidden="true"]')], 'the spoken line').toEqual([
+        ...closing.paragraphs,
+      ]);
+    },
+  );
+});
+
+it('the closing-line tests cover every pair in the home page record', () => {
+  expect(closings.map(({ closing }) => closing)).toEqual(Object.values(storyClosings));
+});
+
+it('the story renders the closing pairs in the order the home page record lists them', () => {
+  media.reduce = true;
+  try {
+    const { container } = render(<AnimatedHero />);
+    const text = container.textContent ?? '';
+    const positions = homePage.sections.map(({ heading }) => text.indexOf(heading));
+    expect(positions, 'every headline is on the page').not.toContain(-1);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+  } finally {
+    cleanup();
+    media.reduce = false;
+  }
+});
+
+it('no module in the story declares a closing line itself', () => {
+  // Every source module beside the phases, read as JSX renders it: entities and escaped quotes
+  // decoded, JSX string expressions such as {' '} unwrapped, line breaks collapsed. Each sentence is
+  // looked for on its own, so restating half of a line is found too.
+  const directory = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const modules = readdirSync(directory).filter((file) => /\.tsx?$/.test(file));
+  expect(modules, 'the check reads the phases').toContain('game-complete.tsx');
+  const sentences = Object.values(storyClosings)
+    .flatMap(({ heading, paragraphs }) => [heading, ...paragraphs])
+    .flatMap((text) => text.split(/(?<=[.!?])\s+/));
+  const restated = modules.flatMap((module) => {
+    const source = readFileSync(join(directory, module), 'utf8')
+      .replace(/\\(['"])/g, '$1')
+      .replace(/&(?:apos|#0*39|#x0*27|rsquo|lsquo);/gi, "'")
+      .replace(/&(?:quot|#0*34|#x0*22|ldquo|rdquo);/gi, '"')
+      .replace(/\{\s*(['"`])((?:(?!\1).)*)\1\s*\}/g, '$2')
+      .replace(/\s+/g, ' ');
+    return sentences.filter((sentence) => source.includes(sentence)).map((s) => `${module}: ${s}`);
+  });
+  expect(restated).toEqual([]);
 });

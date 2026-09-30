@@ -1,13 +1,13 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
+import { workCopy, workRecord } from '@/data/pages/work';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
-  title: 'Work — AI agents & legacy modernization',
-  description:
-    'Real projects, real constraints, real results. Case studies on AI agents, legacy modernization, and high-performance systems.',
-  path: '/work',
+  title: workRecord.title,
+  description: workRecord.summary,
+  path: workRecord.path,
 });
 
 function CornerBrackets() {
@@ -181,7 +181,7 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
       {/* Read more indicator */}
       <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-4">
         <span className="text-sm text-[var(--muted)] transition-colors group-hover:text-[var(--accent-text)]">
-          Read full case study
+          {workCopy.readMore}
         </span>
         <svg
           className="h-4 w-4 text-[var(--muted)] transition-all group-hover:translate-x-1 group-hover:text-[var(--accent-text)]"
@@ -235,7 +235,7 @@ export default function WorkPage() {
             <div className="flex items-start gap-2">
               <span className="mt-1 h-2 w-2 shrink-0 animate-pulse rounded-full bg-[var(--accent)]" />
               <p className="font-mono text-xs tracking-widest text-[var(--accent-text)] uppercase">
-                Case studies · Milos Cvetkovic, Senior Full-Stack Engineer
+                {workCopy.eyebrow}
               </p>
             </div>
             <div className="hidden h-px flex-1 bg-gradient-to-r from-[var(--accent)]/50 to-transparent sm:block" />
@@ -243,30 +243,17 @@ export default function WorkPage() {
           <h1 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
             Problems solved. Systems shipped.
           </h1>
-          <p className="max-w-2xl text-xl text-[var(--muted)]">
-            Real projects with real constraints: AI agents, legacy modernization and developer
-            tooling. Each one pushed boundaries—and delivered results.
-          </p>
+          <p className="max-w-2xl text-xl text-[var(--muted)]">{workCopy.intro}</p>
         </div>
 
         {/* Stats bar */}
         <div className="mb-12 flex flex-wrap justify-center gap-8 rounded-lg border border-[var(--border)] bg-[var(--card)]/50 p-4 md:gap-16">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-[var(--accent-text)]">{caseStudies.length}</div>
-            <div className="text-xs tracking-wider text-[var(--muted)] uppercase">Projects</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-[var(--accent-text)]">100%</div>
-            <div className="text-xs tracking-wider text-[var(--muted)] uppercase">
-              In Production
+          {workCopy.stats.map(({ value, label }) => (
+            <div key={label} className="text-center">
+              <div className="text-2xl font-bold text-[var(--accent-text)]">{value}</div>
+              <div className="text-xs tracking-wider text-[var(--muted)] uppercase">{label}</div>
             </div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-[var(--accent-text)]">0</div>
-            <div className="text-xs tracking-wider text-[var(--muted)] uppercase">
-              Left Unfinished
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* Projects */}
@@ -278,18 +265,15 @@ export default function WorkPage() {
 
         {/* CTA */}
         <div className="mt-16 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-8 text-center">
-          <h2 className="mb-4 text-2xl font-bold">Like what you see?</h2>
-          <p className="mx-auto mb-6 max-w-lg text-[var(--muted)]">
-            I share engineering deep dives, project updates, and lessons learned. Connect with me to
-            follow along.
-          </p>
+          <h2 className="mb-4 text-2xl font-bold">{workCopy.cta.heading}</h2>
+          <p className="mx-auto mb-6 max-w-lg text-[var(--muted)]">{workCopy.cta.text}</p>
           <a
-            href="https://www.linkedin.com/in/milos-cvetkovic-dev"
+            href={workCopy.cta.link.href}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-lg bg-[var(--accent)] px-6 py-3 font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
           >
-            <span>Connect on LinkedIn</span>
+            <span>{workCopy.cta.link.text}</span>
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"

@@ -1,4 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { OWNER_TODO } from '../src/data/owner-todo';
+import { yearsOfExperience } from '../src/data/profile';
+import { yearsClausesAboutAi, yearsFigures } from '../src/test/experience-claims';
 import {
   CASE_STUDY_ROUTES,
   NOT_FOUND_ROUTE,
@@ -354,6 +357,40 @@ test('the sitemap and robots.txt are served and agree with the routes', async ({
   expect(body, 'robots.txt must point at the sitemap').toContain('Sitemap:');
 });
 
+test('no route, nor the sitemap, robots.txt or the manifest, serves an owner placeholder', async ({
+  request,
+}) => {
+  // The publication rule of src/data/owner-todo.ts: whatever renders a value the owner has not
+  // supplied yet omits it rather than printing its marker. A typed placeholder's `state` and every
+  // `ownerTodo(...)` marker both contain OWNER_TODO, so one search of each served body covers both,
+  // flight payload included. The social cards need no search of their own: each draws its title,
+  // description and tags from the same data the page's head and body serve here. The status and a
+  // non-empty body are the control, soft so that one broken route does not hide a leak on the next:
+  // an error page or an empty response contains no marker either.
+  const served = [
+    ...routes,
+    { path: '/sitemap.xml', status: 200 },
+    { path: '/robots.txt', status: 200 },
+    { path: '/manifest.webmanifest', status: 200 },
+  ];
+  const problems: string[] = [];
+  for (const { path, status } of served) {
+    const response = await request.get(path);
+    const body = await response.text();
+    expect.soft(response.status(), path).toBe(status);
+    expect.soft(body.length, `${path} must serve a body`).toBeGreaterThan(0);
+    const leaks = [...body.matchAll(new RegExp(OWNER_TODO, 'g'))];
+    for (const { index } of leaks.slice(0, 5)) {
+      problems.push(`${path} serves "${body.slice(Math.max(0, index - 40), index + 60)}"`);
+    }
+    if (leaks.length > 5) problems.push(`${path} serves ${leaks.length - 5} more`);
+  }
+  expect(
+    problems,
+    'a placeholder reached served output: omit the sentence, row or block until the owner fills it',
+  ).toEqual([]);
+});
+
 test('the JSON-LD blocks are served and parse, and a case study adds its own two', async ({
   request,
 }) => {
@@ -386,6 +423,67 @@ test('the JSON-LD blocks are served and parse, and a case study adds its own two
     const article = blocks[2];
     expect(new URL(String(article.url)).pathname, `${path}: the article's own URL`).toBe(path);
   }
+});
+
+test('the Person schema, the hero and the /about description carry one derived years figure, none of it framed as AI-native (#49)', async ({
+  request,
+}) => {
+  // pages-9 and live-14: the Person schema once put the whole career down as AI-native work, which
+  // the site's own timeline (AI from 2025) and /skills (AI/LLM Integration, 2+) contradict, while
+  // /about said `10+`. The figure now comes from `yearsOfExperience()` in data/profile.ts, so every
+  // surface a crawler reads has to carry that one number.
+  const home = await request.get('/');
+  expect(home.status(), 'GET /').toBe(200);
+  const homeHtml = await home.text();
+  const blocks = [
+    ...homeHtml.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
+  ].map(([, body], index) => {
+    try {
+      return JSON.parse(body) as { '@type': string; description?: string };
+    } catch (error) {
+      throw new Error(`JSON-LD block ${index} on / does not parse: ${String(error)}\n${body}`);
+    }
+  });
+  const person = blocks.find((block) => block['@type'] === 'Person');
+  const about = await fetchHead(request, '/about');
+  expect(about.status, 'GET /about').toBe(200);
+
+  const surfaces = {
+    'the Person JSON-LD description on /': person?.description ?? '',
+    'the /about meta description': first(about.meta, 'description') ?? '',
+    'the /about og:description': first(about.meta, 'og:description') ?? '',
+    // The player card's XP row, as served: a crawler reads it without running the hero.
+    'the hero XP line on /': homeHtml.match(/>(\d+ years · 6 domains · 3 clouds)</)?.[1] ?? '',
+  };
+
+  const problems: string[] = [];
+  const figures = new Map<string, number[]>();
+  for (const [surface, text] of Object.entries(surfaces)) {
+    figures.set(surface, yearsFigures(text));
+    if (yearsFigures(text).length === 0)
+      problems.push(`${surface} states no years figure: "${text}"`);
+    for (const clause of yearsClausesAboutAi(text)) {
+      problems.push(`${surface} ties the years to AI work: "${clause}"`);
+    }
+  }
+  // One source: every surface states the same figure, whenever the build ran.
+  const stated = new Set([...figures.values()].flat());
+  if (stated.size > 1) {
+    problems.push(`the surfaces disagree: ${JSON.stringify(Object.fromEntries(figures))}`);
+  }
+  expect(problems).toEqual([]);
+
+  // And that figure is the derived one. The pages are prerendered, so it is the build's clock that
+  // counts: a build made before 1 January and served after it states one year fewer, which is a
+  // stale build rather than a second source, and the message says so.
+  const expected = yearsOfExperience();
+  const [served] = stated;
+  expect(
+    served,
+    served === expected - 1
+      ? `the build predates 1 January: it states ${served} years, the clock gives ${expected}; rebuild`
+      : `yearsOfExperience() gives ${expected}`,
+  ).toBe(expected);
 });
 
 /** A date the served body shows: its `<dt>` label, then the `<time>` in the `<dd>` after it. */

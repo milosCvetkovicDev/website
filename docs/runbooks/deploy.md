@@ -56,11 +56,12 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm check:build-output
 pnpm --filter web exec playwright install --with-deps chromium webkit   # once per machine
 pnpm --filter web test:e2e
 ```
 
-These are every gate in `.github/workflows/ci.yml`. The first nine commands are the `quality` job;
+These are every gate in `.github/workflows/ci.yml`. The first ten commands are the `quality` job;
 the last two are the `e2e` job, which on CI runs Playwright against the production build
 (`next start`) on port 3000, while the same command locally starts a dev server on port 3210.
 Playwright always starts the server it tests and never attaches to one that is already running, so
@@ -546,6 +547,22 @@ pages at rest on two phone viewports; either fails the `e2e` job on any violatio
   59.13.1): it rebuilds that deployment's own commit and takes no git ref, so it **cannot move
   production forward**. If production is behind `main`, see **Catching production up** below.
 
+### The years of experience in January
+
+`apps/web/src/data/profile.ts` computes the years of experience when the site is built (the hero's
+XP row, the Person JSON-LD, the /about description and quick fact), and every route is prerendered.
+After 1 January production keeps last year's figure until a build actually runs in the new year.
+The year is not part of the build's cache key: `turbo.json` hashes the tracked files under
+`apps/web` and `NEXT_PUBLIC_SITE_URL` and `VERCEL_ENV`, so `vercel redeploy`, a deploy hook or a
+dashboard deployment of a commit whose inputs did not change can replay the cached `.next` from the
+previous year. The dependable trigger is the first merge of the year that changes a file under
+`apps/web`. Check it after that deployment:
+
+```bash
+curl -s https://miloscvetkovic.dev/ | grep -o '[0-9]* years · 6 domains'
+# expect: this year minus 2013 (CAREER_START_YEAR), e.g. "14 years · 6 domains" in 2027
+```
+
 ### Catching production up
 
 When production's commit is not `main`'s HEAD — because a build was refused, cancelled or never
@@ -707,7 +724,7 @@ the branch and the live site agree.
 | A merge to `main` produced no deployment at all                                                                             | The build was skipped on purpose, or was never created                                                                                                                                                                                                                                                 | Run the `git diff --quiet` command under **Catching production up**. Exit 0 means no build input changed and the skip is deliberate ([ADR 0016](../adr/0016-vercel-deployment-budget.md)); exit 1 means production is genuinely behind                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `vercel deploy` uploads gigabytes, then fails with `File size limit exceeded (100 MB)`                                      | `.vercelignore` missing or out of step with `.gitignore`                                                                                                                                                                                                                                               | Restore `.vercelignore` (it must list `.turbo`), or deploy from Git instead                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `vercel git connect` prints `Failed to connect`                                                                             | Often spurious                                                                                                                                                                                                                                                                                         | `vercel api /v9/projects/<id> --raw \| jq .link`; if `link` is set the connection exists, otherwise install the Vercel GitHub App and retry                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| A Vercel install log warns `Ignored build scripts: esbuild@<version>` for a package that already has an `allowBuilds` entry | Stale state, not a new decision. pnpm re-reports the builds recorded in `node_modules/.modules.yaml`, and Vercel restores that from its build cache ("Restored build cache from previous deployment"), so the record is written back after every deploy. The `main` CI install log has zero such lines | Nothing to decide; the denial in `pnpm-workspace.yaml` is already the answer ([ADR 0013](../adr/0013-dependency-build-scripts-reviewed.md)). Locally: `pnpm clean && pnpm install`. On Vercel: redeploy with the build cache off (**Deployments → … → Redeploy**, untick **Use existing Build Cache**), then `vercel inspect <url> --logs 2>&1 \| grep -c 'Ignored build scripts'` prints `0`. Do **not** run `pnpm approve-builds`: approving `esbuild` would reverse the reviewed denial at `pnpm-workspace.yaml`, and `pnpm check:allowbuilds` only verifies the reviewed version and that a script still exists, so a mistaken `true` passes CI. A warning naming a package with **no** entry is a real new decision — follow the procedure in ADR 0013 (`pnpm ignored-builds`, `pnpm why -r <name>`, read its `scripts`, add `true`/`false` with a `Reviewed at` comment), which supersedes [ADR 0007](../adr/0007-dependency-build-scripts.md) |
+| The Vercel install log warns `Ignored build scripts: unrs-resolver@<version>` for a package that has an `allowBuilds` entry | Stale state, not a new decision. pnpm re-reports the builds recorded in `node_modules/.modules.yaml`, and Vercel restores that from its build cache ("Restored build cache from previous deployment"), so the record is written back after every deploy. The `main` CI install log has zero such lines | Nothing to decide: the `pnpm-workspace.yaml` denial is the answer ([ADR 0013](../adr/0013-dependency-build-scripts-reviewed.md)). Locally: `pnpm clean && pnpm install`. On Vercel: redeploy with the build cache off (**Deployments → … → Redeploy**, untick **Use existing Build Cache**), then `vercel inspect <url> --logs 2>&1 \| grep -c 'Ignored build scripts'` prints `0`. Do **not** run `pnpm approve-builds`: approving `unrs-resolver` would reverse the reviewed denial at `pnpm-workspace.yaml`, and `pnpm check:allowbuilds` only verifies the reviewed version and that a script exists, so a wrong `true` passes CI. A package with **no** entry that `pnpm why -r <name>` finds is a new decision (one it can't find: see below) — follow ADR 0013's procedure (`pnpm ignored-builds`, read its `scripts`, add `true`/`false` with a `Reviewed at` comment), which supersedes [ADR 0007](../adr/0007-dependency-build-scripts.md) |
 
 Detail on the less obvious rows:
 
@@ -733,6 +750,12 @@ Detail on the less obvious rows:
   to the same value changes nothing. The variable exists to make the origin explicit, not to change
   behaviour, and because the value is inlined at build time, saving it in Vercel does nothing until
   the next deploy.
+- **Ignored build scripts.** A warning naming a package that `pnpm why -r <name>` does not find is
+  the same stale `.modules.yaml` record, for a package the lockfile no longer resolves. The first
+  Vercel deploys after the vite 8 migration can report `esbuild@0.27.2` that way: esbuild left the
+  tree and its `allowBuilds` entry with it ([ADR 0027](../adr/0027-vite-8-in-apps-web.md)). Redeploy
+  with the build cache off, as in the row above, and add no entry: `pnpm check:allowbuilds` fails on
+  an entry for a package the lockfile does not resolve.
 
 ## Not covered
 

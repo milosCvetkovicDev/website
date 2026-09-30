@@ -44,6 +44,14 @@ updates:
       security:
         applies-to: security-updates
         patterns: ['*']
+      # The vite family moves as one: @vitejs/plugin-react 6 peers vite ^8, which is why #9 failed
+      # when it arrived alone against vite 7, and vitest and @vitest/coverage-v8 peer on each
+      # other's exact version. Majors are included so that they arrive together in one pull
+      # request. It sits ahead of minor-and-patch because Dependabot puts a dependency in the first
+      # group that matches it. See docs/adr/0018-dependency-update-policy.md.
+      vite:
+        patterns: ['vite', '@vitejs/*', 'vitest', '@vitest/*']
+        update-types: [major, minor, patch]
       minor-and-patch:
         update-types: [minor, patch]
     commit-message:

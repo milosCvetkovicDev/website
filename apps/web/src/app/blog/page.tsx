@@ -1,10 +1,10 @@
+import { blogCopy, blogRecord } from '@/data/pages/blog';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
-  title: 'Writing',
-  description:
-    'Hard-won lessons on AI agents, legacy rescue, and building systems that scale. No fluff, no hype—just what actually works.',
-  path: '/blog',
+  title: blogRecord.title,
+  description: blogRecord.summary,
+  path: blogRecord.path,
   // Out of search while this is a Coming Soon placeholder, as it is out of `sitemap.ts`; the nav
   // link stays. When the first post ships, delete this line and put /blog back in the sitemap.
   index: false,
@@ -15,9 +15,7 @@ export default function BlogPage() {
     <div className="py-16 md:py-24">
       <div className="mx-auto max-w-3xl px-6">
         <h1 className="mb-6 text-4xl font-bold md:text-5xl">Writing</h1>
-        <p className="mb-12 text-xl text-[var(--muted)]">
-          Hard-won lessons from the trenches. No fluff, no hype—just what actually works.
-        </p>
+        <p className="mb-12 text-xl text-[var(--muted)]">{blogCopy.intro}</p>
 
         {/* Coming soon placeholder */}
         <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-12 text-center">
@@ -40,12 +38,12 @@ export default function BlogPage() {
               <circle cx="11" cy="11" r="2" />
             </svg>
           </div>
-          <h2 className="mb-3 text-xl font-semibold">Coming Soon</h2>
-          <p className="mx-auto max-w-md text-[var(--muted)]">
-            I&apos;m writing about building AI agents that actually ship, rescuing legacy codebases
-            without losing your mind, and the patterns that make complex systems manageable. Stay
-            tuned.
-          </p>
+          <h2 className="mb-3 text-xl font-semibold">{blogCopy.comingSoon.heading}</h2>
+          {blogCopy.comingSoon.paragraphs.map((paragraph, index) => (
+            <p key={index} className="mx-auto max-w-md text-[var(--muted)]">
+              {paragraph}
+            </p>
+          ))}
         </div>
       </div>
     </div>

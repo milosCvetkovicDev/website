@@ -226,6 +226,15 @@ export function disarmGsapIntent(): void {
 }
 
 /**
+ * Whether anything on the page has asked for GSAP yet, or it has arrived. Until something has, no
+ * tween can exist, so code that only undoes what a tween did can skip asking, and asking would arm
+ * the load for nothing (`runWithGsap` arms it).
+ */
+export function isGsapRequested(): boolean {
+  return loading !== undefined || runtime !== undefined;
+}
+
+/**
  * Starts the load now, as intent. For an event handler that wants GSAP: a hover is the visitor's
  * intent as much as a scroll is. Returns the load's promise, which a caller may ignore (a failure
  * is reported by the loader and the promise is already handled) or await, as the tests that need

@@ -8,12 +8,13 @@ import type { Page } from '@playwright/test';
  * researchers measured the same page on the same day and got 5,156 and 4,623 characters, with
  * nothing but the extraction between them (#55). A floor or a phrase is pinned to this function.
  *
- * A plain `html.includes('EXECUTION')` does not work on this page and never will: `AnimatedText` wraps
- * every character in its own `<span>`, so the label arrives as `E</span><span …>X</span>…` and no
- * contiguous substring of the response contains the word. That is R14's mechanism
+ * A plain `html.includes('EXECUTION')` did not work on this page until #47's slice 47d: `AnimatedText`
+ * wraps every character in its own `<span>`, so the label arrives as `E</span><span …>X</span>…` and,
+ * before the visually hidden copy of the whole text was added beside that split, no contiguous
+ * substring of the response contained the word. That was R14's mechanism
  * (`hero-story-names.spec.ts`) showing up in a second place. Reading the text nodes recovers the
- * text, which is the right question anyway: these specs are about the content being served, not
- * about how it is marked up.
+ * text whatever the markup, which is the right question anyway: these specs are about the content
+ * being served, not about how it is marked up.
  *
  * The browser parses the markup; regular expressions do not. The hand-rolled stripper this replaces
  * produced wrong text for inputs that are legal HTML, which is the one thing a measuring instrument
@@ -49,7 +50,8 @@ import type { Page } from '@playwright/test';
  * phrase assertion can find the sentence. That is an artefact of the extractor, not a defect of the
  * page: Chrome's `innerText` and this walk both read
  * `Most bugs live in the gap between what you asked for and what you meant.` whole. The letter-spaced
- * *accessible name* on the same markup is a different defect, which #47 owns; do not "fix" the spans
+ * *accessible name* on the same markup was a different defect, which #47's slice 47d fixed with an
+ * `aria-hidden` split and a visually hidden copy of the whole text; do not "fix" the spans
  * to suit an extractor. The flip side is that zero-join cannot invent a word boundary the markup does
  * not have: `<br />` is an element, not a space, so text either side of one runs together (see the
  * hero headline in `no-js-text.spec.ts`).

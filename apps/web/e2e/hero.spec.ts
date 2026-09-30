@@ -278,17 +278,40 @@ test.describe('Hero Section', () => {
  * not a page, and `servedText` parses it on `about:blank`.
  */
 test.describe('Hero Section: served HTML', () => {
-  const servedBody = async (page: Page, request: APIRequestContext) => {
+  const served = async (page: Page, request: APIRequestContext) => {
     const response = await request.get('/');
     expect(response.status()).toBe(200);
-    return servedText(page, await response.text(), { root: 'body' });
+    const html = await response.text();
+    return { html, body: await servedText(page, html, { root: 'body' }) };
   };
+  const servedBody = async (page: Page, request: APIRequestContext) =>
+    (await served(page, request)).body;
+
+  /** The three closing headlines that `AnimatedText` splits into one span per letter. */
+  const SPLIT_HEADLINES = [
+    'Most bugs live in the gap between what you asked for and what you meant.',
+    'The bottleneck was never my typing speed.',
+    'This happened at 3:14am. Nobody got paged.',
+  ];
 
   test('story sections are server-rendered', async ({ page, request }) => {
-    const body = await servedBody(page, request);
-    // Plain text from four of the six sections.
-    for (const copy of ['TECH TREE', 'CI/CD PIPELINE', 'SELF-HEALING LOG', 'Connect on LinkedIn']) {
+    const { html, body } = await served(page, request);
+    // Plain text from four of the six sections, and the three closing headlines.
+    for (const copy of [
+      'TECH TREE',
+      'CI/CD PIPELINE',
+      'SELF-HEALING LOG',
+      'Connect on LinkedIn',
+      ...SPLIT_HEADLINES,
+    ]) {
       expect(body).toContain(copy);
+    }
+    // Reading text nodes joins the split letters back into the sentence, so the body text alone
+    // cannot tell the split copy from the whole one. Beside the split copy each headline carries a
+    // visually hidden one with the sentence whole, so the sentence is in the response as one run of
+    // text, as a crawler or a screen reader reads it.
+    for (const headline of SPLIT_HEADLINES) {
+      expect(html).toContain(headline);
     }
   });
 

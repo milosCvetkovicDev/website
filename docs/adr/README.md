@@ -38,7 +38,7 @@ perform an operation.
 | 0010 | [Status colour tokens](0010-status-colour-tokens.md)                                                                                     | Accepted (corrected 2026-09-10)               | 2026-09-09 |
 | 0011 | [Colour roles, corrected for scoped surfaces and stacked tints](0011-colour-roles-on-scoped-surfaces.md)                                 | Accepted                                      | 2026-09-10 |
 | 0012 | [Correcting factual errors in accepted records](0012-correcting-accepted-records.md)                                                     | Accepted                                      | 2026-09-10 |
-| 0013 | [Dependency build scripts stay disabled, and the reviewed versions are enforced](0013-dependency-build-scripts-reviewed.md)              | Accepted                                      | 2026-09-10 |
+| 0013 | [Dependency build scripts stay disabled, and the reviewed versions are enforced](0013-dependency-build-scripts-reviewed.md)              | Superseded by ADR-0027                        | 2026-09-10 |
 | 0014 | [Playwright starts the server it tests, on a port of its own](0014-playwright-owns-its-server.md)                                        | Accepted (corrected 2026-09-16)               | 2026-09-10 |
 | 0015 | [Case-study slugs are fixed at build time, so unknown ones 404 at the router](0015-static-case-study-params.md)                          | Accepted (corrected 2026-09-12)               | 2026-09-10 |
 | 0016 | [Dependabot branches never deploy, and commits that change nothing the site is built from never build](0016-vercel-deployment-budget.md) | Accepted                                      | 2026-09-12 |
@@ -52,6 +52,7 @@ perform an operation.
 | 0024 | [GSAP loads on the visitor's first intent](0024-gsap-loads-on-first-intent.md)                                                           | Accepted                                      | 2026-09-24 |
 | 0025 | [The public `vercel.app` production alias answers `X-Robots-Tag: noindex`](0025-production-alias-noindex.md)                             | Accepted                                      | 2026-09-25 |
 | 0026 | [Vercel Web Analytics loads in Vercel deployments only](0026-vercel-web-analytics.md)                                                    | Accepted (corrected 2026-09-27)               | 2026-09-26 |
+| 0027 | [vite 8 is declared in `apps/web`, and `allowBuilds` keeps one entry](0027-vite-8-in-apps-web.md)                                        | Accepted                                      | 2026-09-28 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
@@ -73,6 +74,10 @@ ADR 0023 is superseded in part too: [ADR 0025](0025-production-alias-noindex.md)
 sentence of its first Decision bullet saying there is no second `headers()` entry, since a second
 one now sends `X-Robots-Tag: noindex` on the production alias alone, and the six security headers
 and the rest of 0023's decision stand.
+ADR 0013 is superseded in part as well: [ADR 0027](0027-vite-8-in-apps-web.md) replaces the
+sentence of its decision saying `allowBuilds` keeps two entries, the two-entry block beneath it and
+what its bullets say about esbuild, since esbuild left the dependency tree with vite 8 and its entry
+went under 0013's own rule, and the rest of 0013's decision stands.
 The bodies of 0002, 0003, 0004 and 0005 still describe the state on 2026-09-08, when they were
 accepted.
 A record's decision is never edited afterwards, and its other sections only to correct a claim
