@@ -390,7 +390,7 @@ test('when GSAP cannot be fetched, the story shows its finished state', async ({
   await expect(page.getByText('RESOLVED', { exact: true })).toBeVisible();
 
   // The page stays usable: a hover on an animated heading does nothing, and throws nothing.
-  await page.locator('h2').filter({ hasText: "doesn't fly here" }).hover();
+  await page.locator('h3').filter({ hasText: "doesn't fly here" }).hover();
   expect(pageErrors).toEqual([]);
 });
 

@@ -8,7 +8,7 @@ import { createRef, type ComponentProps } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap } from '../gsap-runtime';
 import { requestGsap } from '../load-gsap';
-import { DataStream, PipelineStage, ProgressBar, StatDisplay } from '../hud-elements';
+import { DataStream, HudPanel, PipelineStage, ProgressBar, StatDisplay } from '../hud-elements';
 import { cssTransitions } from './gsap-css-conflicts';
 import { stageFill, stageTrack } from './pipeline-fill';
 
@@ -501,6 +501,37 @@ describe('PipelineStage', () => {
       expect(transitioned).toContain('background-color');
     },
   );
+});
+
+describe('HudPanel', () => {
+  afterEach(cleanup);
+
+  // Eight titled panels in the story each drew an "ACTIVE" beside their title, and each one was
+  // announced: decoration a screen-reader user heard eight times over (#47, hero-10).
+  it('keeps the ACTIVE indicator beside its title away from assistive technology', () => {
+    render(<HudPanel title="QUEST LOG">content</HudPanel>);
+
+    const active = screen.getByText('ACTIVE');
+    const hidden = active.closest('[aria-hidden="true"]');
+    expect(hidden, 'the ACTIVE label is inside an aria-hidden element').not.toBeNull();
+    // The title row holds the title and the indicator, nothing else: whatever is drawn beside the
+    // title (the dot as much as the word) is inside the hidden part, found by structure rather than
+    // by a class that names its look.
+    const title = screen.getByText('QUEST LOG');
+    const row = title.parentElement;
+    expect(row?.children ? [...row.children] : [], 'the title row').toEqual([title, hidden]);
+    expect(hidden?.contains(active)).toBe(true);
+    expect(hidden?.children.length, 'the dot and the word').toBe(2);
+    // The title is the panel's content and stays exposed.
+    expect(title.closest('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it('draws no indicator on an untitled panel', () => {
+    const { container } = render(<HudPanel>content</HudPanel>);
+
+    expect(screen.queryByText('ACTIVE')).toBeNull();
+    expect(container.querySelector('[aria-hidden="true"]')).toBeNull();
+  });
 });
 
 describe('ProgressBar', () => {

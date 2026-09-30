@@ -285,7 +285,7 @@ function elapse(seconds: number) {
 /**
  * Mounts one variant and returns what a walk needs: the hover target, with a real box, and checks
  * that remember everything the walk has seen and everything GSAP was already running. With
- * `inHeading` the variant sits inside an `<h2>`, as the story's closing headlines do.
+ * `inHeading` the variant sits inside an `<h2>`, as the story's section titles do.
  */
 function mount(animation: Animation, { inHeading = false } = {}) {
   // Whatever GSAP is already running belongs to something else; the checks below look past it.

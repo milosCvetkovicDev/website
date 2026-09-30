@@ -103,7 +103,9 @@ export const HudPanel = forwardRef<
         <span className="font-mono text-xs tracking-wider text-[var(--accent-text)] uppercase">
           {title}
         </span>
-        <div className="flex items-center gap-1">
+        {/* Decoration, hidden from assistive technology: every titled panel shows it, so a screen
+            reader would announce "ACTIVE" after each title. */}
+        <div className="flex items-center gap-1" aria-hidden="true">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
           <span className="font-mono text-[10px] text-[var(--accent-text)]">ACTIVE</span>
         </div>
