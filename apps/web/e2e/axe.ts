@@ -75,12 +75,18 @@ export const LIGHTHOUSE_AXE_OPTIONS: AxeRunOptions = {
 };
 
 /**
- * Runs the rule set over the whole page. `exclude` takes selectors out of it on top of the dev
- * server's indicator. Only the `/` at-rest pass in `accessibility.spec.ts` passes one, and that
- * test proves what it excludes is decoration before it audits: an exclusion nothing checks would
- * hide whatever came to sit under the selector.
+ * Runs the rule set over the whole page. `exclude` takes more selectors out of every rule, on top of
+ * the dev server's indicator, so whatever comes to sit under one goes unaudited: a caller that passes
+ * one proves in the same test what it matches, as `auditExcludingTmuxLogStream` in
+ * `accessibility.spec.ts`, the only caller that does, checks before and after the audit. A selector
+ * that matches nothing throws rather than quietly excluding nothing.
  */
-export const audit = (page: Page, exclude: readonly string[] = []) => {
+export const audit = async (page: Page, exclude: readonly string[] = []) => {
+  for (const selector of exclude) {
+    if ((await page.locator(selector).count()) === 0) {
+      throw new Error(`audit: the exclusion ${selector} matches nothing on ${page.url()}`);
+    }
+  }
   const builder = new AxeBuilder({ page })
     // AxeBuilder keeps the reference and its other setters write into it: never hand it the constant.
     .options(structuredClone(LIGHTHOUSE_AXE_OPTIONS))

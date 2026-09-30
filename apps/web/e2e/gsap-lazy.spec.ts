@@ -473,7 +473,9 @@ test.describe('the first intent', () => {
   // What a visitor who has not yet scrolled sees, and what Lighthouse's accessibility audit now
   // scores: the served story, before GSAP has built any from-state. The gate's own rule set, its
   // at-rest floor for `/` (`AT_REST_CONTRAST_FLOOR` in `accessibility.spec.ts`, 80), and no budget
-  // of its own: the incomplete count is recorded, not gated.
+  // of its own: the incomplete count is recorded, not gated. It includes the tmux log stream, which
+  // the at-rest pass leaves out (`TMUX_LOG_STREAM` there), so it reads above that pass's constant by
+  // however many lines had streamed when axe ran.
   for (const colorScheme of ['light', 'dark'] as const) {
     test(`/ has no axe violations before any intent in the ${colorScheme} theme`, async ({
       page,
