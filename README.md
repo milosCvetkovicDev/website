@@ -16,7 +16,9 @@ Personal site of Milos Cvetkovic, Senior Full-Stack Engineer. An interactive, an
 
 <!-- connector-snippets:start -->
 
-Claude Code:
+Paste the snippet for your client. If your Cursor or VS Code config file already lists servers, add the entry to its mcpServers or servers object instead of replacing the file.
+
+Claude Code, run in a terminal:
 
 ```bash
 claude mcp add --transport http portfolio https://miloscvetkovic.dev/mcp

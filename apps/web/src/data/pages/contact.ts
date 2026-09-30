@@ -2,9 +2,11 @@
  * The copy `/contact` renders, and the page record its Markdown twin reads (#59). The page keeps
  * the layout, the classes, its `h1` and each profile's icon, which it keys by the link's `name`,
  * and maps over what is here, so a page and its twin cannot disagree. Every string is text the
- * page shows. The connector snippets are the exception: the page renders them from
- * `data/mcp-server.ts`, and the twin has no code block to carry them, so it names the endpoint in
- * the section's intro instead.
+ * page shows, with two exceptions in the "Connect an agent" section. The page renders the connector
+ * snippets from `data/mcp-server.ts` and tells the reader to paste one; the twin has no code block
+ * to carry them, so it names the endpoint and points at the page instead (`agents.twinPointer`).
+ * Importing this module evaluates `MCP_SERVER_URL`, so a malformed `NEXT_PUBLIC_SITE_URL` throws
+ * here, naming the variable, as it does for every absolute URL the build writes.
  */
 import { MCP_SERVER_URL } from '@/data/mcp-server';
 import { social } from '@/data/social';
@@ -61,11 +63,22 @@ export const contactCopy = {
     text: 'Check out my latest projects, case studies, and the engineering behind them.',
     link: { text: 'View My Work', href: '/work' },
   },
-  // How to attach an MCP client to the site (#62). The intro is a draft for the owner to rewrite in
-  // their own voice; keep the endpoint in it, since it is all the twin says of the server.
+  // How to attach an MCP client to the site (#62). The copy is a draft for the owner to rewrite in
+  // their own voice. The endpoint ends its sentence with no punctuation after it, so a double-click
+  // or an autolinker cannot take a trailing full stop into the URL.
   agents: {
     heading: 'Connect an agent',
-    intro: `Prefer to ask an AI agent about my work? Point it at the read-only MCP server at ${MCP_SERVER_URL}. It needs no sign-in: paste the snippet for your client.`,
+    intro:
+      'Prefer to ask an AI agent about my work? Point it at my read-only MCP server, which needs no sign-in:',
+    endpoint: MCP_SERVER_URL,
+    paste:
+      'Paste the snippet for your client. If your Cursor or VS Code config file already lists servers, add the entry to its mcpServers or servers object instead of replacing the file.',
+    // The twin's stand-in for the snippets and the paste line, which it cannot carry.
+    twinPointer: [
+      'The copy-paste snippets for Claude Code, Cursor and VS Code are on ',
+      { text: 'the contact page', href: '/contact' },
+      '.',
+    ],
   },
 } as const;
 
@@ -81,7 +94,14 @@ const sections: readonly PageSection[] = [
     heading: contactCopy.closing.lead,
     paragraphs: [contactCopy.closing.text, [contactCopy.closing.link]],
   },
-  { kind: 'prose', heading: contactCopy.agents.heading, paragraphs: [contactCopy.agents.intro] },
+  {
+    kind: 'prose',
+    heading: contactCopy.agents.heading,
+    paragraphs: [
+      `${contactCopy.agents.intro} ${contactCopy.agents.endpoint}`,
+      contactCopy.agents.twinPointer,
+    ],
+  },
 ];
 
 export const contactRecord: PageRecord = {

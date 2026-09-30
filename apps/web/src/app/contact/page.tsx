@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import Link from 'next/link';
-import { connectorSnippets } from '@/data/mcp-server';
+import { RUN_IN_TERMINAL, connectorSnippets } from '@/data/mcp-server';
 import { contactCopy, contactRecord, socialLinks, type SocialLinkName } from '@/data/pages/contact';
 import { buildMetadata } from '@/lib/metadata';
 
@@ -108,16 +108,26 @@ export default function ContactPage() {
           <h2 className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {contactCopy.agents.heading}
           </h2>
-          <p className="mb-8 break-words text-[var(--muted)]">{contactCopy.agents.intro}</p>
+          <p className="mb-4 break-words text-[var(--muted)]">
+            {contactCopy.agents.intro}{' '}
+            <code className="font-mono">{contactCopy.agents.endpoint}</code>
+          </p>
+          <p className="mb-8 text-[var(--muted)]">{contactCopy.agents.paste}</p>
           <div className="space-y-6">
-            {connectorSnippets.map(({ client, files, code }) => {
-              const captionId = `connector-${client.toLowerCase().replace(/\W+/g, '-')}`;
+            {connectorSnippets.map(({ client, files, code }, index) => {
+              // The index keeps the ids distinct whatever the clients are called.
+              const captionId = `connector-snippet-${index}`;
               return (
                 <div key={client}>
                   <p id={captionId} className="mb-2 text-sm">
-                    <span className="font-semibold">{client}</span>
-                    {files.length > 0 && (
-                      <span className="font-mono text-[var(--muted)]"> · {files.join(' or ')}</span>
+                    <span className="font-semibold">{client}</span>{' '}
+                    <span aria-hidden="true" className="text-[var(--muted)]">
+                      ·
+                    </span>{' '}
+                    {files.length > 0 ? (
+                      <span className="font-mono text-[var(--muted)]">{files.join(' or ')}</span>
+                    ) : (
+                      <span className="text-[var(--muted)]">{RUN_IN_TERMINAL}</span>
                     )}
                   </p>
                   <pre

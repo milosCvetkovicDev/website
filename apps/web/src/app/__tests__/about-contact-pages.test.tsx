@@ -10,7 +10,7 @@ import {
   timeline,
   type StoryParagraph,
 } from '@/data/pages/about';
-import { connectorSnippets } from '@/data/mcp-server';
+import { RUN_IN_TERMINAL, connectorSnippets } from '@/data/mcp-server';
 import { contactCopy, socialLinks } from '@/data/pages/contact';
 
 /**
@@ -131,6 +131,8 @@ describe('/contact', () => {
       contactCopy.closing.link.text,
       contactCopy.agents.heading,
       contactCopy.agents.intro,
+      contactCopy.agents.endpoint,
+      contactCopy.agents.paste,
     ]) {
       expect(main, `/contact must render "${text}"`).toContain(text);
     }
@@ -157,18 +159,28 @@ describe('/contact', () => {
   // and a focusable element needs a role and a name: its caption, which starts with the client.
   it('renders each connector snippet as a named region the keyboard can reach', () => {
     render(<ContactPage />);
-    expect(
-      screen.getByRole('heading', { level: 2, name: contactCopy.agents.heading }),
-    ).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { level: 2, name: contactCopy.agents.heading });
+    const section = heading.closest('section');
+    expect(section, 'the heading opens its own section').not.toBeNull();
 
-    const regions = screen.getAllByRole('region');
+    // The endpoint is code, not the end of a sentence: nothing after it for a selection to take.
+    const endpoint = within(section!).getByText(contactCopy.agents.endpoint);
+    expect(endpoint.tagName).toBe('CODE');
+    expect(endpoint.nextSibling).toBeNull();
+
+    const regions = within(section!).getAllByRole('region');
     expect(regions).toHaveLength(connectorSnippets.length);
-    connectorSnippets.forEach(({ client, code }, index) => {
+    const ids = new Set<string | null>();
+    connectorSnippets.forEach(({ client, files, code }, index) => {
       const region = regions[index];
       expect(region.tagName, client).toBe('PRE');
       expect(region, client).toHaveAttribute('tabindex', '0');
-      expect(region, client).toHaveAccessibleName(expect.stringMatching(new RegExp(`^${client}`)));
+      ids.add(region.getAttribute('aria-labelledby'));
+      // The caption, read without its decorative separator.
+      const where = files.length > 0 ? files.join(' or ') : RUN_IN_TERMINAL;
+      expect(region, client).toHaveAccessibleName(`${client} ${where}`);
       expect(region.textContent, client).toBe(code);
     });
+    expect(ids.size, 'each region is named by its own caption').toBe(connectorSnippets.length);
   });
 });
