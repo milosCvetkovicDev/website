@@ -12,8 +12,8 @@ feed, the sitemap and the JSON-LD read only those. Every route handler prerender
 **Design:** [2026-09-28-blog-engine-design.md](2026-09-28-blog-engine-design.md) (decisions
 D1-D12), with the standing record in [ADR 0028](../adr/0028-blog-posts-as-typed-data.md).
 
-**Branch:** one per task, as the design's Slices table lists: Task 1 is `feat/blog-post-model` from
-`main` at `415014e`.
+**Branch:** one per task, as the design's Slices table lists: Task 1 is `feat/blog-post-model`,
+branched from `main` at `415014e` and rebased onto `a0331e4` (#167) before its first push.
 
 **Stop condition for the whole plan (all must hold):**
 
@@ -47,7 +47,7 @@ Every command runs from the repository root after loading nvm, one suite at a ti
       exist.
 - [x] **Step 2:** Write `posts.ts`: `Inline`, the five block types, `PublishedPost` and `DraftPost`
       discriminated on `draft`, an empty `posts`, and `buildPostIndex` with the `publishedPosts`,
-      `hasPublishedPosts` and `getPost` it derives. The test passes: 79 tests.
+      `hasPublishedPosts` and `getPost` it derives. The test passes: 148 tests.
 - [x] **Step 3:** Mutate the checker and the index (a permissive link pattern, no heading-order
       check, the draft rule inverted, the future-date rule off, the sort reversed, drafts
       published) and see each mutant fail the suite.
