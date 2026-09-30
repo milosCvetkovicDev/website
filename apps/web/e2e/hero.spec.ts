@@ -218,6 +218,12 @@ test.describe('Hero Section', () => {
 
   test('scroll indicator fades on scroll', async ({ page }) => {
     const indicator = page.getByText('Scroll', { exact: true }).first().locator('..');
+    // The indicator is displayed from `lg` and 60rem tall only, so not at the desktop project's
+    // 1280x720, where it would cover the hero card (#134; the scan below). An element that is not
+    // displayed still computes opacity 1, and then 0, so without a tall enough viewport and the
+    // display check this test would pass while showing nothing.
+    await page.setViewportSize({ width: 1280, height: 1024 });
+    await expect(indicator).toHaveCSS('display', 'flex');
     await expect(indicator).toHaveCSS('opacity', '1');
 
     // A wheel scroll, as a visitor makes, not window.scrollTo. Chromium can undo a scripted scroll made
@@ -267,6 +273,115 @@ test.describe('Hero Section', () => {
     const skillList = page.locator('ul[aria-label="Technical skills"]');
     await expect(skillList).toBeAttached();
   });
+});
+
+type Rect = { x: number; y: number; width: number; height: number };
+
+/** Whether two boxes share any area; boxes that only touch along an edge do not. */
+const intersects = (a: Rect, b: Rect) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+const describeRect = (r: Rect) =>
+  `x ${r.x.toFixed(1)}-${(r.x + r.width).toFixed(1)}, y ${r.y.toFixed(1)}-${(r.y + r.height).toFixed(1)}`;
+
+/**
+ * The Scroll indicator is pinned to the viewport, 44 px above its bottom edge, while the hero card is
+ * centred in a section one viewport tall that starts under the sticky header. Losing height lifts the
+ * indicator by the full amount and the card's bottom edge by only half of it, so on short viewports
+ * the indicator sat on the card and on its last row of skill tags (#134: the Kubernetes tag at
+ * 1280x800). `hero-section.tsx` displays it from `lg` and 60rem tall only. This scan is the guard on
+ * that threshold, which drifts when the card's height or the header's offset changes: the sizes #134
+ * measured, width 1280 at every height from 700 to 960 in 20 px steps (960 px being the threshold,
+ * where the indicator is first displayed), and three tall desktops.
+ *
+ * One test per size, each in a context of its own, so every page is laid out at its size from the
+ * start rather than resized. Outside 'Hero Section', whose `beforeEach` loads the page at the
+ * project's 1280x720 first.
+ */
+test.describe('scroll indicator clears the hero card at rest', () => {
+  const MEASURED = [
+    [1024, 768],
+    [1280, 720],
+    [1280, 800],
+    [1366, 768],
+    [1440, 900],
+    [1536, 864],
+  ];
+  const HEIGHT_SCAN = Array.from({ length: 14 }, (_, i) => [1280, 700 + 20 * i]);
+  /** Where the indicator must be displayed at rest: the threshold and three tall desktops. */
+  const DISPLAYED = [
+    [1280, 960],
+    [1280, 1024],
+    [1680, 1050],
+    [1920, 1080],
+  ];
+  const sizes = new Map<string, { width: number; height: number }>();
+  for (const [width, height] of [...MEASURED, ...HEIGHT_SCAN, ...DISPLAYED]) {
+    sizes.set(`${width}x${height}`, { width, height });
+  }
+
+  for (const [size, viewport] of sizes) {
+    const displayed = DISPLAYED.some(([w, h]) => w === viewport.width && h === viewport.height);
+
+    test.describe(`at ${size}`, () => {
+      test.use({ viewport });
+
+      test(
+        displayed
+          ? 'the indicator is displayed at rest, clear of the card'
+          : 'the indicator covers neither the card nor its skill tags',
+        async ({ page }) => {
+          await gotoHydrated(page, '/');
+          await page.evaluate(async () => {
+            await document.fonts.ready;
+          });
+
+          const indicator = page.getByText('Scroll', { exact: true }).first().locator('..');
+          const skills = page.getByRole('list', { name: 'Technical skills' });
+          const card = skills.locator('..');
+
+          if (displayed) {
+            await expect(indicator).toHaveCSS('display', 'flex');
+            await expect(indicator).toHaveCSS('opacity', '1');
+          }
+
+          const { display, opacity } = await indicator.evaluate((el) => {
+            const style = getComputedStyle(el);
+            return { display: style.display, opacity: Number(style.opacity) };
+          });
+          const box = await indicator.boundingBox();
+          // Not displayed, or fully transparent: it covers nothing at this size.
+          if (display === 'none' || box === null || opacity === 0) return;
+
+          const cardBox = await card.boundingBox();
+          expect(cardBox, `at ${size} the hero card has no box`).not.toBeNull();
+          const tags = await skills.getByRole('listitem').all();
+          expect(tags.length, 'the skill tags must be on the page to be measured').toBeGreaterThan(
+            0,
+          );
+          const targets: { what: string; box: Rect | null }[] = [
+            { what: 'the hero card', box: cardBox },
+          ];
+          for (const tag of tags) {
+            targets.push({
+              what: `the "${await tag.innerText()}" tag`,
+              box: await tag.boundingBox(),
+            });
+          }
+          const covered: string[] = [];
+          for (const { what, box: other } of targets) {
+            if (other && intersects(box, other)) covered.push(`${what} (${describeRect(other)})`);
+          }
+
+          expect(
+            covered,
+            `at ${size} the Scroll indicator (${describeRect(box)}, opacity ${opacity}) is ` +
+              'displayed over the hero card or its skill tags',
+          ).toEqual([]);
+        },
+      );
+    });
+  }
 });
 
 /**

@@ -88,11 +88,23 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       {/* 3. Server-rendered content island (passed as children) */}
       {children}
 
-      {/* 4. Scroll indicator -- fixed, bottom-11, z-20 */}
+      {/* 4. Scroll indicator -- fixed, bottom-11, z-20, displayed from `lg` and 60rem tall only.
+          It is pinned to the viewport while the card is centred in a section one viewport tall
+          that starts under the sticky header, so losing height lifts the indicator by the full
+          amount but the card's bottom edge by only half of it. With the card 583 px tall and its
+          centre 69 px below the viewport's, the gap from the card's bottom edge down to the
+          indicator's top is (viewport height / 2) - 460.1 px at every lg size measured (#134),
+          negative where they overlap: the indicator clears the card from 921 px tall, and 60rem
+          (960 px) leaves about 20 px. Shorter screens do not display it, and the card's own
+          "Scroll to see how." invites the scroll there. A media query rather than a
+          measurement, so the served markup is the same at every size (ADR 0006).
+          The threshold drifts when the card's height or the header's offset changes: the height
+          scan 'scroll indicator clears the hero card at rest' in e2e/hero.spec.ts is its guard.
+          Decorative, aria-hidden and without a handler, so it never takes the pointer. */}
       <div
         aria-hidden="true"
-        className={`fixed bottom-11 left-1/2 z-20 hidden -translate-x-1/2 flex-col items-center gap-1.5 transition-opacity duration-300 lg:flex ${
-          showScrollIndicator ? 'opacity-100' : 'pointer-events-none opacity-0'
+        className={`pointer-events-none fixed bottom-11 left-1/2 z-20 hidden -translate-x-1/2 flex-col items-center gap-1.5 transition-opacity duration-300 lg:[@media(min-height:60rem)]:flex ${
+          showScrollIndicator ? 'opacity-100' : 'opacity-0'
         }`}
       >
         <span
