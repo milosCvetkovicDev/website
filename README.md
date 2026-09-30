@@ -71,7 +71,7 @@ CI runs on every pull request and every push to `main` (`.github/workflows/ci.ym
 | `pnpm typecheck`                  | `next typegen && tsc --noEmit` (web), strict `checkJs` over `scripts/`                                                              | -                  | yes |
 | `pnpm test`                       | Vitest unit tests                                                                                                                   | -                  | yes |
 | `pnpm build`                      | Production build of `apps/web`                                                                                                      | -                  | yes |
-| `pnpm check:build-output`         | Every route in the web build prerendered, with its body file, and no server function outside an allowlist that is empty             | -                  | yes |
+| `pnpm check:build-output`         | Every route in the web build prerendered, with its body file, and no server function but `/mcp`, the allowlist's one entry          | -                  | yes |
 | `pnpm --filter web test:e2e`      | Playwright against the production build; a test that passes only on a retry fails the run                                           | -                  | yes |
 | `scripts/check-webserver-log.mjs` | Anything the web server wrote to stderr during the e2e run, beyond ADR 0015's `NoFallbackError` block                               | -                  | yes |
 
