@@ -120,7 +120,7 @@ test('under reduce, hovering an animated heading moves nothing', async ({ page }
   // in place and no reveal is in flight: any transform seen below was put there by the hover.
   const moved = await page.evaluate(async () => {
     const headings = [...document.querySelectorAll<HTMLElement>('h2, h3')].filter((el) =>
-      el.querySelector('[data-animation], .relative'),
+      el.querySelector('[data-animation]'),
     );
     if (headings.length === 0) throw new Error('no animated headings found to hover');
 

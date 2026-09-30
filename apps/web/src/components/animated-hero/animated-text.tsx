@@ -130,15 +130,16 @@ const RAINBOW_TOKENS = ['--status-err', '--status-warn', '--status-ok', '--accen
 
 const VARIANTS = {
   // Shuffles the characters, then reveals them left to right; a leave puts the text back at once.
+  // Whitespace of any kind is kept where it is, so the line never rewraps while it plays.
   scramble: {
     stopsOnLeave: true,
     build: ({ gsap, text, draw }) => {
       const chars = Array.from(text);
       const any = () => SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
-      const tween = gsap.to({}, { duration: text.length * 0.05, onComplete: () => draw(null) });
+      const tween = gsap.to({}, { duration: chars.length * 0.05, onComplete: () => draw(null) });
       return tween.eventCallback('onUpdate', () => {
         const shown = Math.floor(tween.progress() * chars.length);
-        draw(chars.map((c, i) => (c === ' ' || i < shown ? c : any())).join(''));
+        draw(chars.map((c, i) => (/\s/.test(c) || i < shown ? c : any())).join(''));
       });
     },
     draw: (text, frame) => (
@@ -194,16 +195,18 @@ const VARIANTS = {
     },
     draw: (text, frame) => <span style={frame === null ? undefined : GLITCH_OFFSETS}>{text}</span>,
   },
-  // Retypes the text one character at a time, behind a caret.
+  // Retypes the text one character at a time, behind a caret. By code point, so a frame never ends
+  // in half a character, and `draw` can slice the untyped rest off the text by the frame's length.
   typewriter: {
     build: ({ gsap, text, draw }) => {
+      const chars = Array.from(text);
       const typed = { count: 0 };
       draw('');
       return gsap.to(typed, {
-        count: text.length,
-        duration: text.length * 0.04,
+        count: chars.length,
+        duration: chars.length * 0.04,
         ease: 'none',
-        onUpdate: () => draw(text.slice(0, Math.floor(typed.count))),
+        onUpdate: () => draw(chars.slice(0, Math.floor(typed.count)).join('')),
         onComplete: () => draw(null),
       });
     },
@@ -372,7 +375,11 @@ function HoverText({ text, animation, className }: HoverTextProps) {
 
 // Keyed on the variant and the text: a variant keeps what it draws in state and refs made from the
 // text it mounted with (the frame, the letters' refs), so new text or a new variant mounts afresh,
-// and the visually hidden copy never reads other than the visible one.
+// and the visually hidden copy never reads other than the visible one. An animation the table does
+// not own, from a caller the type does not reach, draws the text with no hover rather than throwing.
 export const AnimatedText = memo(function AnimatedText({ children, ...props }: AnimatedTextProps) {
+  if (!Object.hasOwn(VARIANTS, props.animation)) {
+    return <span className={props.className}>{children}</span>;
+  }
   return <HoverText key={`${props.animation}:${children}`} text={children} {...props} />;
 });

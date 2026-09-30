@@ -140,7 +140,7 @@ describe('before GSAP has loaded', () => {
     fireEvent.mouseEnter(leftTarget);
     fireEvent.mouseLeave(leftTarget);
 
-    // An enter and its leave, both early. The leave replaces the enter, so the scramble never
+    // An enter and its leave, both early. The leave cancels the queued enter, so the scramble never
     // starts after the pointer has gone.
     const scrambleTarget = hoverTarget(scramble);
     fireEvent.mouseEnter(scrambleTarget);

@@ -518,6 +518,100 @@ describe('AnimatedText', () => {
     },
   );
 
+  // What the e2e specs and the lazy-load tests find every variant by (#47, slice 47k).
+  it.each(ANIMATIONS)('%s: renders one span root that names its variant', (animation) => {
+    const view = render(<AnimatedText animation={animation}>{TEXT}</AnimatedText>);
+    expect(view.container.childElementCount).toBe(1);
+    const root = view.container.firstElementChild;
+    expect(root?.tagName).toBe('SPAN');
+    expect(root instanceof HTMLElement && root.dataset.animation).toBe(animation);
+  });
+
+  // The variant is part of the key: a new one mid-hover unmounts the old, which takes its tween with
+  // it, and mounts afresh on the same text.
+  it.each(ANIMATIONS)(
+    '%s: a new animation mid-hover leaves no tween and draws the text',
+    (from) => {
+      const to = ANIMATIONS[(ANIMATIONS.indexOf(from) + 1) % ANIMATIONS.length];
+      const running = new Set(liveAnimations());
+      const startedHere = () => liveAnimations().filter((live) => !running.has(live));
+      const view = render(<AnimatedText animation={from}>{TEXT}</AnimatedText>);
+      const before = view.container.firstElementChild;
+      if (!(before instanceof HTMLElement)) throw new Error(`${from}: rendered no element`);
+      vi.spyOn(before, 'getBoundingClientRect').mockReturnValue(DOMRect.fromRect(BOX));
+      fireEvent.mouseEnter(before);
+      fireEvent.mouseMove(before, POINTER);
+      elapse(MID_HOVER_SECONDS);
+      expect(startedHere(), 'the hover had already finished').not.toEqual([]);
+
+      view.rerender(<AnimatedText animation={to}>{TEXT}</AnimatedText>);
+      expect(startedHere(), `${from}'s hover outlived the switch to ${to}`).toEqual([]);
+      const root = view.container.firstElementChild;
+      if (!(root instanceof HTMLElement)) throw new Error(`${to}: rendered no element`);
+      expect(root.dataset.animation).toBe(to);
+      expect(visibleText(root)).toBe(TEXT);
+      const hidden = root.querySelector('.sr-only');
+      if (hidden) expect(hidden.textContent, 'the visually hidden copy').toBe(TEXT);
+    },
+  );
+
+  // The type stops a bad value at compile time only; one from an untyped caller used to fall
+  // through the old `switch` to plain text, and still does. `constructor` is on every object's
+  // prototype, so a lookup that did not check own keys would find it.
+  it.each(['sparkle', 'constructor'])(
+    'an animation it does not own (%s) draws the text',
+    (name) => {
+      const view = render(<AnimatedText animation={name as Animation}>{TEXT}</AnimatedText>);
+      const root = view.container.firstElementChild;
+      if (!(root instanceof HTMLElement)) throw new Error(`${name}: rendered no element`);
+      expect(root.textContent).toBe(TEXT);
+      fireEvent.mouseEnter(root);
+      fireEvent.mouseMove(root, POINTER);
+      fireEvent.mouseLeave(root);
+      elapse(SETTLE_SECONDS);
+      expect(root.textContent).toBe(TEXT);
+    },
+  );
+
+  // Typed a code unit at a time, a frame could end on the first half of a surrogate pair and draw a
+  // replacement glyph until the next one.
+  it('typewriter: a character outside the BMP is never drawn in halves while it types', () => {
+    const ROCKETS = '\u{1F680}\u{1F680} go \u{1F680}';
+    const loneSurrogate = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    const view = render(<AnimatedText animation="typewriter">{ROCKETS}</AnimatedText>);
+    const root = view.container.firstElementChild;
+    if (!(root instanceof HTMLElement)) throw new Error('typewriter: rendered no element');
+    const halves: string[] = [];
+    fireEvent.mouseEnter(root);
+    for (let frame = 0; frame < 1 / FRAME_SECONDS; frame++) {
+      elapse(FRAME_SECONDS);
+      for (const el of root.querySelectorAll('[aria-hidden="true"] > span')) {
+        if (loneSurrogate.test(el.textContent ?? '')) halves.push(JSON.stringify(el.textContent));
+      }
+    }
+    expect(halves, 'half a character drawn mid-typing').toEqual([]);
+    expect(visibleText(root)).toBe(ROCKETS);
+  });
+
+  // Only U+0020 used to be kept: a no-break space or a newline was shuffled into a glyph mid-hover,
+  // which moved the line's break opportunities while it played.
+  it('scramble: whitespace of every kind stays in place while it plays', () => {
+    const SPACED = 'Ship it\ttwice\nnow';
+    const view = render(<AnimatedText animation="scramble">{SPACED}</AnimatedText>);
+    const root = view.container.firstElementChild;
+    if (!(root instanceof HTMLElement)) throw new Error('scramble: rendered no element');
+    fireEvent.mouseEnter(root);
+    elapse(MID_HOVER_SECONDS);
+    const drawn = Array.from(visibleText(root));
+    expect(drawn.join(''), 'the hover changed nothing').not.toBe(SPACED);
+    const moved = Array.from(SPACED).flatMap((c, i) =>
+      /\s/.test(c) && drawn[i] !== c ? [`${JSON.stringify(c)} at ${i}`] : [],
+    );
+    expect(moved, 'whitespace scrambled mid-hover').toEqual([]);
+    fireEvent.mouseLeave(root);
+    expect(visibleText(root)).toBe(SPACED);
+  });
+
   describe('accessible names (#47, AC 3)', () => {
     // jsdom has no Tailwind, so it would lay every letter span out inline and name a heading from the
     // letters run together, which happens to read as the sentence. A browser lays each letter out as

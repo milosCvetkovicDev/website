@@ -35,6 +35,12 @@ const isPlaying = (animation: Animation | null): animation is Animation =>
  *   the preference finishes that hover at once, and `rest` then puts back whatever its end leaves
  *   out of place. Nothing rendered may depend on the preference: it reads `false` during hydration
  *   (ADR 0006), so markup that did would be rewritten right after it.
+ *
+ * `build` and `rest` must be stable (`useCallback`): `build` is a dependency of `play`, and `rest`
+ * of the reduce effect, which an unstable `rest` would re-run on every render under `reduce`.
+ * `build` must return a top-level animation, made by `gsap.to` or `gsap.timeline`: the still-playing
+ * guard relies on GSAP's root timeline removing it once it completes, which a parent timeline that
+ * keeps its finished children would not do.
  */
 export function useHoverTimeline<Arg>(
   build: (gsap: Gsap, arg: Arg) => Animation | null,
