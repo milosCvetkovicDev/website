@@ -787,6 +787,9 @@ locally over HTTP/1.1, and at 0 (within ±8 ms) over HTTP/2 and on the productio
    - The three R16 headlines, which the server renders at `opacity-0` (still an expected failure in
      `served-html.spec.ts`), stay blank until GSAP arrives, which is now after the first intent
      rather than at idle.
+     - **2026-09-30: overtaken** by #170. The sentence above was true when written and is left as
+       it was. From #170 on, the served page shows those blocks, and only a GSAP build that finds
+       the section below the viewport hides them for the reveal; R16 passes.
    - Visitors who never scroll, tap or press a key never download GSAP.
    - Lighthouse's accessibility audit now scores the page as it looks before GSAP. The new
      before-intent axe tests cover that; the pull request reports the incomplete count.

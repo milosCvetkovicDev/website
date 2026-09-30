@@ -43,9 +43,11 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 ## Quality gates
 
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
-  grouped into one pull request and open npm pull requests are capped at five; github-actions bumps
-  are not grouped. Dependabot alerts and automated security updates are both on. Security updates
-  are triggered by alerts rather than the Monday schedule, and a `security` group
+  grouped into one `minor-and-patch` pull request, except those of the `vite` and `lighthouse`
+  groups below, a major outside those two groups arrives as a pull request of its own, and open npm
+  pull requests are capped at five; github-actions bumps are not grouped. Dependabot alerts and
+  automated security updates are both on. Security updates are triggered by alerts rather than the
+  Monday schedule, and a `security` group
   (`applies-to: security-updates`, `patterns: ['*']`) batches the security updates of each run into
   one pull request so they cannot fill the five-slot cap. Three majors are ignored, each with the
   upstream event that reopens it: `eslint` and `@eslint/js` (eslint-config-next pulls an
@@ -62,6 +64,27 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   `scripts/vitest-coverage-pair.test.mjs` fails `pnpm test:scripts` when the installed vite's major
   is outside the installed plugin-react's `vite` peer range, which is what catches a manual or
   security update that moves one without the other.
+- `lighthouse` is pinned exactly in `apps/web/package.json`, and a bump, Dependabot's included,
+  means re-reading the audit ids and scoring rules `apps/web/e2e/lighthouse-audits.spec.ts` asserts
+  and its docblock records at 13.4.1. The spec fails on any other version until `LIGHTHOUSE_VERSION`
+  in `apps/web/e2e/support/lighthouse.ts` is updated, because a changed `notApplicable` or scoring
+  rule would not fail it by itself. So Dependabot raises lighthouse bumps alone: a `lighthouse`
+  group (`patterns: ['lighthouse']`, majors included) sits after `vite` and ahead of
+  `minor-and-patch`, and a `lighthouse-security` group (`applies-to: security-updates`) sits ahead
+  of `security`, so a red lighthouse pull request bumps no other direct dependency. The pattern
+  matches the exact name only; `lighthouse-logger` and the rest of its tree are transitive and
+  change only when the new lighthouse requires it, which can include `@opentelemetry/api` below:
+  check its version and the peer suffix on `next` in the lockfile diff. To land one, check out the
+  Dependabot branch, re-read the audits against the release notes, then update `LIGHTHOUSE_VERSION`
+  and the docblock's version in one commit (`grep -rn '13\.4\.1' apps/web/e2e` lists every place
+  that cites the release). Dependabot stops rebasing a branch once someone else commits to it, and
+  the open pull request holds one of the five version-update slots until it is merged or closed.
+  Lighthouse's tree brings `@opentelemetry/api`, which pnpm then resolves as `next`'s optional peer
+  (the `(@opentelemetry/api@1.9.1)` suffix on `next`, `@vercel/analytics` and `vitest`), so the
+  production build traces that package beside Next's compiled copy. Next prefers it when it
+  resolves; with no tracer provider registered, both are the same no-op API, and the build stays
+  function-free. Removing lighthouse is what drops the peer again (see the optional peer gotcha
+  below).
 
 ## Gotchas
 
