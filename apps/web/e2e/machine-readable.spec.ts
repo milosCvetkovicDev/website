@@ -14,12 +14,13 @@ import {
  *
  * Every path comes from `endpoints.ts`. Each test's title and `fixed-by` annotation name the task
  * that ships its endpoint: #59 the Markdown twins, #60 `/llms.txt` and the JSON representation, #61
- * the Atom feed, #62 the MCP server. None of them exists today, and `expectNotServedYet` makes each
- * test an expected failure for that one reason only. It first requires the status to be the 404 of
- * an endpoint that is not there, outside the declared failure, so a 5xx, a timeout or a server that
- * never started fails the run; only then does it call `test.fail()` and fail on the status. A 200
- * fails the run too, so the change that ships an endpoint must delete that one call, and the rest of
- * the test is then that endpoint's contract.
+ * the Atom feed, #62 the MCP server. The twins are served (#59), so their rows run the contract
+ * alone; for each endpoint not yet served, `expectNotServedYet` makes its test an expected failure
+ * for that one reason only. It first requires the status to be the 404 of an endpoint that is not
+ * there, outside the declared failure, so a 5xx, a timeout or a server that never started fails the
+ * run; only then does it call `test.fail()` and fail on the status. A 200 fails the run too, so the
+ * change that ships an endpoint must delete that one call, and the rest of the test is then that
+ * endpoint's contract.
  *
  * Everything here goes through `request`, the served bytes, because that is all an agent's fetch
  * tool reads. `retries: 0`, as for every spec that carries an expected failure (`e2e-tests.md`): a
@@ -126,7 +127,6 @@ function jsonRpcMessages(response: APIResponse, text: string): unknown[] {
 for (const { route, twin } of MARKDOWN_TWINS) {
   test(`#59: ${twin} is served as text/markdown and ${route} links to it`, async ({ request }) => {
     const response = await request.get(twin);
-    expectNotServedYet(response, twin, '#59');
     expect(response.status()).toBe(200);
     expect(contentType(response)).toMatch(/^text\/markdown\b/);
 

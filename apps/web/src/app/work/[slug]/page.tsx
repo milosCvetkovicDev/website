@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { BreadcrumbListJsonLd, TechArticleJsonLd } from '@/components/json-ld';
 import { adjacentCaseStudies, caseStudies, getCaseStudy } from '@/data/case-studies';
+import { social } from '@/data/social';
 import { formatContentDates } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
 import { cardAlt } from '@/lib/og-image';
@@ -298,7 +299,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
             Want to see more projects like this? Connect with me on social media.
           </p>
           <a
-            href="https://www.linkedin.com/in/milos-cvetkovic-dev"
+            href={social.linkedin.href}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center rounded-lg bg-[var(--accent)] px-6 py-3 font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
