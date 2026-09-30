@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { caseStudies } from '../src/data/case-studies';
 import { gotoHydrated } from './support/hydration';
 import { warmRoutes } from './support/warm-routes';
+import { cardFor, linkFor } from './support/work-card';
 
 /**
  * The `/work` archive cards, and the one thing they used to disagree with the home page about.
@@ -41,21 +42,6 @@ test.describe.configure({ retries: 0 });
 
 const colorSchemes = ['light', 'dark'] as const;
 const MAX_LINK_NAME = 80;
-
-/** The archive card link for one case study: the link whose href is that slug. */
-const linkFor = (page: Page, slug: string) => page.locator(`a[href="/work/${slug}"]`).first();
-
-/**
- * The archive card for one case study: the link's nearest `group` ancestor, which is the element its
- * hover and focus variants key off (the unit test's `closest('.group')`). The link carries only the
- * title, so the status and the rest of the card are found through this. Walking up from the link
- * rather than filtering every `div.group` that contains it keeps one card even if a wrapper around
- * the list ever takes the `group` class too.
- */
-const cardFor = (page: Page, slug: string) =>
-  linkFor(page, slug).locator(
-    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " group ")][1]',
-  );
 
 /**
  * The first study whose badge carries a status colour. A retired study's badge is neutral on both
