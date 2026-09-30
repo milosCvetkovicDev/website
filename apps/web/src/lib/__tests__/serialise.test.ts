@@ -17,12 +17,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
 import { OWNER_TODO } from '@/data/owner-todo';
 import type { PageRecord, PageSection, Paragraph } from '@/data/pages/types';
+import { visible } from '@/test/markdown';
 import { buildMetadata } from '../metadata';
+import { markdownTwinPath } from '../pathname';
 import {
   absoluteUrl,
   caseStudyToMarkdown,
   markdownResponse,
-  markdownTwinPath,
   pageToMarkdown,
   renderSections,
 } from '../serialise';
@@ -37,9 +38,6 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllEnvs();
 });
-
-/** The text a Markdown reader sees: CommonMark drops the backslash before ASCII punctuation. */
-const visible = (markdown: string) => markdown.replace(/\\([!-/:-@[-`{-~])/g, '$1');
 
 /**
  * Four or more single characters in a row, each followed by one space: `M o s t` rather than
@@ -172,8 +170,9 @@ describe('markdownTwinPath()', () => {
   });
 
   // The twin path is derived from the same pathname the canonical is: a path buildMetadata()
-  // refuses must not get a twin, and one it accepts must. metadata.ts keeps its pattern private,
-  // so the two are compared through what each accepts, over a sample that includes the edges.
+  // refuses must not get a twin, and one it accepts must. Both read `pathname.ts` today; the two are
+  // still compared through what each accepts, over a sample that includes the edges, so a caller
+  // that grows its own check again cannot drift unnoticed.
   it.each(['/', '/about', '/work/nx-remote-cache', ...REJECTED, ...EDGES])(
     'accepts %j exactly when buildMetadata() does',
     (path) => {
