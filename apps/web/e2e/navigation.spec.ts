@@ -27,15 +27,35 @@ test.describe('the desktop header', () => {
       await expect(current).toHaveAttribute('href', href);
       // The same rule drives the accent colour, so the link that is current is also the one that
       // looks it: every other desktop link keeps the muted colour.
-      const colours = await page
-        .locator('header nav a')
-        .evaluateAll((links) =>
-          links.map((link) => [link.getAttribute('href'), getComputedStyle(link).color] as const),
-        );
-      const currentColour = colours.find(([linkHref]) => linkHref === href)?.[1];
-      const others = colours.filter(([linkHref]) => linkHref !== href).map(([, colour]) => colour);
+      const { links, accent } = await page.locator('header nav').evaluate((nav) => {
+        // `--accent-text` resolved to the same `rgb()` form as a computed `color`, via a probe.
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--accent-text)';
+        nav.append(probe);
+        const resolved = getComputedStyle(probe).color;
+        probe.remove();
+        return {
+          accent: resolved,
+          links: [...nav.querySelectorAll('a')].map((link) => ({
+            href: link.getAttribute('href'),
+            colour: getComputedStyle(link).color,
+            underlined: getComputedStyle(link).textDecorationLine.includes('underline'),
+          })),
+        };
+      });
+      const currentLink = links.find((link) => link.href === href);
+      expect(currentLink, `no ${href} link in the desktop nav`).toBeDefined();
+      expect(currentLink?.colour, 'the current link takes the accent text colour').toBe(accent);
+      const others = links.filter((link) => link.href !== href);
       expect(others.length).toBeGreaterThan(0);
-      expect(others, 'only the current link takes the accent colour').not.toContain(currentColour);
+      expect(
+        others.map((link) => link.colour),
+        'only the current link takes the accent colour',
+      ).not.toContain(accent);
+      // Colour alone is not enough to tell it apart (WCAG 1.4.1): `--accent-text` and `--muted` are
+      // under 1.2:1 from each other. The current link is also underlined, and only it.
+      expect(currentLink?.underlined, 'the current link is underlined').toBe(true);
+      expect(others.filter((link) => link.underlined).map((link) => link.href)).toEqual([]);
     });
   }
 

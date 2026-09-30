@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import { isCurrentLink } from './current-link';
 import { Logo } from './logo';
 import { useTheme } from './theme-provider';
@@ -21,6 +21,14 @@ const MENU_ID = 'site-menu';
 
 /** Tailwind's `md`, from which the desktop nav shows and the menu button does not. */
 const DESKTOP_QUERY = '(min-width: 48rem)';
+
+/**
+ * How the current link looks, in the desktop nav and the menu alike. `--accent-text` and `--muted`
+ * are under 1.2:1 apart in both themes, so colour alone would not tell the current link from the
+ * others (WCAG 1.4.1): it is underlined as well. The underline is drawn in the text's own colour.
+ */
+const CURRENT_LINK = 'text-[var(--accent-text)] underline decoration-2 underline-offset-4';
+const OTHER_LINK = 'text-[var(--muted)] hover:text-[var(--foreground)]';
 
 function ThemeToggle() {
   const { theme, toggleTheme, mounted } = useTheme();
@@ -84,6 +92,7 @@ export function Navigation() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDialogElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const logoRef = useRef<HTMLAnchorElement>(null);
 
   // Growing past `md` hides the menu button, and a rotation or a resized window can do that with the
   // menu open. A modal dialog leaves the rest of the page inert for as long as it is open, visible or
@@ -103,6 +112,38 @@ export function Navigation() {
     menuRef.current?.close();
   }, [pathname]);
 
+  // A modal dialog makes the page behind it inert, but it does not keep Tab inside itself. Chromium
+  // let the seventh Tab from the Close button leave for the browser's own UI, leaving
+  // `document.activeElement` on <body>; WebKit, which leaves links out of the tab order by default,
+  // did the same on the first Tab, since Close is the menu's only control it tabs to; and with focus
+  // on no control at all, after a tap on empty panel space, Tab went to <body> in both. So while the
+  // menu is open it moves focus itself: every Tab and Shift+Tab steps through the menu's controls in
+  // order and wraps at the ends, the same in every engine. The listener is on the document because
+  // with focus on <body> a key event never reaches the dialog. The effect subscribes and sets no
+  // state (ADR 0006). Ctrl and Meta chords belong to the browser and the OS, and a key pressed during
+  // an IME composition to the IME; Option+Tab, Safari's own "Tab to links", is treated as Tab.
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!menuOpen || !menu) return;
+    const moveFocusInMenu = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Tab' || event.ctrlKey || event.metaKey || event.isComposing) return;
+      const controls = [...menu.querySelectorAll<HTMLElement>('a[href], button')];
+      if (controls.length === 0) return;
+      event.preventDefault();
+      const at = controls.indexOf(document.activeElement as HTMLElement);
+      const step = event.shiftKey ? -1 : 1;
+      const next =
+        at === -1
+          ? event.shiftKey
+            ? controls.length - 1
+            : 0
+          : (at + step + controls.length) % controls.length;
+      controls[next].focus();
+    };
+    document.addEventListener('keydown', moveFocusInMenu);
+    return () => document.removeEventListener('keydown', moveFocusInMenu);
+  }, [menuOpen]);
+
   const openMenu = () => {
     const menu = menuRef.current;
     if (!menu || menu.open) return;
@@ -112,35 +153,44 @@ export function Navigation() {
 
   const closeMenu = () => menuRef.current?.close();
 
+  // A menu link closes the menu when it navigates this tab. A modified or middle click opens the page
+  // in another tab or window and leaves this one where it is, so the menu stays open.
+  const closeMenuOnNavigation = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    closeMenu();
+  };
+
   // Runs however the dialog closed: the Close button, a link, Escape (through the `cancel` event),
   // the backdrop, the breakpoint or the route. Focus goes back to the button that opened it rather
-  // than to wherever each engine's own restore would put it.
+  // than to wherever each engine's own restore would put it. Past `md` that button is `md:hidden`
+  // and cannot take focus, so it goes to the header's first control, the logo link, instead of
+  // falling to <body> at the top of the document.
   const handleMenuClose = () => {
     setMenuOpen(false);
-    menuButtonRef.current?.focus();
+    if (window.matchMedia(DESKTOP_QUERY).matches) logoRef.current?.focus();
+    else menuButtonRef.current?.focus();
   };
 
-  // A click on the `::backdrop` is dispatched to the `<dialog>` itself. The dialog has no padding and
-  // its panel fills it, so a click that targets the dialog element can only be on the backdrop.
+  // A click on the `::backdrop` is dispatched to the `<dialog>` itself. So is a click whose press
+  // began on the panel and ended on the backdrop (a text selection or a drag, whose target is their
+  // common ancestor), and one on the panel's own left border. The menu closes only when the press
+  // both began and ended outside the dialog's box, which is the backdrop and nothing else.
+  const pressBeganOnBackdrop = useRef(false);
+  const isOnBackdrop = (event: PointerEvent<HTMLDialogElement> | MouseEvent<HTMLDialogElement>) => {
+    if (event.target !== event.currentTarget) return false;
+    const box = event.currentTarget.getBoundingClientRect();
+    const { clientX: x, clientY: y } = event;
+    return x < box.left || x > box.right || y < box.top || y > box.bottom;
+  };
+  const notePressStart = (event: PointerEvent<HTMLDialogElement>) => {
+    pressBeganOnBackdrop.current = isOnBackdrop(event);
+  };
   const closeOnBackdrop = (event: MouseEvent<HTMLDialogElement>) => {
-    if (event.target === event.currentTarget) event.currentTarget.close();
-  };
-
-  // A modal dialog makes the page behind it inert, but Chromium still lets Tab leave it: past the
-  // last link focus goes out to the browser's own UI and `document.activeElement` becomes <body>
-  // (measured on the mobile-chrome project, at the seventh Tab from the Close button). So Tab from
-  // the last control and Shift+Tab from the first wrap round, and focus stays in the menu until it
-  // closes. WebKit, which leaves links out of the tab order, gets the same wrap from a focused link.
-  const keepTabInMenu = (event: KeyboardEvent<HTMLDialogElement>) => {
-    if (event.key !== 'Tab') return;
-    const controls = event.currentTarget.querySelectorAll<HTMLElement>('a[href], button');
-    const first = controls[0];
-    const last = controls[controls.length - 1];
-    if (!first || !last) return;
-    const leaving = event.shiftKey ? first : last;
-    if (document.activeElement !== leaving) return;
-    event.preventDefault();
-    (event.shiftKey ? last : first).focus();
+    const began = pressBeganOnBackdrop.current;
+    pressBeganOnBackdrop.current = false;
+    if (began && isOnBackdrop(event)) event.currentTarget.close();
   };
 
   return (
@@ -153,6 +203,7 @@ export function Navigation() {
               prefetch the page it is on: three requests racing the page's own for no navigation
               it can make. */}
           <Link
+            ref={logoRef}
             href="/"
             aria-label="MC, home"
             prefetch={pathname === '/' ? false : undefined}
@@ -161,8 +212,9 @@ export function Navigation() {
             <Logo size={20} />
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden items-center gap-6 md:flex">
+          {/* Desktop Navigation. It and the menu's nav share a name, since only one of them is ever
+              rendered, and the name tells them apart from the page's own navs in a landmark list. */}
+          <nav aria-label="Main" className="hidden items-center gap-6 md:flex">
             {navLinks.slice(1).map((link) => {
               const current = isCurrentLink(pathname, link.href);
               return (
@@ -170,11 +222,7 @@ export function Navigation() {
                   key={link.href}
                   href={link.href}
                   aria-current={current ? 'page' : undefined}
-                  className={`text-sm transition-colors ${
-                    current
-                      ? 'text-[var(--accent-text)]'
-                      : 'text-[var(--muted)] hover:text-[var(--foreground)]'
-                  }`}
+                  className={`text-sm transition-colors ${current ? CURRENT_LINK : OTHER_LINK}`}
                 >
                   {link.label}
                 </Link>
@@ -227,18 +275,26 @@ export function Navigation() {
           screen. No display utility goes on it: author CSS would beat the user agent's
           `dialog:not([open]) { display: none }` and show the closed menu in the page. The inner
           wrapper fills it and carries the layout. The background and the text colour are both set
-          here, on the surface itself (ADR 0011), and the backdrop is a literal colour, because
-          custom properties do not reach `::backdrop` in every engine. `aria-modal` is explicit:
-          showModal() makes the dialog modal but does not set the attribute. */}
+          here, on the surface itself (ADR 0011). The backdrop is a literal colour: `::backdrop`
+          inherits custom properties from its dialog only since Chrome 122, Firefox 120 and Safari
+          17.4, and Next 16 builds for Chrome 111 and Safari 16.4 up. `aria-modal` is explicit:
+          showModal() makes the dialog modal but does not set the attribute. So is the `dialog`
+          role, which the element has anyway: axe 4.13's aria-dialog-name selects explicit roles
+          only, and would otherwise never check the name.
+
+          A modal dialog leaves the page inert but still scrollable: `html:has(dialog:modal)` in
+          globals.css stops the page scrolling while the menu is open, and `overscroll-contain`
+          keeps a swipe on the panel from chaining to it. */}
       <dialog
         ref={menuRef}
         id={MENU_ID}
+        role="dialog"
         aria-label="Site menu"
         aria-modal="true"
         onClose={handleMenuClose}
+        onPointerDown={notePressStart}
         onClick={closeOnBackdrop}
-        onKeyDown={keepTabInMenu}
-        className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-none w-64 max-w-none border-l border-[var(--border)] bg-[var(--background)] p-0 text-[var(--foreground)] backdrop:bg-black/50"
+        className="fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-none w-64 max-w-none overscroll-contain border-l border-[var(--border)] bg-[var(--background)] p-0 text-[var(--foreground)] backdrop:bg-black/50"
       >
         <div className="relative h-full p-6">
           <button
@@ -262,7 +318,7 @@ export function Navigation() {
               <path d="m6 6 12 12" />
             </svg>
           </button>
-          <nav className="mt-12 flex flex-col gap-4">
+          <nav aria-label="Main" className="mt-12 flex flex-col gap-4">
             {/* Opening the menu on a page would otherwise prefetch that page from its own link, as
                 the header logo would on `/`. Only the page itself: on a case study the Work link is
                 current, and prefetching /work from there is worth it. */}
@@ -273,13 +329,9 @@ export function Navigation() {
                   key={link.href}
                   href={link.href}
                   prefetch={pathname === link.href ? false : undefined}
-                  onClick={closeMenu}
+                  onClick={closeMenuOnNavigation}
                   aria-current={current ? 'page' : undefined}
-                  className={`text-lg transition-colors ${
-                    current
-                      ? 'text-[var(--accent-text)]'
-                      : 'text-[var(--muted)] hover:text-[var(--foreground)]'
-                  }`}
+                  className={`text-lg transition-colors ${current ? CURRENT_LINK : OTHER_LINK}`}
                 >
                   {link.label}
                 </Link>

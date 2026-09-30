@@ -98,6 +98,26 @@ const focusInDialog = (page: Page) =>
     };
   });
 
+/**
+ * Where focus is, as the index of the menu control that holds it (`-1` when it is on no control
+ * of the open dialog), with the number of controls and a readable name for the failure message.
+ * Controls are identified by position, not by name, so two with the same label stay distinct.
+ */
+const focusedControl = (page: Page) =>
+  page.evaluate(() => {
+    const dialog = document.querySelector('dialog');
+    const controls = [...(dialog?.querySelectorAll<HTMLElement>('a[href], button') ?? [])];
+    const active = document.activeElement;
+    const name = active
+      ? `${active.tagName.toLowerCase()} ${(active.getAttribute('aria-label') ?? active.textContent?.trim() ?? '').slice(0, 40)}`
+      : 'nothing';
+    return {
+      index: active instanceof HTMLElement ? controls.indexOf(active) : -1,
+      count: controls.length,
+      name,
+    };
+  });
+
 /** Console errors and warnings, and uncaught page errors, from here on. */
 function collectProblems(page: Page): string[] {
   const problems: string[] = [];
@@ -350,8 +370,7 @@ test.describe('the mobile header', () => {
       await open(page, '/work/self-healing-agent');
       await expect(page.locator('html')).toContainClass(colorScheme);
       await openMenu(page);
-      // What is audited: the menu as a modal dialog over an inert page. axe's aria-dialog-name only
-      // selects an explicit role="dialog", so the dialog's name is asserted by R4 instead.
+      // What is audited: the menu as a modal dialog over an inert page.
       await expect(page.getByRole('dialog')).toBeVisible();
 
       const results = await audit(page);
@@ -367,17 +386,37 @@ test.describe('the mobile header', () => {
         describeViolations(results.violations),
         `the open menu must have no axe violations in the ${colorScheme} theme`,
       ).toEqual([]);
-      // An empty violation list proves nothing unless axe measured the menu: every link's contrast
-      // must have been decided, and passed.
-      const measured = (results.passes.find(({ id }) => id === 'color-contrast')?.nodes ?? []).map(
-        ({ html }) => html,
-      );
-      for (const label of ['Home', 'About', 'Work', 'Skills', 'Writing', 'Connect']) {
-        expect(
-          measured.some((html) => html.includes(`>${label}</a>`)),
-          `axe did not measure the contrast of the menu's ${label} link`,
-        ).toBe(true);
-      }
+      // An empty violation list proves nothing unless axe measured the menu. axe 4.13's
+      // aria-dialog-name selects an explicit `role="dialog"` only, which the dialog carries so that
+      // the rule checks its name rather than skipping it.
+      expect(
+        results.passes.find(({ id }) => id === 'aria-dialog-name')?.nodes.length ?? 0,
+        "axe's aria-dialog-name did not check the open menu",
+      ).toBe(1);
+      // And every menu link's contrast must have been decided, and passed: a node axe could not
+      // decide is listed under `incomplete` instead, so it is missing here. Nodes are resolved from
+      // axe's own selectors in the page, rather than matched on its serialised (and truncatable)
+      // HTML, and must be links inside the dialog.
+      const selectors = (
+        results.passes.find(({ id }) => id === 'color-contrast')?.nodes ?? []
+      ).flatMap(({ target }) => target.filter((part): part is string => typeof part === 'string'));
+      const measured = await page.evaluate((all) => {
+        const dialog = document.querySelector('dialog');
+        return all.flatMap((selector) => {
+          const node = document.querySelector(selector);
+          return node instanceof HTMLAnchorElement && dialog?.contains(node)
+            ? [node.getAttribute('href')]
+            : [];
+        });
+      }, selectors);
+      const menuHrefs = await menuDialog(page)
+        .locator('a[href]')
+        .evaluateAll((links) => links.map((link) => link.getAttribute('href')));
+      expect(menuHrefs).toHaveLength(NAV_ROUTES.length);
+      expect(
+        [...new Set(measured)].sort(),
+        "axe did not measure the contrast of every one of the menu's links",
+      ).toEqual([...menuHrefs].sort());
     });
   }
 
@@ -429,21 +468,97 @@ test.describe('the mobile header', () => {
     page,
     browserName,
   }) => {
-    // Safari leaves links out of the tab order by default, so Tab has nothing to walk through
-    // there.
+    // AC 5 scopes this row to mobile-chrome, because Safari leaves links out of the tab order by
+    // default. The menu now moves focus itself on every Tab, in both engines; the next row is the
+    // one that runs on WebKit.
     test.skip(browserName === 'webkit', 'Safari does not tab to links by default');
     await open(page, '/');
     await openMenu(page);
 
-    const visited: string[] = [];
-    for (let press = 1; press <= 10; press++) {
-      await page.keyboard.press('Tab');
-      const focus = await focusInDialog(page);
-      visited.push(focus.active);
-      expect(focus.inside, `Tab ${press} took focus out of the menu to ${focus.active}`).toBe(true);
+    const visited = new Set<number>();
+    let count = 0;
+    for (const shift of [false, true]) {
+      for (let press = 1; press <= 10; press++) {
+        await page.keyboard.press(shift ? 'Shift+Tab' : 'Tab');
+        const focus = await focusedControl(page);
+        count = focus.count;
+        visited.add(focus.index);
+        expect(
+          focus.index,
+          `${shift ? 'Shift+Tab' : 'Tab'} ${press} took focus out of the menu to ${focus.name}`,
+        ).toBeGreaterThanOrEqual(0);
+      }
     }
-    // Seven controls (Close and six links), so ten presses must have wrapped at least once.
-    expect(new Set(visited).size, visited.join(' -> ')).toBe(NAV_ROUTES.length + 1);
+    // Ten presses each way over the dialog's controls (Close and six links) must have wrapped at
+    // least once, and visited every control.
+    expect(count).toBeGreaterThan(1);
+    expect(visited.size).toBe(count);
+  });
+
+  test('Tab and Shift+Tab from the Close button keep focus in the menu, in both engines', async ({
+    page,
+  }) => {
+    await open(page, '/');
+    await openMenu(page);
+    // showModal() puts focus on the Close button, the dialog's first control. In WebKit, links are
+    // not in the default tab order, so without the menu's own handling Tab from here left the
+    // dialog: Close is its first control but not its last.
+    await closeButton(page).focus();
+
+    for (const key of ['Tab', 'Tab', 'Shift+Tab', 'Shift+Tab', 'Shift+Tab']) {
+      await page.keyboard.press(key);
+      const focus = await focusedControl(page);
+      expect(
+        focus.index,
+        `${key} took focus out of the menu to ${focus.name}`,
+      ).toBeGreaterThanOrEqual(0);
+    }
+
+    // Focus on no control at all, as after a tap on empty panel space, is brought back in too.
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press('Tab');
+    const focus = await focusedControl(page);
+    expect(focus.index, `Tab from <body> went to ${focus.name}`).toBeGreaterThanOrEqual(0);
+  });
+
+  // A modal dialog makes the page inert, but not unscrollable: a swipe on the backdrop chained to
+  // the document and moved the page (and on `/`, the scroll-driven story) behind the open menu.
+  // Chromium only, for the real touch-scroll gesture its DevTools protocol can synthesise.
+  test('a swipe on the backdrop does not scroll the page behind the open menu', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'Input.synthesizeScrollGesture is a Chromium protocol');
+    await page.setViewportSize(PHONE);
+    await open(page, '/about');
+    const cdp = await page.context().newCDPSession(page);
+    const swipe = (x: number, y: number) =>
+      cdp.send('Input.synthesizeScrollGesture', {
+        x,
+        y,
+        yDistance: -300,
+        gestureSourceType: 'touch',
+        speed: 2000,
+      });
+    const point = { x: 20, y: PHONE.height - 100 };
+
+    // The control: with the menu closed, the same swipe scrolls the page.
+    await swipe(point.x, point.y);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    const before = await page.evaluate(() => window.scrollY);
+
+    await openMenu(page);
+    await swipe(point.x, point.y);
+    await swipe(PHONE.width - 40, PHONE.height - 100);
+    expect(await page.evaluate(() => window.scrollY), 'the page scrolled behind the menu').toBe(
+      before,
+    );
+    await expect(menuDialog(page)).toHaveJSProperty('open', true);
+
+    // Closed again, the page scrolls as before.
+    await closeButton(page).tap();
+    await swipe(point.x, point.y);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before);
   });
 
   test('a case-study route marks a header nav link as the current page', async ({ page }) => {
@@ -494,6 +609,9 @@ test.describe('the mobile header', () => {
       await openMenu(page);
       await page.setViewportSize({ width: 1024, height: PHONE.height });
       await expect(menuDialog(page)).toHaveJSProperty('open', false);
+      // The menu button is `md:hidden` now, so focus cannot go back to it; it goes to the header's
+      // first control rather than falling to <body>.
+      await expect(page.getByRole('banner').getByRole('link', { name: 'MC, home' })).toBeFocused();
       await page.getByRole('banner').getByRole('link', { name: 'Work' }).click();
       await expect(page).toHaveURL(/\/work$/);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
