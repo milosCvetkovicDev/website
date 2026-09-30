@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
-import { storyClosings } from '@/data/pages/home';
+import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const healingTimeline = [
   {
@@ -27,6 +27,7 @@ const healingTimeline = [
 
 export function LoopPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const dashboardRef = useRef<HTMLDivElement>(null);
   const alertRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -44,11 +45,18 @@ export function LoopPhase() {
   // the derived values below.
   const finished = prefersReducedMotion || gsapUnavailable;
 
-  // Every timer is tracked so unmounting (or a reduced-motion switch) cancels the sequence. A timer
-  // that comes due after the commit that removed the section, but before the cleanup that clears
-  // it, does nothing: its refs are already null, and GSAP would warn about a null target
-  // (runWithGsap).
+  // The sequence is driven by timers the ScrollTrigger callback schedules, and the reveals those
+  // timers create run after GSAP has left the context, so `ctx.revert()` never sees them. Both are
+  // tracked here instead, and cancelled when a run starts, on unmount and on a reduced-motion
+  // switch, as in GauntletPhase. The reveals are reverted rather than killed, finished ones as well
+  // as those in flight: revert restores the inline styles they set, where kill would freeze them
+  // mid-flight and that inline opacity would beat the class-driven state, which alone decides
+  // whether the toast and the headline show once the run is over. A timer that comes due after the
+  // commit that removed the section, but before the cleanup that cancels it, does nothing: `later`
+  // checks the section's ref, which is null by then along with the three it contains, where GSAP
+  // would warn about a null target (runWithGsap).
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const revealTweensRef = useRef<gsap.core.Tween[]>([]);
   const later = useCallback((callback: () => void, delayMs: number) => {
     timersRef.current.push(
       setTimeout(() => {
@@ -56,19 +64,35 @@ export function LoopPhase() {
       }, delayMs),
     );
   }, []);
+  const cancelSequence = useCallback(() => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    revealTweensRef.current.forEach((tween) => tween.revert());
+    revealTweensRef.current = [];
+  }, []);
 
   // Only ever called from the ScrollTrigger below, which exists once GSAP has loaded; it passes
   // GSAP in rather than this callback reaching for a module-level import. `reveal` is false when
   // the section was already in view as GSAP built it: the toast and the headline stay as the
-  // visitor saw them, and only the log runs.
+  // visitor saw them, and only the log runs, with the alert's pulse as its first beat.
   const animateHealing = useCallback(
     (gsap: Gsap, reveal: boolean) => {
+      // The trigger is `once: true`, but a rebuilt one (motion allowed again) fires in view, so the
+      // reset lives here rather than in the effect: every run starts from an empty log, a live
+      // alert and, where it is revealed, no toast, instead of playing over a finished run.
+      cancelSequence();
+      setVisibleEvents(0);
+      setAlertStatus('error');
+      if (reveal) setShowProtocol(false);
+
       // Alert pulses
       later(() => {
-        gsap.fromTo(
-          alertRef.current,
-          { opacity: 0, scale: 0.9 },
-          { opacity: 1, scale: 1, duration: 0.3 },
+        revealTweensRef.current.push(
+          gsap.fromTo(
+            alertRef.current,
+            { opacity: 0, scale: 0.9 },
+            { opacity: 1, scale: 1, duration: 0.3 },
+          ),
         );
       }, 500);
 
@@ -87,17 +111,21 @@ export function LoopPhase() {
                 later(() => {
                   setShowProtocol(true);
                   if (!reveal) return;
-                  gsap.fromTo(
-                    protocolRef.current,
-                    { opacity: 0, y: 20 },
-                    { opacity: 1, y: 0, duration: 0.5, ease: 'back.out(1.7)' },
+                  revealTweensRef.current.push(
+                    gsap.fromTo(
+                      protocolRef.current,
+                      { opacity: 0, y: 20 },
+                      { opacity: 1, y: 0, duration: 0.5, ease: 'back.out(1.7)' },
+                    ),
                   );
 
                   // Headline
-                  gsap.fromTo(
-                    headlineRef.current,
-                    { opacity: 0, y: 20 },
-                    { opacity: 1, y: 0, duration: 0.5 },
+                  revealTweensRef.current.push(
+                    gsap.fromTo(
+                      headlineRef.current,
+                      { opacity: 0, y: 20 },
+                      { opacity: 1, y: 0, duration: 0.5 },
+                    ),
                   );
                 }, 500);
               }, 500);
@@ -107,7 +135,7 @@ export function LoopPhase() {
         );
       });
     },
-    [later],
+    [cancelSequence, later],
   );
 
   useEffect(() => {
@@ -128,6 +156,11 @@ export function LoopPhase() {
         const reached = isAlreadyReached(section);
         // Hidden for the reveal only while the section is still ahead of the visitor (hero-11).
         setShowProtocol(reached);
+        // A rebuild (motion allowed again) must not show a cancelled run's rows or its RESOLVED
+        // banner while the new trigger waits for the section to enter: the log starts empty here,
+        // and animateHealing starts it empty again when the run begins.
+        setVisibleEvents(0);
+        setAlertStatus('error');
         ctx = gsap.context(() => {
           ScrollTrigger.create({
             trigger: section,
@@ -160,10 +193,9 @@ export function LoopPhase() {
     return () => {
       cancelBuild();
       ctx?.revert();
-      timersRef.current.forEach(clearTimeout);
-      timersRef.current = [];
+      cancelSequence();
     };
-  }, [animateHealing, finished]);
+  }, [animateHealing, cancelSequence, finished]);
 
   // With reduced motion, or without GSAP, the timeline is shown complete instead of animating in.
   const shownEvents = finished ? healingTimeline.length : visibleEvents;
@@ -187,18 +219,21 @@ export function LoopPhase() {
   return (
     <section
       ref={sectionRef}
+      aria-labelledby={titleId}
       className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
     >
       <div className="w-full max-w-3xl">
-        {/* Phase Header */}
-        <div className="mb-8 flex items-center gap-3">
+        {/* Phase Header: the section's heading and its name, ahead of the panels. The space keeps
+            "PHASE 5" and the title apart in that name (a flex row lays it out as nothing), and
+            `story-phases.test.tsx` holds the name. */}
+        <h2 id={titleId} className="mb-8 flex items-center gap-3">
           <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
-            <AnimatedText animation="elastic">PHASE 5</AnimatedText>
-          </span>
+            <AnimatedText animation="elastic">{storyTitles.loop.phase}</AnimatedText>
+          </span>{' '}
           <AnimatedText animation="wave" className="font-mono text-sm text-[var(--muted)]">
-            THE LOOP
+            {storyTitles.loop.title}
           </AnimatedText>
-        </div>
+        </h2>
 
         {/* Dashboard */}
         <div ref={dashboardRef}>
@@ -295,9 +330,9 @@ export function LoopPhase() {
           data-reveal="headline"
           className={`mt-16 text-center ${protocolVisible ? '' : 'opacity-0'}`}
         >
-          <h2 className="mb-3 text-2xl font-bold md:text-4xl">
+          <h3 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="morse">{storyClosings.loop.heading}</AnimatedText>
-          </h2>
+          </h3>
           <p className="text-lg text-[var(--muted)]">
             <AnimatedText animation="stagger-up">{storyClosings.loop.paragraphs[0]}</AnimatedText>
           </p>

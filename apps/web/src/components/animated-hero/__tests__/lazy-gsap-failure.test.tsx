@@ -46,7 +46,7 @@ vi.hoisted(() => {
  */
 function revealContainer(text: RegExp) {
   const inside =
-    screen.queryAllByRole('heading', { level: 2 }).find((h2) => text.test(h2.textContent ?? '')) ??
+    screen.queryAllByRole('heading', { level: 3 }).find((h3) => text.test(h3.textContent ?? '')) ??
     screen.getByText(text);
   const container = inside.closest('[data-reveal]');
   if (!container) throw new Error(`no reveal container around ${text}`);
