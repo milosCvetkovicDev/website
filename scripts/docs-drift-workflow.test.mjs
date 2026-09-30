@@ -10,9 +10,10 @@
 //     pull request body file;
 //   - the write token reaches exactly one step, which runs no agent, no package code and no hook;
 //   - nothing merges, and every job that can reach a secret runs only on main;
-//   - the open-pull-request guards ignore pull requests from forks.
+//   - the open-pull-request guards ignore pull requests from forks;
+//   - the agent runs on Sonnet 5.5, which the `sonnet` alias names only from Claude Code 2.1.284.
 // Nothing here runs Claude Code: the flags are checked as written against the documented meaning
-// of Claude Code 2.1.273, the pinned version.
+// of Claude Code 2.1.285, the pinned version.
 //
 // The repository has no YAML parser at the root, and the workflow is plain enough to split by
 // indentation: jobs at two spaces under `jobs:`, steps at `      - name:`.
@@ -206,6 +207,21 @@ describe('the job the agent runs in', () => {
     }
     assert.ok(!args.includes('--dangerously-skip-permissions'));
     assert.ok(!args.includes('--add-dir'));
+  });
+
+  it('runs claude on Sonnet 5.5 at high effort', () => {
+    const args = claudeArgs(agentStep().text);
+    assert.equal(args[args.indexOf('--model') + 1], 'sonnet');
+    assert.equal(args[args.indexOf('--effort') + 1], 'high');
+    const pin = found(
+      /^ {2}CLAUDE_CODE_VERSION: '(\d+)\.(\d+)\.(\d+)'$/m.exec(WORKFLOW),
+      'the pin',
+    );
+    const [major, minor, patch] = pin.slice(1).map(Number);
+    assert.ok(
+      major > 2 || (major === 2 && (minor > 1 || (minor === 1 && patch >= 284))),
+      `Claude Code ${pin.slice(1).join('.')} resolves sonnet to a model older than Sonnet 5.5`,
+    );
   });
 
   it('allows edits only to docs/** and the pull request body file', () => {
