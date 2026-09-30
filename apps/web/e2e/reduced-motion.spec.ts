@@ -14,13 +14,15 @@ import { expectHydrated } from './support/hydration';
  *   battery for something nobody is looking at. Measured with `document.getAnimations()`, which sees
  *   both CSS and Web Animations API timelines, which is why it catches all seven despite their being
  *   written three different ways.
- * - R19 (hero-5) is the reduced-motion promise. `animated-text.tsx` has no reference to
- *   `prefers-reduced-motion` anywhere against fourteen mouse handlers, so under `reduce` — where every
- *   phase's *scroll* animation correctly returns early — hovering a heading still throws its letters
- *   around: 150 ms after hover a letter reads `translate3d(18.76px, 0, 0) rotate(7.44deg)`.
+ * - R19 (hero-5) is the reduced-motion promise, fixed by slice 47d and kept as its guard.
+ *   `animated-text.tsx` had no reference to `prefers-reduced-motion` against fourteen mouse handlers,
+ *   so under `reduce` — where every phase's *scroll* animation correctly returns early — hovering a
+ *   heading still threw its letters around: 150 ms after hover a letter read
+ *   `translate3d(18.76px, 0, 0) rotate(7.44deg)`. Every handler now returns before it creates a tween
+ *   when the preference is set, and the row after R19 extends it to every animated text on the page.
  *
- * R19 is the more interesting failure, because the page looks compliant: the scroll animations really
- * do respect the preference. It is only the hover ones that do not, and no existing spec hovers
+ * R19 was the more interesting failure, because the page looked compliant: the scroll animations
+ * really do respect the preference. It was only the hover ones that did not, and no other spec hovers
  * anything under `reduce` (`featured-work.spec.ts` hovers under `reduce` but asserts SMIL counts, not
  * transforms).
  */
@@ -101,9 +103,6 @@ test('no endless animation keeps running off-screen or at opacity 0', async ({ p
 });
 
 test('under reduce, hovering an animated heading moves nothing', async ({ page }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R19, #47' });
-
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await expectHydrated(page);
@@ -112,9 +111,9 @@ test('under reduce, hovering an animated heading moves nothing', async ({ page }
     'the whole point of this case is the reduce branch',
   ).toBe(true);
   // The hover handlers run their tweens through GSAP, which arrives on the visitor's first intent
-  // (`load-gsap.ts`), under `reduce` as well; a hover is intent too, but it plays only once GSAP is
-  // in, which can be after the 200 ms read below: a clean read, and for an expected failure a lucky
-  // pass fails the whole run. So the helper sends intent and waits for GSAP first.
+  // (`load-gsap.ts`), under `reduce` as well. A hover that did start a tween would play only once
+  // GSAP is in, which can be after the 200 ms read below: a clean read for the wrong reason. So the
+  // helper sends intent and waits for GSAP first.
   await expectGsapLoaded(page);
 
   // Every phase renders its finished state on mount under `reduce`, so all six headings are already
@@ -150,9 +149,107 @@ test('under reduce, hovering an animated heading moves nothing', async ({ page }
 
   expect(
     moved,
-    'animated-text.tsx has no reduced-motion reference against fourteen mouse handlers, so a ' +
-      'visitor who asked for less motion still gets letters thrown around on hover. The scroll ' +
-      'animations already respect the preference; the hover ones must too (ADR 0009).',
+    'a visitor who asked for less motion gets letters thrown around on hover: every handler in ' +
+      'animated-text.tsx must return before it creates a tween under reduce, as the scroll ' +
+      'animations already do (ADR 0009).',
+  ).toEqual([]);
+});
+
+test('under reduce, entering and moving over any animated text changes nothing drawn', async ({
+  page,
+}) => {
+  // #47 AC 4, R19's scenario widened: every `AnimatedText` on the page rather than the headings,
+  // which takes in the phase labels and the lines under the headlines, and a pointer move as well as
+  // the enter, because a move is the only event the Strategy headline's magnetic variant answers.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await expectHydrated(page);
+  expect(
+    await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
+    'the whole point of this case is the reduce branch',
+  ).toBe(true);
+  // As in R19: GSAP first, so a hover that did start a tween would play inside the window below.
+  await expectGsapLoaded(page);
+
+  const { count, changed } = await page.evaluate(async () => {
+    // Every `AnimatedText` root, and nothing else: they are the only spans that carry
+    // `cursor-pointer` (the HUD's hoverable rows are divs). Every phase renders its finished state
+    // on mount under `reduce`, so all of them are in place and no reveal is in flight.
+    const roots = [
+      ...document.querySelectorAll<HTMLElement>('main section span[class*="cursor-pointer"]'),
+    ];
+    const nameOf = (el: Element) =>
+      `${el.tagName.toLowerCase()} "${el.textContent?.trim().slice(0, 30)}"`;
+    // What is drawn: every element's transform, opacity, filter, text shadow, colour and text.
+    const snapshot = (root: HTMLElement) =>
+      [root, ...root.querySelectorAll<HTMLElement>('*')].map((el) => {
+        const style = getComputedStyle(el);
+        return [style.transform, style.opacity, style.filter, style.textShadow, style.color]
+          .concat(el.textContent ?? '')
+          .join(' | ');
+      });
+
+    const changed: string[] = [];
+    const rest = new Map<HTMLElement, string[]>();
+    for (const root of roots) {
+      const before = snapshot(root);
+      rest.set(root, before);
+      const box = root.getBoundingClientRect();
+      // Off the box's centre on both axes, so a magnetic pull would have somewhere to go.
+      const at = { clientX: box.right, clientY: box.bottom };
+      root.dispatchEvent(new MouseEvent('mouseover', { ...at, bubbles: true }));
+      root.dispatchEvent(new MouseEvent('mouseenter', { ...at, bubbles: false }));
+      root.dispatchEvent(new MouseEvent('mousemove', { ...at, bubbles: true }));
+      // AC 4's window: 150 ms in, every variant is mid-effect when motion is allowed.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const after = snapshot(root);
+      const elements = [root, ...root.querySelectorAll<HTMLElement>('*')];
+      // Compared element by element below, so a node added or removed has to be caught here.
+      if (after.length !== before.length) {
+        changed.push(`${nameOf(root)}: ${before.length} elements became ${after.length}`);
+        continue;
+      }
+      for (const [index, el] of elements.entries()) {
+        const style = getComputedStyle(el);
+        const letter = Boolean(el.textContent?.trim());
+        if (letter && (style.transform !== 'none' || style.opacity !== '1')) {
+          changed.push(
+            `${nameOf(root)}: ${nameOf(el)} at transform ${style.transform}, ` +
+              `opacity ${style.opacity}`,
+          );
+          break;
+        }
+        if (after[index] !== before[index]) {
+          changed.push(
+            `${nameOf(root)}: ${nameOf(el)} went from ${before[index]} to ${after[index]}`,
+          );
+          break;
+        }
+      }
+      root.dispatchEvent(new MouseEvent('mouseout', { ...at, bubbles: true }));
+      root.dispatchEvent(new MouseEvent('mouseleave', { ...at, bubbles: false }));
+    }
+
+    // Once more, a second after the last hover: longer than the longest effect with motion allowed
+    // (morse, about 0.9 s), so a tween that started late, behind a per-letter delay, is caught too.
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    for (const [root, before] of rest) {
+      const after = snapshot(root);
+      if (after.join('\n') !== before.join('\n')) {
+        changed.push(`${nameOf(root)}: changed within a second of the hovers`);
+      }
+    }
+    return { count: roots.length, changed };
+  });
+
+  // 24 on 2026-09-28, across the six story sections: fewer means the selector stopped finding them
+  // and the row would pass by hovering nothing.
+  expect(count, 'the animated texts to hover were not found').toBeGreaterThanOrEqual(24);
+  expect(
+    changed,
+    'under reduce a hover or a pointer move over animated text must create no tween and change no ' +
+      "letter's transform or opacity, and the markup must stay as rendered (WCAG 2.3.3, ADR 0006).",
   ).toEqual([]);
 });
 

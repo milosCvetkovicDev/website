@@ -5,7 +5,9 @@ import { expectHydrated } from './support/hydration';
 /**
  * The hero's own text colours, measured by computed style rather than by axe.
  *
- * Rows R12, R13 and R17 of the RED manifest, all fixed by #47.
+ * Rows R12, R13 and R17 of the RED manifest, all fixed by #47. R17 is fixed by slice 47d and was
+ * restated there: it hovered under `reduce`, where the glitch no longer plays, so it now hovers with
+ * motion allowed, after the section's entrance, and samples only the glitch's own text.
  *
  * Axe cannot decide these nodes and never will: the island sets `backdrop-filter: blur(28px)` over a
  * radial-gradient glow, so axe answers `incomplete` with messageKey `bgGradient` — "background could
@@ -119,7 +121,12 @@ async function installColorProbe(page: Page) {
       Math.round(top[2] * top[3] + bottom[2] * (1 - top[3])),
     ];
 
-    (window as unknown as Record<string, unknown>).__contrastProbe = (el: HTMLElement) => {
+    // `color` measures another colour drawn over the same stack, such as a text-shadow's, in place
+    // of the element's own.
+    (window as unknown as Record<string, unknown>).__contrastProbe = (
+      el: HTMLElement,
+      color?: string,
+    ) => {
       const layers: Rgba[] = [];
       const chain: string[] = [];
       let base: [number, number, number] | null = null;
@@ -141,11 +148,12 @@ async function installColorProbe(page: Page) {
       for (const layer of layers.reverse()) base = over(layer, base);
 
       const style = getComputedStyle(el);
-      const color = parse(style.color);
+      const measured = color ?? style.color;
+      const rgba = parse(measured);
       return {
-        color: style.color,
-        alpha: color[3],
-        rgb: over(color, base),
+        color: measured,
+        alpha: rgba[3],
+        rgb: over(rgba, base),
         background: base,
         fontSizePx: parseFloat(style.fontSize),
         bold: Number(style.fontWeight) >= 700,
@@ -156,7 +164,7 @@ async function installColorProbe(page: Page) {
 }
 
 type ProbeResult = Omit<Sample, 'what'>;
-type ProbeWindow = { __contrastProbe: (el: HTMLElement) => ProbeResult };
+type ProbeWindow = { __contrastProbe: (el: HTMLElement, color?: string) => ProbeResult };
 
 /** One element's colour and the background it is painted over. */
 async function sampleColor(locator: Locator, what: string): Promise<Sample> {
@@ -272,74 +280,264 @@ for (const colorScheme of colorSchemes) {
   });
 }
 
-test('no hero text sits at a resting partial opacity while hovered', async ({ page }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R17, #47' });
+/** A hover's measurements over its own text: see `sampleWhileHovered`. */
+interface HoverSamples {
+  /** Whether the hover visibly played: a transform or a text shadow appeared in its subtree. */
+  played: boolean;
+  /** Text drawn at an opacity strictly between 0 and 1, with the lowest value seen. */
+  dimmed: string[];
+  /** Every distinct colour its text was drawn in, text shadows included, measured by the probe. */
+  colours: (Sample & { shadow: boolean })[];
+}
 
-  // Under `reduce` every phase renders its finished state on mount and builds no timeline (ADR 0009),
-  // so nothing is mid-reveal and a sample below 1 can only be a resting value. The glitch handler has
-  // no reduced-motion reference at all (`animated-text.tsx`), so it still fires — which is the point.
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await page.goto('/');
-  await expectHydrated(page);
+type FinderWindow = { __findAnimatedText: (text: string) => HTMLElement | null };
+
+/**
+ * Installs `__findAnimatedText(text)` in the page, which returns the `AnimatedText` root showing
+ * `text`, or null while there is none: the only spans in the story that carry `cursor-pointer`,
+ * matched on their text or on the visually hidden copy some variants carry. Two roots showing the
+ * same text throw, because every step after it would then pick one of them silently. An init
+ * script, like the probe, because the site's CSP refuses code built from a string in the page. Must
+ * be called before the navigation.
+ */
+async function installAnimatedTextFinder(page: Page) {
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__findAnimatedText = (text: string) => {
+      const roots = [
+        ...document.querySelectorAll<HTMLElement>('main section span[class*="cursor-pointer"]'),
+      ].filter(
+        (el) =>
+          el.textContent?.trim() === text ||
+          el.querySelector('.sr-only')?.textContent?.trim() === text,
+      );
+      if (roots.length > 1) throw new Error(`${roots.length} animated texts read "${text}"`);
+      return roots[0] ?? null;
+    };
+  });
+}
+
+/** The root showing `text`, from inside the page, for the steps that need it to be there. */
+type Found = (text: string) => HTMLElement;
+
+/**
+ * Opens `/` in one scheme with motion allowed, brings the story section holding the animated `text`
+ * 40% down the viewport the way a visitor does, with the wheel, and waits for its entrance to finish:
+ * the text and its section's closing headline, with everything above either up to the section, are
+ * fully opaque. On the Gauntlet that includes the headline block, which waits for the pipeline.
+ */
+async function openAnimatedText(
+  page: Page,
+  colorScheme: (typeof colorSchemes)[number],
+  text: string,
+) {
+  await installAnimatedTextFinder(page);
+  await openHero(page, colorScheme);
   expect(
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
-    'this case needs reduced motion, or a reveal mid-tween would be indistinguishable from a ' +
-      'resting partial opacity',
-  ).toBe(true);
-  // The glitch handler runs its timeline through GSAP, which arrives on the visitor's first intent
-  // (`load-gsap.ts`); a hover is intent too, but it plays only once GSAP is in, which can be after
-  // the 45 frames below have been sampled: a clean read, and for an expected failure a lucky pass
-  // fails the whole run. So the helper sends intent and waits for GSAP first.
+    'the hover effects play only with motion allowed',
+  ).toBe(false);
+  // The story builds its timelines and the hovers play once GSAP is in (`load-gsap.ts`).
   await expectGsapLoaded(page);
 
-  // `PHASE 3` uses `AnimatedText animation="glitch"` (`execution-phase.tsx:274`). Its duplicates only
-  // exist while the glitch timeline runs — five 0.05 s bursts and a 0.1 s settle, about 350 ms — so the
-  // opacities are sampled every frame from before the hover rather than read once afterwards. A single
-  // read would race the timeline and could report a clean page, and for an expected failure a lucky
-  // pass fails the whole run.
-  await page.getByText('PHASE 3', { exact: true }).first().scrollIntoViewIfNeeded();
+  // Mounted with the page, so a text missing once hydrated is missing for good.
+  await page.waitForFunction(
+    (wanted) => (window as unknown as FinderWindow).__findAnimatedText(wanted) !== null,
+    text,
+  );
+  const { target, delta } = await page.evaluate((wanted) => {
+    const find = (window as unknown as FinderWindow).__findAnimatedText as Found;
+    const section = find(wanted).closest('section');
+    if (!section) throw new Error(`"${wanted}" is not inside a section`);
+    const bottom = document.documentElement.scrollHeight - innerHeight;
+    const y = Math.round(scrollY + section.getBoundingClientRect().top - innerHeight * 0.4);
+    const clamped = Math.max(0, Math.min(y, bottom));
+    return { target: clamped, delta: clamped - scrollY };
+  }, text);
+  // Scrolled with the wheel: Chromium can put a script-driven scroll on `/` back to the top.
+  await page.mouse.move(2, 360);
+  await page.mouse.wheel(0, delta);
+  await page.waitForFunction((y) => Math.abs(scrollY - y) < 2, target);
 
-  const offenders = await page.evaluate(async () => {
-    const main = document.querySelector('main');
-    if (!main) throw new Error('no <main> to sample');
-    const label = [...main.querySelectorAll<HTMLElement>('*')].find(
-      (el) => el.textContent?.trim() === 'PHASE 3' && el.children.length === 0,
-    );
-    const target = label?.closest<HTMLElement>('[class*="cursor-pointer"]') ?? label;
-    if (!target) throw new Error('the PHASE 3 label is not on the page');
+  await page.waitForFunction(
+    (wanted) => {
+      const root = (window as unknown as FinderWindow).__findAnimatedText(wanted);
+      if (!root) return false;
+      const section = root.closest('section');
+      const headline = section?.querySelector('h2');
+      // Without it the wait below would be over at once, mid-entrance.
+      if (!headline) throw new Error(`no h2 in the section holding "${wanted}"`);
+      const opaque = (from: Element) => {
+        for (let el: Element | null = from; el && el !== section; el = el.parentElement) {
+          if (getComputedStyle(el).opacity !== '1') return false;
+        }
+        return true;
+      };
+      return opaque(root) && opaque(headline);
+    },
+    text,
+    { timeout: 20_000 },
+  );
+}
 
-    const worst = new Map<string, number>();
+/**
+ * Hovers the animated `text` and samples its own subtree every frame for 45 frames, about 750 ms at
+ * 60 Hz and longer than either effect measured here (the rainbow on `PHASE 4` runs about 0.6 s, the
+ * glitch about 0.35 s). Every frame, not one read afterwards, which would race the effect. Only the
+ * text's own subtree, so a reveal or a resting defect elsewhere on the page cannot answer for it.
+ * The visually hidden copy that some variants carry for assistive technology is skipped: nothing
+ * draws it.
+ *
+ * The hover counts as played only once a transform or a text shadow differs from what the subtree
+ * showed before it, so an identity matrix an entrance left behind cannot answer for it. A text's
+ * opacity is the product of its own and every ancestor's up to the root, so a wrapper faded around
+ * the text counts as much as the text itself.
+ */
+async function sampleWhileHovered(page: Page, text: string): Promise<HoverSamples> {
+  return page.evaluate(async (wanted) => {
+    const find = (window as unknown as FinderWindow).__findAnimatedText as Found;
+    const probe = (window as unknown as ProbeWindow).__contrastProbe;
+    const root = find(wanted);
+    let played = false;
+    const dimmed = new Map<string, number>();
+    const colours = new Map<string, Sample & { shadow: boolean }>();
+    const drawn = () =>
+      [root, ...root.querySelectorAll<HTMLElement>('*')].filter((el) => !el.closest('.sr-only'));
+    const motionOf = (el: Element) => {
+      const style = getComputedStyle(el);
+      return `${style.transform} | ${style.textShadow}`;
+    };
+    const atRest = new Map(drawn().map((el) => [el, motionOf(el)]));
+    const opacityOf = (el: Element) => {
+      let opacity = 1;
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        opacity *= Number(getComputedStyle(node).opacity);
+        if (node === root) break;
+      }
+      return opacity;
+    };
+
     const sample = () => {
-      for (const el of main.querySelectorAll<HTMLElement>('*')) {
-        const opacity = Number(getComputedStyle(el).opacity);
-        // 0 exactly is a hidden element, which is allowed and is how every reveal starts; anything
-        // between is dimmed text on screen, which CLAUDE.md forbids even when `aria-hidden`.
-        if (!(opacity > 0 && opacity < 1)) continue;
-        if (!el.textContent?.trim()) continue;
-        const cls = typeof el.className === 'string' ? el.className.slice(0, 60).trim() : '';
-        const key = `${el.tagName.toLowerCase()}.${cls} "${el.textContent.trim().slice(0, 24)}"`;
-        worst.set(key, Math.min(worst.get(key) ?? 1, opacity));
+      for (const el of drawn()) {
+        const style = getComputedStyle(el);
+        if (motionOf(el) !== (atRest.get(el) ?? 'none | none')) played = true;
+        const ownText = [...el.childNodes]
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent ?? '')
+          .join('')
+          .trim();
+        if (!ownText) continue;
+        const what = `${el.tagName.toLowerCase()} "${ownText.slice(0, 24)}"`;
+        const opacity = opacityOf(el);
+        // 0 exactly is hidden, which is how every reveal starts; anything between is dimmed text.
+        if (opacity > 0 && opacity < 1) dimmed.set(what, Math.min(dimmed.get(what) ?? 1, opacity));
+        // Computed colours hold no nested parentheses: `rgb(…)`, `lab(…)`, `oklch(…)`.
+        const shadows =
+          style.textShadow === 'none' ? [] : (style.textShadow.match(/[a-z]+\([^()]*\)/gi) ?? []);
+        for (const [color, shadow] of [
+          [style.color, false] as const,
+          ...shadows.map((value) => [value, true] as const),
+        ]) {
+          const key = `${what} ${shadow ? 'text-shadow' : 'color'} ${color}`;
+          if (!colours.has(key)) {
+            colours.set(key, {
+              what: `${what} ${shadow ? 'text-shadow' : 'color'}`,
+              shadow,
+              ...probe(el, color),
+            });
+          }
+        }
       }
     };
 
-    target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    target.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
-    // 45 frames is about 750 ms at 60 Hz, twice the glitch timeline.
+    root.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    root.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
     for (let frame = 0; frame < 45; frame += 1) {
       sample();
       await new Promise((resolve) => requestAnimationFrame(resolve));
     }
-    return [...worst].map(([key, opacity]) => `${key} at opacity ${opacity}`);
-  });
+    root.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+    root.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
+    return {
+      played,
+      dimmed: [...dimmed].map(([what, opacity]) => `${what} at opacity ${opacity}`),
+      colours: [...colours.values()],
+    };
+  }, text);
+}
 
-  expect(
-    offenders,
-    'the glitch variant paints aria-hidden duplicates at `opacity-70` ' +
-      '(animated-text.tsx:428, :438). CLAUDE.md forbids dimming text with an opacity modifier even ' +
-      'when it is aria-hidden, because axe measures it anyway.',
-  ).toEqual([]);
-});
+/** Records every colour a hover drew with its ratio, so a passing run still reports its margin. */
+function recordContrast(colours: HoverSamples['colours']) {
+  test.info().annotations.push({
+    type: 'contrast',
+    description: colours.map((c) => `${c.what} ${c.color} ${round(ratioOf(c))}:1`).join('; '),
+  });
+}
+
+/**
+ * The glitch variant's two texts: the Execution phase label, on the accent pill, and the Gauntlet's
+ * closing headline, on the page.
+ */
+const GLITCH_TARGETS = [
+  { what: 'the PHASE 3 label', text: 'PHASE 3' },
+  { what: "the Gauntlet's closing headline", text: '"It worked on my machine" doesn\'t fly here.' },
+];
+
+for (const colorScheme of colorSchemes) {
+  for (const { what, text } of GLITCH_TARGETS) {
+    // R17, restated by slice 47d. It used to hover under `reduce`, where nothing is mid-reveal, but
+    // the glitch no longer plays there (AC 4), so it hovers with motion allowed once the section's
+    // entrance has finished, and samples the glitch's own text only (a resting defect elsewhere in
+    // the section, such as the featured-work diagram at opacity 0.4, is not this row's subject).
+    test(`${what} glitches with no text at a partial opacity and offsets at AA in the ${colorScheme} theme`, async ({
+      page,
+    }) => {
+      // The Gauntlet's headline waits for its pipeline, about eight seconds after the entrance.
+      test.setTimeout(60_000);
+      await openAnimatedText(page, colorScheme, text);
+      const { played, dimmed, colours } = await sampleWhileHovered(page, text);
+      recordContrast(colours);
+
+      expect(played, 'the hover did not glitch, so this measured nothing').toBe(true);
+      // Both offsets, drawn: a `var()` that resolved to nothing would drop the whole shadow.
+      expect(
+        colours.filter((sample) => sample.shadow).map((sample) => sample.color),
+        'the glitch drew fewer than its two offset colours',
+      ).toHaveLength(2);
+      expect(
+        dimmed,
+        'the glitch must draw its offsets with no opacity modifier: CLAUDE.md forbids dimming ' +
+          'text that way even when it is aria-hidden, because axe measures it anyway.',
+      ).toEqual([]);
+      expect(
+        colours.filter((sample) => !passesAA(sample)).map(describeSample),
+        'the glitch offsets are drawn in theme tokens that reach AA as text (ADR 0010, 0011), ' +
+          'not palette classes such as text-cyan-400.',
+      ).toEqual([]);
+    });
+  }
+
+  test(`the PHASE 4 label's rainbow draws every letter at AA in the ${colorScheme} theme`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    await openAnimatedText(page, colorScheme, 'PHASE 4');
+    const { played, dimmed, colours } = await sampleWhileHovered(page, 'PHASE 4');
+    recordContrast(colours);
+
+    expect(played, 'the hover did not play, so this measured nothing').toBe(true);
+    const letterColours = new Set(colours.filter((c) => !c.shadow).map((c) => c.color));
+    expect(
+      letterColours.size,
+      `the letters were only drawn in ${[...letterColours].join(', ')}: the rainbow never recoloured them`,
+    ).toBeGreaterThan(2);
+    expect(dimmed).toEqual([]);
+    expect(
+      colours.filter((sample) => !passesAA(sample)).map(describeSample),
+      'the rainbow recolours its letters through theme tokens that reach AA as text on the accent ' +
+        'pill, not hard-coded hexes.',
+    ).toEqual([]);
+  });
+}
 
 test('the hero island, its skill tags and the colour probe are all working', async ({ page }) => {
   // Green, and the guard for every row above. A hero that stopped rendering its island would make
