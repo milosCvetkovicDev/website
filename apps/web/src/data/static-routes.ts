@@ -7,12 +7,13 @@ import { experienceFigureSince } from './profile';
  * A case study's dates live on its entry in `case-studies.ts`.
  *
  * From git, the last commit to change what each route visibly says: `/`, /work and /about
- * 2026-09-30 (#49: the self-healing agent's figure relabelled "errors resolved autonomously" on
- * their cards and in the About timeline, whose 2021 entry also lost its unsourced 40%), /skills
- * 2026-09-28 (#49: the Next.js version dropped), /contact 2026-09-23 (d1da60f, #116, which changed
- * the hero subtitle and the eyebrows) and /blog 2026-01-27 (696c2ef). The later commits to /blog
- * changed only formatting, colour tokens, metadata or Open Graph images. /privacy was added on
- * 2026-09-27.
+ * 2026-09-30 (`/`: #47's story dots and readout named by each phase title, and #49's relabelled
+ * figure; /work and /about: #49, the self-healing agent's figure relabelled "errors resolved
+ * autonomously" on their cards and in the About timeline, whose 2021 entry also lost its unsourced
+ * 40%), /skills 2026-09-28 (#49: the Next.js version dropped), /contact 2026-09-23 (d1da60f, #116,
+ * which changed the hero subtitle and the eyebrows) and /blog 2026-01-27 (696c2ef). The later
+ * commits to /blog changed only formatting, colour tokens, metadata or Open Graph images. /privacy
+ * was added on 2026-09-27.
  *
  * One change needs no commit: `/` (the hero's XP row) and /about (its description and first quick
  * fact) print the years of experience, which `data/profile.ts` derives from the build's clock, so

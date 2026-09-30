@@ -45,7 +45,7 @@
     "MetricCounter": "  active: boolean;\n  value: number;\n  label: string;\n  prefix?: string;\n  suffix?: string;\n  decimals?: number;",
     "Navigation": "  // Takes no props.",
     "NotificationToast": "  children: React.ReactNode;\n  type?: 'success' | 'warning' | 'error' | 'info';",
-    "PipelineStage": "  name: string;\n  status: 'pending' | 'running' | 'passed' | 'failed';\n  progress?: number;",
+    "PipelineStage": "  name: string;\n  status: 'pending' | 'running' | 'passed' | 'failed';\n  progress?: number;\n  fillRef?: React.RefObject<HTMLDivElement | null>;",
     "ProgressBar": "  progress: number;\n  label?: string;\n  className?: string;\n  variant?: 'default' | 'success' | 'warning' | 'error';",
     "QuestItem": "  completed: boolean;\n  children: React.ReactNode;",
     "SectionProgress": "  storyRef: React.RefObject<HTMLElement | null>;",
