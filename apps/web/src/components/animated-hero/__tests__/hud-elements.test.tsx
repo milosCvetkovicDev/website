@@ -8,8 +8,9 @@ import { createRef, type ComponentProps } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { gsap } from '../gsap-runtime';
 import { requestGsap } from '../load-gsap';
-import { DataStream, PipelineStage, StatDisplay } from '../hud-elements';
+import { DataStream, PipelineStage, ProgressBar, StatDisplay } from '../hud-elements';
 import { cssTransitions } from './gsap-css-conflicts';
+import { stageFill, stageTrack } from './pipeline-fill';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers
 // it at import time, so the stub must exist before the imports above are evaluated.
@@ -412,10 +413,6 @@ const everyStatusListed: [
   ? true
   : never = true;
 
-/** The bar a stage fills: the first element inside its clipped track. */
-const stageFill = (name: string) =>
-  screen.getByText(name).parentElement?.querySelector<HTMLElement>('.overflow-hidden > div');
-
 describe('PipelineStage', () => {
   afterEach(() => cleanup());
 
@@ -434,12 +431,47 @@ describe('PipelineStage', () => {
         <PipelineStage name="UNIT TESTS" status="running" progress={progress} fillRef={fillRef} />,
       );
       const fill = stageFill('UNIT TESTS');
-      expect(fill?.style.transform).toBe(transform);
-      expect(fill?.style.width).toBe('');
+      expect(fill.style.transform).toBe(transform);
+      expect(fill.style.width).toBe('');
       expect(fill).toHaveClass('origin-left');
       expect(fillRef.current).toBe(fill);
     },
   );
+
+  // A negative progress would mirror the fill out of its track and show it empty, one past 100
+  // would overrun it, and NaN would make an invalid transform the browser drops, showing it full.
+  it.each([
+    { progress: -10, transform: 'scaleX(0)' },
+    { progress: 150, transform: 'scaleX(1)' },
+    { progress: Number.NaN, transform: 'scaleX(0)' },
+    { progress: Number.POSITIVE_INFINITY, transform: 'scaleX(0)' },
+  ])('clamps a progress of $progress to $transform', ({ progress, transform }) => {
+    render(<PipelineStage name="UNIT TESTS" status="running" progress={progress} />);
+    expect(stageFill('UNIT TESTS').style.transform).toBe(transform);
+  });
+
+  // A scale squashes a border radius with it, so a rounded fill would end in a sliver of a curve
+  // at low progress. The fill has no radius of its own; the track's rounded clip shapes its ends.
+  it('leaves the fill square and lets the rounded track clip it', () => {
+    render(<PipelineStage name="UNIT TESTS" status="running" progress={5} />);
+    expect(stageFill('UNIT TESTS').className).not.toMatch(/\brounded(-|\b)/);
+    expect(stageTrack('UNIT TESTS')).toHaveClass('overflow-hidden', 'rounded-full');
+  });
+
+  // A transformed element is the containing block of its absolutely positioned descendants, so
+  // inside the fill the shimmer would shrink with the scale. It sweeps the track as the fill's
+  // sibling, and only while the stage runs.
+  it.each(PIPELINE_STATUSES)('keeps the shimmer out of the fill while %s', (status) => {
+    const fillRef = createRef<HTMLDivElement>();
+    render(<PipelineStage name="UNIT TESTS" status={status} progress={40} fillRef={fillRef} />);
+    const shimmer = stageTrack('UNIT TESTS').querySelector('.animate-shimmer');
+    if (status !== 'running') {
+      expect(shimmer).toBeNull();
+      return;
+    }
+    expect(shimmer?.parentElement).toBe(stageTrack('UNIT TESTS'));
+    expect(fillRef.current?.contains(shimmer ?? null)).toBe(false);
+  });
 
   // GauntletPhase rewrites the fill's transform every frame from a GSAP tween on a plain object, so
   // a transition on it restarts on every frame and the bar trails its own progress: measured in
@@ -453,7 +485,7 @@ describe('PipelineStage', () => {
       render(<PipelineStage name="UNIT TESTS" status={status} progress={40} />);
       const fill = stageFill('UNIT TESTS');
       // The element React writes the progress to.
-      expect(fill?.style.transform).toBe('scaleX(0.4)');
+      expect(fill.style.transform).toBe('scaleX(0.4)');
 
       // What the fill may transition is what `transition-colors` covers in the installed Tailwind,
       // read the same way, so `transition-[inline-size]` or a bare duration fails as well as
@@ -461,7 +493,7 @@ describe('PipelineStage', () => {
       const colours = document.createElement('div');
       colours.className = 'transition-colors duration-500';
       const allowed = await cssTransitions(colours);
-      const transitioned = await cssTransitions(fill!);
+      const transitioned = await cssTransitions(fill);
       expect(
         [...transitioned].filter((property) => !allowed.has(property)),
         `the fill transitions ${[...transitioned].join(', ')}`,
@@ -469,4 +501,32 @@ describe('PipelineStage', () => {
       expect(transitioned).toContain('background-color');
     },
   );
+});
+
+describe('ProgressBar', () => {
+  afterEach(() => cleanup());
+
+  /** The bar that fills: the one element scaled from the track's left edge. */
+  const barFill = (container: HTMLElement) => {
+    const fill = container.querySelector<HTMLElement>('.origin-left');
+    if (!fill) throw new Error('The progress bar has no fill.');
+    return fill;
+  };
+
+  // ADR 0009 rule 2: drawn by scaling a full-width bar from its left edge, never by a width, and
+  // clamped like PipelineStage's fill. No radius of its own, which the scale would squash.
+  it.each([
+    { progress: 0, transform: 'scaleX(0)' },
+    { progress: 64, transform: 'scaleX(0.64)' },
+    { progress: 100, transform: 'scaleX(1)' },
+    { progress: -10, transform: 'scaleX(0)' },
+    { progress: 150, transform: 'scaleX(1)' },
+    { progress: Number.NaN, transform: 'scaleX(0)' },
+  ])('draws a $progress% bar as $transform from its left edge', ({ progress, transform }) => {
+    const { container } = render(<ProgressBar label="COVERAGE" progress={progress} />);
+    const fill = barFill(container);
+    expect(fill.style.transform).toBe(transform);
+    expect(fill.style.width).toBe('');
+    expect(fill.className).not.toMatch(/\brounded(-|\b)/);
+  });
 });

@@ -2,7 +2,7 @@
 
 import { createRef, useCallback, useEffect, useRef, useState } from 'react';
 import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
-import { HudPanel, PipelineStage, NotificationToast } from './hud-elements';
+import { HudPanel, PipelineStage, NotificationToast, progressFillTransform } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { storyClosings } from '@/data/pages/home';
@@ -24,9 +24,6 @@ type StageState = { status: StageStatus; progress: number };
 
 const pendingStages: StageState[] = pipelineStages.map(() => ({ status: 'pending', progress: 0 }));
 const passedStages: StageState[] = pipelineStages.map(() => ({ status: 'passed', progress: 100 }));
-
-/** The fill's transform at `fraction` of the stage, as PipelineStage renders it from `progress`. */
-const fillTransform = (fraction: number) => `scaleX(${fraction})`;
 
 export function GauntletPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -59,9 +56,9 @@ export function GauntletPhase() {
   // gone. Progress tweens only write the stage fills, which a restart empties (animatePipeline) and
   // the finished render fills, so killing them is enough; the reveal tweens are reverted, because
   // revert restores the inline styles they set, where kill would freeze them mid-flight and that
-  // inline opacity would beat the class-driven state. A timer that comes due
-  // after the commit that removed the section, but before the cleanup that cancels it, does
-  // nothing: its refs are already null, and GSAP would warn about a null target (runWithGsap).
+  // inline opacity would beat the class-driven state. A timer that comes due after the commit that
+  // removed the section, but before the cleanup that cancels it, does nothing: its refs are
+  // already null, and GSAP would warn about a null target (runWithGsap).
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const progressTweensRef = useRef<gsap.core.Tween[]>([]);
   const revealTweensRef = useRef<gsap.core.Tween[]>([]);
@@ -94,7 +91,7 @@ export function GauntletPhase() {
       // running renders the same empty fill as a pending one, so what its tween drew is emptied
       // here. Every stage renders empty once pending, so every fill starts from empty.
       fillRefs.forEach(({ current: fill }) => {
-        if (fill) fill.style.transform = fillTransform(0);
+        if (fill) fill.style.transform = progressFillTransform(0);
       });
       setStageStates(pendingStages);
       setDeploymentStatus('idle');
@@ -111,15 +108,17 @@ export function GauntletPhase() {
           });
 
           // Animate progress: each frame scales the fill directly, with no React render, and
-          // state changes again only when the stage passes.
-          const fill = fillRefs[index].current;
+          // state changes again only when the stage passes. The ref is read on every frame, not
+          // once, so a frame always draws the fill React has mounted, and one after unmount draws
+          // nothing.
           progressTweensRef.current.push(
             gsap.to(
               {},
               {
                 duration: stage.duration,
                 onUpdate: function () {
-                  if (fill) fill.style.transform = fillTransform(this.progress());
+                  const fill = fillRefs[index].current;
+                  if (fill) fill.style.transform = progressFillTransform(this.progress());
                 },
                 onComplete: () => {
                   setStageStates((prev) => {

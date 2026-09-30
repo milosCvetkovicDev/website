@@ -149,10 +149,12 @@ export function ProgressBar({
           }}
         />
         {/* Scaled from the left edge rather than sized, so a change of progress eases on the
-            compositor without laying the row out on every frame (ADR 0009 rule 2). */}
+            compositor without laying the row out on every frame (ADR 0009 rule 2). No radius of
+            its own, which the scale would squash: the track's rounded clip rounds the left end,
+            and the right end once the bar is full; a partial bar ends square. */}
         <div
-          className={`relative h-full origin-left overflow-hidden rounded-full transition-all duration-500 ease-out ${colors[variant]}`}
-          style={{ transform: `scaleX(${progress / 100})` }}
+          className={`relative h-full origin-left overflow-hidden transition-all duration-500 ease-out ${colors[variant]}`}
+          style={{ transform: progressFillTransform(progress / 100) }}
         >
           {/* Static shine effect - no animation to avoid flicker */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -365,6 +367,18 @@ export function CodeLine({
   );
 }
 
+/**
+ * The transform that draws a progress fill `fraction` of the way across its track, from the left
+ * edge. The fraction is clamped to 0-1, so a negative value cannot mirror the fill out of its track
+ * and a value past 1 cannot overrun it, and a non-finite one draws nothing rather than an invalid
+ * transform the browser drops, which would leave the fill full. PipelineStage and ProgressBar
+ * render it, and GauntletPhase writes it through a stage's `fillRef`, so the two always agree.
+ */
+export function progressFillTransform(fraction: number): string {
+  const drawn = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
+  return `scaleX(${drawn})`;
+}
+
 // Pipeline Stage with animated progress.
 // The fill is a full-width bar scaled from its left edge, never a width, so a frame of progress
 // costs no layout (ADR 0009 rule 2). React draws it from `progress`; GauntletPhase draws a running
@@ -408,11 +422,14 @@ export function PipelineStage({
       </span>
       <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
         {/* Colours only: GauntletPhase writes the transform on every frame of a stage, and a
-            transform transition would restart on each write and trail the progress. */}
+            transform transition would restart on each write and trail the progress. No radius of
+            its own, which the scale would squash to a sliver at low progress: the track's rounded
+            clip rounds the left end, and the right end once the stage is full; a partial fill ends
+            square. */}
         <div
           ref={fillRef}
-          className={`h-full origin-left rounded-full transition-colors duration-500 ${progressColors[status]}`}
-          style={{ transform: `scaleX(${progress / 100})` }}
+          className={`h-full origin-left transition-colors duration-500 ${progressColors[status]}`}
+          style={{ transform: progressFillTransform(progress / 100) }}
         />
         {/* A sibling of the fill, not a child: a transformed element contains its absolutely
             positioned descendants, so inside the fill the shimmer would shrink with the scale

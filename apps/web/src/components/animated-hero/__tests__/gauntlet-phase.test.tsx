@@ -5,6 +5,7 @@ import { gsap, ScrollTrigger } from '../gsap-runtime';
 import { requestGsap } from '../load-gsap';
 import { GauntletPhase } from '../gauntlet-phase';
 import { pickTween, progressDriver } from './gsap-tweens';
+import { fillScale, stageFill } from './pipeline-fill';
 
 // GSAP's ScrollTrigger calls window.matchMedia while it registers, and gsap-runtime registers it
 // at import time, so the stub must exist before the imports above are evaluated.
@@ -56,6 +57,8 @@ vi.hoisted(() => {
 });
 
 const STAGE_COUNT = 6;
+// The stages' names, in order (`pipelineStages` in gauntlet-phase.tsx).
+const STAGE_NAMES = ['LINT', 'TYPE CHECK', 'UNIT TESTS', 'E2E TESTS', 'SECURITY', 'BUILD'];
 // The six stages run back to back with a 0.2s gap; deployment starts once the last one ends.
 const PIPELINE_MS = 5300;
 // LINT, the first stage, runs its progress tween for 0.5 s (`pipelineStages` in gauntlet-phase.tsx).
@@ -67,22 +70,6 @@ const achievement = () =>
   screen.getByText('Achievement Unlocked').closest('[data-gauntlet="achievement"]');
 const pendingStages = () => screen.getAllByText('○');
 const passedStages = () => screen.getAllByText('●');
-
-/** The bar a stage fills: the first element inside its clipped track. */
-function stageFill(name: string): HTMLElement {
-  const fill = screen
-    .getByText(name)
-    .parentElement?.querySelector<HTMLElement>('.overflow-hidden > div');
-  if (!fill) throw new Error(`The ${name} stage has no fill.`);
-  return fill;
-}
-
-/** How far the fill is drawn, read from the `scaleX()` in its inline transform. */
-function fillScale(fill: HTMLElement): number {
-  const match = /^scaleX\(([^)]+)\)$/.exec(fill.style.transform);
-  if (!match) throw new Error(`The fill's transform is "${fill.style.transform}", not a scaleX().`);
-  return Number(match[1]);
-}
 
 /** Mounts the phase and lets ScrollTrigger measure; jsdom lays nothing out, so it starts in view. */
 function mount(ui: ReactElement = <GauntletPhase />) {
@@ -280,5 +267,68 @@ describe('GauntletPhase', () => {
     act(() => media.set(true));
     expect(passedStages()).toHaveLength(STAGE_COUNT);
     expect(fillScale(fill)).toBe(1);
+  });
+
+  // A running stage renders the same empty fill from start to finish, so a render in the middle of
+  // its tween writes nothing, and what the tween drew survives it.
+  it('keeps what the tween drew when the phase re-renders in the middle of a stage', () => {
+    const { rerender } = mount();
+    const toSpy = vi.spyOn(gsap, 'to');
+    act(() => vi.advanceTimersByTime(1));
+    act(() => {
+      pickTween(toSpy, lintProgress).tween.progress(0.5);
+    });
+    const fill = stageFill('LINT');
+
+    rerender(<GauntletPhase />);
+
+    expect(fillScale(fill)).toBeCloseTo(0.5, 5);
+  });
+
+  // The restart empties every fill, not just the first stage's: one that passed (React renders it
+  // empty again) and one caught half drawn (React renders it empty throughout, so only the reset
+  // can). Motion switched off and on again then leaves every stage pending and empty too.
+  it('empties every fill when a later stage is restarted mid-tween, and after motion is allowed again', () => {
+    mount();
+    const toSpy = vi.spyOn(gsap, 'to');
+    act(() => vi.advanceTimersByTime(1));
+    act(() => {
+      pickTween(toSpy, lintProgress).tween.progress(1);
+    });
+    // TYPE CHECK starts 0.7 s in: LINT's 0.5 s and the 0.2 s gap.
+    act(() => vi.advanceTimersByTime(700));
+    act(() => {
+      pickTween(toSpy, progressDriver(0.6)).tween.progress(0.5);
+    });
+    expect(fillScale(stageFill('LINT'))).toBe(1);
+    expect(fillScale(stageFill('TYPE CHECK'))).toBeCloseTo(0.5, 5);
+
+    act(() => enterAgain());
+    expect(pendingStages()).toHaveLength(STAGE_COUNT);
+    for (const name of STAGE_NAMES) expect(fillScale(stageFill(name)), name).toBe(0);
+
+    act(() => vi.advanceTimersByTime(1));
+    act(() => {
+      pickTween(toSpy, lintProgress, { latest: true }).tween.progress(0.5);
+    });
+    act(() => media.set(true));
+    act(() => media.set(false));
+    act(() => ScrollTrigger.refresh());
+    expect(pendingStages()).toHaveLength(STAGE_COUNT);
+    for (const name of STAGE_NAMES) expect(fillScale(stageFill(name)), name).toBe(0);
+  });
+
+  // The tween reads the fill's ref on every frame, so a frame rendered after the section is gone
+  // finds the ref null and draws nothing, rather than throwing or writing to a detached node.
+  it('draws nothing and throws nothing when a stage tween renders after the section unmounts', () => {
+    const { unmount } = mount();
+    const toSpy = vi.spyOn(gsap, 'to');
+    act(() => vi.advanceTimersByTime(1));
+    const { tween } = pickTween(toSpy, lintProgress);
+    const fill = stageFill('LINT');
+    unmount();
+
+    expect(() => tween.progress(0.7)).not.toThrow();
+    expect(fill.style.transform).toBe('scaleX(0)');
   });
 });
