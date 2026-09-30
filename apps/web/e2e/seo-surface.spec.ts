@@ -11,7 +11,8 @@ import {
 } from './routes';
 import { caseStudies } from '../src/data/case-studies';
 import { formatContentDate } from '../src/lib/content-date';
-import { fetchHead, first } from './support/served-head';
+import { LLMS_TXT, SITE_ORIGIN } from './endpoints';
+import { attributeText, fetchHead, first } from './support/served-head';
 
 /**
  * The head every crawler and link-preview bot reads.
@@ -92,6 +93,46 @@ test('every page serves one canonical link for its own path, and a 404 serves no
     'every page sets `alternates.canonical` to its own path through buildMetadata() ' +
       '(src/lib/metadata.ts); nothing in the root layout may, or it would reach the 404s.',
   ).toEqual([]);
+});
+
+test('every route, a 404 included, serves one absolute describedby link to /llms.txt (#60)', async ({
+  request,
+}) => {
+  // llms.txt v2's own discovery relation, a literal <link> in the root layout's head. Unlike a
+  // canonical it names the site's index, not the URL that was asked for, so it is as true of the
+  // one static 404 document as of every page.
+  const problems: string[] = [];
+  const targets = new Set<string>();
+  for (const { path, status } of routes) {
+    const head = await fetchHead(request, path);
+    expect(head.status, `${path} should answer ${status}`).toBe(status);
+    const hrefs = head.link.get('describedby') ?? [];
+    if (hrefs.length !== 1) {
+      problems.push(`${path}: ${hrefs.length} describedby links, expected 1`);
+      continue;
+    }
+    const href = attributeText(hrefs[0]);
+    let url: URL;
+    try {
+      url = new URL(href);
+    } catch {
+      problems.push(`${path}: describedby ${href} is not an absolute URL`);
+      continue;
+    }
+    if (url.origin !== SITE_ORIGIN || url.pathname !== LLMS_TXT || url.search || url.hash) {
+      problems.push(`${path}: describedby points at ${href}, not ${SITE_ORIGIN}${LLMS_TXT}`);
+      continue;
+    }
+    targets.add(url.pathname);
+  }
+  expect(problems, 'the root layout carries one <link rel="describedby"> to /llms.txt').toEqual([]);
+
+  // It resolves: requested by its path on this server, having been checked to name this site.
+  for (const target of targets) {
+    const response = await request.get(target);
+    expect(response.status(), target).toBe(200);
+    expect(response.headers()['content-type'] ?? '', target).toMatch(/^text\/plain\b/);
+  }
 });
 
 test('every route serves an og:image that answers with an image', async ({ request }) => {

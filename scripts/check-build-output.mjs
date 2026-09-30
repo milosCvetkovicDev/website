@@ -81,11 +81,15 @@ export const ALLOWED_FUNCTIONS = Object.freeze([]);
  * the route above its last dynamic segment is a route too, exactly that route's params, so
  * `/work/[slug]/index.json` needs one body per `/work/<slug>` page without this list naming a
  * slug. A required route is never a function, so it cannot be in `ALLOWED_FUNCTIONS` as well.
- * #60 adds the case-study JSON; each later endpoint adds its own route.
+ * #60 adds `/llms.txt` and the case-study JSON; each later endpoint adds its own route.
  *
  * @type {readonly string[]}
  */
-export const REQUIRED_ROUTES = Object.freeze(['/case-studies.json', '/work/[slug]/index.json']);
+export const REQUIRED_ROUTES = Object.freeze([
+  '/llms.txt',
+  '/case-studies.json',
+  '/work/[slug]/index.json',
+]);
 
 /** Next's `PrerenderCompute`; every value but `static` finishes the response in a function. */
 const COMPUTE_VALUES = new Set(['static', 'blocking', 'resuming']);

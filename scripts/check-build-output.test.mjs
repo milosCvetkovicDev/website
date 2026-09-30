@@ -41,6 +41,7 @@ const APP_ROUTES = {
   '/about/page': '/about',
   '/robots.txt/route': '/robots.txt',
   '/opengraph-image/route': '/opengraph-image',
+  '/llms.txt/route': '/llms.txt',
   '/case-studies.json/route': '/case-studies.json',
   '/work/[slug]/page': '/work/[slug]',
   '/work/[slug]/og-image.png/route': '/work/[slug]/og-image.png',
@@ -91,6 +92,7 @@ const cleanPrerender = () => ({
     '/about': prerendered('/about'),
     '/robots.txt': prerendered('/robots.txt'),
     '/opengraph-image': prerendered('/opengraph-image'),
+    '/llms.txt': prerendered('/llms.txt'),
     '/case-studies.json': prerendered('/case-studies.json'),
     '/work/a': prerendered('/work/[slug]'),
     '/work/b': prerendered('/work/[slug]'),
@@ -113,6 +115,7 @@ const CLEAN_BODIES = [
   'about.html',
   'robots.txt.body',
   'opengraph-image.body',
+  'llms.txt.body',
   'case-studies.json.body',
   'work/a.html',
   'work/b.html',
@@ -161,7 +164,11 @@ function without(route) {
     if ((entry.srcRoute ?? path) === route) delete prerender.routes[path];
   }
   delete prerender.dynamicRoutes[route];
-  const gone = route === '/case-studies.json' ? /^case-studies\.json/ : /\/index\.json\.body$/;
+  const gone =
+    {
+      '/llms.txt': /^llms\.txt\.body$/,
+      '/case-studies.json': /^case-studies\.json\.body$/,
+    }[route] ?? /\/index\.json\.body$/;
   return { appRoutes, prerender, bodies: CLEAN_BODIES.filter((b) => !gone.test(b)) };
 }
 
@@ -174,6 +181,7 @@ describe('bodyFile', () => {
     ['/work/a/og-image.png', 'route', 'work/a/og-image.png.body'],
     ['/index.md', 'route', 'index.md.body'],
     ['/about/index.md', 'route', 'about/index.md.body'],
+    ['/llms.txt', 'route', 'llms.txt.body'],
     ['/case-studies.json', 'route', 'case-studies.json.body'],
     ['/work/a/index.json', 'route', 'work/a/index.json.body'],
   ]) {
@@ -344,20 +352,29 @@ describe('collectProblems', () => {
     assert.match(problems[0], /^\/work\/b\/index\.json .*server\/app\/work\/b\/index\.json\.body/);
   });
 
-  it('fails a required handler built without force-static once, as a function', () => {
-    // `app/case-studies.json/route.ts` without its `dynamic` export: in the app manifest, not
-    // prerendered. The function finding names it; being required adds no second one.
-    const prerender = cleanPrerender();
-    delete prerender.routes['/case-studies.json'];
-    const { problems } = check({
-      prerender,
-      bodies: CLEAN_BODIES.filter((b) => b !== 'case-studies.json.body'),
-    });
+  it('fails a missing /llms.txt body, naming the file', () => {
+    const { problems } = check({ bodies: CLEAN_BODIES.filter((b) => b !== 'llms.txt.body') });
     assert.equal(problems.length, 1);
-    assert.match(problems[0], /^\/case-studies\.json: .*function.*force-static/);
+    assert.match(problems[0], /^\/llms\.txt .*server\/app\/llms\.txt\.body/);
   });
 
-  for (const route of ['/case-studies.json', '/work/[slug]/index.json']) {
+  for (const [route, body] of [
+    ['/llms.txt', 'llms.txt.body'],
+    ['/case-studies.json', 'case-studies.json.body'],
+  ]) {
+    it(`fails the required ${route} built without force-static once, as a function`, () => {
+      // Its `route.ts` without the `dynamic` export: in the app manifest, not prerendered. The
+      // function finding names it; being required adds no second one.
+      const prerender = cleanPrerender();
+      delete prerender.routes[route];
+      const { problems } = check({ prerender, bodies: CLEAN_BODIES.filter((b) => b !== body) });
+      assert.equal(problems.length, 1);
+      assert.ok(problems[0].startsWith(`${route}: `), problems[0]);
+      assert.match(problems[0], /function.*force-static/);
+    });
+  }
+
+  for (const route of ['/llms.txt', '/case-studies.json', '/work/[slug]/index.json']) {
     it(`fails a build without the required ${route}, naming it`, () => {
       const { problems } = check(without(route));
       assert.equal(problems.length, 1);
@@ -657,8 +674,11 @@ describe('paramsSibling', () => {
 });
 
 describe('REQUIRED_ROUTES', () => {
-  it('names the case-study JSON #60 serves, and no function', () => {
-    assert.deepEqual([...REQUIRED_ROUTES], ['/case-studies.json', '/work/[slug]/index.json']);
+  it('names /llms.txt and the case-study JSON #60 serves, and no function', () => {
+    assert.deepEqual(
+      [...REQUIRED_ROUTES],
+      ['/llms.txt', '/case-studies.json', '/work/[slug]/index.json'],
+    );
     assert.deepEqual(
       REQUIRED_ROUTES.filter((route) => ALLOWED_FUNCTIONS.includes(route)),
       [],
@@ -740,7 +760,7 @@ describe('the command', () => {
     withTree({}, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, /9 routes, 12 prerendered bodies, no server function/);
+      assert.match(result.stdout, /10 routes, 13 prerendered bodies, no server function/);
       assert.match(result.stdout, /\(BUILD_ID test-build-id, written \d{4}-\d\d-\d\dT[\d:.]+Z\)/);
     });
   });

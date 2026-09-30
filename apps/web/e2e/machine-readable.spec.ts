@@ -16,13 +16,13 @@ import {
  *
  * Every path comes from `endpoints.ts`. Each test's title and `fixed-by` annotation name the task
  * that ships its endpoint: #59 the Markdown twins, #60 `/llms.txt` and the JSON representation, #61
- * the Atom feed, #62 the MCP server. The twins (#59) and the case-study JSON (#60) are served, so
- * their rows run the contract alone; for each endpoint not yet served, `expectNotServedYet` makes
- * its test an expected failure for that one reason only. It first requires the status to be the 404
- * of an endpoint that is not there, outside the declared failure, so a 5xx, a timeout or a server
- * that never started fails the run; only then does it call `test.fail()` and fail on the status. A
- * 200 fails the run too, so the change that ships an endpoint must delete that one call, and the
- * rest of the test is then that endpoint's contract.
+ * the Atom feed, #62 the MCP server. The twins (#59), `/llms.txt` and the case-study JSON (#60) are
+ * served, so their rows run the contract alone; for each endpoint not yet served,
+ * `expectNotServedYet` makes its test an expected failure for that one reason only. It first
+ * requires the status to be the 404 of an endpoint that is not there, outside the declared failure,
+ * so a 5xx, a timeout or a server that never started fails the run; only then does it call
+ * `test.fail()` and fail on the status. A 200 fails the run too, so the change that ships an
+ * endpoint must delete that one call, and the rest of the test is then that endpoint's contract.
  *
  * Everything here goes through `request`, the served bytes, because that is all an agent's fetch
  * tool reads. `retries: 0`, as for every spec that carries an expected failure (`e2e-tests.md`): a
@@ -33,6 +33,18 @@ test.describe.configure({ retries: 0, timeout: 60_000 });
 
 /** A slug no case study has, for the 404 of its JSON document (#60 AC 7). */
 const UNKNOWN_SLUG = 'no-such-case-study';
+
+/**
+ * Refused, not pending, so it is no row in `endpoints.ts`: not in the llmstxt.org specification, and
+ * this site's `/llms.txt` already is the whole site (ADR 0017's refusal table, #60 AC 4).
+ */
+const LLMS_FULL_TXT = '/llms-full.txt';
+
+/** llmstxt.org's advice, and #60's bound: the whole file fits any context window. */
+const LLMS_TXT_MAX_BYTES = 10_240;
+
+/** An llmstxt.org list line, `- [name](url)` with an optional `: note`; its URL. */
+const LLMS_TXT_LINK = /^- \[(?:[^\]\\]|\\.)+\]\((\S+)\)(?::\s.*)?$/;
 
 /** The MCP protocol revision #62 targets. */
 const MCP_PROTOCOL_VERSION = '2026-07-28';
@@ -162,15 +174,20 @@ for (const { route, twin } of MARKDOWN_TWINS) {
 
 // The shape is #60's "exact v2 shape": one `# ` H1 first (the only section llmstxt.org requires),
 // then one `> ` blockquote, which #60 requires of this site; then link lists pointing at the twins.
+// `lib/__tests__/llms-txt.test.ts` pins the shape line by line; this row checks the served bytes.
 test(`#60: ${LLMS_TXT} opens with one H1 and a blockquote and links every case study`, async ({
   request,
 }) => {
   const response = await request.get(LLMS_TXT);
-  expectNotServedYet(response, LLMS_TXT, '#60');
   expect(response.status()).toBe(200);
-  expect(contentType(response)).toMatch(/^text\/plain\b/);
+  expect(contentType(response)).toMatch(/^text\/plain; ?charset=utf-8$/i);
 
   const body = await response.text();
+  // The served composition, never the draft one: a placeholder falls back or is left out (#60 AC 15).
+  expect(body, `${LLMS_TXT} serves no owner placeholder`).not.toContain(OWNER_TODO);
+  expect(Buffer.byteLength(body, 'utf8'), `${LLMS_TXT} fits a context window`).toBeLessThan(
+    LLMS_TXT_MAX_BYTES,
+  );
   const lines = linesOutsideFences(body).filter((line) => line.trim() !== '');
   expect(lines[0], 'llmstxt.org: the file opens with the H1').toMatch(/^# \S/);
   expect(
@@ -178,9 +195,46 @@ test(`#60: ${LLMS_TXT} opens with one H1 and a blockquote and links every case s
     'and has only the one H1',
   ).toHaveLength(1);
   expect(lines[1], '#60: followed by the blockquote').toMatch(/^> \S/);
-  for (const { twin } of CASE_STUDY_ENDPOINTS) {
+  expect(
+    lines.filter((line) => /^##\s+optional\s*$/i.test(line)),
+    'v2 dropped the Optional section',
+  ).toEqual([]);
+  for (const { twin, json } of CASE_STUDY_ENDPOINTS) {
     expect(linksTo(body, twin), `${LLMS_TXT} should link ${twin}`).toBe(true);
+    expect(linksTo(body, json), `${LLMS_TXT} should link ${json}`).toBe(true);
   }
+  expect(linksTo(body, CASE_STUDIES_JSON), `${LLMS_TXT} should link ${CASE_STUDIES_JSON}`).toBe(
+    true,
+  );
+});
+
+// #60 AC 4: an agent that follows the index must never land on a 404, so every link in it is
+// requested, by its path on this server once it has been checked to name this site's origin.
+test(`#60: every link in ${LLMS_TXT} answers 200`, async ({ request }) => {
+  const response = await request.get(LLMS_TXT);
+  expect(response.status()).toBe(200);
+  const lines = (await response.text()).split('\n');
+  const sectionStart = lines.findIndex((line) => line.startsWith('## '));
+  expect(sectionStart, `${LLMS_TXT} has link sections`).toBeGreaterThan(0);
+  const listed = lines.slice(sectionStart).filter((line) => line.trim() && !/^## /.test(line));
+
+  const paths: string[] = [];
+  for (const line of listed) {
+    const href = LLMS_TXT_LINK.exec(line)?.[1];
+    expect(href, `every line of a section is a - [name](url) link: ${line}`).toBeDefined();
+    const url = new URL(href as string);
+    expect(url.origin, `${href} is absolute on ${SITE_ORIGIN}`).toBe(SITE_ORIGIN);
+    paths.push(url.pathname);
+  }
+  expect(paths.length, `${LLMS_TXT} links something`).toBeGreaterThan(0);
+  const statuses = await Promise.all(
+    paths.map(async (path) => [path, (await request.get(path)).status()] as const),
+  );
+  expect(statuses, 'every link answers').toEqual(paths.map((path) => [path, 200]));
+});
+
+test(`#60: ${LLMS_FULL_TXT} is a 404, deliberately not served`, async ({ request }) => {
+  expect((await request.get(LLMS_FULL_TXT)).status()).toBe(404);
 });
 
 test(`#60: ${CASE_STUDIES_JSON} is a JSON array of every case study`, async ({ request }) => {

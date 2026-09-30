@@ -7,10 +7,10 @@ import { STATIC_ROUTES, caseStudyRoute } from './routes';
  *
  * Every path an agent-facing endpoint answers on is written here once, and the specs and tasks that
  * build or test one import it rather than restating it: #59 (the Markdown twins), #60 (`/llms.txt`
- * and the JSON representation), #61 (the Atom feed) and #62 (the MCP server). The twins and the
- * case-study JSON are served; the rest are not yet. `machine-readable.spec.ts` holds one expected
- * failure per endpoint not yet served, and the task that ships an endpoint deletes its annotation in
- * the same change.
+ * and the JSON representation), #61 (the Atom feed) and #62 (the MCP server). The twins,
+ * `/llms.txt` and the case-study JSON are served; the rest are not yet. `machine-readable.spec.ts`
+ * holds one expected failure per endpoint not yet served, and the task that ships an endpoint
+ * deletes its annotation in the same change.
  *
  * The page routes come from `routes.ts`, so a new static route or case study gets a twin row without
  * touching this file.
@@ -59,7 +59,10 @@ export const MARKDOWN_TWINS = [
   ...CASE_STUDY_ENDPOINTS.map(({ route, twin }) => ({ route, twin })),
 ];
 
-/** The llmstxt.org index of the site (#60). */
+/**
+ * The llmstxt.org index of the site (#60), served by `src/app/llms.txt/route.ts` and linked from
+ * every page's head with `rel="describedby"`.
+ */
 export const LLMS_TXT = '/llms.txt';
 
 /**

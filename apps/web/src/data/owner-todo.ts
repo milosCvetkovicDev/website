@@ -92,6 +92,17 @@ export const unfilledOwnerFields: readonly UnfilledOwnerField[] = [
     why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the Nx remote cache's 5× faster builds: facts only the owner has.",
     expires: '2026-10-31',
   },
+  {
+    field: 'llms-txt#the blockquote, one sentence on who Milos is and what he is for',
+    why: "The one sentence /llms.txt opens with, in the owner's own words: who he is and what he is for. Until it is written the file serves the home page's description in its place.",
+    expires: '2026-10-31',
+  },
+  {
+    field:
+      'llms-txt#the facts block, how the current role is phrased and which profile links to list',
+    why: 'The ground-truth facts /llms.txt carries after its blockquote: how the owner phrases his current role and which profile links he lists, decisions only he makes. Until then the file has no facts block.',
+    expires: '2026-10-31',
+  },
 ];
 
 /**

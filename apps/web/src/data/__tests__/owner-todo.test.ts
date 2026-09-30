@@ -13,6 +13,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { siteIndexToLlmsTxt } from '@/lib/serialise';
 import { caseStudies } from '../case-studies';
 import {
   MAX_EXPIRY_DAYS,
@@ -33,12 +34,12 @@ import {
 const RENDERS_ONLY: Record<string, string> = {
   'data/__tests__/case-studies.test.ts':
     'a unit test: builds unfilled fixtures to prove formatMetricScope leaves them out, and ships nowhere',
-  'lib/serialise.ts':
-    'a renderer: serves an unfilled metric definition as null and fails the prerender on any other marker',
   'lib/__tests__/serialise.test.ts':
     'a unit test: reads the marker to prove no live Markdown twin serves it, and ships nowhere',
   'lib/__tests__/case-studies-json.test.ts':
     'a unit test: reads the marker to prove the case-study JSON never serves it, and ships nowhere',
+  'lib/__tests__/llms-txt.test.ts':
+    'a unit test: builds unfilled fixtures to prove the served /llms.txt leaves them out, and ships nowhere',
 };
 
 /**
@@ -48,7 +49,12 @@ const RENDERS_ONLY: Record<string, string> = {
  * that imports owner-todo has to be imported by this file (for an entry here) or named in
  * `RENDERS_ONLY`: the 'every importer' test below fails otherwise.
  */
-const OWNER_TODO_SOURCES: OwnerTodoSource[] = [{ id: 'case-studies', value: caseStudies }];
+const OWNER_TODO_SOURCES: OwnerTodoSource[] = [
+  { id: 'case-studies', value: caseStudies },
+  // The draft-complete composition of /llms.txt (#60), because the served one carries no marker for
+  // the walk to find: `lib/serialise.ts` holds the owner's blockquote and facts block there.
+  { id: 'llms-txt', value: siteIndexToLlmsTxt({ includeUnfilled: true }) },
+];
 
 const NOW = new Date('2026-09-28T12:00:00Z');
 const IN_DATE = '2026-10-31';
