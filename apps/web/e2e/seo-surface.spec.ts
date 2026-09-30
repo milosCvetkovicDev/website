@@ -11,6 +11,7 @@ import {
 } from './routes';
 import { caseStudies } from '../src/data/case-studies';
 import { formatContentDate } from '../src/lib/content-date';
+import { fetchHead, first } from './support/served-head';
 
 /**
  * The head every crawler and link-preview bot reads.
@@ -29,47 +30,10 @@ import { formatContentDate } from '../src/lib/content-date';
  * does than a DOM would be, and because Next also embeds a JSON-escaped copy of the head in the RSC
  * flight payload further down the document. Matching only inside `<head>` is what keeps the payload's
  * copy from answering for a tag that is not really there, the same trap `not-found-shell.spec.ts`
- * documents.
+ * documents. The parser lives in `support/served-head.ts`, shared with `markdown-twins.spec.ts`.
  */
 
 test.describe.configure({ retries: 0, timeout: 60_000 });
-
-interface Head {
-  raw: string;
-  status: number;
-  /** `<meta name|property="…" content="…">` collected as name -> every content value seen. */
-  meta: Map<string, string[]>;
-  /** `<link rel="…" href="…">` the same way. */
-  link: Map<string, string[]>;
-}
-
-async function fetchHead(request: APIRequestContext, path: string): Promise<Head> {
-  const response = await request.get(path);
-  const html = await response.text();
-  // Only the head: the flight payload below it describes the same tags and would answer for one that
-  // never reached the markup.
-  const raw = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? '';
-  const meta = new Map<string, string[]>();
-  const link = new Map<string, string[]>();
-  const add = (map: Map<string, string[]>, key: string, value: string) => {
-    const lower = key.toLowerCase();
-    map.set(lower, [...(map.get(lower) ?? []), value]);
-  };
-
-  for (const tag of raw.match(/<meta\b[^>]*>/gi) ?? []) {
-    const key = tag.match(/\b(?:name|property)=["']([^"']+)["']/i)?.[1];
-    const content = tag.match(/\bcontent=["']([^"']*)["']/i)?.[1];
-    if (key !== undefined && content !== undefined) add(meta, key, content);
-  }
-  for (const tag of raw.match(/<link\b[^>]*>/gi) ?? []) {
-    const rel = tag.match(/\brel=["']([^"']+)["']/i)?.[1];
-    const href = tag.match(/\bhref=["']([^"']*)["']/i)?.[1];
-    if (rel !== undefined && href !== undefined) add(link, rel, href);
-  }
-  return { raw, status: response.status(), meta, link };
-}
-
-const first = (map: Map<string, string[]>, key: string) => map.get(key)?.[0];
 
 /** Every route a crawler can reach, with the status it answers. */
 const routes = PAGE_ROUTES.map((path) => ({ path, status: expectedStatus(path) }));

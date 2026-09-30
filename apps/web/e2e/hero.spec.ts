@@ -1,5 +1,23 @@
-import { test, expect } from '@playwright/test';
-import { expectHydrated } from './support/hydration';
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { expectHydrated, gotoHydrated } from './support/hydration';
+import { servedText } from './support/served-text';
+
+/** The tmux background's pane titles, left to right. */
+const PANE_TITLES = [
+  'kubectl — pods',
+  'psql — slow query log',
+  'gh actions — CI pipeline',
+  'nginx — access + error',
+  'prometheus — alerts',
+];
+
+/**
+ * The tmux background is aria-hidden, so no role query reaches a pane: each pane root carries
+ * `data-tmux-pane` (`src/components/animated-hero/tmux-background.tsx`).
+ */
+const tmuxPanes = (page: Page) => page.locator('[data-tmux-pane]');
+const tmuxPane = (page: Page, title: string) =>
+  tmuxPanes(page).filter({ has: page.getByText(title, { exact: true }) });
 
 test.describe('Hero Section', () => {
   test.beforeEach(async ({ page }) => {
@@ -46,28 +64,25 @@ test.describe('Hero Section', () => {
   });
 
   test('tmux background renders with 5 panes', async ({ page }) => {
-    await expect(page.getByText('kubectl', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('psql', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('gh actions', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('nginx', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('prometheus', { exact: false }).first()).toBeVisible();
+    await expect(tmuxPanes(page)).toHaveCount(PANE_TITLES.length);
+    // One pane per title, so the count above is five different panes and not one matched twice.
+    for (const title of PANE_TITLES) {
+      await expect(tmuxPane(page, title), `the ${title} pane`).toHaveCount(1);
+      await expect(tmuxPane(page, title), `the ${title} pane`).toBeVisible();
+    }
   });
 
   test('tmux panes are divided by a 2 px border, with none at the right edge', async ({ page }) => {
-    const titles = [
-      'kubectl — pods',
-      'psql — slow query log',
-      'gh actions — CI pipeline',
-      'nginx — access + error',
-      'prometheus — alerts',
-    ];
     const widths: string[] = [];
-    for (const title of titles) {
-      // The title sits in the pane's title bar, which is the pane's first child.
-      const pane = page.getByText(title, { exact: true }).locator('../..');
+    for (const title of PANE_TITLES) {
+      const pane = tmuxPane(page, title);
+      // Named here, because evaluate on a missing pane only times out.
+      await expect(pane, `the ${title} pane`).toHaveCount(1);
       widths.push(await pane.evaluate((el) => getComputedStyle(el).borderRightWidth));
     }
-    expect(widths).toEqual(['2px', '2px', '2px', '2px', '0px']);
+    expect(widths).toEqual(
+      PANE_TITLES.map((_, i) => (i === PANE_TITLES.length - 1 ? '0px' : '2px')),
+    );
   });
 
   test('the server-rendered tmux background survives hydration', async ({ page }) => {
@@ -167,25 +182,6 @@ test.describe('Hero Section', () => {
     await expect(page.getByRole('link', { name: /connect on linkedin/i })).toBeAttached();
   });
 
-  test('story sections are server-rendered', async ({ page }) => {
-    const response = await page.goto('/');
-    const html = (await response?.text()) ?? '';
-    // Plain text from four of the six sections, and the three closing headlines that `AnimatedText`
-    // splits into one span per letter: beside the split copy each carries a visually hidden one with
-    // the sentence whole, so the sentence is in the response as a crawler or a screen reader reads it.
-    for (const copy of [
-      'TECH TREE',
-      'CI/CD PIPELINE',
-      'SELF-HEALING LOG',
-      'Connect on LinkedIn',
-      'Most bugs live in the gap between what you asked for and what you meant.',
-      'The bottleneck was never my typing speed.',
-      'This happened at 3:14am. Nobody got paged.',
-    ]) {
-      expect(html).toContain(copy);
-    }
-  });
-
   test('scrolling through the story does not shift visible layout', async ({ page }) => {
     // Reduced motion, deliberately: the phases stage their own content in as they animate (the CI
     // pipeline rows, the healing log), and those are intended movements, not layout instability.
@@ -193,7 +189,11 @@ test.describe('Hero Section', () => {
     // is the page being unstable — which is what this guard is for. It also makes the measurement
     // independent of machine load, which a run on a busy laptop is not.
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/');
+    // Hydrated before it scrolls, so the scroll never races hydration. The measurement still covers
+    // the load and the re-render that follows hydration (under `reduce` the phases switch to their
+    // end state in it), which visitors get too: `buffered` hands the observer every shift recorded
+    // since the navigation started, not only those after this script runs.
+    await gotoHydrated(page, '/');
     // Programmatic scrolling is not user input, so nothing here is discounted as recent input.
     const shiftScore = await page.evaluate(async () => {
       let total = 0;
@@ -203,7 +203,7 @@ test.describe('Hero Section', () => {
           if (!shift.hadRecentInput) total += shift.value;
         }
       });
-      observer.observe({ type: 'layout-shift' });
+      observer.observe({ type: 'layout-shift', buffered: true });
       const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
       for (let y = 0; y <= document.documentElement.scrollHeight; y += 400) {
         window.scrollTo(0, y);
@@ -252,21 +252,6 @@ test.describe('Hero Section', () => {
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
   });
 
-  test('hero content is SSR-rendered (SEO)', async ({ page }) => {
-    // Check the raw HTML response for SSR content
-    const response = await page.goto('/');
-    const html = await response?.text();
-
-    expect(html).toContain('This happened at 3am');
-    expect(html).toContain('Milos Cvetkovic');
-    expect(html).toContain('Full Stack Engineer');
-    expect(html).toContain('TypeScript');
-    // In the body, not only in the head's description: the subtitle under the headline says it.
-    const body = html?.slice(html.indexOf('<body'));
-    expect(body).toContain('AI-native development');
-    await expect(page.getByText(/specializing in AI-native development/)).toBeVisible();
-  });
-
   test('has proper semantic HTML', async ({ page }) => {
     // Only one h1 on the page
     const h1Count = await page.locator('h1').count();
@@ -281,5 +266,65 @@ test.describe('Hero Section', () => {
     // Skill tags use a list
     const skillList = page.locator('ul[aria-label="Technical skills"]');
     await expect(skillList).toBeAttached();
+  });
+});
+
+/**
+ * The served HTML, fetched with `request` rather than a second navigation of the page, and read as
+ * text by `servedText` from `<body>` (`support/served-text.ts`). Script, style and template content
+ * does not count, so a phrase cannot pass on the RSC payload Next inlines in `<script>` tags (which
+ * carries the props of client components, rendered or not), and attributes do not count, so the
+ * head's description `<meta>` cannot supply one either. No `beforeEach`: these read the response,
+ * not a page, and `servedText` parses it on `about:blank`.
+ */
+test.describe('Hero Section: served HTML', () => {
+  const served = async (page: Page, request: APIRequestContext) => {
+    const response = await request.get('/');
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    return { html, body: await servedText(page, html, { root: 'body' }) };
+  };
+  const servedBody = async (page: Page, request: APIRequestContext) =>
+    (await served(page, request)).body;
+
+  /** The three closing headlines that `AnimatedText` splits into one span per letter. */
+  const SPLIT_HEADLINES = [
+    'Most bugs live in the gap between what you asked for and what you meant.',
+    'The bottleneck was never my typing speed.',
+    'This happened at 3:14am. Nobody got paged.',
+  ];
+
+  test('story sections are server-rendered', async ({ page, request }) => {
+    const { html, body } = await served(page, request);
+    // Plain text from four of the six sections, and the three closing headlines.
+    for (const copy of [
+      'TECH TREE',
+      'CI/CD PIPELINE',
+      'SELF-HEALING LOG',
+      'Connect on LinkedIn',
+      ...SPLIT_HEADLINES,
+    ]) {
+      expect(body).toContain(copy);
+    }
+    // Reading text nodes joins the split letters back into the sentence, so the body text alone
+    // cannot tell the split copy from the whole one. Beside the split copy each headline carries a
+    // visually hidden one with the sentence whole, so the sentence is in the response as one run of
+    // text, as a crawler or a screen reader reads it.
+    for (const headline of SPLIT_HEADLINES) {
+      expect(html).toContain(headline);
+    }
+  });
+
+  test('hero content is SSR-rendered (SEO)', async ({ page, request }) => {
+    const body = await servedBody(page, request);
+    expect(body).toContain('This happened at 3am');
+    expect(body).toContain('Milos Cvetkovic');
+    expect(body).toContain('Full Stack Engineer');
+    expect(body).toContain('TypeScript');
+    // The subtitle under the headline, not the head's description, which says it too.
+    expect(body).toContain('specializing in AI-native development');
+    // And it survives hydration.
+    await gotoHydrated(page, '/');
+    await expect(page.getByText(/specializing in AI-native development/)).toBeVisible();
   });
 });

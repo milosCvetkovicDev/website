@@ -22,10 +22,26 @@ const about = buildMetadata({
 });
 
 describe('buildMetadata()', () => {
-  it('sets the canonical to the route’s own path', () => {
-    // Relative on purpose: `metadataBase` in the root layout resolves it, so NEXT_PUBLIC_SITE_URL
-    // keeps working for a staging origin.
-    expect(about.alternates).toEqual({ canonical: '/about' });
+  it('sets the canonical to the route’s own path, and advertises its Markdown twin', () => {
+    // Relative on purpose: `metadataBase` in the root layout resolves both, so NEXT_PUBLIC_SITE_URL
+    // keeps working for a staging origin. The twin is derived from the same path by
+    // `markdownTwinPath()` (#59), so the two links cannot name different routes.
+    expect(about.alternates).toEqual({
+      canonical: '/about',
+      types: { 'text/markdown': '/about/index.md' },
+    });
+  });
+
+  it('advertises the root’s twin at /index.md and a case study’s one segment below it', () => {
+    const home = buildMetadata({ title: { absolute: 'Home' }, description: 'd', path: '/' });
+    expect(home.alternates).toEqual({
+      canonical: '/',
+      types: { 'text/markdown': '/index.md' },
+    });
+    const study = buildMetadata({ title: 't', description: 'd', path: '/work/nx-remote-cache' });
+    expect(study.alternates?.types).toEqual({
+      'text/markdown': '/work/nx-remote-cache/index.md',
+    });
   });
 
   it('returns a complete Open Graph object, because Next will not merge one', () => {
@@ -37,6 +53,12 @@ describe('buildMetadata()', () => {
       title: 'About',
       description: 'I fix the systems everyone else gave up on.',
     });
+  });
+
+  it('credits the card to the X handle, read from the one social source', () => {
+    // A literal on purpose: `TWITTER_HANDLE` is built from `data/social.ts` (#49), and comparing it with
+    // that module would pass with the handle typed wrong there.
+    expect(TWITTER_HANDLE).toBe('@milos_dev');
   });
 
   it('returns a complete Twitter card with the route’s own title and description', () => {

@@ -1,5 +1,6 @@
 import { formatMetric, type CaseStudy } from '@/data/case-studies';
 import type { InlineLink, Paragraph, PageRecord, PageSection } from '@/data/pages/types';
+import { assertPathname } from './pathname';
 
 /**
  * The one module that writes Markdown (#59). Every Markdown twin renders its body here from the
@@ -15,23 +16,10 @@ import type { InlineLink, Paragraph, PageRecord, PageSection } from '@/data/page
 // twin can be served as text/plain by a handler that set its own header.
 const MARKDOWN_CONTENT_TYPE = 'text/markdown; charset=utf-8';
 
-// A copy of `PATHNAME` in metadata.ts, which keeps its own private until #59's metadata slice can
-// export it: a leading slash, no trailing one (the root aside), no query, no fragment, no origin, no
-// dot. A twin exists for exactly the paths a canonical can name; `lib/__tests__/serialise.test.ts`
-// compares the two over a list of paths chosen to sit on the pattern's edges.
-const PATHNAME = /^\/(?:[\w-]+(?:\/[\w-]+)*)?$/;
-
-function assertPathname(path: string, caller: string): void {
-  if (!PATHNAME.test(path)) {
-    throw new Error(`${caller}: "${path}" is not a clean pathname such as /work or /`);
-  }
-}
-
-/** Where a route's twin is served: `/` → `/index.md`, `/about` → `/about/index.md`. */
-export function markdownTwinPath(routePath: string): string {
-  assertPathname(routePath, 'markdownTwinPath');
-  return routePath === '/' ? '/index.md' : `${routePath}/index.md`;
-}
+// Where a twin is served, re-exported as part of this module's interface (#59). It lives in
+// `pathname.ts`, which has no imports, so `metadata.ts` and the e2e helpers can read it without
+// loading the content modules this one renders.
+export { markdownTwinPath } from './pathname';
 
 /** A Markdown body as a response, with the one content type every twin is served with. */
 export function markdownResponse(body: string): Response {

@@ -3,6 +3,7 @@ import type { ComponentType, ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
 import { yearsOfExperience } from '@/data/profile';
+import { socialProfiles } from '@/data/social';
 import { yearsClausesAboutAi, yearsFigures } from '@/test/experience-claims';
 
 /**
@@ -241,20 +242,20 @@ describe('the JSON-LD blocks', () => {
     expect(block.url).toBe('https://miloscvetkovic.dev');
   });
 
-  it('gives the Person block the profile links it claims elsewhere', async () => {
-    // Green, and the floor under R38's rename: `sameAs` lists the same three profiles the footer links
-    // to, so #49 renaming the X entry must not leave the two disagreeing about the URL.
+  it('gives the Person block the profile links it claims elsewhere, from the one social source', async () => {
+    // `sameAs` is `data/social.ts`'s list, in its order, so the footer, the pages and the Person cannot
+    // disagree about a profile (#49, AC 15). The literal hrefs are the oracle: comparing the block with
+    // the module alone would pass with a profile URL typed wrong in the module.
     const { PersonJsonLd } = await importWithSiteUrl('https://example.test');
     const { container } = render(<PersonJsonLd />);
 
     const [block] = jsonLdBlocks(container).map((body) => JSON.parse(body) as { sameAs: string[] });
-    expect(block.sameAs).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('linkedin.com/in/'),
-        expect.stringContaining('github.com/'),
-        expect.stringContaining('x.com/'),
-      ]),
-    );
+    expect(block.sameAs).toEqual(socialProfiles.map(({ href }) => href));
+    expect(block.sameAs).toEqual([
+      'https://www.linkedin.com/in/milos-cvetkovic-dev',
+      'https://github.com/milosCvetkovicDev',
+      'https://x.com/milos_dev',
+    ]);
   });
 
   it('describes the Person by the derived years of career experience, not as AI-native work (#49)', async () => {

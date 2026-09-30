@@ -7,6 +7,7 @@
  */
 import { formatMetric, getCaseStudy } from '@/data/case-studies';
 import { experienceFact, yearsOfExperience } from '@/data/profile';
+import { social } from '@/data/social';
 import type { PageRecord, PageSection, Paragraph } from './types';
 
 // The timeline quotes the agent's metric, so it reads it from the study rather than restating it.
@@ -133,9 +134,10 @@ const story: readonly StoryParagraph[] = [
 ];
 
 const connectLinks: readonly ProfileLink[] = [
-  { name: 'LinkedIn', href: 'https://www.linkedin.com/in/milos-cvetkovic-dev', primary: true },
-  { name: 'GitHub', href: 'https://github.com/milosCvetkovicDev', primary: false },
-  { name: 'X / Twitter', href: 'https://x.com/milos_dev', primary: false },
+  { name: social.linkedin.name, href: social.linkedin.href, primary: true },
+  { name: social.github.name, href: social.github.href, primary: false },
+  // The page's own copy, as on /contact, kept by the owner's pages-23 decision (2026-09-29, #49).
+  { name: 'X / Twitter', href: social.x.href, primary: false },
 ];
 
 /** The rest of what `/about` renders in its main element, in page order, less the `h1` (#58's). */
