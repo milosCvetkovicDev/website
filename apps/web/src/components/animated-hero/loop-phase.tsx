@@ -5,7 +5,7 @@ import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
-import { storyClosings } from '@/data/pages/home';
+import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const healingTimeline = [
   {
@@ -193,13 +193,14 @@ export function LoopPhase() {
     >
       <div className="w-full max-w-3xl">
         {/* Phase Header: the section's heading and its name, ahead of the panels. The space keeps
-            "PHASE 5" and the title apart in that name; a flex row lays it out as nothing. */}
+            "PHASE 5" and the title apart in that name (a flex row lays it out as nothing), and
+            `story-phases.test.tsx` holds the name. */}
         <h2 id={titleId} className="mb-8 flex items-center gap-3">
           <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
-            <AnimatedText animation="elastic">PHASE 5</AnimatedText>
+            <AnimatedText animation="elastic">{storyTitles.loop.phase}</AnimatedText>
           </span>{' '}
           <AnimatedText animation="wave" className="font-mono text-sm text-[var(--muted)]">
-            THE LOOP
+            {storyTitles.loop.title}
           </AnimatedText>
         </h2>
 
@@ -298,9 +299,9 @@ export function LoopPhase() {
           data-reveal="headline"
           className={`mt-16 text-center ${protocolVisible ? '' : 'opacity-0'}`}
         >
-          <h2 className="mb-3 text-2xl font-bold md:text-4xl">
+          <h3 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="morse">{storyClosings.loop.heading}</AnimatedText>
-          </h2>
+          </h3>
           <p className="text-lg text-[var(--muted)]">
             <AnimatedText animation="stagger-up">{storyClosings.loop.paragraphs[0]}</AnimatedText>
           </p>

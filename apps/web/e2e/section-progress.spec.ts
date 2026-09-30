@@ -13,17 +13,21 @@ import { expectHydrated } from './support/hydration';
  * The seven dots, top to bottom. `title` is the title each section shows (for the hero, which shows
  * none, the name its region is announced by): each dot's `Go to … section` name and the readout
  * carry it. `label` is the word of it the dot draws, short enough to keep the column clear of the
- * story at 1280px (`section-progress.tsx`).
+ * story at 1280px (`section-progress.tsx`). `region` is the whole name the story section it goes to
+ * is announced by, its header row: phase badge and title.
  */
 const DOTS = [
-  { title: 'HERO', label: 'HERO' },
-  { title: 'DISCOVERY', label: 'DISCOVERY' },
-  { title: 'STRATEGY', label: 'STRATEGY' },
-  { title: 'EXECUTION', label: 'EXECUTION' },
-  { title: 'THE GAUNTLET', label: 'GAUNTLET' },
-  { title: 'THE LOOP', label: 'LOOP' },
-  { title: 'SESSION COMPLETE', label: 'COMPLETE' },
+  { title: 'HERO', label: 'HERO', region: null },
+  { title: 'DISCOVERY', label: 'DISCOVERY', region: 'PHASE 1 DISCOVERY' },
+  { title: 'STRATEGY', label: 'STRATEGY', region: 'PHASE 2 STRATEGY' },
+  { title: 'EXECUTION', label: 'EXECUTION', region: 'PHASE 3 EXECUTION' },
+  { title: 'THE GAUNTLET', label: 'GAUNTLET', region: 'PHASE 4 THE GAUNTLET' },
+  { title: 'THE LOOP', label: 'LOOP', region: 'PHASE 5 THE LOOP' },
+  { title: 'SESSION COMPLETE', label: 'COMPLETE', region: 'SESSION COMPLETE' },
 ];
+
+/** The story sections the dots after the hero's go to, each with the whole name of its region. */
+const STORY_DOTS = DOTS.flatMap(({ title, region }) => (region ? [{ title, region }] : []));
 
 /** The dot group's landmark. Named, so it is distinguishable from the header's unnamed <nav>. */
 const dots = (page: Page) => page.getByRole('navigation', { name: 'Story sections' });
@@ -134,11 +138,13 @@ test.describe('Section progress', () => {
 
     // The hero shows no title of its own: its dot takes the name its region is announced by.
     await expect(page.getByRole('region', { name: /^Hero\b/ })).toHaveCount(1);
-    for (const { title } of DOTS.slice(1)) {
+    for (const { title, region: name } of STORY_DOTS) {
       await expect(dot(page, title), `one dot goes to ${title}`).toHaveCount(1);
       // A phase's name is its header row, `PHASE 2 STRATEGY`; the closing section's is its title.
-      const region = page.getByRole('region', { name: new RegExp(`(^|\\s)${title}$`) });
-      await expect(region, `one story section named for ${title}`).toHaveCount(1);
+      // Whole and exact, so a name that doubled a word or ran two together fails here.
+      const region = page.getByRole('region', { name, exact: true });
+      await expect(region, `one story section named ${name}`).toHaveCount(1);
+      expect(name.endsWith(title), `${name} ends with the title ${title}`).toBe(true);
       // And the title is drawn in that section's first heading, not only announced there.
       const drawn = region
         .getByRole('heading')
@@ -154,11 +160,14 @@ test.describe('Section progress', () => {
     // included, so a longer label moves every dot left. Drawing SESSION COMPLETE in full put the
     // dots 20px over the story's panels at 1280px; the old labels left them 32px clear.
     await page.setViewportSize({ width: 1280, height: 800 });
-    const fill = await dotFill(page, 'HERO').boundingBox();
-    if (!fill) throw new Error('the HERO dot is not laid out at 1280px');
-    for (const { title } of DOTS.slice(1)) {
+    // The whole dot group, not one dot: its left edge is the leftmost thing the column can draw.
+    // Each label sits to its dot's right, so today that edge is the dots', but a label or anything
+    // else moved to the left would move it too.
+    const fill = await dots(page).boundingBox();
+    if (!fill) throw new Error('the dot group is not laid out at 1280px');
+    for (const { title, region: name } of STORY_DOTS) {
       // Each section's content column, the one child that holds its header row and panels.
-      const region = page.getByRole('region', { name: new RegExp(`(^|\\s)${title}$`) });
+      const region = page.getByRole('region', { name, exact: true });
       const column = await region.locator('> div').boundingBox();
       if (!column) throw new Error(`the ${title} section has no content column laid out`);
       expect(

@@ -6,7 +6,7 @@ import { Terminal } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { social } from '@/data/social';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
-import { storyClosings } from '@/data/pages/home';
+import { storyClosings, storyTitles } from '@/data/pages/home';
 
 export function GameComplete() {
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -121,7 +121,7 @@ export function GameComplete() {
               {/* The closing section's heading and its name. */}
               <h2 id={titleId} className="border-b border-[#30363d] py-4 text-center">
                 <span className="text-lg font-bold text-[var(--status-ok)]">
-                  <AnimatedText animation="scramble">SESSION COMPLETE</AnimatedText>
+                  <AnimatedText animation="scramble">{storyTitles.complete.title}</AnimatedText>
                 </span>
               </h2>
 

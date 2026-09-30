@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, type RefObject } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { storyTitles } from '@/data/pages/home';
 
 /**
  * Smallest gap between two measurements, ~30fps. The dots and the readout move a whole step at a
@@ -22,23 +23,19 @@ const FOCUS_RING =
 /**
  * The seven sections, each named by the title it shows, so a dot's `Go to … section` name and the
  * readout name a section the way the section names itself: the phase titles from each header row,
- * and `SESSION COMPLETE`, which heads the closing section. The hero shows no title, so it takes the
- * start of the name its region is announced by ("Hero - …").
+ * and `SESSION COMPLETE`, which heads the closing section, read from the same record the phases
+ * render them from (`storyTitles`). The hero shows no title, so it takes the start of the name its
+ * region is announced by ("Hero - …").
  *
- * `label` is what a dot draws beside itself: the title, less a leading word. The dot column is
- * pinned to the right edge and is as wide as its widest label, hidden ones included, so drawing
+ * `label` is what a dot draws beside itself: the title's last word. The dot column is pinned to the
+ * right edge and is as wide as its widest label, hidden ones included, so drawing
  * `SESSION COMPLETE` there pulled every dot 52px left, onto the story's panels at 1280px wide.
  * A label is always a word of the title, so it stays inside the button's name (WCAG 2.5.3).
  */
 const sections = [
-  { id: 'hero', title: 'HERO', label: 'HERO' },
-  { id: 'discovery', title: 'DISCOVERY', label: 'DISCOVERY' },
-  { id: 'strategy', title: 'STRATEGY', label: 'STRATEGY' },
-  { id: 'execution', title: 'EXECUTION', label: 'EXECUTION' },
-  { id: 'gauntlet', title: 'THE GAUNTLET', label: 'GAUNTLET' },
-  { id: 'loop', title: 'THE LOOP', label: 'LOOP' },
-  { id: 'complete', title: 'SESSION COMPLETE', label: 'COMPLETE' },
-];
+  { id: 'hero', title: 'HERO' },
+  ...Object.entries(storyTitles).map(([id, { title }]) => ({ id, title })),
+].map((section) => ({ ...section, label: section.title.split(' ').at(-1) ?? section.title }));
 
 /**
  * Where the story starts in the document, and the scroll it takes to run from its first section to

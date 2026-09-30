@@ -457,9 +457,22 @@ describe('HudPanel', () => {
     const active = screen.getByText('ACTIVE');
     const hidden = active.closest('[aria-hidden="true"]');
     expect(hidden, 'the ACTIVE label is inside an aria-hidden element').not.toBeNull();
-    // The dot beside it is the same indicator, so it goes with it.
-    expect(hidden?.querySelector('.rounded-full')).not.toBeNull();
+    // The title row holds the title and the indicator, nothing else: whatever is drawn beside the
+    // title (the dot as much as the word) is inside the hidden part, found by structure rather than
+    // by a class that names its look.
+    const title = screen.getByText('QUEST LOG');
+    const row = title.parentElement;
+    expect(row?.children ? [...row.children] : [], 'the title row').toEqual([title, hidden]);
+    expect(hidden?.contains(active)).toBe(true);
+    expect(hidden?.children.length, 'the dot and the word').toBe(2);
     // The title is the panel's content and stays exposed.
-    expect(screen.getByText('QUEST LOG').closest('[aria-hidden="true"]')).toBeNull();
+    expect(title.closest('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it('draws no indicator on an untitled panel', () => {
+    const { container } = render(<HudPanel>content</HudPanel>);
+
+    expect(screen.queryByText('ACTIVE')).toBeNull();
+    expect(container.querySelector('[aria-hidden="true"]')).toBeNull();
   });
 });

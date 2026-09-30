@@ -325,7 +325,7 @@ describe('SectionProgress', () => {
       'THE LOOP',
       'SESSION COMPLETE',
     ];
-    // What each dot draws: the title less a leading word, so the column stays as narrow as it was.
+    // What each dot draws: the title's last word, so the column stays as narrow as it was.
     const labels = ['HERO', 'DISCOVERY', 'STRATEGY', 'EXECUTION', 'GAUNTLET', 'LOOP', 'COMPLETE'];
     render(<Story />);
 
@@ -339,10 +339,10 @@ describe('SectionProgress', () => {
     expect(buttons.map((button) => button.textContent)).toEqual(labels);
     // Label in Name (WCAG 2.5.3): a voice-control user says the words drawn, and they have to be
     // inside the name the button is announced by, as a whole word of the title.
-    for (const button of buttons) {
-      expect(button.getAttribute('aria-label')).toMatch(
-        new RegExp(`^Go to (.+ )?${button.textContent} section$`),
-      );
+    for (const [index, button] of buttons.entries()) {
+      const drawn = button.textContent ?? '';
+      expect(drawn, 'the dot draws a label').not.toBe('');
+      expect(titles[index].split(' '), `${drawn} is a word of the name`).toContain(drawn);
     }
     expect(screen.getByText(`[01/07] ${titles[0]}`)).toBeInTheDocument();
   });
