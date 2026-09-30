@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createRef, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
-import { HudPanel, PipelineStage, NotificationToast } from './hud-elements';
+import { HudPanel, PipelineStage, NotificationToast, progressFillTransform } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { storyClosings, storyTitles } from '@/data/pages/home';
@@ -17,6 +17,9 @@ const pipelineStages = [
 ];
 
 type StageStatus = 'pending' | 'running' | 'passed' | 'failed';
+// What React renders for a stage. A running stage renders an empty fill throughout: its progress
+// tween draws the fill through a ref instead (animatePipeline), so React state changes only when a
+// stage starts running and when it passes.
 type StageState = { status: StageStatus; progress: number };
 
 const pendingStages: StageState[] = pipelineStages.map(() => ({ status: 'pending', progress: 0 }));
@@ -29,6 +32,9 @@ export function GauntletPhase() {
   const deployRef = useRef<HTMLDivElement>(null);
   const achievementRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLDivElement>(null);
+  // Each stage's fill, which its progress tween scales frame by frame without a React render. Made
+  // once, in the state initialiser, so every render hands each stage the same ref.
+  const [fillRefs] = useState(() => pipelineStages.map(() => createRef<HTMLDivElement>()));
 
   const [stageStates, setStageStates] = useState<StageState[]>(pendingStages);
   const [deploymentStatus, setDeploymentStatus] = useState<'idle' | 'deploying' | 'success'>(
@@ -48,11 +54,12 @@ export function GauntletPhase() {
   // inside those timers runs after GSAP has left the context, so `ctx.revert()` never sees it.
   // Everything is tracked here instead, and cancelled when the section is entered again, on
   // unmount, or on a reduced-motion switch, rather than left to set state on a component that is
-  // gone. Progress tweens only drive React state, so killing them is enough; the reveal tweens are
-  // reverted, because revert restores the inline styles they set, where kill would freeze them
-  // mid-flight and that inline opacity would beat the class-driven state. A timer that comes due
-  // after the commit that removed the section, but before the cleanup that cancels it, does
-  // nothing: its refs are already null, and GSAP would warn about a null target (runWithGsap).
+  // gone. Progress tweens only write the stage fills, which a restart empties (animatePipeline) and
+  // the finished render fills, so killing them is enough; the reveal tweens are reverted, because
+  // revert restores the inline styles they set, where kill would freeze them mid-flight and that
+  // inline opacity would beat the class-driven state. A timer that comes due after the commit that
+  // removed the section, but before the cleanup that cancels it, does nothing: its refs are
+  // already null, and GSAP would warn about a null target (runWithGsap).
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const progressTweensRef = useRef<gsap.core.Tween[]>([]);
   const revealTweensRef = useRef<gsap.core.Tween[]>([]);
@@ -81,6 +88,12 @@ export function GauntletPhase() {
       // Entering again (scrolling back up and down, or motion being allowed again) restarts the
       // run from pending instead of stacking on it or resuming a half-finished one.
       cancelSequence();
+      // React rewrites a fill only when the transform it renders changes, and a stage that was
+      // running renders the same empty fill as a pending one, so what its tween drew is emptied
+      // here. Every stage renders empty once pending, so every fill starts from empty.
+      fillRefs.forEach(({ current: fill }) => {
+        if (fill) fill.style.transform = progressFillTransform(0);
+      });
       setStageStates(pendingStages);
       setDeploymentStatus('idle');
       if (reveal) setShowAchievement(false);
@@ -95,21 +108,18 @@ export function GauntletPhase() {
             return newStates;
           });
 
-          // Animate progress
+          // Animate progress: each frame scales the fill directly, with no React render, and
+          // state changes again only when the stage passes. The ref is read on every frame, not
+          // once, so a frame always draws the fill React has mounted, and one after unmount draws
+          // nothing.
           progressTweensRef.current.push(
             gsap.to(
               {},
               {
                 duration: stage.duration,
                 onUpdate: function () {
-                  setStageStates((prev) => {
-                    const newStates = [...prev];
-                    newStates[index] = {
-                      status: 'running',
-                      progress: Math.round(this.progress() * 100),
-                    };
-                    return newStates;
-                  });
+                  const fill = fillRefs[index].current;
+                  if (fill) fill.style.transform = progressFillTransform(this.progress());
                 },
                 onComplete: () => {
                   setStageStates((prev) => {
@@ -170,7 +180,7 @@ export function GauntletPhase() {
         }, 1000);
       }, delay * 1000);
     },
-    [cancelSequence, later],
+    [cancelSequence, fillRefs, later],
   );
 
   useEffect(() => {
@@ -224,6 +234,11 @@ export function GauntletPhase() {
       cancelBuild();
       ctx?.revert();
       cancelSequence();
+      // Back to the run's starting state, which the finished render hides. Once motion is allowed
+      // again, a section not yet re-entered would otherwise show the interrupted stage running,
+      // with no tween behind it, until its trigger fires.
+      setStageStates(pendingStages);
+      setDeploymentStatus('idle');
     };
   }, [animatePipeline, cancelSequence, finished]);
 
@@ -267,6 +282,7 @@ export function GauntletPhase() {
                   name={stage.name}
                   status={shownStageStates[index].status}
                   progress={shownStageStates[index].progress}
+                  fillRef={fillRefs[index]}
                 />
               ))}
             </div>
