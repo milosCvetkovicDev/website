@@ -65,7 +65,8 @@ without authentication, and it is the one route on this site that runs per reque
   earlier revision (an `initialize` without the 2026-07-28 envelope) is answered by the SDK's
   stateless fallback, which mints no session either.
 - **Read-only.** Three tools, in `apps/web/src/app/mcp/tools.ts`: `search_case_studies({ query })`
-  over the titles, tags, highlights and tech stacks; `get_case_study({ slug })`, which answers an
+  over the titles, tags, highlights and tech stacks, where each query word must begin a word there
+  (so `go` does not match a word that merely contains it), ignoring case and accents; `get_case_study({ slug })`, which answers an
   unknown slug with an error result naming the known ones; and `get_tech_stack()`, every
   tech-stack category with the slugs each item appears in. Each has a title and the annotations
   `readOnlyHint: true` and `destructiveHint: false`. Their payloads are `caseStudyToJson()` and
@@ -78,12 +79,19 @@ without authentication, and it is the one route on this site that runs per reque
   does changes state, and authorization is optional in the specification, so authentication would
   protect nothing and would shut out the clients that attach a no-sign-in server. There is no OAuth,
   no `withMcpAuth` and no `/.well-known/oauth-protected-resource`.
-- **Origin.** An absent `Origin` passes, since a CLI or a server-side client sends none. So do the
-  site's canonical origin (`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`)
-  and the origin the request itself was addressed to. Any other value, `null` included, gets 403
-  with a JSON-RPC error in the implementation-defined range (`-32000`) before the SDK reads the
-  body. Whole origins are compared, scheme, host and port, rather than host names. No
-  `Access-Control-Allow-Origin` header is sent, and a refusal writes nothing to the server's output.
+- **Origin.** An absent `Origin` passes, since a CLI or a server-side client sends none. So does the
+  site's canonical origin (`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`).
+  The origin the request itself was addressed to passes only where its host name cannot be an
+  attacker's: on Vercel (`VERCEL=1`), which routes a request to this deployment only through the
+  project's own domains, and elsewhere only for a loopback name (`localhost`, `127.0.0.1`,
+  `[::1]`). The request's URL is built from its `Host` header, and after a DNS rebinding a browser
+  sends the attacker's host name as both `Host` and `Origin`, so accepting the request's own origin
+  everywhere would accept exactly the requests the check exists to refuse. Any other value, `null`
+  included, gets 403 with `Cache-Control: no-store` and a JSON-RPC error in the
+  implementation-defined range (`-32000`) before the SDK reads the body. Whole origins are compared,
+  scheme, host and port, rather than host names. No `Access-Control-Allow-Origin` header is sent,
+  and a refusal writes nothing to the server's output. Off Vercel, behind a proxy that rewrites
+  `Host`, a same-origin page on a public name other than the canonical one is refused.
 - **The gate.** `ALLOWED_FUNCTIONS` in `scripts/check-build-output.mjs` is exactly `['/mcp']`. A
   second function fails the build, and so does a page route that became one or a `/mcp` that went
   missing or static.

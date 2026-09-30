@@ -46,11 +46,25 @@ export interface TechStackJson {
 }
 
 /**
- * The text `search_case_studies` matches against: the title, the tags, the highlight (category,
- * status, metric label and rendered figure) and the tech stack (categories and items), one field a
- * line and lower-cased, so no query word can match across two fields.
+ * The words of `text`, for search: decomposed (NFKD) so a ligature or a full-width letter reads as
+ * its plain form, lower-cased, stripped of combining marks and invisible format characters (so
+ * `é` is `e` and a zero-width space is no break), then split on every run of characters that is
+ * neither a letter nor a digit, so `Node.js` is `node` and `js` and `event-driven` is two words.
  */
-function searchableText(entry: CaseStudyJson): string {
+function words(text: string): string[] {
+  return text
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[\p{M}\p{Cf}]/gu, '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+}
+
+/**
+ * The words `search_case_studies` matches against: the title, the tags, the highlight (category,
+ * status, metric label and rendered figure) and the tech stack (categories and items).
+ */
+function searchableWords(entry: CaseStudyJson): string[] {
   const { title, tags, highlight, techStack } = entry;
   return [
     title,
@@ -60,21 +74,21 @@ function searchableText(entry: CaseStudyJson): string {
     highlight.metric.label,
     highlight.metric.formatted,
     ...techStack.flatMap((group) => [group.category, ...group.items]),
-  ]
-    .join('\n')
-    .toLowerCase();
+  ].flatMap(words);
 }
 
 /**
- * The studies whose searchable text holds every whitespace-separated word of `query`, compared
- * without regard to case, in the data module's order and each as the JSON representation serves it.
+ * The studies in which every word of `query` begins a word of the searchable text, compared as
+ * `words()` folds them, in the data module's order and each as the JSON representation serves it.
+ * A query word matches from the start of a word only, so `postgres` finds `PostgreSQL` but
+ * `script` does not find `TypeScript`, nor `go` a word that merely contains it.
  */
 export function searchCaseStudies(query: string): CaseStudyJson[] {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [];
+  const wanted = words(query);
+  if (wanted.length === 0) return [];
   return caseStudiesToJson().filter((entry) => {
-    const text = searchableText(entry);
-    return words.every((word) => text.includes(word));
+    const text = searchableWords(entry);
+    return wanted.every((word) => text.some((candidate) => candidate.startsWith(word)));
   });
 }
 
@@ -114,11 +128,6 @@ function structured(payload: Record<string, unknown>): CallToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(payload) }], structuredContent: payload };
 }
 
-/** A failure the calling model can act on, as a result rather than a JSON-RPC error. */
-function failure(text: string): CallToolResult {
-  return { content: [{ type: 'text', text }], isError: true };
-}
-
 /** Registers the three read-only tools on `server`. */
 export function registerTools(server: McpServer): void {
   server.registerTool(
@@ -127,8 +136,8 @@ export function registerTools(server: McpServer): void {
       title: 'Search case studies',
       description:
         "Find Milos Cvetkovic's case studies whose title, tags, headline metric or tech stack " +
-        'mention every word of the query, ignoring case. Returns each match in full, as ' +
-        '/case-studies.json serves it.',
+        'have a word starting with each word of the query, ignoring case and accents. Returns ' +
+        'each match in full, as /case-studies.json serves it.',
       inputSchema: z.object({
         query: z
           .string()
@@ -158,10 +167,10 @@ export function registerTools(server: McpServer): void {
       annotations: { title: 'Get a case study', ...READ_ONLY },
     },
     ({ slug }) => {
+      // The enum has already refused any other slug, with an error result that lists the slugs.
       const study = getCaseStudy(slug);
-      return study
-        ? structured(caseStudyToJson(study))
-        : failure(`No case study has the slug "${slug}". The slugs are: ${SLUGS.join(', ')}.`);
+      if (!study) throw new Error(`get_case_study: no case study has the slug "${slug}"`);
+      return structured(caseStudyToJson(study));
     },
   );
 

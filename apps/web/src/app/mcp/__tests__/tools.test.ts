@@ -88,6 +88,23 @@ function payloadOf(result: ToolResult): Record<string, unknown> {
   return result.structuredContent!;
 }
 
+/** The words of a study the search reads, split independently of `tools.ts`. */
+function searchWords(entry: CaseStudyJson): string[] {
+  return [
+    entry.title,
+    ...entry.tags,
+    entry.highlight.category,
+    entry.highlight.status,
+    entry.highlight.metric.label,
+    entry.highlight.metric.formatted,
+    ...entry.techStack.flatMap((group) => [group.category, ...group.items]),
+  ]
+    .join(' ')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
 async function search(query: string): Promise<CaseStudyJson[]> {
   const payload = payloadOf(await callTool('search_case_studies', { query }));
   return payload.caseStudies as CaseStudyJson[];
@@ -120,12 +137,29 @@ describe('get_case_study', () => {
     },
   );
 
-  it('answers an unknown slug with an error result, not a thrown error', async () => {
-    const result = await callTool('get_case_study', { slug: 'no-such-study' });
+  it('lists the slugs in its input schema, so a client can pick one without a failed call', async () => {
+    const result = (await rpc('tools/list')) as {
+      tools: { name: string; inputSchema: { properties: { slug?: { enum?: string[] } } } }[];
+    };
+    const tool = result.tools.find((entry) => entry.name === 'get_case_study');
+    expect(tool?.inputSchema.properties.slug?.enum).toEqual(caseStudies.map((study) => study.slug));
+  });
+
+  // The enum refuses these during input validation, before the tool runs: the SDK answers with an
+  // error result, not a JSON-RPC error, and names the slugs that exist so a client can correct
+  // itself in one step.
+  it.each([
+    ['an unknown slug', { slug: 'no-such-study' }],
+    ['a slug that is not a string', { slug: 42 }],
+    ['no slug', {}],
+  ])('answers %s with an input validation error naming the slugs', async (_label, args) => {
+    const result = await callTool('get_case_study', args);
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toBeUndefined();
     const text = result.content.map((block) => block.text ?? '').join('\n');
-    // The error names the slugs that exist, so a client can correct itself in one step.
+    expect(text).toMatch(
+      /^Input validation error: Invalid arguments for tool get_case_study: slug:/,
+    );
     for (const study of caseStudies) expect(text).toContain(study.slug);
   });
 });
@@ -174,9 +208,51 @@ describe('search_case_studies', () => {
     expect(await search('zzz-matches-nothing')).toEqual([]);
   });
 
+  it('matches a query word from the start of a word only', async () => {
+    // Taken from the data: a word of some study, and the tail of it that begins no word anywhere.
+    const all = caseStudiesToJson().flatMap((entry) => searchWords(entry));
+    const word = all.find((candidate) => {
+      const tail = candidate.slice(2);
+      return tail.length >= 3 && !all.some((other) => other.startsWith(tail));
+    });
+    expect(word, 'no word in the data has a tail that begins no word').toBeDefined();
+    expect(await search(word!.slice(2))).toEqual([]);
+    const owners = caseStudiesToJson().filter((entry) => searchWords(entry).includes(word!));
+    expect(await search(word!.slice(0, 3))).toEqual(expect.arrayContaining(owners));
+  });
+
+  it('ignores accents, compatibility forms and invisible characters in the query', async () => {
+    const [study] = caseStudies;
+    const [first] = study.title.split(/\s+/);
+    const fullWidth = [...first].map((char) =>
+      /[A-Za-z0-9]/.test(char) ? String.fromCodePoint(char.codePointAt(0)! + 0xfee0) : char,
+    );
+    const slugs = async (query: string) => (await search(query)).map((entry) => entry.slug);
+    expect(await slugs(fullWidth.join(''))).toContain(study.slug);
+    expect(await slugs(`${first.slice(0, 2)}\u200b${first.slice(2)}`)).toContain(study.slug);
+    expect(await slugs(`${first[0]}\u0301${first.slice(1)}`)).toContain(study.slug);
+  });
+
   it('refuses a blank query with an error result', async () => {
     const result = await callTool('search_case_studies', { query: '   ' });
     expect(result.isError).toBe(true);
+  });
+
+  it('accepts a query of 200 characters and refuses one of 201', async () => {
+    expect(await search('a'.repeat(200))).toEqual([]);
+    const result = await callTool('search_case_studies', { query: 'a'.repeat(201) });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toMatch(/^Input validation error: .*<=200 characters/);
+  });
+
+  it.each([
+    ['no query', {}],
+    ['a query that is not a string', { query: 42 }],
+    ['a query that is a list', { query: ['nx'] }],
+  ])('answers %s with an input validation error', async (_label, args) => {
+    const result = await callTool('search_case_studies', args);
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toMatch(/^Input validation error: .* query: /);
   });
 });
 
@@ -203,6 +279,11 @@ describe('get_tech_stack', () => {
     }
 
     expect(payload.categories.map((group) => group.category)).toEqual([...expected.keys()]);
+    // Items merge by their exact spelling, so the data must spell one technology one way.
+    for (const group of payload.categories) {
+      const folded = group.items.map((item) => item.name.trim().toLowerCase());
+      expect(new Set(folded).size, `${group.category} spells an item two ways`).toBe(folded.length);
+    }
     for (const group of payload.categories) {
       const items = expected.get(group.category)!;
       expect(group.items, group.category).toEqual(

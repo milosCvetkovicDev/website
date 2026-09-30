@@ -118,9 +118,9 @@ test(`AC 2 and 3: tools/list names three read-only tools, cacheably, and hands o
       destructiveHint: false,
     });
   }
-  // The 2026-07-28 revision requires both on a list result.
-  expect(result?.ttlMs).toEqual(expect.any(Number));
-  expect(['public', 'private']).toContain(result?.cacheScope);
+  // The 2026-07-28 revision requires both on a list result; the route sets an hour, for any cache.
+  expect(result?.ttlMs).toBe(60 * 60 * 1000);
+  expect(result?.cacheScope).toBe('public');
 });
 
 test('AC 4: tools/call get_case_study returns the case study from the data module', async ({
@@ -186,6 +186,24 @@ test.describe('AC 6: the Origin check', () => {
       headers: { origin: SITE_ORIGIN },
     });
     expect(response.status()).toBe(200);
+    expect((await reply(response)).error).toBeUndefined();
+    expectNoCorsGrant(response);
+  });
+
+  test("grants another site's preflight nothing", async ({ request }) => {
+    // A browser preflights a JSON POST from another origin; without a grant it never sends it.
+    const response = await request.fetch(MCP, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'https://example.invalid',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type, mcp-protocol-version, mcp-method',
+      },
+    });
+    expect(response.status()).toBeLessThan(500);
+    expectNoCorsGrant(response);
+    expect(response.headers()['access-control-allow-methods']).toBeUndefined();
+    expect(response.headers()['access-control-allow-headers']).toBeUndefined();
   });
 });
 

@@ -49,8 +49,8 @@ never reaches a page that declares its own `openGraph`. The route handlers:
 - The MCP server (#62), `mcp/route.ts`: `POST` only, a stateless, read-only server on protocol
   revision 2026-07-28 built with `mcp-handler`, whose three tools in `mcp/tools.ts`
   (`search_case_studies`, `get_case_study`, `get_tech_stack`) return the same serialiser's JSON. It
-  refuses a present `Origin` other than the canonical one or the request's own with 403, and logs
-  nothing. `mcp/__tests__/tools.test.ts` and `route.test.ts` call its `POST`, and `e2e/mcp.spec.ts`
+  refuses a present `Origin` with 403 unless it is the canonical one, or the request's own on
+  Vercel or on a loopback host (never a DNS-rebound name), and logs nothing. `mcp/__tests__/tools.test.ts` and `route.test.ts` call its `POST`, and `e2e/mcp.spec.ts`
   the served route; `/mcp` is kept out of `e2e/routes.ts`, whose walks GET every route.
 
 `buildMetadata()` advertises the twin of every route that calls it as

@@ -30,27 +30,45 @@ const handler = createMcpHandler(registerTools, {
   maxSubscriptions: 0,
 });
 
+/** Host names only this machine answers to: a page on another site can never be addressed by one. */
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/**
+ * Whether a present `Origin` may call the server. The site's canonical origin may. So may the
+ * origin the request was addressed to, but only where that address cannot be an attacker's name:
+ * `request.url` is built from the `Host` header, and after a DNS rebinding the browser sends the
+ * attacker's own host name as both `Host` and `Origin`, so the two always agree. On Vercel
+ * (`VERCEL=1`) a request reaches this deployment only through one of the project's own domains;
+ * anywhere else, a `next start` on a developer's machine or in the e2e job, only a loopback host
+ * name is trusted. Whole serialised origins are compared (scheme, host and port), not host names;
+ * `absoluteUrl('/')` is already one, normalised by `siteOrigin()` in `lib/serialise.ts`.
+ */
+function trusted(origin: string, request: Request): boolean {
+  if (origin === absoluteUrl('/')) return true;
+  const own = new URL(request.url);
+  if (origin !== own.origin) return false;
+  return process.env.VERCEL === '1' || LOOPBACK.has(own.hostname);
+}
+
 /**
  * The transport requires the `Origin` header to be checked and a present but invalid one refused
  * with 403, against DNS rebinding; the SDK leaves the check to its host. An absent `Origin` passes:
- * a CLI or a server-side client sends none. The site's canonical origin passes, and so does the
- * origin the request was addressed to, which on Vercel is one of the deployment's own domains and
- * locally the server Playwright started. Anything else, `null` included, is refused before the SDK
- * reads the body. The comparison is of whole serialised origins (scheme, host and port), not host
- * names. No `Access-Control-Allow-Origin` is ever sent, so a page on another origin cannot read an
- * answer either way. The refusal logs nothing: the e2e job fails on any line of server output.
+ * a CLI or a server-side client sends none. Anything `trusted()` does not accept, `null` included,
+ * is refused before the SDK reads the body, with `no-store` so nothing keeps the refusal. No
+ * `Access-Control-Allow-Origin` is ever sent, so a page on another origin cannot read an answer
+ * either way. The refusal logs nothing: the e2e job fails on any line of server output.
  */
 function refusal(request: Request): Response | undefined {
   const origin = request.headers.get('origin');
   if (origin === null || origin === '') return undefined;
-  if (origin === absoluteUrl('/') || origin === new URL(request.url).origin) return undefined;
+  if (trusted(origin, request)) return undefined;
   return Response.json(
     {
       jsonrpc: '2.0',
       error: { code: -32000, message: 'Forbidden: requests from this Origin are not accepted' },
       id: null,
     },
-    { status: 403 },
+    { status: 403, headers: { 'Cache-Control': 'no-store' } },
   );
 }
 
