@@ -1,4 +1,5 @@
 import { caseStudies } from '../src/data/case-studies';
+import { markdownTwinPath } from '../src/lib/pathname';
 import { STATIC_ROUTES, caseStudyRoute } from './routes';
 
 /**
@@ -6,9 +7,9 @@ import { STATIC_ROUTES, caseStudyRoute } from './routes';
  *
  * Every path an agent-facing endpoint answers on is written here once, and the specs and tasks that
  * build or test one import it rather than restating it: #59 (the Markdown twins), #60 (`/llms.txt`
- * and the JSON representation), #61 (the Atom feed) and #62 (the MCP server). None of them is
- * served yet. `machine-readable.spec.ts` holds one expected failure per endpoint, and the task that
- * ships an endpoint deletes its annotation in the same change.
+ * and the JSON representation), #61 (the Atom feed) and #62 (the MCP server). The twins are served;
+ * the rest are not yet. `machine-readable.spec.ts` holds one expected failure per endpoint not yet
+ * served, and the task that ships an endpoint deletes its annotation in the same change.
  *
  * The page routes come from `routes.ts`, so a new static route or case study gets a twin row without
  * touching this file.
@@ -16,7 +17,9 @@ import { STATIC_ROUTES, caseStudyRoute } from './routes';
 
 /**
  * The Markdown twin of a page route: `/` -> `/index.md`, `/about` -> `/about/index.md`,
- * `/work/<slug>` -> `/work/<slug>/index.md`.
+ * `/work/<slug>` -> `/work/<slug>/index.md`. The function `buildMetadata()` advertises each twin
+ * with (#59), imported rather than restated, so a spec cannot look for a twin at a path the site
+ * does not link.
  *
  * One shape for every route, the owner's decision of 2026-09-12. The obvious alternative,
  * `/work/<slug>.md`, cannot be built: a folder named `[slug].md` is a literal segment, so Next types
@@ -24,12 +27,7 @@ import { STATIC_ROUTES, caseStudyRoute } from './routes';
  * (reproduced in this repository on Next 16.3.4, 2026-09-12). A twin one segment below its route
  * works for a dynamic route and a static one alike.
  */
-export function markdownTwinPath(route: string): string {
-  if (!route.startsWith('/') || (route !== '/' && route.endsWith('/'))) {
-    throw new Error(`markdownTwinPath: ${JSON.stringify(route)} is not a route path`);
-  }
-  return route === '/' ? '/index.md' : `${route}/index.md`;
-}
+export { markdownTwinPath };
 
 /** One case study as JSON (#60), `/work/<slug>/index.json` for the same reason as the twins. */
 export function caseStudyJsonPath(slug: string): string {
@@ -48,9 +46,9 @@ export const CASE_STUDY_ENDPOINTS = caseStudies.map(({ slug }) => ({
 }));
 
 /**
- * Every page route with its twin: the static routes and every case study, not the 404. That
- * includes `/privacy` and `/blog`; whether those two ship a twin is #59's decision, and if one does
- * not, #59 drops its row here rather than leaving a declared failure that never flips.
+ * Every page route with its twin: the static routes and every case study, not the 404. `/privacy`
+ * and `/blog` included: every route that goes through `buildMetadata()` advertises a twin, so every
+ * one serves one (#59).
  */
 export const MARKDOWN_TWINS = [
   ...STATIC_ROUTES.map((route) => ({ route, twin: markdownTwinPath(route) })),

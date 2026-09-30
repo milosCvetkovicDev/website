@@ -33,7 +33,10 @@ export function GauntletPhase() {
   const [deploymentStatus, setDeploymentStatus] = useState<'idle' | 'deploying' | 'success'>(
     'idle',
   );
-  const [showAchievement, setShowAchievement] = useState(false);
+  // Shown to begin with: the served HTML, a page GSAP never reaches and a section already in view
+  // when GSAP builds all keep the achievement and the headline. Only a build that finds the section
+  // still ahead hides them for the sequence to reveal (below).
+  const [showAchievement, setShowAchievement] = useState(true);
   const [gsapUnavailable, setGsapUnavailable] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   // Reduced motion, or no GSAP to run the sequence with: the finished pipeline is rendered directly
@@ -69,15 +72,17 @@ export function GauntletPhase() {
   }, []);
 
   // Only ever called from the ScrollTrigger below, which exists once GSAP has loaded; it passes
-  // GSAP in rather than this callback reaching for a module-level import.
+  // GSAP in rather than this callback reaching for a module-level import. `reveal` is false when
+  // the section was already in view as GSAP built it: the achievement and the headline stay as the
+  // visitor saw them, and only the pipeline runs.
   const animatePipeline = useCallback(
-    (gsap: Gsap) => {
+    (gsap: Gsap, reveal: boolean) => {
       // Entering again (scrolling back up and down, or motion being allowed again) restarts the
       // run from pending instead of stacking on it or resuming a half-finished one.
       cancelSequence();
       setStageStates(pendingStages);
       setDeploymentStatus('idle');
-      setShowAchievement(false);
+      if (reveal) setShowAchievement(false);
       let delay = 0;
 
       pipelineStages.forEach((stage, index) => {
@@ -137,6 +142,7 @@ export function GauntletPhase() {
           // Achievement pops in
           later(() => {
             setShowAchievement(true);
+            if (!reveal) return;
             revealTweensRef.current.push(
               gsap.fromTo(
                 achievementRef.current,
@@ -170,7 +176,7 @@ export function GauntletPhase() {
     if (finished) return;
 
     // GSAP arrives on the visitor's first intent (load-gsap.ts); until then the section keeps its
-    // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
+    // starting state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
@@ -182,11 +188,14 @@ export function GauntletPhase() {
         const section = sectionRef.current;
         if (!section) return;
         const reached = isAlreadyReached(section);
+        // Hidden for the reveal only while the section is still ahead of the visitor, so the hide
+        // is never seen; one they can already see keeps them (the served state, hero-11).
+        setShowAchievement(reached);
         ctx = gsap.context(() => {
           ScrollTrigger.create({
             trigger: section,
             start: 'top center',
-            onEnter: () => animatePipeline(gsap),
+            onEnter: () => animatePipeline(gsap, !reached),
           });
 
           // Initial fade in
@@ -221,6 +230,11 @@ export function GauntletPhase() {
   // by stage.
   const shownStageStates = finished ? passedStages : stageStates;
   const shownDeploymentStatus = finished ? 'success' : deploymentStatus;
+  // The achievement and the headline start shown, and only a GSAP build that finds the section
+  // still below the viewport hides them for the sequence to reveal. So the served HTML shows them
+  // to a reader without JavaScript, and a page GSAP has not reached (no intent yet: a crawler that
+  // renders but never scrolls, print before any scroll) keeps them. Opacity only, never rows, so
+  // the layout does not move.
   const achievementVisible = finished || showAchievement;
 
   return (
@@ -322,6 +336,7 @@ export function GauntletPhase() {
         {/* Achievement */}
         <div
           ref={achievementRef}
+          data-reveal="achievement"
           data-gauntlet="achievement"
           className={`mt-6 ${achievementVisible ? '' : 'opacity-0'}`}
         >
@@ -339,6 +354,7 @@ export function GauntletPhase() {
         {/* Headline */}
         <div
           ref={headlineRef}
+          data-reveal="headline"
           className={`mt-16 text-center ${achievementVisible ? '' : 'opacity-0'}`}
         >
           <h2 className="mb-3 text-2xl font-bold md:text-4xl">
