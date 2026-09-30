@@ -103,7 +103,9 @@ export const HudPanel = forwardRef<
         <span className="font-mono text-xs tracking-wider text-[var(--accent-text)] uppercase">
           {title}
         </span>
-        <div className="flex items-center gap-1">
+        {/* Decoration, hidden from assistive technology: every titled panel shows it, so a screen
+            reader would announce "ACTIVE" after each title. */}
+        <div className="flex items-center gap-1" aria-hidden="true">
           <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
           <span className="font-mono text-[10px] text-[var(--accent-text)]">ACTIVE</span>
         </div>
@@ -148,9 +150,13 @@ export function ProgressBar({
             background: `linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.2) ${progress}%, transparent ${progress}%)`,
           }}
         />
+        {/* Scaled from the left edge rather than sized, so a change of progress eases on the
+            compositor without laying the row out on every frame (ADR 0009 rule 2). No radius of
+            its own, which the scale would squash: the track's rounded clip rounds the left end,
+            and the right end once the bar is full; a partial bar ends square. */}
         <div
-          className={`relative h-full overflow-hidden rounded-full transition-all duration-500 ease-out ${colors[variant]}`}
-          style={{ width: `${progress}%` }}
+          className={`relative h-full origin-left overflow-hidden transition-all duration-500 ease-out ${colors[variant]}`}
+          style={{ transform: progressFillTransform(progress / 100) }}
         >
           {/* Static shine effect - no animation to avoid flicker */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -363,15 +369,32 @@ export function CodeLine({
   );
 }
 
-// Pipeline Stage with animated progress
+/**
+ * The transform that draws a progress fill `fraction` of the way across its track, from the left
+ * edge. The fraction is clamped to 0-1, so a negative value cannot mirror the fill out of its track
+ * and a value past 1 cannot overrun it, and a non-finite one draws nothing rather than an invalid
+ * transform the browser drops, which would leave the fill full. PipelineStage and ProgressBar
+ * render it, and GauntletPhase writes it through a stage's `fillRef`, so the two always agree.
+ */
+export function progressFillTransform(fraction: number): string {
+  const drawn = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
+  return `scaleX(${drawn})`;
+}
+
+// Pipeline Stage with animated progress.
+// The fill is a full-width bar scaled from its left edge, never a width, so a frame of progress
+// costs no layout (ADR 0009 rule 2). React draws it from `progress`; GauntletPhase draws a running
+// stage frame by frame through `fillRef`, writing the same transform without re-rendering.
 export function PipelineStage({
   name,
   status,
   progress = 100,
+  fillRef,
 }: {
   name: string;
   status: 'pending' | 'running' | 'passed' | 'failed';
   progress?: number;
+  fillRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const statusColors = {
     pending: 'text-[var(--muted)]',
@@ -400,16 +423,22 @@ export function PipelineStage({
         {name}
       </span>
       <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-[var(--border)]">
-        {/* Colours only: GauntletPhase writes the width on every frame of a stage, and a width
-            transition would restart on each write and trail the progress. */}
+        {/* Colours only: GauntletPhase writes the transform on every frame of a stage, and a
+            transform transition would restart on each write and trail the progress. No radius of
+            its own, which the scale would squash to a sliver at low progress: the track's rounded
+            clip rounds the left end, and the right end once the stage is full; a partial fill ends
+            square. */}
         <div
-          className={`h-full rounded-full transition-colors duration-500 ${progressColors[status]}`}
-          style={{ width: `${progress}%` }}
-        >
-          {status === 'running' && (
-            <div className="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-          )}
-        </div>
+          ref={fillRef}
+          className={`h-full origin-left transition-colors duration-500 ${progressColors[status]}`}
+          style={{ transform: progressFillTransform(progress / 100) }}
+        />
+        {/* A sibling of the fill, not a child: a transformed element contains its absolutely
+            positioned descendants, so inside the fill the shimmer would shrink with the scale
+            instead of sweeping the whole track. */}
+        {status === 'running' && (
+          <div className="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+        )}
       </div>
       <span className={`w-8 text-center ${statusColors[status]}`}>
         <span className={status === 'running' ? 'inline-block animate-spin' : ''}>
