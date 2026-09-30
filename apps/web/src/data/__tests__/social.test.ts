@@ -11,7 +11,7 @@
  * @vitest-environment node
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { aboutCopy } from '../pages/about';
@@ -68,13 +68,16 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * Every text file that ships from `src` and `public`, as a POSIX path from the app root, less the
  * tests: they keep their literal hrefs as an oracle (this file's `EXPECTED`, the footer's and the
  * JSON-LD block's), which is the point of them. Fonts, images and other binaries are skipped by
- * extension. `readdirSync`'s `recursive` needs Node 20.1, below the `engines.node` floor of 22.22.
+ * extension. Only regular files are kept, because a route folder can carry a file-like name: the
+ * Markdown twins live in `index.md/` folders, which the extension filter alone would pass on to
+ * `readFileSync`. `readdirSync`'s `recursive` needs Node 20.1 and `Dirent.parentPath` Node 20.12,
+ * both below the `engines.node` floor of 22.22.
  */
 const SHIPPED_TEXT = ['src', 'public']
   .flatMap((root) =>
-    readdirSync(join(APP, root), { recursive: true, encoding: 'utf8' }).map((name) =>
-      [root, ...name.split(sep)].join('/'),
-    ),
+    readdirSync(join(APP, root), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => relative(APP, join(entry.parentPath, entry.name)).split(sep).join('/')),
   )
   .filter((name) =>
     /\.(?:[cm]?[jt]sx?|css|json|md|mdx|txt|svg|xml|html|ya?ml|webmanifest)$/.test(name),
