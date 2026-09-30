@@ -42,6 +42,11 @@
 // that is not a function fails too, so the list stays exactly the set of functions. Every prerendered
 // path must also have its body file, allowlisted routes included.
 //
+// All of that judges the routes the build has, so an endpoint whose handler vanished outright (its
+// folder renamed or deleted) would pass it. REQUIRED_ROUTES names the agent-facing handlers that
+// must be in every build: each must be an App Router route with at least one prerendered path, and
+// that path's body file is then required like any other.
+//
 // Usage: `pnpm check:build-output`, after `pnpm --filter web build`, or
 // `node scripts/check-build-output.mjs [<distDir>]`, which defaults to apps/web/.next. Prints what it
 // checked, with the build's BUILD_ID and when it was written, and exits 0; prints every problem and
@@ -67,6 +72,16 @@ const DEFAULT_DIST = join(repoRoot, 'apps', 'web', '.next');
  * @type {readonly string[]}
  */
 export const ALLOWED_FUNCTIONS = Object.freeze([]);
+
+/**
+ * The route handlers every build must contain, prerendered, as `app-path-routes-manifest.json` names
+ * them: the machine-readable endpoints an agent is told about. A dynamic one's paths come from its
+ * `generateStaticParams`, so `/work/[slug]/index.json` requires one body per case study without
+ * this list naming a slug. #60 adds the case-study JSON; each later endpoint adds its own route.
+ *
+ * @type {readonly string[]}
+ */
+export const REQUIRED_ROUTES = Object.freeze(['/case-studies.json', '/work/[slug]/index.json']);
 
 /** Next's `PrerenderCompute`; every value but `static` finishes the response in a function. */
 const COMPUTE_VALUES = new Set(['static', 'blocking', 'resuming']);
@@ -256,13 +271,14 @@ const ownerOf = (path, entry) => (typeof entry.srcRoute === 'string' ? entry.src
  *   appRoutes: AppRoute[],
  *   prerender: PrerenderManifest,
  *   allowed: readonly string[],
+ *   required: readonly string[],
  *   hasBody: (file: string) => boolean,
  * }} build `hasBody` answers whether a file exists under `server/app`
  * @returns {{ problems: string[], routes: number, bodies: number, functions: string[] }}
  * @throws {CheckError} when a prerendered path or dynamic route matches no App Router route, or a
  *   path's `routeType` disagrees with its entry's name
  */
-export function collectProblems({ appRoutes, prerender, allowed, hasBody }) {
+export function collectProblems({ appRoutes, prerender, allowed, required, hasBody }) {
   /** @type {string[]} */
   const problems = [];
   /** @type {string[]} */
@@ -362,6 +378,25 @@ export function collectProblems({ appRoutes, prerender, allowed, hasBody }) {
     if (!known.has(route)) {
       problems.push(
         `${route}: is in ALLOWED_FUNCTIONS but the build has no such route. Drop it from the list.`,
+      );
+    }
+  }
+
+  for (const route of new Set(required)) {
+    if (!known.has(route)) {
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES but the build has no such route. Restore its handler, or ` +
+          'drop it from the list in the change that retires the endpoint.',
+      );
+    } else if (
+      prerender.dynamicRoutes[route] !== undefined &&
+      !prerenderedPaths.some(([path, entry]) => ownerOf(path, entry) === route)
+    ) {
+      // A static route with no path is already a finding above; a dynamic one with fixed params and
+      // none passes it, and serves nothing but 404s.
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES but prerendered no path, so every URL under it is a 404. ` +
+          'Its `generateStaticParams` returned nothing.',
       );
     }
   }
@@ -494,6 +529,7 @@ function main(args) {
       appRoutes,
       prerender,
       allowed: ALLOWED_FUNCTIONS,
+      required: REQUIRED_ROUTES,
       hasBody: (file) => {
         try {
           return statSync(join(app, file)).isFile();

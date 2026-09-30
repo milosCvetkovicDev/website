@@ -53,7 +53,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                                           |
 | `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                                                     |
 | `pnpm check:adrs`                                                       | Checks each ADR's status, H1 title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules; exit 1 on a disagreement, 2 if it could not run                         |
-| `pnpm check:build-output [<distDir>]`                                   | After `pnpm --filter web build`: every route in `apps/web/.next` is prerendered with its body file and none needs a server function outside `ALLOWED_FUNCTIONS`; exit 1 on a finding, 2 if it could not run |
+| `pnpm check:build-output [<distDir>]`                                   | After `pnpm --filter web build`: every route, and each one in `REQUIRED_ROUTES`, is prerendered with its body file, none a function outside `ALLOWED_FUNCTIONS`; exit 1 on a finding, 2 if it could not run |
 | `pnpm check:docs-drift`                                                 | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                                         |
 | `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/`                                                                                                                                                                   |
 | `scripts/flake-hunt.sh [runs]`                                          | Runs the whole e2e suite N times (30 by default) and ranks specs by failure rate in `flake-hunt/flake-report.json`                                                                                          |
@@ -134,7 +134,9 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   revalidation, or a partially prerendered page) unless it is in the script's `ALLOWED_FUNCTIONS`,
   when an allowlisted route turns out static or absent, when a prerendered path has no body file,
   and when the build has a `proxy.ts` or middleware, a Server Action or a Pages Router entry (the
-  four `server/*-manifest.json` files the App Router manifests do not cover). A manifest field it
+  four `server/*-manifest.json` files the App Router manifests do not cover). It also fails a build
+  that lacks a route in its `REQUIRED_ROUTES`, the agent-facing handlers every build must contain
+  (the case-study JSON since #60), or where a dynamic one prerendered no path. A manifest field it
   decides on that is missing or holds an unknown value, or a prerendered path it cannot attribute to
   a route, exits 2 rather than passing. The allowlist is empty; #62 adds `/mcp`. A route handler
   without `export const dynamic = 'force-static'` is the failure it exists for: it still serves the

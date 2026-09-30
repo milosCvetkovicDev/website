@@ -7,6 +7,7 @@ import {
   MARKDOWN_TWINS,
   MCP,
   SITE_ORIGIN,
+  caseStudyJsonPath,
 } from './endpoints';
 
 /**
@@ -14,13 +15,13 @@ import {
  *
  * Every path comes from `endpoints.ts`. Each test's title and `fixed-by` annotation name the task
  * that ships its endpoint: #59 the Markdown twins, #60 `/llms.txt` and the JSON representation, #61
- * the Atom feed, #62 the MCP server. The twins are served (#59), so their rows run the contract
- * alone; for each endpoint not yet served, `expectNotServedYet` makes its test an expected failure
- * for that one reason only. It first requires the status to be the 404 of an endpoint that is not
- * there, outside the declared failure, so a 5xx, a timeout or a server that never started fails the
- * run; only then does it call `test.fail()` and fail on the status. A 200 fails the run too, so the
- * change that ships an endpoint must delete that one call, and the rest of the test is then that
- * endpoint's contract.
+ * the Atom feed, #62 the MCP server. The twins (#59) and the case-study JSON (#60) are served, so
+ * their rows run the contract alone; for each endpoint not yet served, `expectNotServedYet` makes
+ * its test an expected failure for that one reason only. It first requires the status to be the 404
+ * of an endpoint that is not there, outside the declared failure, so a 5xx, a timeout or a server
+ * that never started fails the run; only then does it call `test.fail()` and fail on the status. A
+ * 200 fails the run too, so the change that ships an endpoint must delete that one call, and the
+ * rest of the test is then that endpoint's contract.
  *
  * Everything here goes through `request`, the served bytes, because that is all an agent's fetch
  * tool reads. `retries: 0`, as for every spec that carries an expected failure (`e2e-tests.md`): a
@@ -28,6 +29,9 @@ import {
  */
 
 test.describe.configure({ retries: 0, timeout: 60_000 });
+
+/** A slug no case study has, for the 404 of its JSON document (#60 AC 7). */
+const UNKNOWN_SLUG = 'no-such-case-study';
 
 /** The MCP protocol revision #62 targets. */
 const MCP_PROTOCOL_VERSION = '2026-07-28';
@@ -166,7 +170,6 @@ test(`#60: ${LLMS_TXT} opens with one H1 and a blockquote and links every case s
 
 test(`#60: ${CASE_STUDIES_JSON} is a JSON array of every case study`, async ({ request }) => {
   const response = await request.get(CASE_STUDIES_JSON);
-  expectNotServedYet(response, CASE_STUDIES_JSON, '#60');
   expect(response.status()).toBe(200);
   expect(contentType(response)).toMatch(/^application\/json\b/);
 
@@ -183,19 +186,50 @@ test(`#60: ${CASE_STUDIES_JSON} is a JSON array of every case study`, async ({ r
       }),
     );
   }
-  const slugs = (entries as { slug: string }[]).map(({ slug }) => slug);
-  expect([...slugs].sort()).toEqual(CASE_STUDY_ENDPOINTS.map(({ slug }) => slug).sort());
+  const typed = entries as { slug: string; url: string; markdown: string }[];
+  expect(typed.map(({ slug }) => slug).sort()).toEqual(
+    CASE_STUDY_ENDPOINTS.map(({ slug }) => slug).sort(),
+  );
+
+  // The derived URLs are absolute on this site and name what it serves: the study's page and twin.
+  for (const { slug, route, twin } of CASE_STUDY_ENDPOINTS) {
+    const entry = typed.find((study) => study.slug === slug);
+    if (!entry) throw new Error(`${CASE_STUDIES_JSON} has no entry for ${slug}`);
+    for (const [key, href, path] of [
+      ['url', entry.url, route],
+      ['markdown', entry.markdown, twin],
+    ] as const) {
+      const said = `${slug}'s ${key} ${href}`;
+      expect(href.startsWith(`${SITE_ORIGIN}/`), `${said} is absolute on ${SITE_ORIGIN}`).toBe(
+        true,
+      );
+      expect(isSitePath(href, path), `${said} should be ${path}`).toBe(true);
+      expect((await request.get(path)).status(), `${path} is served`).toBe(200);
+    }
+  }
 });
 
 for (const { slug, json } of CASE_STUDY_ENDPOINTS) {
   test(`#60: ${json} is the case study as JSON`, async ({ request }) => {
     const response = await request.get(json);
-    expectNotServedYet(response, json, '#60');
     expect(response.status()).toBe(200);
     expect(contentType(response)).toMatch(/^application\/json\b/);
-    expect(await response.json()).toMatchObject({ slug });
+    const entry: unknown = await response.json();
+    expect(entry).toMatchObject({ slug });
+
+    // One study, one representation: the document is the array's entry for the same slug.
+    const list = (await (await request.get(CASE_STUDIES_JSON)).json()) as { slug: string }[];
+    expect(entry).toEqual(list.find((study) => study.slug === slug));
   });
 }
+
+// ADR 0015: the params are fixed at build time, so a slug with no study is a routing-level 404, as
+// the page's and the twin's are, rather than a document rendered on demand.
+test(`#60: ${caseStudyJsonPath(UNKNOWN_SLUG)} is a 404`, async ({ request }) => {
+  expect(CASE_STUDY_ENDPOINTS.map(({ slug }) => slug)).not.toContain(UNKNOWN_SLUG);
+  const response = await request.get(caseStudyJsonPath(UNKNOWN_SLUG));
+  expect(response.status()).toBe(404);
+});
 
 test(`#61: ${FEED} is an Atom feed`, async ({ request }) => {
   const response = await request.get(FEED);

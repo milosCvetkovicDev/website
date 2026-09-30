@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import {
   ALLOWED_FUNCTIONS,
   CheckError,
+  REQUIRED_ROUTES,
   bodyFile,
   collectOtherFunctions,
   collectProblems,
@@ -30,7 +31,8 @@ const thisScript = join(dirname(fileURLToPath(import.meta.url)), 'check-build-ou
 
 /**
  * `app-path-routes-manifest.json` for a small site shaped like this one: static pages, metadata
- * routes, a force-static handler, and a dynamic page and handler with fixed params (ADR 0015).
+ * routes, force-static handlers, and a dynamic page and handlers with fixed params (ADR 0015),
+ * the routes in `REQUIRED_ROUTES` among them.
  */
 const APP_ROUTES = {
   '/page': '/',
@@ -38,8 +40,10 @@ const APP_ROUTES = {
   '/about/page': '/about',
   '/robots.txt/route': '/robots.txt',
   '/opengraph-image/route': '/opengraph-image',
+  '/case-studies.json/route': '/case-studies.json',
   '/work/[slug]/page': '/work/[slug]',
   '/work/[slug]/og-image.png/route': '/work/[slug]/og-image.png',
+  '/work/[slug]/index.json/route': '/work/[slug]/index.json',
 };
 
 /**
@@ -86,14 +90,18 @@ const cleanPrerender = () => ({
     '/about': prerendered('/about'),
     '/robots.txt': prerendered('/robots.txt'),
     '/opengraph-image': prerendered('/opengraph-image'),
+    '/case-studies.json': prerendered('/case-studies.json'),
     '/work/a': prerendered('/work/[slug]'),
     '/work/b': prerendered('/work/[slug]'),
     '/work/a/og-image.png': prerendered('/work/[slug]/og-image.png'),
     '/work/b/og-image.png': prerendered('/work/[slug]/og-image.png'),
+    '/work/a/index.json': prerendered('/work/[slug]/index.json'),
+    '/work/b/index.json': prerendered('/work/[slug]/index.json'),
   },
   dynamicRoutes: {
     '/work/[slug]': { fallback: false },
     '/work/[slug]/og-image.png': { fallback: false },
+    '/work/[slug]/index.json': { fallback: false },
   },
 });
 
@@ -104,10 +112,13 @@ const CLEAN_BODIES = [
   'about.html',
   'robots.txt.body',
   'opengraph-image.body',
+  'case-studies.json.body',
   'work/a.html',
   'work/b.html',
   'work/a/og-image.png.body',
   'work/b/og-image.png.body',
+  'work/a/index.json.body',
+  'work/b/index.json.body',
 ];
 
 /**
@@ -116,6 +127,7 @@ const CLEAN_BODIES = [
  *   prerender?: PrerenderManifest,
  *   bodies?: string[],
  *   allowed?: readonly string[],
+ *   required?: readonly string[],
  * }} [overrides]
  */
 function check({
@@ -123,14 +135,33 @@ function check({
   prerender = cleanPrerender(),
   bodies = CLEAN_BODIES,
   allowed = [],
+  required = REQUIRED_ROUTES,
 } = {}) {
   const present = new Set(bodies);
   return collectProblems({
     appRoutes: readAppRoutes(JSON.stringify(appRoutes)),
     prerender: readPrerender(JSON.stringify(prerender)),
     allowed,
+    required,
     hasBody: (file) => present.has(file),
   });
+}
+
+/**
+ * The clean tree without one route: its app-manifest entry, its prerendered paths, its dynamic
+ * entry and its bodies, as a build without that route's folder would write it.
+ *
+ * @param {string} route
+ */
+function without(route) {
+  const appRoutes = Object.fromEntries(Object.entries(APP_ROUTES).filter(([, r]) => r !== route));
+  const prerender = cleanPrerender();
+  for (const [path, entry] of Object.entries(prerender.routes)) {
+    if ((entry.srcRoute ?? path) === route) delete prerender.routes[path];
+  }
+  delete prerender.dynamicRoutes[route];
+  const gone = route === '/case-studies.json' ? /^case-studies\.json/ : /\/index\.json\.body$/;
+  return { appRoutes, prerender, bodies: CLEAN_BODIES.filter((b) => !gone.test(b)) };
 }
 
 describe('bodyFile', () => {
@@ -142,6 +173,8 @@ describe('bodyFile', () => {
     ['/work/a/og-image.png', 'route', 'work/a/og-image.png.body'],
     ['/index.md', 'route', 'index.md.body'],
     ['/about/index.md', 'route', 'about/index.md.body'],
+    ['/case-studies.json', 'route', 'case-studies.json.body'],
+    ['/work/a/index.json', 'route', 'work/a/index.json.body'],
   ]) {
     it(`finds ${route} (${kind}) at server/app/${file}`, () => {
       assert.equal(bodyFile(route, /** @type {'page' | 'route'} */ (kind)), file);
@@ -300,6 +333,53 @@ describe('collectProblems', () => {
     const { problems } = check({ bodies: CLEAN_BODIES.filter((b) => b !== 'work/b.html') });
     assert.equal(problems.length, 1);
     assert.match(problems[0], /^\/work\/b .*server\/app\/work\/b\.html/);
+  });
+
+  it('fails a missing JSON body of one case study, naming the file', () => {
+    const { problems } = check({
+      bodies: CLEAN_BODIES.filter((b) => b !== 'work/b/index.json.body'),
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/work\/b\/index\.json .*server\/app\/work\/b\/index\.json\.body/);
+  });
+
+  it('fails a required handler built without force-static once, as a function', () => {
+    // `app/case-studies.json/route.ts` without its `dynamic` export: in the app manifest, not
+    // prerendered. The function finding names it; being required adds no second one.
+    const prerender = cleanPrerender();
+    delete prerender.routes['/case-studies.json'];
+    const { problems } = check({
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => b !== 'case-studies.json.body'),
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/case-studies\.json: .*function.*force-static/);
+  });
+
+  for (const route of ['/case-studies.json', '/work/[slug]/index.json']) {
+    it(`fails a build without the required ${route}, naming it`, () => {
+      const { problems } = check(without(route));
+      assert.equal(problems.length, 1);
+      assert.ok(problems[0].startsWith(`${route}: is in REQUIRED_ROUTES`), problems[0]);
+      assert.match(problems[0], /no such route/);
+    });
+  }
+
+  it('passes the same tree when nothing is required', () => {
+    assert.deepEqual(check({ ...without('/case-studies.json'), required: [] }).problems, []);
+  });
+
+  it('fails a required dynamic route whose params produced no path', () => {
+    // Passes the function check (fixed params, nothing on demand) but serves only 404s.
+    const prerender = cleanPrerender();
+    delete prerender.routes['/work/a/index.json'];
+    delete prerender.routes['/work/b/index.json'];
+    const { problems } = check({
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => !b.endsWith('/index.json.body')),
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/work\/\[slug\]\/index\.json: .*REQUIRED_ROUTES.*no path/);
   });
 
   it('fails a dynamic route that renders unknown params on demand', () => {
@@ -500,6 +580,16 @@ describe('ALLOWED_FUNCTIONS', () => {
   });
 });
 
+describe('REQUIRED_ROUTES', () => {
+  it('names the case-study JSON #60 serves, and no function', () => {
+    assert.deepEqual([...REQUIRED_ROUTES], ['/case-studies.json', '/work/[slug]/index.json']);
+    assert.deepEqual(
+      REQUIRED_ROUTES.filter((route) => ALLOWED_FUNCTIONS.includes(route)),
+      [],
+    );
+  });
+});
+
 /**
  * Writes an artifact tree to a temporary directory: BUILD_ID, the six manifests and the body files.
  *
@@ -574,7 +664,7 @@ describe('the command', () => {
     withTree({}, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, /7 routes, 9 prerendered bodies, no server function/);
+      assert.match(result.stdout, /9 routes, 12 prerendered bodies, no server function/);
       assert.match(result.stdout, /\(BUILD_ID test-build-id, written \d{4}-\d\d-\d\dT[\d:.]+Z\)/);
     });
   });
@@ -601,6 +691,14 @@ describe('the command', () => {
       const result = run([dist]);
       assert.equal(result.status, 1);
       assert.match(result.stderr, /\/llms-full\.txt/);
+    });
+  });
+
+  it('exits 1 when a required route is gone, naming it', () => {
+    withTree(without('/work/[slug]/index.json'), (dist) => {
+      const result = run([dist]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /\/work\/\[slug\]\/index\.json: is in REQUIRED_ROUTES/);
     });
   });
 

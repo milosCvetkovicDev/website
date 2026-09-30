@@ -35,6 +35,8 @@ const RENDERS_ONLY: Record<string, string> = {
     'a unit test: builds unfilled fixtures to prove formatMetricScope leaves them out, and ships nowhere',
   'lib/__tests__/serialise.test.ts':
     'a unit test: reads the marker to prove no live Markdown twin serves it, and ships nowhere',
+  'lib/__tests__/case-studies-json.test.ts':
+    'a unit test: reads the marker to prove the case-study JSON never serves it, and ships nowhere',
 };
 
 /**

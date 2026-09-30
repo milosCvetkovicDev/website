@@ -1,12 +1,20 @@
-import { formatMetric, type CaseStudy } from '@/data/case-studies';
+import {
+  caseStudies,
+  formatMetric,
+  formatMetricScope,
+  type CaseStudy,
+  type CaseStudyHighlight,
+  type CaseStudyMetric,
+  type MetricDefinition,
+} from '@/data/case-studies';
 import type { InlineLink, Paragraph, PageRecord, PageSection } from '@/data/pages/types';
-import { assertPathname } from './pathname';
+import { assertPathname, markdownTwinPath } from './pathname';
 
 /**
- * The one module that writes Markdown (#59). Every Markdown twin renders its body here from the
- * content modules, so a twin and its page read one source and no route handler builds Markdown of
- * its own. Every string it is handed is plain text: it escapes whatever Markdown would read as
- * syntax, so the text a reader sees is the text in the module.
+ * The one module that writes Markdown (#59) and the case studies as JSON (#60). Every Markdown twin
+ * renders its body here from the content modules, so a twin and its page read one source and no
+ * route handler builds Markdown of its own. Every string it is handed is plain text: it escapes
+ * whatever Markdown would read as syntax, so the text a reader sees is the text in the module.
  *
  * Each document opens the same way: `# <title>`, the summary paragraph, then `Source:` and the
  * absolute canonical URL of the HTML page it mirrors. A server module like `metadata.ts`.
@@ -16,14 +24,22 @@ import { assertPathname } from './pathname';
 // twin can be served as text/plain by a handler that set its own header.
 const MARKDOWN_CONTENT_TYPE = 'text/markdown; charset=utf-8';
 
+// RFC 8259 defines no charset parameter for application/json: JSON on the wire is UTF-8.
+const JSON_CONTENT_TYPE = 'application/json';
+
 // Where a twin is served, re-exported as part of this module's interface (#59). It lives in
 // `pathname.ts`, which has no imports, so `metadata.ts` and the e2e helpers can read it without
 // loading the content modules this one renders.
-export { markdownTwinPath } from './pathname';
+export { markdownTwinPath };
 
 /** A Markdown body as a response, with the one content type every twin is served with. */
 export function markdownResponse(body: string): Response {
   return new Response(body, { headers: { 'Content-Type': MARKDOWN_CONTENT_TYPE } });
+}
+
+/** A value as a JSON response, with the one content type every JSON representation is served with. */
+export function jsonResponse(value: unknown): Response {
+  return new Response(JSON.stringify(value), { headers: { 'Content-Type': JSON_CONTENT_TYPE } });
 }
 
 /**
@@ -337,4 +353,61 @@ function commaList(list: readonly string[], what: string): string {
     }
   });
   return list.join(', ');
+}
+
+/** A case study's metric with the text `formatMetric()` renders for it, as the cards show it. */
+export type CaseStudyMetricJson = CaseStudyMetric & { formatted: string };
+
+/** A metric definition that can be stated: the owner's window and method. */
+export type StatedMetricDefinition = Extract<MetricDefinition, { state: 'defined' }>;
+
+/**
+ * One case study as JSON (#60): every field of `CaseStudy` as the data module holds it, except that
+ * the metric also carries its rendering and a metric definition that cannot be stated is `null`,
+ * plus the absolute URLs of the study's page (`url`) and of its Markdown twin (`markdown`).
+ */
+export type CaseStudyJson = Omit<CaseStudy, 'highlight' | 'metricDefinition'> & {
+  highlight: Omit<CaseStudyHighlight, 'metric'> & { metric: CaseStudyMetricJson };
+  metricDefinition: StatedMetricDefinition | null;
+  url: string;
+  markdown: string;
+};
+
+/**
+ * A metric definition as it may be served: as it stands once `formatMetricScope()`, the one producer
+ * of its sentence, could state it, and `null` while it is the owner's placeholder or holds nothing
+ * statable, because a placeholder marker never reaches served output (`data/owner-todo.ts`).
+ */
+function statedDefinition(definition: MetricDefinition): StatedMetricDefinition | null {
+  return definition.state === 'defined' && formatMetricScope(null, definition) !== null
+    ? definition
+    : null;
+}
+
+/**
+ * A case study as JSON, for `/work/<slug>/index.json` and as one entry of `/case-studies.json`. The
+ * fields are the data module's own, so a program reads the same facts the page shows without an
+ * HTML parser, and the metric goes through `formatMetric()`, the function the cards and the twin
+ * use, so no reader renders a figure differently. The URLs are absolute from the origin
+ * `metadataBase` resolves (`absoluteUrl()`), because the JSON is read away from the site.
+ * `lib/__tests__/case-studies-json.test.ts` fails when a study holds a key the JSON does not carry.
+ */
+export function caseStudyToJson(caseStudy: CaseStudy): CaseStudyJson {
+  const { highlight, metricDefinition } = caseStudy;
+  const page = `/work/${caseStudy.slug}`;
+  return {
+    ...caseStudy,
+    highlight: {
+      ...highlight,
+      metric: { ...highlight.metric, formatted: formatMetric(highlight.metric) },
+    },
+    metricDefinition: statedDefinition(metricDefinition),
+    url: absoluteUrl(page),
+    markdown: absoluteUrl(markdownTwinPath(page)),
+  };
+}
+
+/** Every case study as JSON, in the data module's order: the body of `/case-studies.json`. */
+export function caseStudiesToJson(): CaseStudyJson[] {
+  return caseStudies.map((caseStudy) => caseStudyToJson(caseStudy));
 }
