@@ -15,8 +15,17 @@ const dots = (page: Page) => page.getByRole('navigation', { name: 'Story section
 const dot = (page: Page, label: string) =>
   dots(page).getByRole('button', { name: `Go to ${label} section` });
 
-/** The dot's text label. A direct child, so a future icon span inside the button cannot match. */
-const dotLabel = (page: Page, label: string) => dot(page, label).locator('> span');
+/**
+ * The dot's text label, found by the words it shows. The painted dot beside it is a span as well,
+ * so an element-name locator would match both.
+ */
+const dotLabel = (page: Page, label: string) => dot(page, label).getByText(label, { exact: true });
+
+/**
+ * The painted dot inside a dot button: the direct child whose `data-state` says whether it is lit.
+ * Scoped to direct children so that no descendant carrying a `data-state` of its own can match.
+ */
+const dotFill = (page: Page, label: string) => dot(page, label).locator('> [data-state]');
 
 /**
  * What `value` computes to as a colour, read from a throwaway element beside `near`.
@@ -175,6 +184,37 @@ test.describe('Section progress', () => {
       // the one the visitor is on from the four painted the same accent colour. Asserted as
       // absence rather than as "not location", which would still accept a stray `page` or `true`.
       await expect(dot(page, 'INIT')).not.toHaveAttribute('aria-current');
+    });
+
+    test('paints the dots up to the current one in the accent and glows the current one alone', async ({
+      page,
+    }) => {
+      // The fill is chosen by a `data-[state=lit]` variant over a `--border` base, and jsdom runs
+      // no Tailwind, so only a browser can say that the variant compiled and matches the attribute
+      // the component writes. A typo in either leaves every dot in the border colour while every
+      // unit test still passes.
+      const accent = await resolveColor(dots(page), 'var(--accent)');
+      const border = await resolveColor(dots(page), 'var(--border)');
+      // The control: were the two tokens to resolve alike, the assertions below could not tell a
+      // lit dot from an unlit one.
+      expect(accent).not.toBe(border);
+
+      await dot(page, 'BUILD').click();
+      await expect(dot(page, 'BUILD')).toHaveAttribute('aria-current', 'location');
+
+      for (const label of ['INIT', 'DISCOVER', 'PLAN', 'BUILD']) {
+        await expect(dotFill(page, label)).toHaveAttribute('data-state', 'lit');
+        await expect(dotFill(page, label)).toHaveCSS('background-color', accent);
+      }
+      for (const label of ['TEST', 'SHIP', 'CTA']) {
+        await expect(dotFill(page, label)).toHaveAttribute('data-state', 'unlit');
+        await expect(dotFill(page, label)).toHaveCSS('background-color', border);
+      }
+
+      // The glow marks the current dot alone; the lit trail behind it carries the fill only.
+      await expect(dotFill(page, 'BUILD')).not.toHaveCSS('box-shadow', 'none');
+      await expect(dotFill(page, 'PLAN')).toHaveCSS('box-shadow', 'none');
+      await expect(dotFill(page, 'TEST')).toHaveCSS('box-shadow', 'none');
     });
 
     test('moves the story on Enter, not only on a pointer click', async ({ page }) => {

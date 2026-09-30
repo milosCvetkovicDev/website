@@ -181,14 +181,15 @@ export function SectionProgress({
                   // stages of a process that has to be advanced through.
                   aria-current={index === activeSection ? 'location' : undefined}
                 >
-                  {/* Dot. `data-state` is what paints it: every dot up to the active one is lit,
-                      and the `data-[state=lit]` variant swaps the border fill for the accent, so
-                      the state a test reads and the colour on screen come from one attribute and
-                      cannot disagree. The glow stays on the current dot alone, which
-                      `aria-current` on the button names. */}
-                  <div
+                  {/* Dot. Every dot up to the active one is lit, and `data-state` drives the fill
+                      through the `data-[state=lit]` variant, which swaps the border fill for the
+                      accent: the fill is not chosen in JavaScript. That the variant really paints
+                      it is a browser fact, pinned by `e2e/section-progress.spec.ts`. The glow stays
+                      on the current dot alone, which `aria-current` on the button names. A span,
+                      because a button holds phrasing content only. */}
+                  <span
                     data-state={index <= activeSection ? 'lit' : 'unlit'}
-                    className={`relative h-3 w-3 rounded-full bg-[var(--border)] transition-all duration-300 data-[state=lit]:bg-[var(--accent)] ${
+                    className={`relative block h-3 w-3 rounded-full bg-[var(--border)] transition-all duration-300 data-[state=lit]:bg-[var(--accent)] ${
                       index === activeSection
                         ? 'shadow-[0_0_8px_color-mix(in_oklab,var(--accent)_60%,transparent)]'
                         : ''
