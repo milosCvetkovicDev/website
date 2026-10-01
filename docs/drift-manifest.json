@@ -7099,6 +7099,579 @@
       }
     },
     {
+      "id": "adr-readme-link-0028-blog-posts-as-typed-data",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to 0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "adr-index-0028-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0028 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0028's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0028-blog-posts-as-typed-data.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0028-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0028 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0028 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0028 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0028-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0028 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0028's record carries the Date \"2026-09-29\".",
+      "check": {
+        "file": "docs/adr/0028-blog-posts-as-typed-data.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-29"
+      }
+    },
+    {
+      "id": "adr-index-0028-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0028 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0028 gives the record's Date, \"2026-09-29\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0028 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-29"
+      }
+    },
+    {
+      "id": "adr-index-0028-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0028 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0028's record carries the H1 title \"Blog posts are typed data, and the owner writes every one\".",
+      "check": {
+        "file": "docs/adr/0028-blog-posts-as-typed-data.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Blog posts are typed data, and the owner writes every one"
+      }
+    },
+    {
+      "id": "adr-index-0028-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0028 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0028 gives the record's H1 title, \"Blog posts are typed data, and the owner writes every one\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0028 \\| \\[(.+?)\\]\\(0028-",
+        "equals": "Blog posts are typed data, and the owner writes every one"
+      }
+    },
+    {
+      "id": "adr-0028-link-plans-2026-09-28-blog-engine-design",
+      "doc": "docs/adr/0028-blog-posts-as-typed-data.md",
+      "anchor": "](../plans/2026-09-28-blog-engine-design.md)",
+      "claim": "The link to ../plans/2026-09-28-blog-engine-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../plans/2026-09-28-blog-engine-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-design.md"
+      }
+    },
+    {
+      "id": "adr-0028-post-union",
+      "doc": "docs/adr/0028-blog-posts-as-typed-data.md",
+      "anchor": "`Post` is a union discriminated on `draft`",
+      "claim": "posts.ts declares Post as the union of PublishedPost and DraftPost, discriminated on draft.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/posts.ts",
+        "contains": "export type Post = PublishedPost | DraftPost;"
+      }
+    },
+    {
+      "id": "adr-0028-post-index",
+      "doc": "docs/adr/0028-blog-posts-as-typed-data.md",
+      "anchor": "come from `buildPostIndex(posts)`",
+      "claim": "posts.ts derives publishedPosts, hasPublishedPosts and getPost from buildPostIndex over posts.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/posts.ts",
+        "contains": "const index = buildPostIndex(posts);"
+      }
+    },
+    {
+      "id": "adr-0028-posts-test",
+      "doc": "docs/adr/0028-blog-posts-as-typed-data.md",
+      "anchor": "`apps/web/src/data/__tests__/posts.test.ts` holds the rules",
+      "claim": "The post rules live in apps/web/src/data/__tests__/posts.test.ts.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/__tests__/posts.test.ts",
+        "contains": "function problemsIn("
+      }
+    },
+    {
+      "id": "adr-0028-post-fixtures",
+      "doc": "docs/adr/0028-blog-posts-as-typed-data.md",
+      "anchor": "fixtures in `apps/web/src/test/fixtures/posts.ts`",
+      "claim": "The post fixtures live in apps/web/src/test/fixtures/posts.ts.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/test/fixtures/posts.ts",
+        "contains": "export const fixturePosts: readonly Post[]"
+      }
+    },
+    {
+      "id": "adr-readme-link-0029-read-only-mcp-server",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0029-read-only-mcp-server.md)",
+      "claim": "The link to 0029-read-only-mcp-server.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0029-read-only-mcp-server.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0029-read-only-mcp-server.md"
+      }
+    },
+    {
+      "id": "adr-index-0029-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0029's record carries the status line \"Proposed\".",
+      "check": {
+        "file": "docs/adr/0029-read-only-mcp-server.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0029-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0029 gives the record's status line, \"Proposed\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0029 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0029-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0029's record carries the Date \"2026-09-30\".",
+      "check": {
+        "file": "docs/adr/0029-read-only-mcp-server.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-30"
+      }
+    },
+    {
+      "id": "adr-index-0029-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0029 gives the record's Date, \"2026-09-30\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0029 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-30"
+      }
+    },
+    {
+      "id": "adr-index-0029-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0029's record carries the H1 title \"A read-only, unauthenticated MCP server at /mcp is the site's one server function\".",
+      "check": {
+        "file": "docs/adr/0029-read-only-mcp-server.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "A read-only, unauthenticated MCP server at /mcp is the site's one server function"
+      }
+    },
+    {
+      "id": "adr-index-0029-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0029 gives the record's H1 title, \"A read-only, unauthenticated MCP server at /mcp is the site's one server function\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0029 \\| \\[(.+?)\\]\\(0029-",
+        "equals": "A read-only, unauthenticated MCP server at /mcp is the site's one server function"
+      }
+    },
+    {
+      "id": "adr-0029-link-0017-ai-discoverability-policy",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "](0017-ai-discoverability-policy.md)",
+      "claim": "The link to 0017-ai-discoverability-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0017-ai-discoverability-policy.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0017-ai-discoverability-policy.md"
+      }
+    },
+    {
+      "id": "adr-0029-link-0005-hosting-on-vercel",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "](0005-hosting-on-vercel.md)",
+      "claim": "The link to 0005-hosting-on-vercel.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0005-hosting-on-vercel.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0005-hosting-on-vercel.md"
+      }
+    },
+    {
+      "id": "adr-0029-link-0012-correcting-accepted-records",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "](0012-correcting-accepted-records.md)",
+      "claim": "The link to 0012-correcting-accepted-records.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0012-correcting-accepted-records.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0012-correcting-accepted-records.md"
+      }
+    },
+    {
+      "id": "adr-0029-script-check-build-output",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "`pnpm check:build-output`",
+      "claim": "`pnpm check:build-output` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:build-output"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:build-output"
+      }
+    },
+    {
+      "id": "adr-0029-allowed-functions",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "`ALLOWED_FUNCTIONS` in `scripts/check-build-output.mjs` is exactly `['/mcp']`",
+      "claim": "The build-output gate allows exactly one server function, /mcp.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "scripts/check-build-output.mjs",
+        "contains": "export const ALLOWED_FUNCTIONS = Object.freeze(['/mcp']);"
+      }
+    },
+    {
+      "id": "adr-0029-route-post",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "`apps/web/src/app/mcp/route.ts` exports `POST` and nothing else",
+      "claim": "The MCP route handler exports POST.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/app/mcp/route.ts",
+        "contains": "export async function POST(request: Request): Promise<Response> {"
+      }
+    },
+    {
+      "id": "adr-0029-tools",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "Three tools, in `apps/web/src/app/mcp/tools.ts`",
+      "claim": "tools.ts registers the MCP server's tools.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/app/mcp/tools.ts",
+        "contains": "export function registerTools(server: McpServer): void {"
+      }
+    },
+    {
+      "id": "adr-0029-list-changed",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "advertises `listChanged: false`",
+      "claim": "The MCP route advertises tools without listChanged.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/app/mcp/route.ts",
+        "contains": "capabilities: { tools: { listChanged: false } },"
+      }
+    },
+    {
+      "id": "adr-readme-link-0030-generated-endpoints-as-static-route-handlers",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0030-generated-endpoints-as-static-route-handlers.md)",
+      "claim": "The link to 0030-generated-endpoints-as-static-route-handlers.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        { "kind": "link", "token": "0030-generated-endpoints-as-static-route-handlers.md" }
+      ],
+      "check": { "path": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md" }
+    },
+    {
+      "id": "adr-index-0030-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0030's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0030-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0030 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0030 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0030-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0030's record carries the Date \"2026-10-01\".",
+      "check": {
+        "file": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-01"
+      }
+    },
+    {
+      "id": "adr-index-0030-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0030 gives the record's Date, \"2026-10-01\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0030 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-01"
+      }
+    },
+    {
+      "id": "adr-index-0030-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0030's record carries the H1 title \"Generated endpoints are static route handlers; pages negotiate twins by rewrite\".",
+      "check": {
+        "file": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Generated endpoints are static route handlers; pages negotiate twins by rewrite"
+      }
+    },
+    {
+      "id": "adr-index-0030-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0030 gives the record's H1 title, \"Generated endpoints are static route handlers; pages negotiate twins by rewrite\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0030 \\| \\[(.+?)\\]\\(0030-",
+        "equals": "Generated endpoints are static route handlers; pages negotiate twins by rewrite"
+      }
+    },
+    {
+      "id": "adr-0030-link-0015-static-case-study-params",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0015-static-case-study-params.md)",
+      "claim": "The link to 0015-static-case-study-params.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0015-static-case-study-params.md" }],
+      "check": { "path": "docs/adr/0015-static-case-study-params.md" }
+    },
+    {
+      "id": "adr-0030-link-0017-ai-discoverability-policy",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0017-ai-discoverability-policy.md)",
+      "claim": "The link to 0017-ai-discoverability-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0017-ai-discoverability-policy.md" }],
+      "check": { "path": "docs/adr/0017-ai-discoverability-policy.md" }
+    },
+    {
+      "id": "adr-0030-link-0023-static-security-headers",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0023-static-security-headers.md)",
+      "claim": "The link to 0023-static-security-headers.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0023-static-security-headers.md" }],
+      "check": { "path": "docs/adr/0023-static-security-headers.md" }
+    },
+    {
+      "id": "adr-0030-link-0025-production-alias-noindex",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0025-production-alias-noindex.md)",
+      "claim": "The link to 0025-production-alias-noindex.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0025-production-alias-noindex.md" }],
+      "check": { "path": "docs/adr/0025-production-alias-noindex.md" }
+    },
+    {
+      "id": "adr-0030-link-0026-vercel-web-analytics",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0026-vercel-web-analytics.md)",
+      "claim": "The link to 0026-vercel-web-analytics.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0026-vercel-web-analytics.md" }],
+      "check": { "path": "docs/adr/0026-vercel-web-analytics.md" }
+    },
+    {
+      "id": "adr-0030-script-check-build-output",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`pnpm check:build-output`",
+      "claim": "`pnpm check:build-output` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [{ "kind": "script", "token": "check:build-output" }],
+      "check": { "package": ".", "script": "check:build-output" }
+    },
+    {
+      "id": "adr-0030-accept-match",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`ACCEPTS_MARKDOWN` matches `text/markdown` as a",
+      "claim": "next.config.ts keys each Markdown rewrite on ACCEPTS_MARKDOWN in its has conditions.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": { "path": "apps/web/next.config.ts", "contains": "has: [ACCEPTS_MARKDOWN]," }
+    },
+    {
+      "id": "adr-0030-refuses-match",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`REFUSES_MARKDOWN` matches it with a",
+      "claim": "next.config.ts skips each Markdown rewrite on REFUSES_MARKDOWN, a weight of zero, in its missing conditions.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": { "path": "apps/web/next.config.ts", "contains": "missing: [REFUSES_MARKDOWN]," }
+    },
+    {
+      "id": "adr-0030-before-files",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "one `beforeFiles` rewrite per route",
+      "claim": "next.config.ts returns the Markdown rewrites as its beforeFiles rewrites.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": { "path": "apps/web/next.config.ts", "contains": "beforeFiles: markdownRewrites()" }
+    },
+    {
+      "id": "adr-0030-live-negotiation-spec",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`apps/web/e2e-live/markdown-negotiation.spec.ts` asks each negotiating",
+      "claim": "The live check's directory holds the spec that asks each negotiating route for Markdown and as a browser in both orders.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e-live/markdown-negotiation.spec.ts",
+        "contains": "serves Markdown to an agent after a browser's request"
+      }
+    },
+    {
+      "id": "adr-0030-relative-import",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`content-date.ts` by relative path",
+      "claim": "case-studies.ts imports content-date by a relative path, because next.config.ts reaches it through Next's config loader.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/case-studies.ts",
+        "contains": "from '../lib/content-date'"
+      }
+    },
+    {
       "id": "adr-index-0025-cell-date",
       "doc": "docs/adr/README.md",
       "anchor": "| 0025 |",
@@ -8921,6 +9494,185 @@
         "file": "docs/plans/README.md",
         "regex": "^\\| \\[2026\\-09\\-24\\-mobile\\-lighthouse\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
         "equals": "Shipped"
+      }
+    },
+    {
+      "id": "plans-readme-link-2026-09-28-blog-engine-design",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-09-28-blog-engine-design.md)",
+      "claim": "The link to 2026-09-28-blog-engine-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-28-blog-engine-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-design.md"
+      }
+    },
+    {
+      "id": "plans-readme-link-2026-09-28-blog-engine-plan",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-09-28-blog-engine-plan.md)",
+      "claim": "The link to 2026-09-28-blog-engine-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-28-blog-engine-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-plan.md"
+      }
+    },
+    {
+      "id": "plans-readme-link-adr-0028-blog-posts-as-typed-data",
+      "doc": "docs/plans/README.md",
+      "anchor": "](../adr/0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to ../adr/0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-28-blog-engine-design-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-28-blog-engine-design.md](2026-09-28-blog-engine-design.md)",
+      "claim": "The plans index gives 2026-09-28-blog-engine-design.md the status \"In review\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-28\\-blog\\-engine\\-design\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "In review"
+      }
+    },
+    {
+      "id": "plans-index-2026-09-28-blog-engine-plan-cell-status",
+      "doc": "docs/plans/README.md",
+      "anchor": "| [2026-09-28-blog-engine-plan.md](2026-09-28-blog-engine-plan.md)",
+      "claim": "The plans index gives 2026-09-28-blog-engine-plan.md the status \"In review\".",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "docs/plans/README.md",
+        "regex": "^\\| \\[2026\\-09\\-28\\-blog\\-engine\\-plan\\.md\\]\\([^)]+\\)\\s*\\|\\s*\\w+\\s*\\|\\s*([^|]+?)\\s*\\|",
+        "equals": "In review"
+      }
+    },
+    {
+      "id": "plan-blog-engine-design-link-adr-0028-blog-posts-as-typed-data",
+      "doc": "docs/plans/2026-09-28-blog-engine-design.md",
+      "anchor": "](../adr/0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to ../adr/0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "plan-blog-engine-design-link-adr-0017-ai-discoverability-policy",
+      "doc": "docs/plans/2026-09-28-blog-engine-design.md",
+      "anchor": "](../adr/0017-ai-discoverability-policy.md)",
+      "claim": "The link to ../adr/0017-ai-discoverability-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0017-ai-discoverability-policy.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0017-ai-discoverability-policy.md"
+      }
+    },
+    {
+      "id": "plan-blog-engine-design-link-adr-0015-static-case-study-params",
+      "doc": "docs/plans/2026-09-28-blog-engine-design.md",
+      "anchor": "](../adr/0015-static-case-study-params.md)",
+      "claim": "The link to ../adr/0015-static-case-study-params.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0015-static-case-study-params.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0015-static-case-study-params.md"
+      }
+    },
+    {
+      "id": "plan-blog-engine-design-link-2026-09-28-blog-engine-plan",
+      "doc": "docs/plans/2026-09-28-blog-engine-design.md",
+      "anchor": "](2026-09-28-blog-engine-plan.md)",
+      "claim": "The link to 2026-09-28-blog-engine-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-28-blog-engine-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-plan.md"
+      }
+    },
+    {
+      "id": "plan-blog-engine-plan-link-2026-09-28-blog-engine-design",
+      "doc": "docs/plans/2026-09-28-blog-engine-plan.md",
+      "anchor": "](2026-09-28-blog-engine-design.md)",
+      "claim": "The link to 2026-09-28-blog-engine-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-28-blog-engine-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-design.md"
+      }
+    },
+    {
+      "id": "plan-blog-engine-plan-link-adr-0028-blog-posts-as-typed-data",
+      "doc": "docs/plans/2026-09-28-blog-engine-plan.md",
+      "anchor": "](../adr/0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to ../adr/0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
       }
     },
     {

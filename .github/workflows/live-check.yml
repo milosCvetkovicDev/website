@@ -2,9 +2,11 @@ name: Live check
 
 # Loads every route of the live site and checks what only a Vercel deployment can show: each page
 # loads the Web Analytics tracker, the page's request for that script answers 200, the console logs
-# no error or warning, and nothing is stored (apps/web/e2e-live, ADR 0026). It runs after Vercel
-# reports a production deployment ready, every morning (an Instant Rollback, a promotion or a CLI
-# deploy can change what the apex serves without a status reaching GitHub), and on dispatch.
+# no error or warning, and nothing is stored (ADR 0026); and the CDN keeps a page and its Markdown
+# twin apart, a browser getting the page and an agent the twin in either order (ADR 0030). The
+# specs are in apps/web/e2e-live. It runs after Vercel reports a production deployment ready,
+# every morning (an Instant Rollback, a promotion or a CLI deploy can change what the apex serves
+# without a status reaching GitHub), and on dispatch.
 #
 # None of it is a required check. Vercel reports a deployment_status for every deployment, previews
 # included, and GitHub runs this file as it stands at the deployed commit, a pull request branch's

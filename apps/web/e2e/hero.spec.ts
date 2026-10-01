@@ -1,5 +1,35 @@
-import { test, expect } from '@playwright/test';
-import { expectHydrated } from './support/hydration';
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { expectHydrated, gotoHydrated } from './support/hydration';
+import { servedText } from './support/served-text';
+
+/** The tmux background's pane titles, left to right. */
+const PANE_TITLES = [
+  'kubectl — pods',
+  'psql — slow query log',
+  'gh actions — CI pipeline',
+  'nginx — access + error',
+  'prometheus — alerts',
+];
+
+/**
+ * The tmux background is aria-hidden, so no role query reaches a pane: each pane root carries
+ * `data-tmux-pane` (`src/components/animated-hero/tmux-background.tsx`).
+ */
+const tmuxPanes = (page: Page) => page.locator('[data-tmux-pane]');
+const tmuxPane = (page: Page, title: string) =>
+  tmuxPanes(page).filter({ has: page.getByText(title, { exact: true }) });
+
+/** The hero `<section>`, by the start of its aria-label. */
+const heroSection = (page: Page) => page.locator('section[aria-label^="Hero"]');
+
+/**
+ * The Scroll indicator's wrapper: the element that carries the display gate and the fade. The
+ * indicator is aria-hidden, so no role query reaches it; its "Scroll" label is found in the hero
+ * section, without `.first()`, so a second "Scroll" there fails the locator's strictness rather than
+ * being measured in its place.
+ */
+const scrollIndicator = (page: Page) =>
+  heroSection(page).getByText('Scroll', { exact: true }).locator('..');
 
 test.describe('Hero Section', () => {
   test.beforeEach(async ({ page }) => {
@@ -46,28 +76,25 @@ test.describe('Hero Section', () => {
   });
 
   test('tmux background renders with 5 panes', async ({ page }) => {
-    await expect(page.getByText('kubectl', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('psql', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('gh actions', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('nginx', { exact: false }).first()).toBeVisible();
-    await expect(page.getByText('prometheus', { exact: false }).first()).toBeVisible();
+    await expect(tmuxPanes(page)).toHaveCount(PANE_TITLES.length);
+    // One pane per title, so the count above is five different panes and not one matched twice.
+    for (const title of PANE_TITLES) {
+      await expect(tmuxPane(page, title), `the ${title} pane`).toHaveCount(1);
+      await expect(tmuxPane(page, title), `the ${title} pane`).toBeVisible();
+    }
   });
 
   test('tmux panes are divided by a 2 px border, with none at the right edge', async ({ page }) => {
-    const titles = [
-      'kubectl — pods',
-      'psql — slow query log',
-      'gh actions — CI pipeline',
-      'nginx — access + error',
-      'prometheus — alerts',
-    ];
     const widths: string[] = [];
-    for (const title of titles) {
-      // The title sits in the pane's title bar, which is the pane's first child.
-      const pane = page.getByText(title, { exact: true }).locator('../..');
+    for (const title of PANE_TITLES) {
+      const pane = tmuxPane(page, title);
+      // Named here, because evaluate on a missing pane only times out.
+      await expect(pane, `the ${title} pane`).toHaveCount(1);
       widths.push(await pane.evaluate((el) => getComputedStyle(el).borderRightWidth));
     }
-    expect(widths).toEqual(['2px', '2px', '2px', '2px', '0px']);
+    expect(widths).toEqual(
+      PANE_TITLES.map((_, i) => (i === PANE_TITLES.length - 1 ? '0px' : '2px')),
+    );
   });
 
   test('the server-rendered tmux background survives hydration', async ({ page }) => {
@@ -167,25 +194,6 @@ test.describe('Hero Section', () => {
     await expect(page.getByRole('link', { name: /connect on linkedin/i })).toBeAttached();
   });
 
-  test('story sections are server-rendered', async ({ page }) => {
-    const response = await page.goto('/');
-    const html = (await response?.text()) ?? '';
-    // Plain text from four of the six sections, and the three closing headlines that `AnimatedText`
-    // splits into one span per letter: beside the split copy each carries a visually hidden one with
-    // the sentence whole, so the sentence is in the response as a crawler or a screen reader reads it.
-    for (const copy of [
-      'TECH TREE',
-      'CI/CD PIPELINE',
-      'SELF-HEALING LOG',
-      'Connect on LinkedIn',
-      'Most bugs live in the gap between what you asked for and what you meant.',
-      'The bottleneck was never my typing speed.',
-      'This happened at 3:14am. Nobody got paged.',
-    ]) {
-      expect(html).toContain(copy);
-    }
-  });
-
   test('scrolling through the story does not shift visible layout', async ({ page }) => {
     // Reduced motion, deliberately: the phases stage their own content in as they animate (the CI
     // pipeline rows, the healing log), and those are intended movements, not layout instability.
@@ -193,7 +201,11 @@ test.describe('Hero Section', () => {
     // is the page being unstable — which is what this guard is for. It also makes the measurement
     // independent of machine load, which a run on a busy laptop is not.
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/');
+    // Hydrated before it scrolls, so the scroll never races hydration. The measurement still covers
+    // the load and the re-render that follows hydration (under `reduce` the phases switch to their
+    // end state in it), which visitors get too: `buffered` hands the observer every shift recorded
+    // since the navigation started, not only those after this script runs.
+    await gotoHydrated(page, '/');
     // Programmatic scrolling is not user input, so nothing here is discounted as recent input.
     const shiftScore = await page.evaluate(async () => {
       let total = 0;
@@ -203,7 +215,7 @@ test.describe('Hero Section', () => {
           if (!shift.hadRecentInput) total += shift.value;
         }
       });
-      observer.observe({ type: 'layout-shift' });
+      observer.observe({ type: 'layout-shift', buffered: true });
       const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
       for (let y = 0; y <= document.documentElement.scrollHeight; y += 400) {
         window.scrollTo(0, y);
@@ -216,21 +228,32 @@ test.describe('Hero Section', () => {
     expect(shiftScore).toBeLessThan(0.02);
   });
 
-  test('scroll indicator fades on scroll', async ({ page }) => {
-    const indicator = page.getByText('Scroll', { exact: true }).first().locator('..');
-    await expect(indicator).toHaveCSS('opacity', '1');
+  // The indicator is displayed from `lg` and 960 px tall only, so not at the desktop project's
+  // 1280x720, where it would cover the hero card (#134; the scan below). An element that is not
+  // displayed still computes opacity 1, and then 0, so without a tall enough viewport and the
+  // display check this test would pass while showing nothing. The `beforeEach` above loads the
+  // page at this size, so the page is laid out at it from the start rather than resized.
+  test.describe('at 1280x1024', () => {
+    test.use({ viewport: { width: 1280, height: 1024 } });
 
-    // A wheel scroll, as a visitor makes, not window.scrollTo. Chromium can undo a scripted scroll made
-    // this soon after hydration: the page snaps back to the top, with no script scrolling it, some 70 ms
-    // after Next's post-hydration history.replaceState. A user scroll is never undone. Measured on
-    // production builds of this branch and of main alike: 0 of 10 wheel scrolls and 2 to 5 of 10
-    // scripted ones snapped back. The boot loader used to hide it, holding every test 600 ms past
-    // hydration (ADR 0022).
-    await page.mouse.move(640, 360);
-    await page.mouse.wheel(0, 500);
+    test('scroll indicator fades on scroll', async ({ page }) => {
+      const indicator = scrollIndicator(page);
+      await expect(indicator).toHaveCSS('display', 'flex');
+      await expect(indicator).toHaveCSS('opacity', '1');
 
-    // Playwright counts opacity:0 elements as visible, so assert the computed style the fade produces.
-    await expect(indicator).toHaveCSS('opacity', '0');
+      // A wheel scroll, as a visitor makes, not window.scrollTo. Chromium can undo a scripted scroll
+      // made this soon after hydration: the page snaps back to the top, with no script scrolling it,
+      // some 70 ms after Next's post-hydration history.replaceState. A user scroll is never undone.
+      // Measured on production builds of this branch and of main alike: 0 of 10 wheel scrolls and 2
+      // to 5 of 10 scripted ones snapped back. The boot loader used to hide it, holding every test
+      // 600 ms past hydration (ADR 0022).
+      await page.mouse.move(640, 360);
+      await page.mouse.wheel(0, 500);
+
+      // Playwright counts opacity:0 elements as visible, so assert the computed style the fade
+      // produces.
+      await expect(indicator).toHaveCSS('opacity', '0');
+    });
   });
 
   test('dark mode toggles hero appearance', async ({ page }) => {
@@ -252,21 +275,6 @@ test.describe('Hero Section', () => {
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
   });
 
-  test('hero content is SSR-rendered (SEO)', async ({ page }) => {
-    // Check the raw HTML response for SSR content
-    const response = await page.goto('/');
-    const html = await response?.text();
-
-    expect(html).toContain('This happened at 3am');
-    expect(html).toContain('Milos Cvetkovic');
-    expect(html).toContain('Full Stack Engineer');
-    expect(html).toContain('TypeScript');
-    // In the body, not only in the head's description: the subtitle under the headline says it.
-    const body = html?.slice(html.indexOf('<body'));
-    expect(body).toContain('AI-native development');
-    await expect(page.getByText(/specializing in AI-native development/)).toBeVisible();
-  });
-
   test('has proper semantic HTML', async ({ page }) => {
     // Only one h1 on the page
     const h1Count = await page.locator('h1').count();
@@ -281,5 +289,222 @@ test.describe('Hero Section', () => {
     // Skill tags use a list
     const skillList = page.locator('ul[aria-label="Technical skills"]');
     await expect(skillList).toBeAttached();
+  });
+});
+
+type Rect = { x: number; y: number; width: number; height: number };
+
+/** Whether two boxes share any area; boxes that only touch along an edge do not. */
+const intersects = (a: Rect, b: Rect) =>
+  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+
+const describeRect = (r: Rect) =>
+  `x ${r.x.toFixed(1)}-${(r.x + r.width).toFixed(1)}, y ${r.y.toFixed(1)}-${(r.y + r.height).toFixed(1)}`;
+
+/**
+ * The gate in `hero-section.tsx`, restated so each size knows what it must see: `lg` is 64rem wide,
+ * and the height has to reach both 960 px and 60rem. Media-query rems follow the browser's default
+ * font size, which is 16 px here unless a case sets another.
+ */
+const INDICATOR_GATE = { minWidthRem: 64, minHeightPx: 960, minHeightRem: 60 };
+const indicatorDisplayed = (width: number, height: number, fontSize: number) =>
+  width >= INDICATOR_GATE.minWidthRem * fontSize &&
+  height >= Math.max(INDICATOR_GATE.minHeightPx, INDICATOR_GATE.minHeightRem * fontSize);
+
+/**
+ * How far above the indicator the card's bottom edge must end wherever the indicator is displayed.
+ * The gap was 19.9 px at 1280x960 when #134 was fixed, so the card may grow by about 8 px before
+ * this fails, rather than by 20 px, when it would touch the indicator.
+ */
+const MIN_CLEARANCE_PX = 12;
+
+/**
+ * The Scroll indicator is pinned to the viewport, 44 px above its bottom edge, while the hero card is
+ * centred in a section one small-viewport tall that starts under the sticky header. Losing height
+ * lifts the indicator by the full amount and the card's bottom edge by only half of it, so on short
+ * viewports the indicator sat on the card and on its last row of skill tags (#134: the Kubernetes
+ * tag at 1280x800). `hero-section.tsx` displays it from `lg` and 960 px and 60rem tall only. This is
+ * the guard on that gate, which drifts when the card's height or the header's offset changes:
+ *
+ * - below the gate the indicator must not be displayed, and the card's own "Scroll to see how." is
+ *   in the viewport in its place;
+ * - at and above it the indicator is displayed at rest, and its box (the union of its own and its
+ *   children's, the bouncing dot included) ends at least `MIN_CLEARANCE_PX` below the card.
+ *
+ * The sizes: the six #134 measured, 1280x940 just under the gate, the gate itself at the narrowest
+ * `lg` width, between it and 1280 and at 1280, a tall `lg` portrait, three tall desktops, and a
+ * browser default font of 12 px and of 20 px, where a rem-only or a px-only gate would show the
+ * indicator over the card. Chromium only: the desktop project is the only one that runs this spec,
+ * and `Page.setFontSizes`, the browser setting a visitor changes, is a Chromium DevTools call.
+ *
+ * One test per size, each in a context of its own, so every page is laid out at its size from the
+ * start rather than resized. Outside 'Hero Section', whose `beforeEach` loads the page at the
+ * project's 1280x720 first.
+ */
+test.describe('scroll indicator clears the hero card at rest', () => {
+  const CASES: { width: number; height: number; fontSize?: number }[] = [
+    { width: 1024, height: 768 },
+    { width: 1280, height: 720 },
+    { width: 1280, height: 800 },
+    { width: 1366, height: 768 },
+    { width: 1440, height: 900 },
+    { width: 1536, height: 864 },
+    { width: 1280, height: 940 },
+    { width: 1024, height: 960 },
+    { width: 1152, height: 960 },
+    { width: 1280, height: 960 },
+    { width: 1024, height: 1366 },
+    { width: 1280, height: 1024 },
+    { width: 1680, height: 1050 },
+    { width: 1920, height: 1080 },
+    { width: 1280, height: 800, fontSize: 12 },
+    { width: 1280, height: 960, fontSize: 12 },
+    { width: 1280, height: 1024, fontSize: 20 },
+    { width: 1280, height: 1200, fontSize: 20 },
+  ];
+
+  for (const { width, height, fontSize = 16 } of CASES) {
+    const size = `${width}x${height}${fontSize === 16 ? '' : ` with a ${fontSize} px default font`}`;
+    const displayed = indicatorDisplayed(width, height, fontSize);
+
+    test.describe(`at ${size}`, () => {
+      test.use({ viewport: { width, height } });
+
+      test(
+        displayed
+          ? 'the indicator is displayed at rest, clear of the card'
+          : 'the indicator is not displayed, and the card invites the scroll',
+        async ({ page }) => {
+          if (fontSize !== 16) {
+            const cdp = await page.context().newCDPSession(page);
+            await cdp.send('Page.setFontSizes', { fontSizes: { standard: fontSize } });
+          }
+          await gotoHydrated(page, '/');
+          await page.evaluate(async () => {
+            await document.fonts.ready;
+          });
+
+          const indicator = scrollIndicator(page);
+          await expect(indicator).toHaveAttribute('aria-hidden', 'true');
+          await expect(indicator).toHaveCSS('position', 'fixed');
+          const skills = heroSection(page).getByRole('list', { name: 'Technical skills' });
+          await expect(skills.getByRole('listitem')).not.toHaveCount(0);
+          // The card is the list's parent; holding the headline proves it is not a wrapper of the list.
+          const card = skills.locator('..');
+          await expect(card.getByRole('heading', { level: 1 })).toHaveCount(1);
+
+          // Measured before the display is asserted, so a failure also says whether it overlaps.
+          const display = await indicator.evaluate((el) => getComputedStyle(el).display);
+          let measured = '';
+          if (display !== 'none') {
+            const indicatorBox = await indicator.evaluate((el) => {
+              const rects = [el, ...el.querySelectorAll('*')]
+                .map((node) => node.getBoundingClientRect())
+                .filter((r) => r.width > 0 && r.height > 0);
+              const left = Math.min(...rects.map((r) => r.left));
+              const top = Math.min(...rects.map((r) => r.top));
+              const right = Math.max(...rects.map((r) => r.right));
+              const bottom = Math.max(...rects.map((r) => r.bottom));
+              return { x: left, y: top, width: right - left, height: bottom - top };
+            });
+            const { cardBox, tagBoxes } = await skills.evaluate((list) => {
+              const box = (el: Element) => {
+                const r = el.getBoundingClientRect();
+                return { x: r.x, y: r.y, width: r.width, height: r.height };
+              };
+              return {
+                cardBox: box(list.parentElement!),
+                tagBoxes: [...list.querySelectorAll('li')].map((li) => ({
+                  what: `the "${li.textContent}" tag`,
+                  box: box(li),
+                })),
+              };
+            });
+            const gap = indicatorBox.y - (cardBox.y + cardBox.height);
+            const covered = [{ what: 'the hero card', box: cardBox }, ...tagBoxes]
+              .filter(({ box }) => intersects(indicatorBox, box))
+              .map(({ what, box }) => `${what} (${describeRect(box)})`);
+            measured =
+              `the Scroll indicator (${describeRect(indicatorBox)}) is ${gap.toFixed(1)} px below ` +
+              `the hero card (${describeRect(cardBox)})` +
+              (covered.length ? `, covering ${covered.join(', ')}` : '');
+            if (displayed) {
+              expect(gap, `at ${size} ${measured}`).toBeGreaterThanOrEqual(MIN_CLEARANCE_PX);
+            }
+          }
+          expect(
+            display,
+            `at ${size} the Scroll indicator must ${displayed ? '' : 'not '}be displayed` +
+              (measured ? `; ${measured}` : ''),
+          ).toBe(displayed ? 'flex' : 'none');
+
+          if (displayed) {
+            await expect(indicator).toHaveCSS('opacity', '1');
+          } else {
+            await expect(heroSection(page).getByText('Scroll to see how.')).toBeInViewport();
+          }
+        },
+      );
+    });
+  }
+});
+
+/**
+ * The served HTML, fetched with `request` rather than a second navigation of the page, and read as
+ * text by `servedText` from `<body>` (`support/served-text.ts`). Script, style and template content
+ * does not count, so a phrase cannot pass on the RSC payload Next inlines in `<script>` tags (which
+ * carries the props of client components, rendered or not), and attributes do not count, so the
+ * head's description `<meta>` cannot supply one either. No `beforeEach`: these read the response,
+ * not a page, and `servedText` parses it on `about:blank`.
+ */
+test.describe('Hero Section: served HTML', () => {
+  const served = async (page: Page, request: APIRequestContext) => {
+    const response = await request.get('/');
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    return { html, body: await servedText(page, html, { root: 'body' }) };
+  };
+  const servedBody = async (page: Page, request: APIRequestContext) =>
+    (await served(page, request)).body;
+
+  /** The three closing headlines that `AnimatedText` splits into one span per letter. */
+  const SPLIT_HEADLINES = [
+    'Most bugs live in the gap between what you asked for and what you meant.',
+    'The bottleneck was never my typing speed.',
+    'This happened at 3:14am. Nobody got paged.',
+  ];
+
+  test('story sections are server-rendered', async ({ page, request }) => {
+    const { html, body } = await served(page, request);
+    // Plain text from four of the six sections, and the three closing headlines.
+    for (const copy of [
+      'TECH TREE',
+      'CI/CD PIPELINE',
+      'SELF-HEALING LOG',
+      'Connect on LinkedIn',
+      ...SPLIT_HEADLINES,
+    ]) {
+      expect(body).toContain(copy);
+    }
+    // Reading text nodes joins the split letters back into the sentence, so the body text alone
+    // cannot tell the split copy from the whole one. Beside the split copy each headline carries a
+    // visually hidden one with the sentence whole, so the sentence is in the response as one run of
+    // text, as a crawler or a screen reader reads it.
+    for (const headline of SPLIT_HEADLINES) {
+      expect(html).toContain(headline);
+    }
+  });
+
+  test('hero content is SSR-rendered (SEO)', async ({ page, request }) => {
+    const body = await servedBody(page, request);
+    expect(body).toContain('This happened at 3am');
+    expect(body).toContain('Milos Cvetkovic');
+    expect(body).toContain('Full Stack Engineer');
+    expect(body).toContain('TypeScript');
+    // The subtitle under the headline, not the head's description, which says it too.
+    expect(body).toContain('specializing in AI-native development');
+    // And it survives hydration.
+    await gotoHydrated(page, '/');
+    await expect(page.getByText(/specializing in AI-native development/)).toBeVisible();
   });
 });

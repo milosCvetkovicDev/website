@@ -495,12 +495,15 @@ function StaticPane({ config }: { config: PaneConfig }) {
   const lines = config.seq.slice(0, 15);
   return (
     <div
+      // Test hooks, here and on the slot container: the tree is aria-hidden, so no role reaches it.
+      data-tmux-pane=""
       className="flex min-w-0 flex-1 flex-col overflow-hidden border-r-2 last:border-r-0"
       style={{ borderColor: 'var(--tmux-border)' }}
     >
       <PaneTitle title={config.title} host={config.host} />
       <div className="relative flex-1 overflow-hidden">
         <div
+          data-tmux-slots=""
           className="absolute right-0 bottom-0 left-0 font-mono whitespace-nowrap"
           style={{ padding: '6px 10px', fontSize: '14px', lineHeight: '1.65' }}
         >
@@ -661,6 +664,8 @@ function AnimatedPane({
 
   return (
     <div
+      // Test hooks, here and on the slot container: the tree is aria-hidden, so no role reaches it.
+      data-tmux-pane=""
       className="flex min-w-0 flex-1 flex-col overflow-hidden border-r-2 last:border-r-0"
       style={{ borderColor: 'var(--tmux-border)' }}
     >
@@ -668,6 +673,7 @@ function AnimatedPane({
       <div ref={viewportRef} className="relative flex-1 overflow-hidden">
         <div
           ref={slotsRef}
+          data-tmux-slots=""
           className="absolute right-0 bottom-0 left-0 font-mono whitespace-nowrap"
           style={{
             padding: `${PANE_PADDING_Y_PX}px ${PANE_PADDING_X_PX}px`,

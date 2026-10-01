@@ -6,6 +6,13 @@ import type { NextConfig } from 'next';
 // the wire can import it: Playwright loads TypeScript as CommonJS, where this file's
 // `import.meta.url` is a syntax error.
 import { PRODUCTION_ALIAS_HOST } from './production-alias';
+// Relative paths all the way down: Next's config loader compiles every module it requires with the
+// same options and no file name, so an `@/` import becomes `./src/...`, a path that is right only
+// beside this file. No module these reach may use the alias (`src/test/next-config.test.ts` loads
+// this file through that loader to prove it).
+import { caseStudies } from './src/data/case-studies';
+import { STATIC_ROUTE_UPDATED } from './src/data/static-routes';
+import { markdownTwinPath } from './src/lib/pathname';
 
 /**
  * The nearest ancestor of `startDir` that holds a `pnpm-workspace.yaml`, or null if there is none.
@@ -143,6 +150,73 @@ export function securityHeaders(env: HeaderEnv): { key: string; value: string }[
  */
 export const PRODUCTION_ALIAS_HEADERS = [{ key: 'X-Robots-Tag', value: 'noindex' }];
 
+/**
+ * Every route that has a Markdown twin (#59): the static routes, which are the keys of
+ * `STATIC_ROUTE_UPDATED` (`data/pages` holds a record for each), and one route per case study. The
+ * same list the twins' route handlers are built from, so a route gains its rewrite with its twin.
+ */
+export const MARKDOWN_ROUTES: readonly string[] = [
+  ...Object.keys(STATIC_ROUTE_UPDATED),
+  ...caseStudies.map(({ slug }) => `/work/${slug}`),
+];
+
+/**
+ * A request whose `Accept` header lists the media range `text/markdown`: at the start of the header
+ * or after a comma, and followed by its end, a parameter or the next range, so `text/markdownx` or
+ * `application/vnd.x+text/markdown` does not count. Next anchors the value (`^…$`) and matches it
+ * case-sensitively, so `Text/Markdown` does not count either (ADR 0030).
+ */
+export const ACCEPTS_MARKDOWN = {
+  type: 'header',
+  key: 'accept',
+  value: String.raw`(?:.*,)?\s*text/markdown\s*(?:[;,].*)?`,
+} as const;
+
+/**
+ * A request that lists `text/markdown` with a weight of zero (`q=0` up to `q=0.000`, after any
+ * other parameters), which RFC 9110 makes a refusal. It goes in the rule's `missing`, so such a
+ * request is served the page. Any other weight is not ranked against the other ranges:
+ * `text/html, text/markdown;q=0.1` still gets Markdown, because ranking needs code that runs per
+ * request, which ADR 0017 refuses (ADR 0030).
+ */
+export const REFUSES_MARKDOWN = {
+  type: 'header',
+  key: 'accept',
+  value: String.raw`(?:.*,)?\s*text/markdown\s*(?:;[^,]*)?;\s*[qQ]=0(?:\.0{0,3})?\s*(?:[;,].*)?`,
+} as const;
+
+/**
+ * One `beforeFiles` rewrite per route with a twin: a request for the page that asks for Markdown is
+ * served the twin, prerendered like the page, and every other request is served the page. One rule
+ * per route rather than a `/:path*` source, which would also rewrite a Markdown-asking request for
+ * a path that exists without a twin (`robots.txt`, the sitemap, an Open Graph image, a
+ * `/_next/static` chunk) to an `index.md` below it that does not exist.
+ */
+export function markdownRewrites() {
+  return MARKDOWN_ROUTES.map((route) => ({
+    source: route,
+    has: [ACCEPTS_MARKDOWN],
+    missing: [REFUSES_MARKDOWN],
+    destination: markdownTwinPath(route),
+  }));
+}
+
+/**
+ * `Vary: Accept` on each route that negotiates, so a shared or browser cache keeps the two
+ * representations of one URL apart. Next matches `headers()` against the requested path, before
+ * the rewrite, so the negotiated Markdown answer carries it. The twin's own URL is left out: it
+ * serves one representation whatever the request accepts, and varying it would only split caches
+ * by `Accept` string. Its own entries, over exactly these paths: the key is one ADR 0023's and
+ * ADR 0025's entries do not set. On an HTML page Next replaces this `Vary` with its own after
+ * `headers()` has run (ADR 0030).
+ */
+export function varyOnAccept() {
+  return MARKDOWN_ROUTES.map((source) => ({
+    source,
+    headers: [{ key: 'Vary', value: 'Accept' }],
+  }));
+}
+
 const nextConfig: NextConfig = {
   // Outside a pnpm workspace there is no nested-lockfile problem to solve, so leave the root to
   // Next's own inference rather than failing the build or refusing to boot the server.
@@ -182,7 +256,11 @@ const nextConfig: NextConfig = {
         has: [{ type: 'host', value: PRODUCTION_ALIAS_HOST }],
         headers: PRODUCTION_ALIAS_HEADERS,
       },
+      ...varyOnAccept(),
     ];
+  },
+  async rewrites() {
+    return { beforeFiles: markdownRewrites(), afterFiles: [], fallback: [] };
   },
 };
 

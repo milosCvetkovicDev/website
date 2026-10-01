@@ -79,7 +79,7 @@ describe('the day the printed figure took effect', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-30T12:00:00Z'));
     const today = (await import('../static-routes')).STATIC_ROUTE_UPDATED;
-    expect(today['/']).toBe('2026-09-25');
+    expect(today['/']).toBe('2026-09-30');
     expect(today['/about']).toBe('2026-09-30');
 
     vi.resetModules();

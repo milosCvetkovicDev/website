@@ -88,24 +88,43 @@ export function HeroSection({ children }: { children?: ReactNode }) {
       {/* 3. Server-rendered content island (passed as children) */}
       {children}
 
-      {/* 4. Scroll indicator -- fixed, bottom-11, z-20 */}
+      {/* 4. Scroll indicator -- fixed, bottom-11, z-20, displayed from `lg` and from 960 px and
+          60rem tall only. It is pinned to the viewport while the card is centred in a section one
+          small-viewport tall that starts under the sticky header, so losing height lifts the
+          indicator by the full amount but the card's bottom edge by only half of it. Measured in
+          Chromium for #134 (2026-09-28, 16 px default font): with the card 583 px tall and its
+          centre 69 px below the viewport's, the gap from the card's bottom edge down to the
+          indicator's top was (viewport height / 2) - 460.1 px at every lg size, negative where they
+          overlap, so the indicator clears the card from 921 px tall and 960 px leaves about 20 px.
+          Both heights guard against the visitor's default font size, which media-query rems follow
+          while most of the card is set in px: a smaller default would pull 60rem alone below the
+          card (720 px at 12 px), and a larger one grows the rem-sized part of the card and header,
+          never by more than the 60rem it also raises. Shorter screens do not display it, and the
+          card's own "Scroll to see how." invites the scroll there. A media query rather than a
+          measurement, so the served markup is the same at every size (ADR 0006). The figures drift
+          when the card or the header changes: 'scroll indicator clears the hero card at rest' in
+          e2e/hero.spec.ts asserts the gate and a minimum clearance, at both font extremes too.
+          Decorative, aria-hidden and without a handler, so it never takes the pointer. */}
       <div
         aria-hidden="true"
-        className={`fixed bottom-11 left-1/2 z-20 hidden -translate-x-1/2 flex-col items-center gap-1.5 transition-opacity duration-300 lg:flex ${
-          showScrollIndicator ? 'opacity-100' : 'pointer-events-none opacity-0'
+        className={`pointer-events-none fixed bottom-11 left-1/2 z-20 hidden -translate-x-1/2 flex-col items-center gap-1.5 transition-opacity duration-300 lg:[@media(min-height:960px)_and_(min-height:60rem)]:flex ${
+          showScrollIndicator ? 'opacity-100' : 'opacity-0'
         }`}
       >
         <span
-          className="font-mono tracking-[0.2em] uppercase"
+          className="font-mono tracking-[0.2em] text-[var(--accent-text)] uppercase"
           style={{
             fontSize: '9px',
-            color: 'rgba(139, 92, 246, 0.7)',
-            textShadow: '0 1px 10px rgba(0,0,0,0.9)',
+            // A halo of the page's own colour lifts the label off the tmux panes behind it in both
+            // themes. A black one in light pulled the pixels under the glyphs down to rgb(219):
+            // e2e/hero-contrast.spec.ts measures the label against --background and holds the halo
+            // to it, since its probe cannot see a shadow.
+            textShadow: '0 1px 10px var(--background)',
           }}
         >
           Scroll
         </span>
-        <div className="relative h-[36px] w-[22px] rounded-[11px] border-[1.5px] border-[rgba(99,102,241,0.3)] bg-white/60 dark:border-[rgba(139,92,246,0.35)] dark:bg-[rgba(10,10,10,0.6)]">
+        <div className="relative h-[36px] w-[22px] rounded-[11px] border-[1.5px] border-[var(--accent)]/30 bg-[var(--background)]/60">
           <div
             className="absolute left-1/2 h-[5px] w-[5px] -translate-x-1/2 rounded-full bg-[var(--accent)]"
             style={{

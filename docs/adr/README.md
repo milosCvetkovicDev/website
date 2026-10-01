@@ -53,6 +53,9 @@ perform an operation.
 | 0025 | [The public `vercel.app` production alias answers `X-Robots-Tag: noindex`](0025-production-alias-noindex.md)                             | Accepted                                      | 2026-09-25 |
 | 0026 | [Vercel Web Analytics loads in Vercel deployments only](0026-vercel-web-analytics.md)                                                    | Accepted (corrected 2026-09-27)               | 2026-09-26 |
 | 0027 | [vite 8 is declared in `apps/web`, and `allowBuilds` keeps one entry](0027-vite-8-in-apps-web.md)                                        | Accepted                                      | 2026-09-28 |
+| 0028 | [Blog posts are typed data, and the owner writes every one](0028-blog-posts-as-typed-data.md)                                            | Accepted                                      | 2026-09-29 |
+| 0029 | [A read-only, unauthenticated MCP server at /mcp is the site's one server function](0029-read-only-mcp-server.md)                        | Proposed                                      | 2026-09-30 |
+| 0030 | [Generated endpoints are static route handlers; pages negotiate twins by rewrite](0030-generated-endpoints-as-static-route-handlers.md)  | Accepted                                      | 2026-10-01 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see

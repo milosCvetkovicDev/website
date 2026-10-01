@@ -71,7 +71,7 @@ CI runs on every pull request and every push to `main` (`.github/workflows/ci.ym
 | `pnpm typecheck`                  | `next typegen && tsc --noEmit` (web), strict `checkJs` over `scripts/`                                                              | -                  | yes |
 | `pnpm test`                       | Vitest unit tests                                                                                                                   | -                  | yes |
 | `pnpm build`                      | Production build of `apps/web`                                                                                                      | -                  | yes |
-| `pnpm check:build-output`         | Every route in the web build prerendered, with its body file, and no server function outside an allowlist that is empty             | -                  | yes |
+| `pnpm check:build-output`         | Every route in the web build prerendered, with its body file, and no server function but `/mcp`, the allowlist's one entry          | -                  | yes |
 | `pnpm --filter web test:e2e`      | Playwright against the production build; a test that passes only on a retry fails the run                                           | -                  | yes |
 | `scripts/check-webserver-log.mjs` | Anything the web server wrote to stderr during the e2e run, beyond ADR 0015's `NoFallbackError` block                               | -                  | yes |
 
@@ -79,7 +79,7 @@ CodeQL default setup is on as well. GitHub manages it outside `.github/workflows
 
 `.github/workflows/flake-hunt.yml` is not a check: every night it runs the e2e suite 30 times with `scripts/flake-hunt.sh` and opens an issue for flaky tests no open `flake-hunt` issue tracks yet.
 
-`.github/workflows/live-check.yml` is not a check either: after each production deployment and every morning it loads every page of the live site with `apps/web/playwright.live.config.ts`, fails when a page does not load the Web Analytics tracker, logs an error or warning to the console, or stores a cookie or a storage entry, and opens an issue when it fails. It cannot see a page view reach Vercel: the tracker sends none to an automated browser.
+`.github/workflows/live-check.yml` is not a check either: after each production deployment and every morning it loads every page of the live site with `apps/web/playwright.live.config.ts`, fails when a page does not load the Web Analytics tracker, logs an error or warning to the console, or stores a cookie or a storage entry, or when a page's URL, asked in both orders, serves a browser Markdown or an agent that asks for Markdown the HTML page, and opens an issue when it fails. It cannot see a page view reach Vercel: the tracker sends none to an automated browser.
 
 Useful extras: `pnpm lint:fix`, `pnpm format`, `pnpm clean`.
 

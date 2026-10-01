@@ -28,14 +28,15 @@ function playerStats() {
 function PlayerCard() {
   return (
     <div className="mb-6 w-full max-w-[420px] overflow-hidden rounded-lg border border-black/[0.08] bg-white/95 font-mono text-xs transition-all duration-300 hover:border-[rgba(139,92,246,0.35)] hover:shadow-[0_0_30px_rgba(139,92,246,0.06)] sm:mb-8 dark:border-[rgba(90,97,144,0.25)] dark:bg-[rgba(22,27,34,0.9)]">
-      {/* Header with dots */}
+      {/* Header with the three window controls, decoration only */}
       <div
+        data-window-controls
         className="flex items-center gap-[7px] border-b border-black/[0.06] bg-[#f5f5f8]/95 px-3 py-1.5 dark:border-[rgba(90,97,144,0.2)] dark:bg-[rgba(30,34,48,0.9)]"
         aria-hidden="true"
       >
-        <div className="h-[10px] w-[10px] rounded-full bg-[#ff5f56]" />
-        <div className="h-[10px] w-[10px] rounded-full bg-[#ffbd2e]" />
-        <div className="h-[10px] w-[10px] rounded-full bg-[#27c93f]" />
+        <div data-window-dot className="h-[10px] w-[10px] rounded-full bg-[#ff5f56]" />
+        <div data-window-dot className="h-[10px] w-[10px] rounded-full bg-[#ffbd2e]" />
+        <div data-window-dot className="h-[10px] w-[10px] rounded-full bg-[#27c93f]" />
       </div>
 
       {/* Body with stats - semantic definition list */}
@@ -108,7 +109,7 @@ function SkillTags() {
       {SKILL_TAGS.map((tag) => (
         <li
           key={tag}
-          className="rounded-[3px] border border-[rgba(99,102,241,0.2)] bg-transparent px-[9px] py-[3px] font-mono text-[rgba(99,102,241,0.7)] transition-all duration-200 hover:border-[rgba(139,92,246,0.4)] hover:text-[#a78bfa] dark:border-[rgba(139,92,246,0.15)] dark:text-[rgba(167,139,250,0.6)]"
+          className="rounded-[3px] border border-[var(--accent)]/20 bg-transparent px-[9px] py-[3px] font-mono text-[var(--muted)] transition-colors duration-200 hover:border-[var(--accent)]/40 hover:text-[var(--accent-text)]"
           style={{
             fontSize: '10px',
           }}
@@ -164,16 +165,7 @@ export function HeroContent() {
         >
           I build systems that inherit chaos and ship clarity.
           <br />
-          <span
-            className="font-bold"
-            style={{
-              background: 'linear-gradient(135deg, #a78bfa, #22d3ee)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            Scroll to see how.
-          </span>
+          <span className="font-bold text-[var(--accent-text)]">Scroll to see how.</span>
         </p>
       </div>
 
