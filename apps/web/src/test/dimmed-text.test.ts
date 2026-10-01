@@ -2,10 +2,10 @@
  * Guard for the colour rule ADR 0008 set and ADR 0011 carried over, which CLAUDE.md restates under
  * Conventions: text is not dimmed with an opacity modifier, "decorative or `aria-hidden` text
  * included, since axe measures it either way". The axe gate (`e2e/accessibility.spec.ts`) enforces
- * it only on what a route renders, at the moment it samples: `CodeLine`'s line numbers,
- * `text-[var(--muted)]/50` at 2.74:1 on the Terminal, went unnoticed until #110 because no route
- * rendered `CodeLine` (#47 has since deleted it). This reads the source instead, so it sees every
- * component a page uses or not.
+ * it only on what a route renders, at the moment it samples: the code-line component's line
+ * numbers, `text-[var(--muted)]/50` at 2.74:1 on the Terminal, went unnoticed until #110 because no
+ * route rendered that component (#47 has since deleted it). This reads the source instead, so it
+ * sees every component a page uses or not.
  *
  * It reads every module under `src/components` outside tests and flags dimming declared in the
  * markup that reaches text:
@@ -27,12 +27,12 @@
  * `opacity-0` and an alpha of 0 hide rather than dim, so the reveal idiom stays legal. "Reaches
  * text" is structural: text or an expression anywhere under the element, SVG `<text>` included, or
  * content the scan cannot see, such as an imported component's output. An opacity reaches the whole
- * subtree, because it composites everything under the element, which is how `DataStream`'s
- * `opacity-10` wrapper dimmed digits one element down until #111. A colour stops where a descendant
- * always sets its own, and SVG text takes `fill` rather than `color`, so a decorative SVG can keep
- * a dimmed `currentColor`, as the section progress corners do. A class a variant aims elsewhere
- * reaches what it aims at: the children or descendants `*:`, `**:` and `[&_p]:` select, or the
- * content `before:` generates. A component of the same module is followed through its props:
+ * subtree, because it composites everything under the element, which is how the data-stream
+ * texture's `opacity-10` wrapper dimmed digits one element down until #111. A colour stops where
+ * a descendant always sets its own, and SVG text takes `fill` rather than `color`, so a decorative
+ * SVG can keep a dimmed `currentColor`, as the section progress corners do. A class a variant aims
+ * elsewhere reaches what it aims at: the children or descendants `*:`, `**:` and `[&_p]:` select,
+ * or the content `before:` generates. A component of the same module is followed through its props:
  * `<Label tone={DIM} />` dims whatever `Label` puts `tone` on. Class and style props are the
  * exception, because they land on the `<Label>` element itself and are judged there.
  *
@@ -98,8 +98,8 @@ describe('what the scan flags', () => {
 
   it.each<[string, string, (string | [string, Verdict])[]]>([
     [
-      "CodeLine's gutter as it was before #110",
-      `export function CodeLine({ lineNumber }: { lineNumber?: number }) {
+      "a code line's gutter as it was before #110",
+      `export function GutterLine({ lineNumber }: { lineNumber?: number }) {
         return (
           <div className="group flex">
             {lineNumber !== undefined && (
@@ -221,8 +221,8 @@ describe('what the scan flags', () => {
       ['group-hover:opacity-50'],
     ],
     [
-      "an opacity on an ancestor of the text, as DataStream's wrapper had until #111",
-      `export function DataStream({ className = '' }: { className?: string }) {
+      "an opacity on an ancestor of the text, as the data-stream texture's wrapper had until #111",
+      `export function Stream({ className = '' }: { className?: string }) {
         const lines = '0101';
         return (
           <div className={\`pointer-events-none absolute inset-0 opacity-10 \${className}\`}>
@@ -317,7 +317,7 @@ describe('what the scan flags', () => {
       ],
     ],
     [
-      'a pulse on text, as StatDisplay had when highlighted until #111',
+      'a pulse on text, as the highlighted stat had until #111',
       `export function Stat({ value, highlight }: { value: string; highlight?: boolean }) {
         return (
           <span
@@ -842,8 +842,8 @@ describe('what the scan leaves alone', () => {
       ['opacity-100', 'opacity-50'],
     ],
     [
-      "shapes inside an SVG beside text that is not dimmed, as HexBadge's polygons were",
-      `export function HexBadge({ children }: { children: React.ReactNode }) {
+      "shapes inside an SVG beside text that is not dimmed, as the hex badge's polygons were",
+      `export function Badge({ children }: { children: React.ReactNode }) {
         return (
           <div className="relative inline-flex">
             <svg viewBox="0 0 100 100" className="h-16 w-16 text-[var(--accent)]">
@@ -1238,7 +1238,7 @@ describe('what the scan leaves alone', () => {
       "paints for a bar, a graph's edges or a border side, whose last word says whose they are",
       `export const Charts = () => (
         <div className="font-mono">
-          <ProgressBar barColor="rgba(99,102,241,0.3)" value={40} />
+          <Meter barColor="rgba(99,102,241,0.3)" value={40} />
           <Graph edgeOpacity={0.4} />
           <Toggle borderTopColor="rgba(0,0,0,0.5)" ringOffsetColor="rgba(0,0,0,0.5)" />
         </div>
@@ -1499,9 +1499,9 @@ const KNOWN_DEFECTS: KnownDefect[] = [
 
 /**
  * Dimmed classes the text rule allows because nothing under them renders text: the sites this guard
- * was written to leave alone, less HexBadge's polygons, which went with the component (#47, slice
- * 47l). Pinned with their counts to show the scan reaching and judging them rather than missing
- * them. A <text> added under one turns it into a finding, and the change that deletes one of these
+ * was written to leave alone, less the hex badge's polygons, which went with the component (#47,
+ * slice 47l). Pinned with their counts to show the scan reaching and judging them rather than
+ * missing them. A <text> added under one turns it into a finding, and the change that deletes one of these
  * components deletes its row.
  */
 const DECORATIVE = [
