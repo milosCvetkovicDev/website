@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
 import { pages } from '@/data/pages';
+import { publishedPosts } from '@/data/posts';
 import { beliefs, facts, timeline } from '@/data/pages/about';
 import { socialLinks } from '@/data/pages/contact';
 import { coreSkills, differentiators, skillCategories } from '@/data/pages/skills';
@@ -136,6 +137,16 @@ describe('the entries moved out of the page modules', () => {
   });
 });
 
+/**
+ * The one page folder whose twin handler is still to come, and the slice that adds it: the post
+ * page (61b) landed before `postToMarkdown` (61e). It may wait only while no post is published, when
+ * the route prerenders no page and so no served head links the twin; the test after next fails the
+ * moment a post is published without it. The expected failure below it passes, and so fails the
+ * run, once the handler exists: that change deletes this constant, the two tests that name it and
+ * the `blog/[slug]` exception in the one before them.
+ */
+const POST_FOLDER = join('blog', '[slug]');
+
 describe('the twin handlers', () => {
   // `buildMetadata()` advertises a twin for every route that calls it, so every page folder, the
   // dynamic ones included, needs a handler beside it or its head links a 404.
@@ -144,10 +155,23 @@ describe('the twin handlers', () => {
       .filter((file) => file.endsWith(`${sep}page.tsx`))
       .map((file) => dirname(file));
     expect(pageFolders.length).toBeGreaterThan(0);
+    expect(pageFolders, 'the post page folder moved').toContain(join(APP, POST_FOLDER));
     const missing = pageFolders
       .filter((folder) => !existsSync(join(folder, 'index.md', 'route.ts')))
-      .map((folder) => relative(APP, folder) || '(root)');
+      .map((folder) => relative(APP, folder) || '(root)')
+      .filter((folder) => folder !== POST_FOLDER);
     expect(missing, 'each needs an index.md/route.ts').toEqual([]);
+  });
+
+  it('lets the post twin wait only while no post is published (#61, 61e)', () => {
+    expect(
+      publishedPosts.map(({ slug }) => slug),
+      'a published post advertises /blog/<slug>/index.md, which 404s until 61e adds its handler',
+    ).toEqual([]);
+  });
+
+  it.fails('blog/[slug] (#61, 61e): has its twin handler beside it', () => {
+    expect(existsSync(join(APP, POST_FOLDER, 'index.md', 'route.ts'))).toBe(true);
   });
 
   it.each(records.map(([route]) => [route]))(

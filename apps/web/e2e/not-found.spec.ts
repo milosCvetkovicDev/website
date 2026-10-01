@@ -13,7 +13,7 @@ import { warmRoutes } from './support/warm-routes';
  * the page a visitor actually reads was not.
  *
  * Both 404 shapes are checked, because they arrive by different routes: an unknown path has no matching
- * segment at all, while an unknown case-study slug is kept at the routing layer by
+ * segment at all, while an unknown case-study or post slug is kept at the routing layer by
  * `dynamicParams = false` rather than reaching a render-time `notFound()` (ADR 0015). They should be
  * indistinguishable to a visitor, and this is what says so.
  *
@@ -23,7 +23,7 @@ import { warmRoutes } from './support/warm-routes';
 
 test.describe.configure({ retries: 0 });
 
-const NOT_FOUND_PATHS = [NOT_FOUND_ROUTE, '/work/does-not-exist'];
+const NOT_FOUND_PATHS = [NOT_FOUND_ROUTE, '/work/does-not-exist', '/blog/does-not-exist'];
 
 for (const path of NOT_FOUND_PATHS) {
   test(`${path} renders the not-found page with both recovery links`, async ({ page }) => {

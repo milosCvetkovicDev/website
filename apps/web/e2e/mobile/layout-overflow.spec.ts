@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { CASE_STUDY_ROUTES, STATIC_ROUTES } from '../routes';
+import { CASE_STUDY_ROUTES, POST_ROUTES, STATIC_ROUTES } from '../routes';
 import { expectGsapLoaded } from '../support/gsap';
 import { expectHydrated, gotoHydrated } from '../support/hydration';
 import {
@@ -76,8 +76,15 @@ const MOTIONS = ['no-preference', 'reduce'] as const;
  */
 const REVERSE_MS = 4_000;
 
-/** Every page route but `/`, which the tests below cover at three widths each. */
-const OTHER_ROUTES = [...STATIC_ROUTES.filter((route) => route !== '/'), ...CASE_STUDY_ROUTES];
+/**
+ * Every page route but `/`, which the tests below cover at three widths each. The posts join as they
+ * are published: a code block's long line has to scroll inside the block, not the page (#61).
+ */
+const OTHER_ROUTES = [
+  ...STATIC_ROUTES.filter((route) => route !== '/'),
+  ...CASE_STUDY_ROUTES,
+  ...POST_ROUTES,
+];
 
 /** The same windows on any page that runs no GSAP: after hydration, then either end of a walk. */
 const READ_AND_WALK: OverflowWindow[] = [
@@ -139,7 +146,7 @@ for (const motion of MOTIONS) {
     // Each route is a navigation, a hydration wait, two walks and three reads: nine routes measured
     // 5 s together on Pixel 7 against the production build. Five seconds each on top of the file's
     // 30 s for a context leaves room for a loaded machine, and the budget grows with the case
-    // studies rather than being retuned by hand.
+    // studies and the posts rather than being retuned by hand.
     test.setTimeout(30_000 + OTHER_ROUTES.length * 5_000);
     await page.emulateMedia({ reducedMotion: motion });
     await narrowTo(page, 320);

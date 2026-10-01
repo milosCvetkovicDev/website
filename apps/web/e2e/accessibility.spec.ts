@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { PAGE_ROUTES, expectedStatus } from './routes';
+import { publishedPosts, type PostBlock } from '../src/data/posts';
+import { PAGE_ROUTES, POST_ROUTES, expectedStatus, postRoute } from './routes';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 import { TMUX_LOG_STREAM, tmuxLogStreamProblems } from './support/tmux-log-stream';
@@ -93,12 +94,21 @@ import {
  */
 
 /**
- * Every page route, from the one shared list in `e2e/routes.ts`: the seven static routes, the three case
- * studies and a 404. This used to be `['/', '/work/self-healing-agent']` — two of ten — which is why
- * every defect the audit found on `/about`, `/skills`, `/contact`, `/blog` or a 404 was invisible to a
- * green gate. `console-clean.spec.ts` reads the same module, so a new route reaches both gates at once.
+ * Every page route, from the one shared list in `e2e/routes.ts`: the static routes, every case
+ * study and every published post, and a 404. This used to be `['/', '/work/self-healing-agent']` —
+ * two of ten — which is why every defect the audit found on `/about`, `/skills`, `/contact`,
+ * `/blog` or a 404 was invisible to a green gate. `console-clean.spec.ts` reads the same module, so
+ * a new route reaches both gates at once.
  */
 const pages = PAGE_ROUTES;
+
+/**
+ * The text a post's body puts in front of axe at the least: one element per block, and one per item
+ * of a list, since a paragraph, a heading, a list item, a code block and a quote each hold text of
+ * their own, and `posts.test.ts` refuses an empty one. Inline code and links only add to it.
+ */
+const bodyTextElements = (body: readonly PostBlock[]) =>
+  body.reduce((count, block) => count + (block.kind === 'list' ? block.items.length : 1), 0);
 
 /**
  * Fewest colour-contrast nodes each page must still measure at rest. A floor, not a target: the
@@ -122,6 +132,18 @@ const pages = PAGE_ROUTES;
  * matters for that route.
  */
 const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
+  // Every published post (#61, 61b), first, so that an entry written below for one post wins over
+  // this one: a later key replaces an earlier one in an object literal. No post is published yet,
+  // so this is derived rather than measured: 8 for the page around the body (its title, the two
+  // labelled dates, the back link, the header and the footer), as for the bare 404, plus the
+  // body's own text elements, so a body that drops out of the measurement fails even on a long
+  // post. Measured locally over two fixture posts while 61b was built: a one-paragraph post
+  // measured 16 against a floor of 9, and a post of every block kind (twelve text elements)
+  // measured 32 against 20, so the page around a body measures 15. Re-measure when the first post
+  // lands, and give it an entry of its own below if its count says the derivation is loose.
+  ...Object.fromEntries(
+    publishedPosts.map(({ slug, body }) => [postRoute(slug), 8 + bodyTextElements(body)]),
+  ),
   '/': 80,
   '/about': 45,
   '/work': 5,
@@ -162,10 +184,11 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * the same day. The node #48 added is the hero's line naming who the site is about, which was
  * sr-only and is now visible text on the island; `e2e/hero-contrast.spec.ts` measures its colour.
  *
- * Nine of the eleven routes have a budget of **zero**, which is the strongest form this can take: on those
- * pages axe decides every text node, and the first blurred panel or gradient put behind text fails here.
- * The two that are not zero are the two surfaces the audit already found, and between them they account
- * for every undecidable node on the site — 167 of them, against 103 and 8 decided.
+ * Every route but `/` and `/work` has a budget of **zero**, which is the strongest form this can
+ * take: on those pages axe decides every text node, and the first blurred panel or gradient put
+ * behind text fails here. The two that are not zero are the two surfaces the audit already found,
+ * and between them they account for every undecidable node on the site — 167 of them, against 103
+ * and 8 decided.
  *
  * `/` gets a margin of a few nodes and the others do not. The reason this comment gave until #180 was
  * wrong: the tmux chrome's tab labels, pane titles and status lines are static, and its clock changes
@@ -180,13 +203,17 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * The margin over that, six nodes to the budget of 118, stays by the owner's decision on #180 of
  * 2026-09-30 until #47's slices 47c and 47e, #49's 49d and #58's 58a have all landed, so that none of
  * them has to raise a budget; a pull request of its own then lowers it to the re-measured constant.
- * `/work` and the nine zeroes are static and were identical across every run. Never widen a margin to
+ * `/work` and the zeroes are static and were identical across every run. Never widen a margin to
  * quieten a failure: read the nodes the message names first, because a genuinely new blurred surface
  * looks exactly like this.
  *
  * The positive control at the bottom of this file proves the comparison can fail at all.
  */
 const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }> = {
+  // Every published post (#61, 61b), first, so that an entry written below for one post wins over
+  // this one: plain text on the page background, no blur or gradient behind it, so zero.
+  // Re-measure with the floor above when the first post lands.
+  ...Object.fromEntries(POST_ROUTES.map((route) => [route, { light: 0, dark: 0 }])),
   '/': { light: 118, dark: 118 },
   '/about': { light: 0, dark: 0 },
   // 55 until #58 dropped /work's "0 / Left Unfinished" stat, two nodes over the grid; 53 measured.
