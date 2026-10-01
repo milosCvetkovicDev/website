@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// Checks that the web build stays function-free: every App Router route was prerendered, its body
-// file is on disk, nothing else in the build runs per request, and the only routes that need a
-// server function are the ones on an explicit allowlist, which is empty.
+// Checks that the web build stays static: every App Router route was prerendered, its body file is
+// on disk, nothing else in the build runs per request, and the only routes that need a server
+// function are the ones on an explicit allowlist, which names `/mcp` (#62) and nothing else.
 //
 // The failure this catches is silent. Since Next 15 a `GET` route handler is dynamic unless it says
 // otherwise, so a handler that forgets `export const dynamic = 'force-static'` still serves the right
 // bytes; it just becomes a function, and every crawl of it an invocation on the Hobby plan. Measured
 // in this repository on 2026-09-12 (Next 16.3.4): the same handler built as `○ /llms.txt` with
-// `force-static` and as `ƒ /llms-full.txt` without it. Issue #55 lands this gate before the first of
-// the epic's handlers (#59 to #62), and #62 adds `/mcp`, the one function the site is meant to have.
+// `force-static` and as `ƒ /llms-full.txt` without it. Issue #55 landed this gate before the first of
+// the epic's handlers (#59 to #62), and #62 added `/mcp`, the one function the site is meant to have.
 //
 // It reads what `next build` wrote, not the route table it printed, because Next 16 redesigned its
 // terminal output and a grep over it breaks on a minor upgrade. The manifest shapes below are the
@@ -24,8 +24,9 @@
 //   (ADR 0015).
 // - `server/app/`: the prerendered bodies, `<path>.html` for a page (`index.html` for `/`) and
 //   `<path>.body` for a handler.
-// - Four manifests of what runs outside the App Router's routes, each empty in a function-free
-//   build: `server/functions-config-manifest.json` (a `proxy.ts` or Node.js middleware appears as
+// - Four manifests of what runs outside the App Router's routes, each empty in this build (`/mcp`
+//   exports no segment config, so it has no entry either; checked 2026-09-30):
+//   `server/functions-config-manifest.json` (a `proxy.ts` or Node.js middleware appears as
 //   `/_middleware`), `server/middleware-manifest.json` (Edge middleware), `server/server-reference-
 //   manifest.json` (Server Actions, which run in a function when a form posts to them even from a
 //   prerendered page), and `server/pages-manifest.json` (a Pages Router entry, where only the static
@@ -67,12 +68,14 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_DIST = join(repoRoot, 'apps', 'web', '.next');
 
 /**
- * The routes permitted to need a server function, as `app-path-routes-manifest.json` names them.
- * Empty: nothing on this site renders per request. #62 adds '/mcp' and nothing else.
+ * The routes permitted to need a server function, as `app-path-routes-manifest.json` names them:
+ * the read-only MCP server (#62), whose `POST` handler cannot be prerendered, and nothing else.
+ * Every page and every other handler renders at build time. The list must be exact: a route on it
+ * that the build has not got, or that was built static, fails the check as well.
  *
  * @type {readonly string[]}
  */
-export const ALLOWED_FUNCTIONS = Object.freeze([]);
+export const ALLOWED_FUNCTIONS = Object.freeze(['/mcp']);
 
 /**
  * Route handlers every build must contain, prerendered, as `app-path-routes-manifest.json` names
@@ -621,7 +624,7 @@ function main(args) {
   const problems = [...result.problems, ...other];
   if (problems.length > 0) {
     console.error(
-      `\nThe build at ${dist} (BUILD_ID ${build.id}) is not function-free ` +
+      `\nThe build at ${dist} (BUILD_ID ${build.id}) is not static outside ALLOWED_FUNCTIONS ` +
         '(scripts/check-build-output.mjs):\n',
     );
     for (const problem of problems) console.error(`  - ${problem}`);

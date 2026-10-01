@@ -7259,6 +7259,218 @@
       }
     },
     {
+      "id": "adr-readme-link-0029-read-only-mcp-server",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0029-read-only-mcp-server.md)",
+      "claim": "The link to 0029-read-only-mcp-server.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0029-read-only-mcp-server.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0029-read-only-mcp-server.md"
+      }
+    },
+    {
+      "id": "adr-index-0029-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0029's record carries the status line \"Proposed\".",
+      "check": {
+        "file": "docs/adr/0029-read-only-mcp-server.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0029-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0029 gives the record's status line, \"Proposed\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0029 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0029-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0029's record carries the Date \"2026-09-30\".",
+      "check": {
+        "file": "docs/adr/0029-read-only-mcp-server.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-30"
+      }
+    },
+    {
+      "id": "adr-index-0029-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0029 gives the record's Date, \"2026-09-30\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0029 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-30"
+      }
+    },
+    {
+      "id": "adr-index-0029-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0029's record carries the H1 title \"A read-only, unauthenticated MCP server at /mcp is the site's one server function\".",
+      "check": {
+        "file": "docs/adr/0029-read-only-mcp-server.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "A read-only, unauthenticated MCP server at /mcp is the site's one server function"
+      }
+    },
+    {
+      "id": "adr-index-0029-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0029 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0029 gives the record's H1 title, \"A read-only, unauthenticated MCP server at /mcp is the site's one server function\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0029 \\| \\[(.+?)\\]\\(0029-",
+        "equals": "A read-only, unauthenticated MCP server at /mcp is the site's one server function"
+      }
+    },
+    {
+      "id": "adr-0029-link-0017-ai-discoverability-policy",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "](0017-ai-discoverability-policy.md)",
+      "claim": "The link to 0017-ai-discoverability-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0017-ai-discoverability-policy.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0017-ai-discoverability-policy.md"
+      }
+    },
+    {
+      "id": "adr-0029-link-0005-hosting-on-vercel",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "](0005-hosting-on-vercel.md)",
+      "claim": "The link to 0005-hosting-on-vercel.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0005-hosting-on-vercel.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0005-hosting-on-vercel.md"
+      }
+    },
+    {
+      "id": "adr-0029-link-0012-correcting-accepted-records",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "](0012-correcting-accepted-records.md)",
+      "claim": "The link to 0012-correcting-accepted-records.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0012-correcting-accepted-records.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0012-correcting-accepted-records.md"
+      }
+    },
+    {
+      "id": "adr-0029-script-check-build-output",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "`pnpm check:build-output`",
+      "claim": "`pnpm check:build-output` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:build-output"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:build-output"
+      }
+    },
+    {
+      "id": "adr-0029-allowed-functions",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "`ALLOWED_FUNCTIONS` in `scripts/check-build-output.mjs` is exactly `['/mcp']`",
+      "claim": "The build-output gate allows exactly one server function, /mcp.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "scripts/check-build-output.mjs",
+        "contains": "export const ALLOWED_FUNCTIONS = Object.freeze(['/mcp']);"
+      }
+    },
+    {
+      "id": "adr-0029-route-post",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "`apps/web/src/app/mcp/route.ts` exports `POST` and nothing else",
+      "claim": "The MCP route handler exports POST.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/app/mcp/route.ts",
+        "contains": "export async function POST(request: Request): Promise<Response> {"
+      }
+    },
+    {
+      "id": "adr-0029-tools",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "Three tools, in `apps/web/src/app/mcp/tools.ts`",
+      "claim": "tools.ts registers the MCP server's tools.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/app/mcp/tools.ts",
+        "contains": "export function registerTools(server: McpServer): void {"
+      }
+    },
+    {
+      "id": "adr-0029-list-changed",
+      "doc": "docs/adr/0029-read-only-mcp-server.md",
+      "anchor": "advertises `listChanged: false`",
+      "claim": "The MCP route advertises tools without listChanged.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/app/mcp/route.ts",
+        "contains": "capabilities: { tools: { listChanged: false } },"
+      }
+    },
+    {
       "id": "adr-readme-link-0030-generated-endpoints-as-static-route-handlers",
       "doc": "docs/adr/README.md",
       "anchor": "](0030-generated-endpoints-as-static-route-handlers.md)",
