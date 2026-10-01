@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, PipelineStage, NotificationToast, progressFillTransform } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { useStoryVisibility } from '@/hooks/use-story-visibility';
 import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const pipelineStages = [
@@ -27,6 +28,8 @@ const passedStages: StageState[] = pipelineStages.map(() => ({ status: 'passed',
 
 export function GauntletPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  // Pauses the section's endless CSS animations while it is out of view (globals.css).
+  useStoryVisibility(sectionRef);
   const titleId = useId();
   const pipelineRef = useRef<HTMLDivElement>(null);
   const deployRef = useRef<HTMLDivElement>(null);

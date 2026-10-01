@@ -1402,8 +1402,11 @@ describe('how an animation is judged', () => {
     expect(judge(css, utility)).toBe(dims);
   });
 
-  // A new dimming animation fails this: check where it is used, then add it here.
-  it("finds that only pulse and ping dim, among Tailwind's animations and globals.css's", () => {
+  // A new dimming animation fails this: check where it is used, then add it here. The four hero and
+  // caret classes (slice 47g of #47) carry the keyframes the story used to write inline, and each
+  // runs on a text-free, aria-hidden element: the hero glow, the scroll dot, the status dot and the
+  // Execution caret.
+  it("finds which of Tailwind's animations and globals.css's dim", () => {
     const names = [...vocabulary.animations.keys()];
     expect(names).toEqual(
       expect.arrayContaining(['spin', 'bounce', 'fade-in', 'blink', 'highlight-scan']),
@@ -1413,7 +1416,14 @@ describe('how an animation is judged', () => {
         animationDims(shorthand, vocabulary.keyframes),
       ),
     );
-    expect(dimming.toSorted()).toEqual(['ping', 'pulse']);
+    expect(dimming.toSorted()).toEqual([
+      'caret-pulse',
+      'hero-breathe',
+      'hero-scroll-bounce',
+      'hero-status-pulse',
+      'ping',
+      'pulse',
+    ]);
   });
 });
 

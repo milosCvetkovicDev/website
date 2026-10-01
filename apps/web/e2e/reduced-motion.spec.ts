@@ -1,19 +1,24 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 
 /**
- * Two promises the page makes about motion and does not keep.
+ * Two promises the page makes about motion, which it once did not keep.
  *
  * Rows R18 and R19 of the RED manifest, both fixed by #47.
  *
  * - R18 (hero-4) is ADR 0009 rule 4: an endless animation stops while nothing can see it. Seven
- *   `repeat: -1` animations keep running after the story has been scrolled past — `hero-section.tsx:40`
- *   and `:113`, `hero-content.tsx:78`, `hud-elements.tsx:326`, `execution-phase.tsx:304`,
- *   `game-complete.tsx:161`, `loop-phase.tsx:209` — off-screen or at `opacity: 0`, burning a phone
- *   battery for something nobody is looking at. Measured with `document.getAnimations()`, which sees
- *   both CSS and Web Animations API timelines, which is why it catches all seven despite their being
- *   written three different ways.
+ *   endless animations kept running after the story had been scrolled past — the hero's glow and
+ *   scroll dot, its status pulse, TypingCursor's blink, the Execution caret, GameComplete's arrow and
+ *   the Loop's alert dot — off-screen or at an effective opacity of 0, burning a phone battery for
+ *   something nobody is looking at. Slice 47g fixed it: `useStoryVisibility` marks the hero and each
+ *   phase section `data-story-visible="false"` while it is out of view, a `globals.css` rule pauses
+ *   the endless animations inside one, and the scroll dot pauses while its indicator is faded out.
+ *   Measured with `document.getAnimations()`, which sees both CSS and Web Animations API timelines,
+ *   which is why it caught all seven despite their being written three different ways. It never sees
+ *   a GSAP tween, which GSAP writes inline from its ticker: the story's one that repeats,
+ *   GameComplete's CTA glow, pauses from its own ScrollTrigger. The pause works a section at a time
+ *   and ignores opacity, so R18 measures at the bottom of the page, with every section out of view.
  * - R19 (hero-5) is the reduced-motion promise, fixed by slice 47d and kept as its guard.
  *   `animated-text.tsx` had no reference to `prefers-reduced-motion` against fourteen mouse handlers,
  *   so under `reduce` — where every phase's *scroll* animation correctly returns early — hovering a
@@ -48,58 +53,231 @@ async function walkToBottom(page: Page) {
   });
 }
 
-test('no endless animation keeps running off-screen or at opacity 0', async ({ page }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R18, #47' });
+/** The hero `<section>`, by the start of its aria-label. */
+const heroSection = (page: Page) => page.locator('section[aria-label^="Hero"]');
 
-  // Motion allowed: under `reduce` these animations are never created and the row would be green for
-  // the wrong reason.
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto('/');
-  await expectHydrated(page);
-  expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(
-    false,
+/**
+ * Every story section whose `data-story-visible` disagrees with where it is: the IntersectionObserver
+ * path on its own, before any animation is read. The story wrapper is the hero's grandparent
+ * (AnimatedHero's outer `div`, around the content layer), and it holds exactly the hero and the six
+ * phases: featured work's `<section>` would make eight if the wrapper were ever `<main>`.
+ */
+async function storyVisibilityMismatches(page: Page) {
+  return page.evaluate(() => {
+    const story = document.querySelector('section[aria-label^="Hero"]')?.parentElement
+      ?.parentElement;
+    const sections = story ? [...story.querySelectorAll('section')] : [];
+    if (sections.length !== 7)
+      return [`the story wrapper holds ${sections.length} sections, not 7`];
+    return sections.flatMap((section, index) => {
+      const box = section.getBoundingClientRect();
+      const { innerWidth: width, innerHeight: height } = window;
+      const inView = box.bottom > 0 && box.top < height && box.right > 0 && box.left < width;
+      // The observer counts a section touching the viewport's edge as intersecting: either is right.
+      const onEdge = Math.abs(box.bottom) < 1 || Math.abs(box.top - height) < 1;
+      const attribute = section.getAttribute('data-story-visible');
+      if (attribute === String(inView) || (onEdge && attribute !== null)) return [];
+      return [`section ${index + 1} is ${inView ? 'in' : 'out of'} view, marked ${attribute}`];
+    });
+  });
+}
+
+/** The story's named endless animations, by keyframe name, with each one's play state. */
+async function animationStates(page: Page, names: string[]) {
+  return page.evaluate(
+    (names) =>
+      document
+        .getAnimations()
+        .filter((animation): animation is CSSAnimation => animation instanceof CSSAnimation)
+        .map((animation) => [animation.animationName, animation.playState])
+        .filter(([name]) => names.includes(name))
+        .sort(([a], [b]) => a.localeCompare(b)),
+    names,
   );
+}
 
-  await walkToBottom(page);
-  // Let the timer-driven sequences settle so nothing is still legitimately mid-entrance.
-  await page.waitForTimeout(9_000);
+const HERO_ANIMATIONS = ['hero-breathe', 'hero-scroll-bounce', 'hero-status-pulse'];
+const heroAnimationStates = (page: Page) => animationStates(page, HERO_ANIMATIONS);
+const caretState = (page: Page) => animationStates(page, ['caret-pulse']);
+const each = (state: string, names = HERO_ANIMATIONS) => names.map((name) => [name, state]);
 
-  const wasteful = await page.evaluate(() => {
-    const viewport = { width: window.innerWidth, height: window.innerHeight };
-    const offenders: string[] = [];
-    for (const animation of document.getAnimations()) {
-      if (animation.playState !== 'running') continue;
-      // An endless animation is one with no finite end: `repeat: -1` (GSAP writes it as
-      // `iterations: Infinity`) or a CSS `animation-iteration-count: infinite`.
-      const timing = animation.effect?.getComputedTiming();
-      if (!timing || Number.isFinite(timing.iterations ?? 1)) continue;
-      const target = (animation.effect as KeyframeEffect | null)?.target;
-      if (!(target instanceof Element)) continue;
+/**
+ * Wheels the page, as a visitor does, until `region`'s top sits at the viewport's top. Not
+ * window.scrollTo: Chromium can undo a scripted scroll made this soon after hydration (see 'scroll
+ * indicator fades on scroll' in hero.spec.ts).
+ */
+async function parkOn(page: Page, region: Locator) {
+  await page.mouse.move(640, 512);
+  await expect(async () => {
+    const top = await region.evaluate((el) => el.getBoundingClientRect().top);
+    if (Math.abs(top) > 8) await page.mouse.wheel(0, top);
+    expect(Math.abs(await region.evaluate((el) => el.getBoundingClientRect().top))).toBeLessThan(
+      64,
+    );
+  }).toPass({ timeout: 10_000 });
+}
 
-      const box = target.getBoundingClientRect();
-      const style = getComputedStyle(target);
-      const offScreen = box.bottom <= 0 || box.top >= viewport.height || box.width === 0;
-      const invisible =
-        Number(style.opacity) === 0 || style.visibility === 'hidden' || style.display === 'none';
-      if (!offScreen && !invisible) continue;
+// The Scroll indicator is displayed from `lg` and 960 px tall only (#134), and an element that is not
+// displayed runs no CSS animation at all, so at the desktop project's 1280x720 its dot would be
+// missing from both tests below rather than measured. This spec sits outside `e2e/mobile/`, so it
+// runs on the desktop project only (playwright.config.ts, MOBILE_SPECS), as it did at 1280x720.
+test.describe('at 1280x1024, where the scroll indicator is displayed', () => {
+  test.use({ viewport: { width: 1280, height: 1024 } });
 
-      const cls = typeof target.className === 'string' ? target.className.slice(0, 50).trim() : '';
-      offenders.push(
-        `${target.tagName.toLowerCase()}.${cls} — ` +
-          `${offScreen ? 'off-screen' : ''}${offScreen && invisible ? ' and ' : ''}` +
-          `${invisible ? `opacity ${style.opacity}` : ''}`,
-      );
+  test('no endless animation keeps running off-screen or at opacity 0', async ({ page }) => {
+    // Motion allowed: under `reduce` these animations are never created and the row would be green
+    // for the wrong reason.
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/');
+    await expectHydrated(page);
+    expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(
+      false,
+    );
+
+    await walkToBottom(page);
+    // Not a wait for a settled state: an endless animation running out of view is wrong at any
+    // moment. The wait lets a sequence that adds an endless element late (a spinner once a stage
+    // starts, a pulse once an alert lands) do so before the count, so it is measured, not missed.
+    await page.waitForTimeout(9_000);
+    // Chromium can undo a scripted scroll soon after hydration: measure at the bottom, not at the
+    // top with the hero in view.
+    await expect(async () => {
+      const atBottom = await page.evaluate(() => {
+        const bottom = document.documentElement.scrollHeight - window.innerHeight;
+        if (window.scrollY < bottom - 2) window.scrollTo({ top: bottom, behavior: 'instant' });
+        return window.scrollY >= bottom - 2;
+      });
+      expect(atBottom, 'the walk ends at the bottom of the page').toBe(true);
+      expect(
+        await heroSection(page).evaluate((el) => el.getBoundingClientRect().bottom),
+      ).toBeLessThanOrEqual(0);
+    }).toPass({ timeout: 10_000 });
+    await expect
+      .poll(() => storyVisibilityMismatches(page), {
+        message: 'each story section is marked data-story-visible by where it is',
+      })
+      .toEqual([]);
+
+    const { endless, wasteful, outside } = await page.evaluate(() => {
+      // The story wrapper, as storyVisibilityMismatches checked it: seven sections exactly. AC 5
+      // holds the story to the rule; the featured work below it has endless pulses of its own, which
+      // are a follow-up of #47 and reported here without failing.
+      const story = document.querySelector('section[aria-label^="Hero"]')?.parentElement
+        ?.parentElement;
+      if (!story || story.querySelectorAll('section').length !== 7) {
+        throw new Error(
+          'the story wrapper, holding the hero and six phase sections, was not found',
+        );
+      }
+      const viewport = { width: window.innerWidth, height: window.innerHeight };
+      const offenders: string[] = [];
+      const outside: string[] = [];
+      let endless = 0;
+      for (const animation of document.getAnimations()) {
+        // An endless animation is one with no finite end: a CSS `animation-iteration-count:
+        // infinite` or a Web Animations `iterations: Infinity`. GSAP's own tweens never show up
+        // here: it writes inline styles from its ticker.
+        const timing = animation.effect?.getComputedTiming();
+        if (!timing || Number.isFinite(timing.iterations ?? 1)) continue;
+        const effect = animation.effect as KeyframeEffect | null;
+        const target = effect?.target;
+        if (!(target instanceof Element)) continue;
+        const inStory = story.contains(target);
+        if (inStory) endless++;
+        if (animation.playState !== 'running') continue;
+
+        const box = target.getBoundingClientRect();
+        const style = getComputedStyle(target);
+        const offScreen =
+          box.bottom <= 0 ||
+          box.top >= viewport.height ||
+          box.right <= 0 ||
+          box.left >= viewport.width ||
+          box.width === 0;
+        // Effective opacity: every ancestor's, and the target's own unless this animation is what
+        // moves it, or a blink caught on its off beat would read as invisible. The scroll dot's own
+        // opacity is its keyframes', while the wrapper that fades the indicator out takes it to 0.
+        const animatesOpacity = effect?.getKeyframes().some((frame) => 'opacity' in frame);
+        let opacity = animatesOpacity ? 1 : Number(style.opacity);
+        for (let el = target.parentElement; el; el = el.parentElement) {
+          opacity *= Number(getComputedStyle(el).opacity);
+        }
+        const invisible = opacity === 0 || style.visibility === 'hidden';
+        if (!offScreen && !invisible) continue;
+
+        const cls =
+          typeof target.className === 'string' ? target.className.slice(0, 50).trim() : '';
+        (inStory ? offenders : outside).push(
+          `${target.tagName.toLowerCase()}.${cls} — ` +
+            `${offScreen ? 'off-screen' : ''}${offScreen && invisible ? ' and ' : ''}` +
+            `${invisible ? `effective opacity ${opacity}` : ''}`,
+        );
+      }
+      return { endless, wasteful: offenders, outside };
+    });
+
+    if (outside.length > 0) {
+      test.info().annotations.push({
+        type: 'outside the story (featured work, a follow-up of #47)',
+        description: outside.join('; '),
+      });
     }
-    return offenders;
+    // Paused animations still exist, so the story's endless animations are counted here whatever
+    // their state: the hero's three at least, or the row would pass by measuring nothing.
+    expect(endless, 'the endless animations in the story were not found').toBeGreaterThanOrEqual(3);
+    expect(
+      wasteful,
+      'ADR 0009 rule 4: an endless animation stops while nothing can see it. These CSS or Web ' +
+        'Animations are still running at the bottom of the page, where every story section is out ' +
+        "of view. A CSS one inside a story section takes a class listed in globals.css's " +
+        'data-story-visible rule. A GSAP tween is invisible to this measure: one that repeats ' +
+        "pauses from its own ScrollTrigger, as GameComplete's CTA glow does.",
+    ).toEqual([]);
   });
 
-  expect(
-    wasteful,
-    'ADR 0009 rule 4: an endless animation stops while nothing can see it. These are still running ' +
-      "at the bottom of the page. Pause them from the section's own ScrollTrigger onLeave, as " +
-      'GameComplete already does for its CTA glow.',
-  ).toEqual([]);
+  test("parked on a phase, the hero's endless animations pause and the phase's run, and back", async ({
+    page,
+  }) => {
+    // #47 AC 5's second half, the scenario "Off-screen animations stop": the hero's breathing glow,
+    // its status pulse and the scroll dot, and the Execution caret for a phase, each found by its
+    // keyframes. The scroll dot also pauses inline once the page has scrolled 100 px, which it
+    // always has when the hero is out of view; the glow and the status pulse have only the rule.
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/');
+    await expectHydrated(page);
+    await expect
+      .poll(async () => [...(await heroAnimationStates(page)), ...(await caretState(page))], {
+        message: 'at the top, the hero runs and the Execution caret, far below, waits',
+      })
+      .toEqual([...each('running'), ['caret-pulse', 'paused']]);
+
+    await parkOn(page, page.getByRole('region', { name: /strategy/i }));
+    expect(
+      await heroSection(page).evaluate((el) => el.getBoundingClientRect().bottom),
+      'the hero is entirely above the viewport',
+    ).toBeLessThanOrEqual(0);
+    await expect
+      .poll(() => heroAnimationStates(page), {
+        message: 'with the hero out of view, its glow, status pulse and scroll dot all pause',
+      })
+      .toEqual(each('paused'));
+
+    await parkOn(page, page.getByRole('region', { name: /execution/i }));
+    await expect
+      .poll(() => caretState(page), { message: 'parked on Execution, its caret runs' })
+      .toEqual([['caret-pulse', 'running']]);
+    await expect.poll(() => storyVisibilityMismatches(page)).toEqual([]);
+
+    await expect(async () => {
+      if ((await page.evaluate(() => window.scrollY)) > 0) await page.mouse.wheel(0, -100_000);
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    }).toPass({ timeout: 10_000 });
+    await expect
+      .poll(async () => [...(await heroAnimationStates(page)), ...(await caretState(page))], {
+        message: 'back at the top, the hero runs again and the caret waits again',
+      })
+      .toEqual([...each('running'), ['caret-pulse', 'paused']]);
+  });
 });
 
 test('under reduce, hovering an animated heading moves nothing', async ({ page }) => {
