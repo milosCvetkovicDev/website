@@ -112,16 +112,19 @@ export function HeroSection({ children }: { children?: ReactNode }) {
         }`}
       >
         <span
-          className="font-mono tracking-[0.2em] uppercase"
+          className="font-mono tracking-[0.2em] text-[var(--accent-text)] uppercase"
           style={{
             fontSize: '9px',
-            color: 'rgba(139, 92, 246, 0.7)',
-            textShadow: '0 1px 10px rgba(0,0,0,0.9)',
+            // A halo of the page's own colour lifts the label off the tmux panes behind it in both
+            // themes. A black one in light pulled the pixels under the glyphs down to rgb(219):
+            // e2e/hero-contrast.spec.ts measures the label against --background and holds the halo
+            // to it, since its probe cannot see a shadow.
+            textShadow: '0 1px 10px var(--background)',
           }}
         >
           Scroll
         </span>
-        <div className="relative h-[36px] w-[22px] rounded-[11px] border-[1.5px] border-[rgba(99,102,241,0.3)] bg-white/60 dark:border-[rgba(139,92,246,0.35)] dark:bg-[rgba(10,10,10,0.6)]">
+        <div className="relative h-[36px] w-[22px] rounded-[11px] border-[1.5px] border-[var(--accent)]/30 bg-[var(--background)]/60">
           <div
             className="absolute left-1/2 h-[5px] w-[5px] -translate-x-1/2 rounded-full bg-[var(--accent)]"
             style={{
