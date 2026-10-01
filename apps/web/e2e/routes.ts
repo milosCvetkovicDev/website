@@ -49,9 +49,22 @@ export const POST_ROUTES = publishedPosts.map(({ slug }) => postRoute(slug));
 export const NOT_FOUND_ROUTE = '/no-such-page';
 
 /**
+ * The unknown post slug the 404 checks request, as `/blog/does-not-exist`. It is a valid slug, so
+ * nothing in the data stops a post from taking it; if one is ever published, every spec that expects
+ * it to 404 would fail at once and confusingly, so this list refuses to load instead.
+ */
+export const UNKNOWN_POST_ROUTE = postRoute('does-not-exist');
+if (POST_ROUTES.includes(UNKNOWN_POST_ROUTE)) {
+  throw new Error(
+    `${UNKNOWN_POST_ROUTE} is the e2e specs' unknown post, and a published post has taken its slug`,
+  );
+}
+
+/**
  * Every page a visitor can land on: the static seven, the case studies, the published posts, and a
- * 404. Eleven entries today, while no post is published. This is the list the axe and console gates
- * walk; the acceptance criteria's "all ten page routes" was written before /privacy made it eleven.
+ * 404, so its length grows with each published post (eleven while none is). This is the list the
+ * axe and console gates walk; the acceptance criteria's "all ten page routes" was written before
+ * /privacy made it eleven.
  */
 export const PAGE_ROUTES = [
   ...STATIC_ROUTES,

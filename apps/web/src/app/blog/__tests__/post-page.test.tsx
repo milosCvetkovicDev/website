@@ -39,6 +39,18 @@ vi.mock('@/lib/og-image', async (importOriginal) => ({
   socialCard,
 }));
 
+// `notFound()`'s own error is a Next internal (a digest string that has changed between releases),
+// so the page's call is observed through a stand-in that throws an error of this file's own.
+const notFound = vi.hoisted(() =>
+  vi.fn<() => never>(() => {
+    throw new Error('notFound() was called');
+  }),
+);
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  notFound,
+}));
+
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const paramsOf = (slug: string) => ({ params: Promise.resolve({ slug }) });
@@ -141,8 +153,10 @@ describe('the post page', () => {
     // Unreachable in a build, where `dynamicParams = false` 404s any slug the static params lack,
     // but the lookup it rests on must find nothing for a draft either.
     for (const slug of [draftPost.slug, 'does-not-exist']) {
+      notFound.mockClear();
       // notFound()'s own error, not any throw on the way to rendering.
-      await expect(PostPage(paramsOf(slug)), slug).rejects.toThrow('NEXT_HTTP_ERROR_FALLBACK;404');
+      await expect(PostPage(paramsOf(slug)), slug).rejects.toThrow('notFound() was called');
+      expect(notFound, slug).toHaveBeenCalledOnce();
       expect(await generateMetadata(paramsOf(slug)), slug).toEqual({ title: 'Not Found' });
     }
   });
@@ -230,7 +244,10 @@ describe('the post modules', () => {
   ])('%s is server-only', (file) => {
     const source = readFileSync(join(APP, '..', file), 'utf8');
     expect(source).not.toMatch(/^\s*['"]use client['"]/m);
-    // Imports, static or dynamic, rather than any mention: the comments name what is kept out.
-    expect(source).not.toMatch(/(?:from\s+|import\s*\(\s*)['"][^'"]*(?:gsap|animated-hero)/);
+    // Imports, static, side-effect or dynamic, rather than any mention: the comments name what is
+    // kept out. `AnimatedText` lives in `animated-hero/animated-text.tsx`; either name is refused.
+    expect(source).not.toMatch(
+      /(?:from\s+|import\s+|import\s*\(\s*)['"][^'"]*(?:gsap|animated-hero|animated-text)/,
+    );
   });
 });

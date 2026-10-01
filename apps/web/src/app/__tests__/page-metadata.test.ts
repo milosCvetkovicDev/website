@@ -74,7 +74,11 @@ describe('page titles and descriptions', () => {
       const metadata = await postMetadata({ params: Promise.resolve({ slug }) });
       const title = served(metadata.title);
       expect([...title].length, title).toBeLessThanOrEqual(TITLE_MAX);
-      const description = String(metadata.description);
+      // A string, measured as one: `String(undefined)` would pass the length check at 9 characters.
+      const { description } = metadata;
+      if (typeof description !== 'string' || !description) {
+        throw new Error(`${slug}: no description, while a post's summary is its description`);
+      }
       expect([...description].length, `${slug}: ${description}`).toBeLessThanOrEqual(
         DESCRIPTION_MAX,
       );

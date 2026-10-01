@@ -1,7 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { posts, publishedPosts } from '../src/data/posts';
 import { formatContentDate } from '../src/lib/content-date';
-import { postRoute } from './routes';
+import { UNKNOWN_POST_ROUTE, postRoute } from './routes';
 
 /**
  * The post pages (#61, 61b), as served: `request.get(path)` and the browser's `DOMParser` over the
@@ -65,13 +65,20 @@ for (const { slug, title, publishedAt, updatedAt } of publishedPosts) {
 for (const { slug } of posts.filter((post) => post.draft)) {
   const path = postRoute(slug);
 
-  test(`${path}: a draft is not served`, async ({ request }) => {
+  test(`${path}: a draft is not served, and has no card`, async ({ request }) => {
     expect((await request.get(path)).status(), `${path} is a draft`).toBe(404);
+    // The card handler keeps a list of its own (`og-image.png/route.ts`), so it is checked apart.
+    const card = `${path}/og-image.png`;
+    expect((await request.get(card)).status(), `${card} is a draft's card`).toBe(404);
   });
 }
 
-test('an unknown post slug is a 404', async ({ request }) => {
+// A published post's card is fetched, and held to 200 and an image type, by `seo-surface.spec.ts`,
+// which follows every route's og:image; what is left here is the card a post does not have.
+test('an unknown post slug is a 404, page and card', async ({ request }) => {
   // `not-found-shell.spec.ts` checks that this 404 renders through the root layout, with the theme
-  // init script; this is the status alone, the one check here that runs while no post is published.
-  expect((await request.get('/blog/does-not-exist')).status()).toBe(404);
+  // init script; this is the status alone. These run while no post is published, too.
+  expect((await request.get(UNKNOWN_POST_ROUTE)).status()).toBe(404);
+  // A routing 404 from the handler's `dynamicParams = false`, never its throw, which would be a 500.
+  expect((await request.get(`${UNKNOWN_POST_ROUTE}/og-image.png`)).status()).toBe(404);
 });

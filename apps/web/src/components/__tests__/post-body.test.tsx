@@ -50,11 +50,15 @@ describe('PostBody', () => {
   });
 
   it('keeps each heading at its level, under the page title', () => {
-    renderBody();
-    for (const block of blocksOf('heading')) {
-      if (block.kind !== 'heading') continue;
-      expect(screen.getByRole('heading', { level: block.level }).textContent).toBe(block.text);
-    }
+    const body = renderBody();
+    // In order, by tag, so a fixture with two headings at one level still reads as one list.
+    expect(
+      [...body.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((h) => [h.tagName, h.textContent]),
+    ).toEqual(
+      blocksOf('heading').map((block) =>
+        block.kind === 'heading' ? [`H${block.level}`, block.text] : [],
+      ),
+    );
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
 
@@ -95,7 +99,9 @@ describe('PostBody', () => {
     const [block] = hostileTitlePost.body;
     if (block.kind !== 'paragraph') throw new Error('the hostile fixture opens with a paragraph');
     expect(body.textContent).toBe(block.content.join(''));
-    expect(body.querySelectorAll('em, a, h1, h2')).toHaveLength(0);
+    // One paragraph holding text alone: no element of any kind was made from the string.
+    expect([...body.children].map((element) => element.tagName)).toEqual(['P']);
+    expect(body.querySelectorAll('p *')).toHaveLength(0);
   });
 
   it('puts each code block in a keyboard-reachable scroll region of its own, as written', () => {
@@ -126,9 +132,13 @@ describe('PostBody', () => {
   it('never dims text with opacity, and never uses --accent as a text colour', () => {
     // ADR 0011 and 0010: secondary text takes --muted; an alpha or opacity step is measured by axe
     // at its blended colour, and --accent misses AA as text in the dark theme.
-    const classes = classesUnder(renderBody());
-    expect(classes.filter((name) => /^(?:text-.*\/\d+|opacity-\d+)$/.test(name))).toEqual([]);
-    expect(classes).not.toContain('text-[var(--accent)]');
+    // Each class without its variants (`hover:`, `md:`, `dark:`), so a dim behind one counts too,
+    // and with an arbitrary step (`/[0.6]`, `opacity-[.6]`) as well as a scale one (`/60`).
+    const bases = classesUnder(renderBody()).map((name) => name.split(':').at(-1) ?? name);
+    const step = String.raw`(?:\d+(?:\.\d+)?|\[[^\]]+\])`;
+    const dimmed = new RegExp(String.raw`^(?:text-.*\/${step}|opacity-${step})$`);
+    expect(bases.filter((name) => dimmed.test(name) && name !== 'opacity-100')).toEqual([]);
+    expect(bases).not.toContain('text-[var(--accent)]');
   });
 
   it('puts no text under aria-hidden', () => {

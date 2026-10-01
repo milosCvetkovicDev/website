@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { PAGE_ROUTES, POST_ROUTES, expectedStatus } from './routes';
+import { publishedPosts, type PostBlock } from '../src/data/posts';
+import { PAGE_ROUTES, POST_ROUTES, expectedStatus, postRoute } from './routes';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 // The rule map and the result readers are shared with e2e/mobile/accessibility.spec.ts: only
@@ -120,7 +121,27 @@ const pages = PAGE_ROUTES;
  * `incomplete` instead. The floor there is nearly meaningless; the budget below is the number that
  * matters for that route.
  */
+/**
+ * The text a post's body puts in front of axe at the least: one element per block, and one per item
+ * of a list, since a paragraph, a heading, a list item, a code block and a quote each hold text of
+ * their own, and `posts.test.ts` refuses an empty one. Inline code and links only add to it.
+ */
+const bodyTextElements = (body: readonly PostBlock[]) =>
+  body.reduce((count, block) => count + (block.kind === 'list' ? block.items.length : 1), 0);
+
 const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
+  // Every published post (#61, 61b), first, so that an entry written below for one post wins over
+  // this one: a later key replaces an earlier one in an object literal. No post is published yet,
+  // so this is derived rather than measured: 8 for the page around the body (its title, the two
+  // labelled dates, the back link, the header and the footer), as for the bare 404, plus the
+  // body's own text elements, so a body that drops out of the measurement fails even on a long
+  // post. Measured locally over two fixture posts while 61b was built: a one-paragraph post
+  // measured 16 against a floor of 9, and a post of every block kind (twelve text elements)
+  // measured 32 against 20, so the page around a body measures 15. Re-measure when the first post
+  // lands, and give it an entry of its own below if its count says the derivation is loose.
+  ...Object.fromEntries(
+    publishedPosts.map(({ slug, body }) => [postRoute(slug), 8 + bodyTextElements(body)]),
+  ),
   '/': 80,
   '/about': 45,
   '/work': 5,
@@ -132,11 +153,6 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
   '/work/enterprise-b2b-platform': 40,
   '/work/nx-remote-cache': 35,
   '/no-such-page': 8,
-  // Every published post (#61, 61b): a template floor, not a measurement, since no post is
-  // published yet. A post page draws its title, the two labelled dates, the back link and the
-  // footer before any body text, and a fixture post measured well over it locally. Re-measure when
-  // the first post lands, and set that post's own floor under its count as the routes above are.
-  ...Object.fromEntries(POST_ROUTES.map((route) => [route, 8])),
 };
 
 /**
@@ -191,6 +207,10 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * The positive control at the bottom of this file proves the comparison can fail at all.
  */
 const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }> = {
+  // Every published post (#61, 61b), first, so that an entry written below for one post wins over
+  // this one: plain text on the page background, no blur or gradient behind it, so zero.
+  // Re-measure with the floor above when the first post lands.
+  ...Object.fromEntries(POST_ROUTES.map((route) => [route, { light: 0, dark: 0 }])),
   '/': { light: 118, dark: 118 },
   '/about': { light: 0, dark: 0 },
   '/work': { light: 55, dark: 55 },
@@ -202,9 +222,6 @@ const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }
   '/work/enterprise-b2b-platform': { light: 0, dark: 0 },
   '/work/nx-remote-cache': { light: 0, dark: 0 },
   '/no-such-page': { light: 0, dark: 0 },
-  // Every published post (#61, 61b): plain text on the page background, no blur or gradient
-  // behind it, so zero. Re-measure with the floor above when the first post lands.
-  ...Object.fromEntries(POST_ROUTES.map((route) => [route, { light: 0, dark: 0 }])),
 };
 
 /**
