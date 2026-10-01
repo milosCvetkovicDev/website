@@ -58,8 +58,10 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   newest first with the summary only, links absolute on the site's origin, ids on the fixed
   `https://miloscvetkovic.dev` whatever the origin (RFC 4287 ids never change), an author name and
   URI and no address, and `updated` the later of the latest post update and `/blog`'s date in
-  `static-routes.ts`, never the clock: bump `/blog`'s date when a post is unpublished. It builds
-  with no post published too, as a feed with no entries.
+  `static-routes.ts`, never the clock: bump `/blog`'s date when a post is unpublished. That differs
+  from `/blog`'s sitemap `lastmod` on purpose, which takes the posts' `publishedAt`: each entry
+  carries its post's `updated`, so revising a post changes the feed, while `/blog` shows no post
+  body. It builds with no post published too, as a feed with no entries.
   `app/__tests__/feed.test.ts` parses it with a real XML parser, and `e2e/feed.spec.ts` checks it
   as served.
 - The MCP server (#62), `mcp/route.ts`: `POST` only, a stateless, read-only server on protocol
@@ -96,10 +98,10 @@ because a `POST` handler cannot be prerendered, and `pnpm check:build-output` (a
 is dynamic unless it exports `dynamic = 'force-static'`, and without it builds as a server function,
 as a handler that exports any other method does even with it. The same check fails a `proxy.ts` and
 any `'use server'` action, and a build that lacks a route in its `REQUIRED_ROUTES` (the JSON
-handlers and the feed above) or prerendered no path for one, or other slugs for `/work/[slug]/index.json` than
-for the page. `sitemap.ts`, `robots.ts`, `layout.tsx`, `feed.xml/route.ts`,
-`components/json-ld.tsx` and `lib/serialise.ts` each read `NEXT_PUBLIC_SITE_URL`, falling back to
-`https://miloscvetkovic.dev`. There is no middleware.
+handlers and the feed above) or prerendered no path for one, or other slugs for
+`/work/[slug]/index.json` than for the page. `sitemap.ts`, `robots.ts`, `layout.tsx`,
+`feed.xml/route.ts`, `components/json-ld.tsx` and `lib/serialise.ts` each read
+`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
 `src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
 page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own
 (#59). It writes the case-study JSON too, with `jsonResponse()` as the one place that sets its
