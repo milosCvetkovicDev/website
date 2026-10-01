@@ -43,6 +43,13 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   (`app/index.md/route.ts` for `/`), and `work/[slug]/index.md/route.ts` for the case studies, with
   its own `generateStaticParams` and `dynamicParams = false`. Each is three lines that hand a record
   from `pages` in `src/data/pages/index.ts`, or a study, to the serialiser below.
+- `feed.xml/route.ts` serves the Atom feed of `publishedPosts` (#61) as
+  `application/atom+xml; charset=utf-8`, written by `buildAtomFeed()` in `src/lib/atom.ts`: entries
+  newest first with the summary only, ids and links absolute on the site's origin, an author name
+  and URI and no address, and `updated` from the latest post update or, with nothing published,
+  `/blog`'s date in `static-routes.ts`, never the clock. It builds with no post published too, as a
+  feed with no entries. `app/__tests__/feed.test.ts` parses it with a real XML parser, and
+  `e2e/feed.spec.ts` checks it as served.
 
 `buildMetadata()` advertises the twin of every route that calls it as
 `alternates.types['text/markdown']`, at the path `markdownTwinPath()` in `src/lib/pathname.ts`
@@ -50,15 +57,18 @@ derives from the canonical's (a module with no imports, which the e2e helpers re
 folder with a `page.tsx` needs an `index.md/route.ts` beside it: `data/__tests__/pages.test.ts`
 fails one without, fails a static route without a record, and calls every handler to check it
 serves exactly the serialiser's output, statically. `e2e/markdown-twins.spec.ts` checks the served
-twins against the served pages. The sitemap lists no twin.
+twins against the served pages. The sitemap lists no twin. Once `hasPublishedPosts` is true,
+`buildMetadata()` also advertises the feed on every route, as
+`alternates.types['application/atom+xml']` at `FEED_PATH` from the same module; until then no
+route links it, since an advertised feed with nothing in it helps no reader (ADR 0028).
 
 All of the route handlers prerender at build time, and `pnpm check:build-output` (a `quality` step,
 `ci-and-scripts.md`) fails when a route does not: a `GET` handler is dynamic unless it exports
 `dynamic = 'force-static'`, and without it builds as a server function, as a handler that exports
 any other method does even with it. The same check fails a `proxy.ts` and any `'use server'`
-action. `sitemap.ts`, `robots.ts`, `layout.tsx`, `components/json-ld.tsx` and `lib/serialise.ts`
-each read `NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no
-middleware.
+action. `sitemap.ts`, `robots.ts`, `layout.tsx`, `feed.xml/route.ts`, `components/json-ld.tsx`
+and `lib/serialise.ts` each read `NEXT_PUBLIC_SITE_URL`, falling back to
+`https://miloscvetkovic.dev`. There is no middleware.
 `src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
 page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own
 (#59). `lib/__tests__/serialise.test.ts` fails when a file under `src/app` writes `text/markdown`.

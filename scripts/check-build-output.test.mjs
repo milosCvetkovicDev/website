@@ -140,6 +140,7 @@ describe('bodyFile', () => {
     ['/work/a', 'page', 'work/a.html'],
     ['/robots.txt', 'route', 'robots.txt.body'],
     ['/work/a/og-image.png', 'route', 'work/a/og-image.png.body'],
+    ['/feed.xml', 'route', 'feed.xml.body'],
     ['/index.md', 'route', 'index.md.body'],
     ['/about/index.md', 'route', 'about/index.md.body'],
   ]) {
@@ -427,6 +428,39 @@ describe('collectProblems', () => {
     const prerender = cleanPrerender();
     prerender.routes['/robots.txt'] = prerendered('/robots.txt', { routeType: 'page' });
     assert.throws(() => check({ prerender }), /\/robots\.txt is a "page".*\/robots\.txt\/route/);
+  });
+});
+
+describe('the Atom feed (#61)', () => {
+  // `app/feed.xml/route.ts` as `next build` writes it: a static handler whose body is
+  // `server/app/feed.xml.body`, prerendered even with no post published (an empty feed).
+  const appRoutes = { ...APP_ROUTES, '/feed.xml/route': '/feed.xml' };
+  const withFeed = () => {
+    const prerender = cleanPrerender();
+    prerender.routes['/feed.xml'] = prerendered('/feed.xml');
+    return prerender;
+  };
+  const bodies = [...CLEAN_BODIES, 'feed.xml.body'];
+
+  it('passes the feed prerendered with its body', () => {
+    const result = check({ appRoutes, prerender: withFeed(), bodies });
+    assert.deepEqual(result.problems, []);
+    assert.equal(result.bodies, bodies.length);
+  });
+
+  it('fails the feed without its body, naming server/app/feed.xml.body', () => {
+    const { problems } = check({ appRoutes, prerender: withFeed(), bodies: CLEAN_BODIES });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/feed\.xml \(\/feed\.xml\): .*server\/app\/feed\.xml\.body/);
+  });
+
+  it('fails the feed built without force-static, as a function', () => {
+    // The handler without `export const dynamic = 'force-static'`: in the app manifest, never
+    // prerendered, so no body either. The feed must not be on the allowlist (#62 adds only /mcp).
+    const { problems } = check({ appRoutes, bodies: CLEAN_BODIES });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/feed\.xml: .*function.*force-static/);
+    assert.equal(ALLOWED_FUNCTIONS.includes('/feed.xml'), false);
   });
 });
 

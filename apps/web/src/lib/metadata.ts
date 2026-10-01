@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
+import { hasPublishedPosts } from '@/data/posts';
 import { social } from '@/data/social';
 import { OG_CONTENT_TYPE, OG_SIZE } from './og-image';
-import { assertPathname, markdownTwinPath } from './pathname';
+import { assertPathname, FEED_PATH, markdownTwinPath } from './pathname';
 
 /**
  * The per-route half of the head. The root layout keeps only what is true of every response, the
@@ -56,7 +57,16 @@ export function buildMetadata({
     // The canonical, and the route's Markdown twin as `<link rel="alternate" type="text/markdown">`,
     // which is how an agent reading the HTML finds it (#59). Both come from `path`, so they cannot
     // name different routes; `e2e/markdown-twins.spec.ts` fails a route whose twin is not served.
-    alternates: { canonical: path, types: { 'text/markdown': markdownTwinPath(path) } },
+    // Then the Atom feed, the same on every route, once a post is published (#61): `/feed.xml` is
+    // served either way, but an advertised feed with nothing in it helps no reader (ADR 0028). Here
+    // rather than in the layout, whose `alternates` every page's would replace.
+    alternates: {
+      canonical: path,
+      types: {
+        'text/markdown': markdownTwinPath(path),
+        ...(hasPublishedPosts && { 'application/atom+xml': FEED_PATH }),
+      },
+    },
     openGraph: {
       type,
       url: path,
