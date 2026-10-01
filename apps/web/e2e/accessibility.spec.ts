@@ -189,7 +189,8 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
 const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }> = {
   '/': { light: 118, dark: 118 },
   '/about': { light: 0, dark: 0 },
-  '/work': { light: 55, dark: 55 },
+  // 55 until #58 dropped /work's "0 / Left Unfinished" stat, two nodes over the grid; 53 measured.
+  '/work': { light: 53, dark: 53 },
   '/skills': { light: 0, dark: 0 },
   '/blog': { light: 0, dark: 0 },
   '/contact': { light: 0, dark: 0 },
