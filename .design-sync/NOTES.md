@@ -67,6 +67,12 @@ expects, and what each workaround depends on.
   with `--spot-check-components` and regraded the 81 cells from the sheets: all
   `good`, render check 32/32 clean, still no warns. Do the same after any run of component changes
   that large: carried-forward grades vouch for the previews, not for the components behind them.
+- #47 (hero-6, docs-14) deleted six carded components that no route rendered: `CircuitBackground`,
+  and `ProgressBar`, `StatDisplay`, `CodeLine`, `DataStream` and `HexBadge` from `hud-elements.tsx`.
+  Their previews, `docs/` stubs and config entries went with them, and the `HudPanel` preview's
+  stat rows, which were `StatDisplay`s, are plain markup in the style of the story's BUILD STATS
+  panel. Claude Design keeps the six cards until the next `/design-sync` removes them, and that run
+  regrades the `HudPanel` cells.
 - **Animated components are previewed in their settled state.** A card is a still frame, and the
   phases, the hero pieces, `ArchitectureBackground` and `MetricCounter` animate on scroll or on a
   timer. Their preview files stub `window.matchMedia` for `(prefers-reduced-motion: reduce)` at
@@ -78,10 +84,10 @@ expects, and what each workaround depends on.
   `[class*="mc-blink"]` the same way.
 - **Fixed-position components need a sized wrapper in their story.** A card renders inside a
   transformed element, which becomes the containing block for `position: fixed`, so
-  `CircuitBackground` (fixed overlay) came out blank with no wrapper height, and `SectionProgress`
-  put its dots halfway down a 4,200px box. Their stories wrap them in a box the size of the card
-  viewport. The four components whose layers still escape a grid cell (`AnimatedHero`,
-  `HeroSection`, `CircuitBackground`, `SectionProgress`) are `cardMode: single` with a
+  `SectionProgress` put its dots halfway down a 4,200px box (and `CircuitBackground`, a fixed
+  overlay deleted since, came out blank with no wrapper height). Its story wraps it in a box the
+  size of the card viewport. The three components whose layers still escape a grid cell
+  (`AnimatedHero`, `HeroSection`, `SectionProgress`) are `cardMode: single` with a
   `primaryStory`; the wide ones are `cardMode: column`, with `viewport` set where the site's layout
   needs more width than the 900x700 default (`TechStack` at 1200 for its four columns, the phases at
   1200x1000, `FeaturedWork` at 1200x1300).
@@ -226,4 +232,5 @@ expects, and what each workaround depends on.
   with a `transition-all`, which had smeared its ±2px shake to under 0.15px (sampled every frame
   in Chromium).
 - All three fixes (`CodeLine` above, these two) reached Claude Design with the 2026-09-23 re-sync:
-  the regraded cards show the full-opacity gutter, the masked texture and the glow.
+  the regraded cards show the full-opacity gutter, the masked texture and the glow. #47 has since
+  deleted all three components, which no route rendered (see Previews).

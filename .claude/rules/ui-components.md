@@ -76,9 +76,8 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   through `runWithGsap` and event handlers through `useWithGsap`; `import type` is fine. A static
   import from anything the home page reaches puts about 44 KB gzip back into its initial chunk, so
   `@typescript-eslint/no-restricted-imports` in `apps/web/eslint.config.mjs` refuses one everywhere
-  in `src` except that module, the tests and `circuit-background.tsx`, which still imports GSAP and
-  two plugins statically and is rendered by no route. `apps/web/src/test/eslint-config.test.ts`
-  pins the rule.
+  in `src` except that module and the tests. `apps/web/src/test/eslint-config.test.ts` pins the
+  rule.
 - An animation that repeats forever stops while nothing can see it (ADR 0009 rule 4). In the home
   page story, `useStoryVisibility` (`src/hooks/use-story-visibility.ts`) marks the hero and each
   phase `<section>` with `data-story-visible`, and the rule beside `.scan-line` in `globals.css`

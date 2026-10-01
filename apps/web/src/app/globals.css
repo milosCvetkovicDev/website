@@ -238,22 +238,6 @@ main {
   }
 }
 
-/* Scrolling data stream. Moves up by --scroll-up-by, or half the element's height when it is unset.
-   DataStream sets it to one tile of its repeating texture, so each loop restarts on an identical
-   frame. */
-@keyframes scroll-up {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(calc(-1 * var(--scroll-up-by, 50%)));
-  }
-}
-
-.animate-scroll-up {
-  animation: scroll-up 20s linear infinite;
-}
-
 /* Scan line that sweeps a panel top to bottom. The element covers its parent and draws the 1px line
    as a background image, so the sweep is a transform of the element's own height and stays on the
    compositor; animating `top` instead would lay out and paint every frame. */
@@ -307,7 +291,6 @@ main {
   .animate-bounce,
   .animate-blink,
   .animate-shimmer,
-  .animate-scroll-up,
   .animate-hero-breathe,
   .animate-hero-scroll-bounce,
   .animate-hero-status-pulse,
