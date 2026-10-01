@@ -113,14 +113,17 @@ describe('/blog with posts published', () => {
     // publishes a post; this guards the list over fixtures, as post-body.test.tsx guards the body.
     const { default: BlogPage } = await pageOver(fixturePosts);
     const { container } = render(<BlogPage />);
-    const bases = [...container.querySelectorAll('[data-post-list] *')]
+    // The list element too: a dim on the <ol> would dim every post.
+    const bases = [...container.querySelectorAll('[data-post-list], [data-post-list] *')]
       .flatMap((element) => [...element.classList])
       .map((name) => name.split(':').at(-1) ?? name);
     expect(bases).not.toEqual([]);
     const step = String.raw`(?:\d+(?:\.\d+)?|\[[^\]]+\])`;
     const dimmed = new RegExp(String.raw`^(?:text-.*\/${step}|opacity-${step})$`);
     expect(bases.filter((name) => dimmed.test(name) && name !== 'opacity-100')).toEqual([]);
-    expect(bases).not.toContain('text-[var(--accent)]');
+    // Every spelling Tailwind v4 accepts for --accent as a text colour (`--color-accent` in the theme).
+    const accentText = /^text-(?:\[var\(--accent\)\]|\(--accent\)|accent)$/;
+    expect(bases.filter((name) => accentText.test(name))).toEqual([]);
   });
 
   it('wraps a long title or summary inside its card instead of widening the page', async () => {
