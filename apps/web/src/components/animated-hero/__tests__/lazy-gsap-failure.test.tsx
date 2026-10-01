@@ -88,7 +88,9 @@ describe('when GSAP fails to load', () => {
     // The visitor scrolls, which starts the load, and hovers while it is in flight. That hover is
     // waiting for GSAP, so it is dropped with the load, and throws nothing.
     fireEvent.scroll(window);
-    fireEvent.mouseEnter(glitch.container.querySelector('[class*="cursor-pointer"]')!);
+    const glitchTarget = glitch.container.querySelector('[data-animation]');
+    if (!glitchTarget) throw new Error('AnimatedText rendered no hover target');
+    fireEvent.mouseEnter(glitchTarget);
 
     await act(async () => {
       await expect(loadGsap()).rejects.toThrow();

@@ -42,6 +42,12 @@
 // that is not a function fails too, so the list stays exactly the set of functions. Every prerendered
 // path must also have its body file, allowlisted routes included.
 //
+// All of that judges the routes the build has, so an endpoint whose handler vanished outright (its
+// folder renamed or deleted) would pass it. REQUIRED_ROUTES names handlers that must be in every
+// build: each must be an App Router route handler, not allowlisted as a function, with at least one
+// prerendered path (for a dynamic one, the params of the route above its last dynamic segment when
+// that is a route), and each path's body file is then required like any other.
+//
 // Usage: `pnpm check:build-output`, after `pnpm --filter web build`, or
 // `node scripts/check-build-output.mjs [<distDir>]`, which defaults to apps/web/.next. Prints what it
 // checked, with the build's BUILD_ID and when it was written, and exits 0; prints every problem and
@@ -67,6 +73,19 @@ const DEFAULT_DIST = join(repoRoot, 'apps', 'web', '.next');
  * @type {readonly string[]}
  */
 export const ALLOWED_FUNCTIONS = Object.freeze([]);
+
+/**
+ * Route handlers every build must contain, prerendered, as `app-path-routes-manifest.json` names
+ * them. It lists the machine-readable endpoints from #60 on, and not yet #59's Markdown twins. A
+ * dynamic one's paths come from its `generateStaticParams`: it must prerender at least one, and when
+ * the route above its last dynamic segment is a route too, exactly that route's params, so
+ * `/work/[slug]/index.json` needs one body per `/work/<slug>` page without this list naming a
+ * slug. A required route is never a function, so it cannot be in `ALLOWED_FUNCTIONS` as well.
+ * #60 adds the case-study JSON; each later endpoint adds its own route.
+ *
+ * @type {readonly string[]}
+ */
+export const REQUIRED_ROUTES = Object.freeze(['/case-studies.json', '/work/[slug]/index.json']);
 
 /** Next's `PrerenderCompute`; every value but `static` finishes the response in a function. */
 const COMPUTE_VALUES = new Set(['static', 'blocking', 'resuming']);
@@ -250,19 +269,33 @@ export function bodyFile(path, kind) {
 const ownerOf = (path, entry) => (typeof entry.srcRoute === 'string' ? entry.srcRoute : path);
 
 /**
+ * The route a dynamic route's params must match: its own path up to its last dynamic segment, when
+ * static segments follow it (`/work/[slug]` for `/work/[slug]/index.json`), and `null` otherwise.
+ *
+ * @param {string} route
+ * @returns {string | null}
+ */
+export function paramsSibling(route) {
+  const segments = route.split('/');
+  const last = segments.findLastIndex((segment) => segment.startsWith('['));
+  return last === -1 || last === segments.length - 1 ? null : segments.slice(0, last + 1).join('/');
+}
+
+/**
  * Every problem with the App Router routes of the build, and what was checked.
  *
  * @param {{
  *   appRoutes: AppRoute[],
  *   prerender: PrerenderManifest,
  *   allowed: readonly string[],
+ *   required: readonly string[],
  *   hasBody: (file: string) => boolean,
  * }} build `hasBody` answers whether a file exists under `server/app`
  * @returns {{ problems: string[], routes: number, bodies: number, functions: string[] }}
  * @throws {CheckError} when a prerendered path or dynamic route matches no App Router route, or a
  *   path's `routeType` disagrees with its entry's name
  */
-export function collectProblems({ appRoutes, prerender, allowed, hasBody }) {
+export function collectProblems({ appRoutes, prerender, allowed, required, hasBody }) {
   /** @type {string[]} */
   const problems = [];
   /** @type {string[]} */
@@ -362,6 +395,67 @@ export function collectProblems({ appRoutes, prerender, allowed, hasBody }) {
     if (!known.has(route)) {
       problems.push(
         `${route}: is in ALLOWED_FUNCTIONS but the build has no such route. Drop it from the list.`,
+      );
+    }
+  }
+
+  /** @param {string} route */
+  const pathsOf = (route) =>
+    prerenderedPaths
+      .filter(([path, entry]) => ownerOf(path, entry) === route)
+      .map(([path]) => path);
+
+  for (const route of new Set(required)) {
+    const kind = appRoutes.find((appRoute) => appRoute.route === route)?.kind;
+    const paths = pathsOf(route);
+    if (kind === undefined) {
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES but the build has no such route. Restore its handler, or ` +
+          'drop it from the list in the change that retires the endpoint.',
+      );
+      continue;
+    }
+    if (kind !== 'route') {
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES but is built as a ${kind}, not a route handler, so it ` +
+          'serves HTML. Restore its `route.ts`.',
+      );
+    }
+    if (allowedSet.has(route)) {
+      // The allowlist would otherwise turn its function findings into an accepted function.
+      problems.push(
+        `${route}: is in both REQUIRED_ROUTES and ALLOWED_FUNCTIONS, but a required route must be ` +
+          'prerendered. Take it out of one list.',
+      );
+    }
+    if (prerender.dynamicRoutes[route] === undefined) continue;
+    if (paths.length === 0) {
+      // A static route with no path is already a finding above; a dynamic one with fixed params and
+      // none passes it, and serves nothing but 404s.
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES but prerendered no path, so every URL under it is a 404. ` +
+          'Its `generateStaticParams` returned nothing.',
+      );
+      continue;
+    }
+    const sibling = paramsSibling(route);
+    if (sibling === null || !known.has(sibling)) continue;
+    const depth = route.split('/').length - sibling.split('/').length;
+    const own = new Set(paths.map((path) => path.split('/').slice(0, -depth).join('/')));
+    const theirs = new Set(pathsOf(sibling));
+    const missing = [...theirs].filter((path) => !own.has(path)).sort();
+    const extra = [...own].filter((path) => !theirs.has(path)).sort();
+    if (missing.length > 0) {
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES but prerendered nothing for ${missing.join(', ')}, which ` +
+          `${sibling} serves, so those URLs are 404s. Its \`generateStaticParams\` has drifted ` +
+          "from the page's.",
+      );
+    }
+    if (extra.length > 0) {
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES and prerendered ${extra.join(', ')}, which ${sibling} ` +
+          "does not serve. Its `generateStaticParams` has drifted from the page's.",
       );
     }
   }
@@ -494,6 +588,7 @@ function main(args) {
       appRoutes,
       prerender,
       allowed: ALLOWED_FUNCTIONS,
+      required: REQUIRED_ROUTES,
       hasBody: (file) => {
         try {
           return statSync(join(app, file)).isFile();

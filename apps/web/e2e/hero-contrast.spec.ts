@@ -424,7 +424,7 @@ type FinderWindow = { __findAnimatedText: (text: string) => HTMLElement | null }
 
 /**
  * Installs `__findAnimatedText(text)` in the page, which returns the `AnimatedText` root showing
- * `text`, or null while there is none: the only spans in the story that carry `cursor-pointer`,
+ * `text`, or null while there is none: the only spans in the story that carry `data-animation`,
  * matched on their text or on the visually hidden copy some variants carry. Two roots showing the
  * same text throw, because every step after it would then pick one of them silently. An init
  * script, like the probe, because the site's CSP refuses code built from a string in the page. Must
@@ -434,7 +434,7 @@ async function installAnimatedTextFinder(page: Page) {
   await page.addInitScript(() => {
     (window as unknown as Record<string, unknown>).__findAnimatedText = (text: string) => {
       const roots = [
-        ...document.querySelectorAll<HTMLElement>('main section span[class*="cursor-pointer"]'),
+        ...document.querySelectorAll<HTMLElement>('main section span[data-animation]'),
       ].filter(
         (el) =>
           el.textContent?.trim() === text ||
