@@ -1459,10 +1459,10 @@ interface KnownDefect {
  * The violations present when this guard landed. Each is an expected failure until the change that
  * fixes it deletes the entry, which it has to: an expected failure that passes fails the run. Adding
  * an entry ships a known defect on purpose, so it names what fixes it. #47 is the hero task of the
- * audit remediation epic (.claude/epics/audit-remediation-2026-09/47.md): R12 and R13 are its
- * expected-failure rows in e2e/hero-contrast.spec.ts, and hero-2 its finding. DIM1, the glitch
- * variant's two copies at `opacity-70` (critic-8), was fixed with R17 by #47's slice 47d; ids are
- * not reused.
+ * audit remediation epic (.claude/epics/audit-remediation-2026-09/47.md). DIM1, the glitch
+ * variant's two copies at `opacity-70` (critic-8), was fixed with R17 by #47's slice 47d; DIM3 and
+ * DIM4, the hero skill tags and the Scroll label (hero-2), with R12 and R13 in
+ * e2e/hero-contrast.spec.ts by slice 47c. Ids are not reused.
  */
 const KNOWN_DEFECTS: KnownDefect[] = [
   {
@@ -1473,24 +1473,6 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     sites: 3,
     fixedBy: 'unassigned',
     why: 'the SVG <text> node labels of the diagram behind the featured work sit at 40% (60% dark), and at 0.3 of that under a hovered card',
-  },
-  {
-    id: 'DIM3',
-    file: 'src/components/animated-hero/hero-content.tsx',
-    component: 'SkillTags',
-    tokens: ['text-[rgba(99,102,241,0.7)]', 'dark:text-[rgba(167,139,250,0.6)]'],
-    sites: 2,
-    fixedBy: 'R12, R13, #47',
-    why: 'the hero skill tags paint an accent at 0.7 alpha, 0.6 in the dark theme (hero-2)',
-  },
-  {
-    id: 'DIM4',
-    file: 'src/components/animated-hero/hero-section.tsx',
-    component: 'HeroSection',
-    tokens: ['style.color'],
-    sites: 1,
-    fixedBy: 'R13, #47',
-    why: 'the Scroll label under the hero, painted inline at 0.7 alpha (hero-2)',
   },
   {
     id: 'DIM5',
