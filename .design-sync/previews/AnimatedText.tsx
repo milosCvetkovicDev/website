@@ -1,13 +1,9 @@
 import { AnimatedText } from 'web';
 
 export const Headline = () => (
-  <AnimatedText
-    as="h2"
-    animation="scramble"
-    className="text-3xl font-bold text-[var(--foreground)]"
-  >
-    This happened at 3am. Nobody woke up.
-  </AnimatedText>
+  <h2 className="text-3xl font-bold text-[var(--foreground)]">
+    <AnimatedText animation="scramble">This happened at 3am. Nobody woke up.</AnimatedText>
+  </h2>
 );
 
 export const PhaseLabel = () => (
@@ -59,8 +55,10 @@ export const EveryAnimation = () => (
 
 export const DarkTheme = () => (
   <div className="dark bg-[var(--background)] p-6 text-[var(--foreground)]">
-    <AnimatedText as="h2" animation="glitch" className="text-3xl font-bold">
-      Hype fades. The right tool for the job doesn&apos;t.
-    </AnimatedText>
+    <h2 className="text-3xl font-bold">
+      <AnimatedText animation="glitch">
+        Hype fades. The right tool for the job doesn&apos;t.
+      </AnimatedText>
+    </h2>
   </div>
 );
