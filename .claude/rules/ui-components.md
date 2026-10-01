@@ -84,5 +84,9 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   pauses the endless animation classes it lists inside a section marked `false`. An endless CSS
   animation there is a class on that list, never an inline `animation` shorthand, which resets
   `animation-play-state` with inline precedence; a finite one stays off the list, or it would hold
-  its first frame while the section is out of view. `e2e/reduced-motion.spec.ts` (R18) fails on an
-  endless animation in the story left running off-screen or at an effective opacity of 0.
+  its first frame while the section is out of view. `src/test/story-animation-pause.test.ts` holds
+  the story's sources to that list (no variant, arbitrary or inline animation), and
+  `e2e/reduced-motion.spec.ts` (R18) fails on an endless CSS or Web Animation in the story still
+  running at the bottom of the page. The pause is per section and ignores opacity: while any pixel
+  of a section is in view, everything in it runs. R18 cannot see GSAP tweens, so a GSAP tween that
+  repeats pauses from its own ScrollTrigger, as GameComplete's CTA glow does on leave.

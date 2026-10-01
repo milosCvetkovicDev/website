@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 
@@ -15,7 +15,10 @@ import { expectHydrated } from './support/hydration';
  *   phase section `data-story-visible="false"` while it is out of view, a `globals.css` rule pauses
  *   the endless animations inside one, and the scroll dot pauses while its indicator is faded out.
  *   Measured with `document.getAnimations()`, which sees both CSS and Web Animations API timelines,
- *   which is why it caught all seven despite their being written three different ways.
+ *   which is why it caught all seven despite their being written three different ways. It never sees
+ *   a GSAP tween, which GSAP writes inline from its ticker: the story's one that repeats,
+ *   GameComplete's CTA glow, pauses from its own ScrollTrigger. The pause works a section at a time
+ *   and ignores opacity, so R18 measures at the bottom of the page, with every section out of view.
  * - R19 (hero-5) is the reduced-motion promise, fixed by slice 47d and kept as its guard.
  *   `animated-text.tsx` had no reference to `prefers-reduced-motion` against fourteen mouse handlers,
  *   so under `reduce` — where every phase's *scroll* animation correctly returns early — hovering a
@@ -53,23 +56,71 @@ async function walkToBottom(page: Page) {
 /** The hero `<section>`, by the start of its aria-label. */
 const heroSection = (page: Page) => page.locator('section[aria-label^="Hero"]');
 
-/** The hero's three endless animations, by keyframe name, with each one's play state. */
-async function heroAnimationStates(page: Page) {
-  return page.evaluate(() =>
-    document
-      .getAnimations()
-      .filter((animation): animation is CSSAnimation => animation instanceof CSSAnimation)
-      .map((animation) => [animation.animationName, animation.playState])
-      .filter(([name]) =>
-        ['hero-breathe', 'hero-status-pulse', 'hero-scroll-bounce'].includes(name),
-      )
-      .sort(([a], [b]) => a.localeCompare(b)),
+/**
+ * Every story section whose `data-story-visible` disagrees with where it is: the IntersectionObserver
+ * path on its own, before any animation is read. The story wrapper is the hero's grandparent
+ * (AnimatedHero's outer `div`, around the content layer), and it holds exactly the hero and the six
+ * phases: featured work's `<section>` would make eight if the wrapper were ever `<main>`.
+ */
+async function storyVisibilityMismatches(page: Page) {
+  return page.evaluate(() => {
+    const story = document.querySelector('section[aria-label^="Hero"]')?.parentElement
+      ?.parentElement;
+    const sections = story ? [...story.querySelectorAll('section')] : [];
+    if (sections.length !== 7)
+      return [`the story wrapper holds ${sections.length} sections, not 7`];
+    return sections.flatMap((section, index) => {
+      const box = section.getBoundingClientRect();
+      const { innerWidth: width, innerHeight: height } = window;
+      const inView = box.bottom > 0 && box.top < height && box.right > 0 && box.left < width;
+      // The observer counts a section touching the viewport's edge as intersecting: either is right.
+      const onEdge = Math.abs(box.bottom) < 1 || Math.abs(box.top - height) < 1;
+      const attribute = section.getAttribute('data-story-visible');
+      if (attribute === String(inView) || (onEdge && attribute !== null)) return [];
+      return [`section ${index + 1} is ${inView ? 'in' : 'out of'} view, marked ${attribute}`];
+    });
+  });
+}
+
+/** The story's named endless animations, by keyframe name, with each one's play state. */
+async function animationStates(page: Page, names: string[]) {
+  return page.evaluate(
+    (names) =>
+      document
+        .getAnimations()
+        .filter((animation): animation is CSSAnimation => animation instanceof CSSAnimation)
+        .map((animation) => [animation.animationName, animation.playState])
+        .filter(([name]) => names.includes(name))
+        .sort(([a], [b]) => a.localeCompare(b)),
+    names,
   );
+}
+
+const HERO_ANIMATIONS = ['hero-breathe', 'hero-scroll-bounce', 'hero-status-pulse'];
+const heroAnimationStates = (page: Page) => animationStates(page, HERO_ANIMATIONS);
+const caretState = (page: Page) => animationStates(page, ['caret-pulse']);
+const each = (state: string, names = HERO_ANIMATIONS) => names.map((name) => [name, state]);
+
+/**
+ * Wheels the page, as a visitor does, until `region`'s top sits at the viewport's top. Not
+ * window.scrollTo: Chromium can undo a scripted scroll made this soon after hydration (see 'scroll
+ * indicator fades on scroll' in hero.spec.ts).
+ */
+async function parkOn(page: Page, region: Locator) {
+  await page.mouse.move(640, 512);
+  await expect(async () => {
+    const top = await region.evaluate((el) => el.getBoundingClientRect().top);
+    if (Math.abs(top) > 8) await page.mouse.wheel(0, top);
+    expect(Math.abs(await region.evaluate((el) => el.getBoundingClientRect().top))).toBeLessThan(
+      64,
+    );
+  }).toPass({ timeout: 10_000 });
 }
 
 // The Scroll indicator is displayed from `lg` and 960 px tall only (#134), and an element that is not
 // displayed runs no CSS animation at all, so at the desktop project's 1280x720 its dot would be
-// missing from both tests below rather than measured.
+// missing from both tests below rather than measured. This spec sits outside `e2e/mobile/`, so it
+// runs on the desktop project only (playwright.config.ts, MOBILE_SPECS), as it did at 1280x720.
 test.describe('at 1280x1024, where the scroll indicator is displayed', () => {
   test.use({ viewport: { width: 1280, height: 1024 } });
 
@@ -84,16 +135,36 @@ test.describe('at 1280x1024, where the scroll indicator is displayed', () => {
     );
 
     await walkToBottom(page);
-    // Let the timer-driven sequences settle so nothing is still legitimately mid-entrance.
+    // Not a wait for a settled state: an endless animation running out of view is wrong at any
+    // moment. The wait lets a sequence that adds an endless element late (a spinner once a stage
+    // starts, a pulse once an alert lands) do so before the count, so it is measured, not missed.
     await page.waitForTimeout(9_000);
+    // Chromium can undo a scripted scroll soon after hydration: measure at the bottom, not at the
+    // top with the hero in view.
+    await expect(async () => {
+      const atBottom = await page.evaluate(() => {
+        const bottom = document.documentElement.scrollHeight - window.innerHeight;
+        if (window.scrollY < bottom - 2) window.scrollTo({ top: bottom, behavior: 'instant' });
+        return window.scrollY >= bottom - 2;
+      });
+      expect(atBottom, 'the walk ends at the bottom of the page').toBe(true);
+      expect(
+        await heroSection(page).evaluate((el) => el.getBoundingClientRect().bottom),
+      ).toBeLessThanOrEqual(0);
+    }).toPass({ timeout: 10_000 });
+    await expect
+      .poll(() => storyVisibilityMismatches(page), {
+        message: 'each story section is marked data-story-visible by where it is',
+      })
+      .toEqual([]);
 
     const { endless, wasteful, outside } = await page.evaluate(() => {
-      // The story wrapper AnimatedHero renders: the hero section sits in its content layer, beside
-      // the six phase sections. AC 5 holds the story to the rule; the featured work below it has
-      // endless pulses of its own, which are a follow-up of #47 and reported here without failing.
-      const hero = document.querySelector('section[aria-label^="Hero"]');
-      const story = hero?.parentElement?.parentElement;
-      if (!story || story.querySelectorAll('section').length < 7) {
+      // The story wrapper, as storyVisibilityMismatches checked it: seven sections exactly. AC 5
+      // holds the story to the rule; the featured work below it has endless pulses of its own, which
+      // are a follow-up of #47 and reported here without failing.
+      const story = document.querySelector('section[aria-label^="Hero"]')?.parentElement
+        ?.parentElement;
+      if (!story || story.querySelectorAll('section').length !== 7) {
         throw new Error(
           'the story wrapper, holding the hero and six phase sections, was not found',
         );
@@ -108,7 +179,8 @@ test.describe('at 1280x1024, where the scroll indicator is displayed', () => {
         // here: it writes inline styles from its ticker.
         const timing = animation.effect?.getComputedTiming();
         if (!timing || Number.isFinite(timing.iterations ?? 1)) continue;
-        const target = (animation.effect as KeyframeEffect | null)?.target;
+        const effect = animation.effect as KeyframeEffect | null;
+        const target = effect?.target;
         if (!(target instanceof Element)) continue;
         const inStory = story.contains(target);
         if (inStory) endless++;
@@ -116,11 +188,18 @@ test.describe('at 1280x1024, where the scroll indicator is displayed', () => {
 
         const box = target.getBoundingClientRect();
         const style = getComputedStyle(target);
-        const offScreen = box.bottom <= 0 || box.top >= viewport.height || box.width === 0;
-        // Effective opacity: the scroll dot's own opacity is its keyframes', while the wrapper that
-        // fades the indicator out is what takes it to 0.
-        let opacity = 1;
-        for (let el: Element | null = target; el; el = el.parentElement) {
+        const offScreen =
+          box.bottom <= 0 ||
+          box.top >= viewport.height ||
+          box.right <= 0 ||
+          box.left >= viewport.width ||
+          box.width === 0;
+        // Effective opacity: every ancestor's, and the target's own unless this animation is what
+        // moves it, or a blink caught on its off beat would read as invisible. The scroll dot's own
+        // opacity is its keyframes', while the wrapper that fades the indicator out takes it to 0.
+        const animatesOpacity = effect?.getKeyframes().some((frame) => 'opacity' in frame);
+        let opacity = animatesOpacity ? 1 : Number(style.opacity);
+        for (let el = target.parentElement; el; el = el.parentElement) {
           opacity *= Number(getComputedStyle(el).opacity);
         }
         const invisible = opacity === 0 || style.visibility === 'hidden';
@@ -148,59 +227,56 @@ test.describe('at 1280x1024, where the scroll indicator is displayed', () => {
     expect(endless, 'the endless animations in the story were not found').toBeGreaterThanOrEqual(3);
     expect(
       wasteful,
-      'ADR 0009 rule 4: an endless animation stops while nothing can see it. These are still ' +
-        'running at the bottom of the page. A CSS one inside a story section takes a class listed ' +
-        "in globals.css's data-story-visible rule; a GSAP one pauses from its own ScrollTrigger, as " +
-        "GameComplete's CTA glow does.",
+      'ADR 0009 rule 4: an endless animation stops while nothing can see it. These CSS or Web ' +
+        'Animations are still running at the bottom of the page, where every story section is out ' +
+        "of view. A CSS one inside a story section takes a class listed in globals.css's " +
+        'data-story-visible rule. A GSAP tween is invisible to this measure: one that repeats ' +
+        "pauses from its own ScrollTrigger, as GameComplete's CTA glow does.",
     ).toEqual([]);
   });
 
-  test("parked on Strategy, the hero's endless animations pause, and run again at the top", async ({
+  test("parked on a phase, the hero's endless animations pause and the phase's run, and back", async ({
     page,
   }) => {
     // #47 AC 5's second half, the scenario "Off-screen animations stop": the hero's breathing glow,
-    // its status pulse and the scroll dot, each found by its keyframes.
+    // its status pulse and the scroll dot, and the Execution caret for a phase, each found by its
+    // keyframes. The scroll dot also pauses inline once the page has scrolled 100 px, which it
+    // always has when the hero is out of view; the glow and the status pulse have only the rule.
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/');
     await expectHydrated(page);
-    const running = [
-      ['hero-breathe', 'running'],
-      ['hero-scroll-bounce', 'running'],
-      ['hero-status-pulse', 'running'],
-    ];
-    expect(await heroAnimationStates(page), 'at the top, all three run').toEqual(running);
+    await expect
+      .poll(async () => [...(await heroAnimationStates(page)), ...(await caretState(page))], {
+        message: 'at the top, the hero runs and the Execution caret, far below, waits',
+      })
+      .toEqual([...each('running'), ['caret-pulse', 'paused']]);
 
-    // Wheel scrolls, as a visitor makes, not window.scrollTo: Chromium can undo a scripted scroll
-    // made this soon after hydration (see 'scroll indicator fades on scroll' in hero.spec.ts).
-    const strategy = page.getByRole('region', { name: /strategy/i });
-    await page.mouse.move(640, 512);
-    await expect(async () => {
-      const top = await strategy.evaluate((el) => el.getBoundingClientRect().top);
-      if (Math.abs(top) > 8) await page.mouse.wheel(0, top);
-      expect(
-        await heroSection(page).evaluate((el) => el.getBoundingClientRect().bottom),
-        'the hero is entirely above the viewport',
-      ).toBeLessThanOrEqual(0);
-      expect(
-        Math.abs(await strategy.evaluate((el) => el.getBoundingClientRect().top)),
-      ).toBeLessThan(64);
-    }).toPass({ timeout: 10_000 });
-
+    await parkOn(page, page.getByRole('region', { name: /strategy/i }));
+    expect(
+      await heroSection(page).evaluate((el) => el.getBoundingClientRect().bottom),
+      'the hero is entirely above the viewport',
+    ).toBeLessThanOrEqual(0);
     await expect
       .poll(() => heroAnimationStates(page), {
         message: 'with the hero out of view, its glow, status pulse and scroll dot all pause',
       })
-      .toEqual(running.map(([name]) => [name, 'paused']));
+      .toEqual(each('paused'));
+
+    await parkOn(page, page.getByRole('region', { name: /execution/i }));
+    await expect
+      .poll(() => caretState(page), { message: 'parked on Execution, its caret runs' })
+      .toEqual([['caret-pulse', 'running']]);
+    await expect.poll(() => storyVisibilityMismatches(page)).toEqual([]);
 
     await expect(async () => {
       if ((await page.evaluate(() => window.scrollY)) > 0) await page.mouse.wheel(0, -100_000);
       expect(await page.evaluate(() => window.scrollY)).toBe(0);
     }).toPass({ timeout: 10_000 });
     await expect
-      .poll(() => heroAnimationStates(page), {
-        message: 'back at the top, all three run again',
+      .poll(async () => [...(await heroAnimationStates(page)), ...(await caretState(page))], {
+        message: 'back at the top, the hero runs again and the caret waits again',
       })
-      .toEqual(running);
+      .toEqual([...each('running'), ['caret-pulse', 'paused']]);
   });
 });
 

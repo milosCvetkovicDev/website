@@ -110,6 +110,11 @@ describe('useStoryVisibility', () => {
     second.unmount();
     expect(observer.disconnected).toBe(true);
 
+    // An entry the browser queued before the section was unobserved can still arrive afterwards:
+    // it must not mark an element nobody is watching any more.
+    observer.deliver([hero, false]);
+    expect(hero).not.toHaveAttribute('data-story-visible');
+
     // A later mount, such as a soft navigation back to `/`, starts a fresh observer.
     render(<Section id="loop" />);
     expect(observers).toHaveLength(2);
