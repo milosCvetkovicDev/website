@@ -32,12 +32,21 @@ export type OwnerTodoMarker = `${typeof OWNER_TODO}(${string})`;
 /**
  * Marks a gap in a drafted sentence, naming what the owner has to supply. The hint is plain words on
  * one line with no brackets, since a finding names the gap by it and the marker ends at the first `)`.
+ * Nor does it hold Markdown syntax (a backslash, a backtick, `*`, `_`, `[`, `]`, `<`, `>`, `|`, `~`
+ * or `&`), a tab or a run of spaces: a generated Markdown source such as `/llms.txt`'s draft escapes
+ * or collapses those, and its finding would then name a hint that no register row spells.
  */
 export function ownerTodo(hint: string): OwnerTodoMarker {
   if (hint.trim() === '' || /[()\r\n]/.test(hint)) {
     throw new Error(
       `ownerTodo(${JSON.stringify(hint)}): the hint says what the owner supplies, on one line, ` +
         'without brackets',
+    );
+  }
+  if (/[\\`*_[\]<>|~&\t]| {2,}/.test(hint)) {
+    throw new Error(
+      `ownerTodo(${JSON.stringify(hint)}): the hint is plain words, with no Markdown syntax, tab ` +
+        'or run of spaces',
     );
   }
   return `${OWNER_TODO}(${hint})`;
@@ -90,6 +99,17 @@ export const unfilledOwnerFields: readonly UnfilledOwnerField[] = [
   {
     field: 'case-studies.2.metricDefinition',
     why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the Nx remote cache's 5× faster builds: facts only the owner has.",
+    expires: '2026-10-31',
+  },
+  {
+    field: 'llms-txt#the blockquote, one sentence on who Milos is and what he is for',
+    why: "The one sentence /llms.txt opens with, in the owner's own words: who he is and what he is for. Until it is written the file serves the home page's description in its place.",
+    expires: '2026-10-31',
+  },
+  {
+    field:
+      'llms-txt#the facts block, how the current role is phrased and which profile links to list',
+    why: 'The ground-truth facts /llms.txt carries after its blockquote: how the owner phrases his current role and which profile links he lists, decisions only he makes. Until then the file has no facts block.',
     expires: '2026-10-31',
   },
 ];

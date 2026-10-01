@@ -58,10 +58,9 @@ import {
  *   none" in `e2e/seo-surface.spec.ts`.
  * - `llms-txt` fetches `/llms.txt` from the audited origin and reports a 4xx as `notApplicable`,
  *   which is how a missing file left agentic browsing at 1.0, a 5xx as 0, and a 2xx as a pass only
- *   with an H1, a Markdown link and at least 50 characters. The site serves no `/llms.txt` until
- *   #60, so both of its rows are expected failures naming it, declared only once the audit has
- *   reported `notApplicable`: any other outcome fails the run, and the change that serves the file
- *   deletes the `llms-txt` entry in `EXPECTED_NOT_APPLICABLE`.
+ *   with an H1, a Markdown link and at least 50 characters. #60 serves the file, so both of its
+ *   rows are plain assertions now: a 404 fails them like any other `notApplicable`.
+ *   `EXPECTED_NOT_APPLICABLE` is empty, kept for the next audit whose subject is not served yet.
  * - `agent-accessibility-tree` passes when none of a fixed set of axe rules (names, labels, ARIA
  *   validity, `document-title` among them) reports a violation on the page as loaded. It runs under
  *   Lighthouse's default emulation, the mobile form factor at a 412 px wide viewport, so it checks
@@ -128,8 +127,11 @@ const AUDIT_IDS = [
 
 type AuditId = (typeof AUDIT_IDS)[number];
 
-/** The audits whose failure is declared, each with the task that removes the declaration. */
-const EXPECTED_NOT_APPLICABLE: Partial<Record<AuditId, string>> = { 'llms-txt': '#60' };
+/**
+ * The audits whose failure is declared, each with the task that removes the declaration. Empty
+ * since #60 served `/llms.txt`.
+ */
+const EXPECTED_NOT_APPLICABLE: Partial<Record<AuditId, string>> = {};
 
 /**
  * The case study #55's AC 9 names. Named rather than taken from the data file's order, so that a

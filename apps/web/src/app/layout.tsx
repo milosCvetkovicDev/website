@@ -83,6 +83,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <PersonJsonLd />
         <WebsiteJsonLd />
+        <link rel="describedby" href={new URL('/llms.txt', siteUrl).href} />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} flex min-h-screen flex-col antialiased`}

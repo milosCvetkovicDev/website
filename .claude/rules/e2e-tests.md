@@ -110,11 +110,14 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   the pull request that fixes the defect deletes the annotation in the same change. The
   machine-readable endpoints follow the same rule without a manifest row: `e2e/endpoints.ts` is the
   one list of their paths, and `e2e/machine-readable.spec.ts` holds one `test.fail()` per endpoint
-  not yet served, its title and `fixed-by` annotation naming the issue that ships it (#60 to #62;
-  #59's Markdown twins ship, and `e2e/markdown-twins.spec.ts` is their fuller contract). Its
-  `expectNotServedYet` requires the 404 before it calls `test.fail()`, so a 5xx or a server that
-  never answered fails the run instead of passing as the expected failure; the change that ships an
-  endpoint deletes that call.
+  not yet served, its title and `fixed-by` annotation naming the issue that ships it (#61 and #62).
+  #59's Markdown twins and #60's `/llms.txt` and case-study JSON ship: the rows for `/llms.txt` and
+  the JSON there are their contract (every link in `/llms.txt` answers 200, and the refused
+  `/llms-full.txt` stays a 404), `e2e/seo-surface.spec.ts` checks every route's one
+  `rel="describedby"` link to `/llms.txt`, and `e2e/markdown-twins.spec.ts` is the twins' fuller
+  contract. The machine-readable spec's `expectNotServedYet` requires the 404 before it calls
+  `test.fail()`, so a 5xx or a server that never answered fails the run instead of passing as the
+  expected failure; the change that ships an endpoint deletes that call.
 - The two gate specs opt out of those retries: `e2e/console-clean.spec.ts` and
   `e2e/accessibility.spec.ts` both set `test.describe.configure({ retries: 0 })`, and so does every
   spec that carries an expected failure. A retry would turn an intermittent console message or axe

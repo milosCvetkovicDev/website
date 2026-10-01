@@ -13,6 +13,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { LLMS_TXT_OWNER_COPY, siteIndexToLlmsTxt } from '@/lib/serialise';
 import { caseStudies } from '../case-studies';
 import {
   MAX_EXPIRY_DAYS,
@@ -35,6 +36,10 @@ const RENDERS_ONLY: Record<string, string> = {
     'a unit test: builds unfilled fixtures to prove formatMetricScope leaves them out, and ships nowhere',
   'lib/__tests__/serialise.test.ts':
     'a unit test: reads the marker to prove no live Markdown twin serves it, and ships nowhere',
+  'lib/__tests__/case-studies-json.test.ts':
+    'a unit test: reads the marker to prove the case-study JSON never serves it, and ships nowhere',
+  'lib/__tests__/llms-txt.test.ts':
+    'a unit test: builds unfilled fixtures to prove the served /llms.txt leaves them out, and ships nowhere',
 };
 
 /**
@@ -44,7 +49,19 @@ const RENDERS_ONLY: Record<string, string> = {
  * that imports owner-todo has to be imported by this file (for an entry here) or named in
  * `RENDERS_ONLY`: the 'every importer' test below fails otherwise.
  */
-const OWNER_TODO_SOURCES: OwnerTodoSource[] = [{ id: 'case-studies', value: caseStudies }];
+const OWNER_TODO_SOURCES: OwnerTodoSource[] = [
+  { id: 'case-studies', value: caseStudies },
+  // The draft-complete composition of /llms.txt (#60), because the served one carries no marker for
+  // the walk to find: `lib/serialise.ts` holds the owner's blockquote and facts block there. Built
+  // when the live test reads it, so a composition that throws fails that test by name instead of
+  // stopping this file from loading.
+  {
+    id: 'llms-txt',
+    get value() {
+      return siteIndexToLlmsTxt({ includeUnfilled: true });
+    },
+  },
+];
 
 const NOW = new Date('2026-09-28T12:00:00Z');
 const IN_DATE = '2026-10-31';
@@ -75,6 +92,29 @@ describe('OWNER_TODO and ownerTodo', () => {
     ['on two lines', 'the window\nand the method'],
   ])('refuses a hint that is %s, since a finding names the gap by it', (_, hint) => {
     expect(() => ownerTodo(hint)).toThrow('the hint says what the owner supplies');
+  });
+
+  it.each([
+    ['an underscore', 'the metric_window'],
+    ['an asterisk', 'the *main* role'],
+    ['a square bracket', 'the [profile] links'],
+    ['an angle bracket', 'the <role>'],
+    ['a backtick', 'the `role`'],
+    ['a backslash', 'the role\\title'],
+    ['a pipe', 'the role | title'],
+    ['a tilde', 'about ~40 teams'],
+    ['an ampersand', 'the role &amp; title'],
+    ['a tab', 'the role\ttitle'],
+    ['a run of spaces', 'the role  title'],
+  ])('refuses a hint holding %s, which a generated Markdown source would rewrite', (_, hint) => {
+    expect(() => ownerTodo(hint)).toThrow('the hint is plain words, with no Markdown syntax');
+  });
+
+  it('keeps each live /llms.txt hint as the draft composition writes it', () => {
+    const draft = siteIndexToLlmsTxt({ includeUnfilled: true });
+    for (const marker of [LLMS_TXT_OWNER_COPY.summary, ...LLMS_TXT_OWNER_COPY.facts]) {
+      expect(draft).toContain(marker as string);
+    }
   });
 });
 

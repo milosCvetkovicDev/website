@@ -1,9 +1,9 @@
 /**
  * @vitest-environment node
  *
- * `serialise.ts`, the one module that turns the content modules into Markdown (#59). Every twin,
- * and later `/llms.txt`, the feed and the MCP payloads, render through it, so this file pins the
- * output rather than trusting each consumer to notice a gap.
+ * `serialise.ts`, the one module that turns the content modules into Markdown (#59). Every twin
+ * and `/llms.txt` (#60, pinned in `llms-txt.test.ts`) render through it, and later the feed and the
+ * MCP payloads, so this file pins the output rather than trusting each consumer to notice a gap.
  *
  * The case-study check reads the data, not the interface: it walks every key of every study and
  * asserts each value reaches the twin, so a new `CaseStudy` field (#56's metric scope and window)
