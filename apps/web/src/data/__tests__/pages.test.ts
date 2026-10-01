@@ -100,7 +100,9 @@ describe('the entries moved out of the page modules', () => {
     }
     const skills = twin('/skills');
     for (const { name, years, level, context } of coreSkills) {
-      expect(skills).toContain(`- **${name}**: ${years} years. Proficiency: ${level}%. ${context}`);
+      expect(skills).toContain(
+        `- **${name}**: ${years} years. Self-assessed proficiency: ${level}%. ${context}`,
+      );
     }
     for (const { title, description } of differentiators) {
       expect(skills).toContain(`- **${title}**: ${description}`);

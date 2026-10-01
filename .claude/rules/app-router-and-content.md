@@ -43,6 +43,16 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   (`app/index.md/route.ts` for `/`), and `work/[slug]/index.md/route.ts` for the case studies, with
   its own `generateStaticParams` and `dynamicParams = false`. Each is three lines that hand a record
   from `pages` in `src/data/pages/index.ts`, or a study, to the serialiser below.
+- The case studies as JSON (#60), `application/json` and outside `/api/` on purpose:
+  `case-studies.json/route.ts` serves every study as one array at `/case-studies.json`, and
+  `work/[slug]/index.json/route.ts` one study at `/work/<slug>/index.json`, with its own
+  `generateStaticParams` and `dynamicParams = false`. Both return `caseStudiesToJson()` or
+  `caseStudyToJson()` from the serialiser: every `CaseStudy` field as the data holds it, the
+  metric with its `formatMetric()` text as `formatted`, a metric definition that cannot be stated
+  as `null` (never a marker) and a stated one with its method on one line, and the absolute `url`
+  of the page and `markdown` of its twin. The prerender fails on a metric value that is not finite
+  and on a marker in any other field. `lib/__tests__/case-studies-json.test.ts` fails when an
+  entry's keys are not the study's own plus those two, and calls both handlers.
 - `feed.xml/route.ts` serves the Atom feed of `publishedPosts` (#61) as
   `application/atom+xml; charset=utf-8`, written by `buildAtomFeed()` in `src/lib/atom.ts`: entries
   newest first with the summary only, links absolute on the site's origin, ids on the fixed
@@ -59,22 +69,34 @@ derives from the canonical's (a module with no imports, which the e2e helpers re
 folder with a `page.tsx` needs an `index.md/route.ts` beside it: `data/__tests__/pages.test.ts`
 fails one without, fails a static route without a record, and calls every handler to check it
 serves exactly the serialiser's output, statically. `e2e/markdown-twins.spec.ts` checks the served
-twins against the served pages. The sitemap lists no twin. Once `hasPublishedPosts` is true,
+twins against the served pages. The sitemap lists no twin. The page's own URL also answers with
+its twin when the request's `Accept` lists `text/markdown` (not at `q=0`), through one rewrite
+per route in `next.config.ts` (the rules and their limits are in `deploy-and-next-config.md`), so
+a route added here needs its twin for the rewrite as well: `src/test/next-config.test.ts` fails
+when the negotiated routes and the twin handlers differ. `src/data/static-routes.ts`,
+`src/data/case-studies.ts`, `src/lib/pathname.ts` and every module they import are loaded by
+`next.config.ts` and must import by relative path, never `@/`, or `next build` fails. The
+pattern, `force-static` included, is recorded in
+`docs/adr/0030-generated-endpoints-as-static-route-handlers.md`. Once `hasPublishedPosts` is true,
 `buildMetadata()` also advertises the feed on every route, as
-`alternates.types['application/atom+xml']` at `FEED_PATH` from the same module, titled with the
-feed's own `FEED_TITLE` from `lib/metadata.ts`; until then no route links it, since an advertised
-feed with nothing in it helps no reader (ADR 0028).
+`alternates.types['application/atom+xml']` at `FEED_PATH` from `src/lib/pathname.ts`, titled
+with the feed's own `FEED_TITLE` from `lib/metadata.ts`; until then no route links it, since an
+advertised feed with nothing in it helps no reader (ADR 0028).
 
 All of the route handlers prerender at build time, and `pnpm check:build-output` (a `quality` step,
 `ci-and-scripts.md`) fails when a route does not: a `GET` handler is dynamic unless it exports
 `dynamic = 'force-static'`, and without it builds as a server function, as a handler that exports
 any other method does even with it. The same check fails a `proxy.ts` and any `'use server'`
-action. `sitemap.ts`, `robots.ts`, `layout.tsx`, `feed.xml/route.ts`, `components/json-ld.tsx`
+action, and a build that lacks a route in its `REQUIRED_ROUTES` (the JSON handlers above) or
+prerendered no path for one, or other slugs for `/work/[slug]/index.json` than for the page.
+`sitemap.ts`, `robots.ts`, `layout.tsx`, `feed.xml/route.ts`, `components/json-ld.tsx`
 and `lib/serialise.ts` each read `NEXT_PUBLIC_SITE_URL`, falling back to
 `https://miloscvetkovic.dev`. There is no middleware.
 `src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
 page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own
-(#59). `lib/__tests__/serialise.test.ts` fails when a file under `src/app` writes `text/markdown`.
+(#59). It writes the case-study JSON too, with `jsonResponse()` as the one place that sets its
+content type (#60). `lib/__tests__/serialise.test.ts` fails when a file under `src/app` writes
+`text/markdown`.
 The security headers come from one static `headers()` entry in `apps/web/next.config.ts` whose
 source, `/:path*`, matches every path, `/_next/static` assets and the 404s included:
 `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a Content-Security-Policy, a

@@ -1,5 +1,6 @@
 import { caseStudies, formatMetric } from '@/data/case-studies';
 import { social } from '@/data/social';
+import { productionFigure } from '@/data/work-stats';
 import type { InlineLink, PageRecord, ProseSection } from './types';
 
 /**
@@ -8,7 +9,10 @@ import type { InlineLink, PageRecord, ProseSection } from './types';
  * a study's title, description or metric. The `h1` stays in the page.
  */
 
-/** A figure in the stats bar and the label under it. */
+/**
+ * A figure in the stats bar and the label under it, which the page renders as two elements: the
+ * figure large, the label small and uppercase. Keep them apart rather than one string.
+ */
 export interface WorkStat {
   value: string;
   label: string;
@@ -19,10 +23,12 @@ export const workCopy = {
   eyebrow: 'Case studies · Milos Cvetkovic, Senior Full-Stack Engineer',
   intro:
     'Real projects with real constraints: AI agents, legacy modernization and developer tooling. Each one pushed boundaries—and delivered results.',
+  // Both figures are counted from `caseStudies` when the page is built, never written down (#58).
+  // The bar once claimed 100% in production, which went false when a study was retired, and a count
+  // of projects left unfinished with no denominator, which stays out until the owner supplies one.
   stats: [
     { value: String(caseStudies.length), label: 'Projects' },
-    { value: '100%', label: 'In Production' },
-    { value: '0', label: 'Left Unfinished' },
+    { value: productionFigure(caseStudies), label: 'Running in production' },
   ],
   /** The line at the foot of every card, which the whole card links from. */
   readMore: 'Read full case study',

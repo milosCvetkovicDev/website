@@ -109,7 +109,7 @@ function SkillTags() {
       {SKILL_TAGS.map((tag) => (
         <li
           key={tag}
-          className="rounded-[3px] border border-[rgba(99,102,241,0.2)] bg-transparent px-[9px] py-[3px] font-mono text-[rgba(99,102,241,0.7)] transition-all duration-200 hover:border-[rgba(139,92,246,0.4)] hover:text-[#a78bfa] dark:border-[rgba(139,92,246,0.15)] dark:text-[rgba(167,139,250,0.6)]"
+          className="rounded-[3px] border border-[var(--accent)]/20 bg-transparent px-[9px] py-[3px] font-mono text-[var(--muted)] transition-colors duration-200 hover:border-[var(--accent)]/40 hover:text-[var(--accent-text)]"
           style={{
             fontSize: '10px',
           }}
@@ -165,16 +165,7 @@ export function HeroContent() {
         >
           I build systems that inherit chaos and ship clarity.
           <br />
-          <span
-            className="font-bold"
-            style={{
-              background: 'linear-gradient(135deg, #a78bfa, #22d3ee)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            Scroll to see how.
-          </span>
+          <span className="font-bold text-[var(--accent-text)]">Scroll to see how.</span>
         </p>
       </div>
 
