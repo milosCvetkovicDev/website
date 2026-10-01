@@ -43,6 +43,16 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   (`app/index.md/route.ts` for `/`), and `work/[slug]/index.md/route.ts` for the case studies, with
   its own `generateStaticParams` and `dynamicParams = false`. Each is three lines that hand a record
   from `pages` in `src/data/pages/index.ts`, or a study, to the serialiser below.
+- The case studies as JSON (#60), `application/json` and outside `/api/` on purpose:
+  `case-studies.json/route.ts` serves every study as one array at `/case-studies.json`, and
+  `work/[slug]/index.json/route.ts` one study at `/work/<slug>/index.json`, with its own
+  `generateStaticParams` and `dynamicParams = false`. Both return `caseStudiesToJson()` or
+  `caseStudyToJson()` from the serialiser: every `CaseStudy` field as the data holds it, the
+  metric with its `formatMetric()` text as `formatted`, a metric definition that cannot be stated
+  as `null` (never a marker) and a stated one with its method on one line, and the absolute `url`
+  of the page and `markdown` of its twin. The prerender fails on a metric value that is not finite
+  and on a marker in any other field. `lib/__tests__/case-studies-json.test.ts` fails when an
+  entry's keys are not the study's own plus those two, and calls both handlers.
 
 `buildMetadata()` advertises the twin of every route that calls it as
 `alternates.types['text/markdown']`, at the path `markdownTwinPath()` in `src/lib/pathname.ts`
@@ -56,12 +66,15 @@ All of the route handlers prerender at build time, and `pnpm check:build-output`
 `ci-and-scripts.md`) fails when a route does not: a `GET` handler is dynamic unless it exports
 `dynamic = 'force-static'`, and without it builds as a server function, as a handler that exports
 any other method does even with it. The same check fails a `proxy.ts` and any `'use server'`
-action. `sitemap.ts`, `robots.ts`, `layout.tsx`, `components/json-ld.tsx` and `lib/serialise.ts`
-each read `NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no
-middleware.
+action, and a build that lacks a route in its `REQUIRED_ROUTES` (the JSON handlers above) or
+prerendered no path for one, or other slugs for `/work/[slug]/index.json` than for the page. `sitemap.ts`, `robots.ts`, `layout.tsx`, `components/json-ld.tsx`
+and `lib/serialise.ts` each read `NEXT_PUBLIC_SITE_URL`, falling back to
+`https://miloscvetkovic.dev`. There is no middleware.
 `src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
 page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own
-(#59). `lib/__tests__/serialise.test.ts` fails when a file under `src/app` writes `text/markdown`.
+(#59). It writes the case-study JSON too, with `jsonResponse()` as the one place that sets its
+content type (#60). `lib/__tests__/serialise.test.ts` fails when a file under `src/app` writes
+`text/markdown`.
 The security headers come from one static `headers()` entry in `apps/web/next.config.ts` whose
 source, `/:path*`, matches every path, `/_next/static` assets and the 404s included:
 `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a Content-Security-Policy, a

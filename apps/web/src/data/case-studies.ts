@@ -40,8 +40,11 @@ export type MetricDefinition =
   | { state: 'defined'; window: { from: string; to: string }; method: string }
   | { state: typeof OWNER_TODO };
 
-/** `text` on one line: every run of whitespace, line breaks included, as one space, ends trimmed. */
-function oneLine(text: string): string {
+/**
+ * `text` on one line: every run of whitespace, line breaks included, as one space, ends trimmed.
+ * Exported for the JSON serialiser, which serves a metric definition's method as this states it.
+ */
+export function oneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
