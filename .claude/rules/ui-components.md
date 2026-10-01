@@ -78,3 +78,11 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   in `src` except that module, the tests and `circuit-background.tsx`, which still imports GSAP and
   two plugins statically and is rendered by no route. `apps/web/src/test/eslint-config.test.ts`
   pins the rule.
+- An animation that repeats forever stops while nothing can see it (ADR 0009 rule 4). In the home
+  page story, `useStoryVisibility` (`src/hooks/use-story-visibility.ts`) marks the hero and each
+  phase `<section>` with `data-story-visible`, and the rule beside `.scan-line` in `globals.css`
+  pauses the endless animation classes it lists inside a section marked `false`. An endless CSS
+  animation there is a class on that list, never an inline `animation` shorthand, which resets
+  `animation-play-state` with inline precedence; a finite one stays off the list, or it would hold
+  its first frame while the section is out of view. `e2e/reduced-motion.spec.ts` (R18) fails on an
+  endless animation in the story left running off-screen or at an effective opacity of 0.
