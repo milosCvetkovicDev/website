@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { yearsOfExperience } from '@/data/profile';
 import { HeroContent } from '../hero-content';
@@ -42,7 +42,7 @@ describe('HeroContent', () => {
     const skillList = screen.getByRole('list', { name: /technical skills/i });
     expect(skillList).toBeInTheDocument();
 
-    const items = screen.getAllByRole('listitem');
+    const items = within(skillList).getAllByRole('listitem');
     expect(items).toHaveLength(8);
 
     expect(screen.getByText('TypeScript')).toBeInTheDocument();
@@ -88,11 +88,12 @@ describe('HeroContent', () => {
 
   it('renders the player card header dots (decorative)', () => {
     const { container } = render(<HeroContent />);
-    // Three colored dots in the card header, inside an aria-hidden div
-    const decorativeHeader = container.querySelector('[aria-hidden="true"]');
-    expect(decorativeHeader).toBeInTheDocument();
-    // Should have 3 dot divs inside
-    const dots = decorativeHeader?.querySelectorAll('.rounded-full');
-    expect(dots).toHaveLength(3);
+    // The three window controls in the card header are decoration, so the row that holds them is
+    // hidden from assistive technology as a whole.
+    const rows = container.querySelectorAll('[data-window-controls]');
+    expect(rows, 'the card header holds one window-control row').toHaveLength(1);
+    const controls = rows[0];
+    expect(controls).toHaveAttribute('aria-hidden', 'true');
+    expect(controls.querySelectorAll('[data-window-dot]')).toHaveLength(3);
   });
 });

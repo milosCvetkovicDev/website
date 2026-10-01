@@ -12,10 +12,10 @@ import { expectHydrated } from './support/hydration';
  * that should have torn down keeps running, and a GSAP timeline built on the old DOM can write into
  * nodes React has since replaced. None of that is reachable from a `goto`.
  *
- * Green on arrival, and that is the point: it is the regression floor for #46 to #49, which all
- * change components on this path. The console collector listens for the whole walk, so a hydration
- * mismatch or a stray warning on any hop fails here — `console-clean.spec.ts` only ever sees the
- * first load of each route.
+ * Green on arrival, and that is the point: it is the regression floor for the audit's navigation,
+ * hero and page fixes, which all change components on this path. The console collector listens for
+ * the whole walk, so a hydration mismatch or a stray warning on any hop fails here —
+ * `console-clean.spec.ts` only ever sees the first load of each route.
  *
  * Two assertions are about the soft navigation specifically rather than about arriving:
  * every hop must keep the document the walk started in (a property set on `window` before the first
@@ -112,9 +112,9 @@ test.describe('client-side navigation', () => {
     await expectHydrated(page);
     await markDocument(page);
 
-    // The header, scoped as `banner` rather than `navigation`: the `MC` home link is a sibling of the
-    // `<nav>`, not inside it, so a `navigation`-scoped query for it resolves nothing and waits out the
-    // whole test budget.
+    // The header, scoped as `banner` rather than `navigation`: the `MC, home` link is a sibling of
+    // the `<nav>`, not inside it, so a `navigation`-scoped query for it resolves nothing and waits
+    // out the whole test budget.
     const header = page.getByRole('banner');
 
     // 1. / -> /work, through the header's own nav link.
@@ -143,7 +143,7 @@ test.describe('client-side navigation', () => {
     await expectSameDocument(page, 'going back');
 
     // 4. Back to /, by the header's home link.
-    await header.getByRole('link', { name: 'MC', exact: true }).click();
+    await header.getByRole('link', { name: 'MC, home', exact: true }).click();
     await expect(page).toHaveURL(/\/$/, { timeout: SOFT_NAVIGATION_TIMEOUT_MS });
 
     await expect(page.getByRole('heading', { level: 1 })).toContainText('This happened at 3am');

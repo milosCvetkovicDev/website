@@ -14,6 +14,9 @@ interface ArchitectureBackgroundProps {
   activeNodes?: readonly ArchitectureNode[];
 }
 
+// The diagram is decorative chrome drawn inside the tmux frame, so its nodes and packets keep the
+// tmux palette (`--tmux-status-*`) on purpose. The cards over it colour their status text and
+// active metric with the ADR 0010 `--status-ok` instead, because those are text in a status role.
 const ACTIVE_BORDER: Record<NodeKind, string> = {
   user: 'var(--tmux-status-ok)',
   compute: 'var(--accent)',

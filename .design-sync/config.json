@@ -25,7 +25,7 @@
   "dtsPropsFor": {
     "ActivityEntry": "  status: 'success' | 'error' | 'pending';\n  children: React.ReactNode;\n  timestamp?: string;",
     "AnimatedHero": "  children?: React.ReactNode;",
-    "AnimatedText": "  children: string;\n  animation: 'scramble' | 'wave' | 'magnetic' | 'scatter' | 'glitch' | 'typewriter' | 'elastic' | 'stagger-up' | 'rainbow' | 'perspective' | 'gravity' | 'blur-reveal' | 'highlight' | 'morse';\n  className?: string;\n  as?: 'span' | 'p' | 'h1' | 'h2' | 'h3' | 'div';\n  delay?: number;",
+    "AnimatedText": "  children: string;\n  animation: 'scramble' | 'wave' | 'magnetic' | 'scatter' | 'glitch' | 'typewriter' | 'elastic' | 'stagger-up' | 'rainbow' | 'perspective' | 'gravity' | 'blur-reveal' | 'highlight' | 'morse';\n  className?: string;",
     "ArchitectureBackground": "  activeNodes?: ReadonlyArray<'client' | 'gateway' | 'auth' | 'backend' | 'worker' | 'db' | 'cache' | 'ai' | 'storage'>;",
     "CircuitBackground": "  progressRef: React.RefObject<number>;",
     "CodeLine": "  lineNumber?: number;\n  children: React.ReactNode;\n  className?: string;\n  highlighted?: boolean;",
@@ -45,7 +45,7 @@
     "MetricCounter": "  active: boolean;\n  value: number;\n  label: string;\n  prefix?: string;\n  suffix?: string;\n  decimals?: number;",
     "Navigation": "  // Takes no props.",
     "NotificationToast": "  children: React.ReactNode;\n  type?: 'success' | 'warning' | 'error' | 'info';",
-    "PipelineStage": "  name: string;\n  status: 'pending' | 'running' | 'passed' | 'failed';\n  progress?: number;",
+    "PipelineStage": "  name: string;\n  status: 'pending' | 'running' | 'passed' | 'failed';\n  progress?: number;\n  fillRef?: React.RefObject<HTMLDivElement | null>;",
     "ProgressBar": "  progress: number;\n  label?: string;\n  className?: string;\n  variant?: 'default' | 'success' | 'warning' | 'error';",
     "QuestItem": "  completed: boolean;\n  children: React.ReactNode;",
     "SectionProgress": "  storyRef: React.RefObject<HTMLElement | null>;",

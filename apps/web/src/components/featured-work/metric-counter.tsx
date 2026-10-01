@@ -59,12 +59,12 @@ export function MetricCounter({ active, ...metric }: MetricCounterProps) {
   return (
     <div
       className={`shrink-0 rounded border border-[var(--tmux-border)]/50 bg-[var(--background)]/80 p-4 text-center transition-all duration-300 lg:w-40 ${
-        active ? 'border-[var(--accent)] shadow-[0_0_15px_rgba(139,92,246,0.15)]' : ''
+        active ? 'border-[var(--accent)] shadow-[0_0_15px] shadow-(color:--accent)/15' : ''
       }`}
     >
       <div
         className={`mb-1 font-mono text-2xl font-bold tracking-tight tabular-nums transition-colors duration-300 lg:text-3xl ${
-          active ? 'text-[var(--tmux-status-ok)]' : 'text-[var(--tmux-bar-text-bright)]'
+          active ? 'text-[var(--status-ok)]' : 'text-[var(--tmux-bar-text-bright)]'
         }`}
       >
         {shown}
@@ -72,7 +72,7 @@ export function MetricCounter({ active, ...metric }: MetricCounterProps) {
       <div className="flex items-center justify-center gap-2 font-mono text-[10px] tracking-wider text-[var(--tmux-bar-text)] uppercase">
         {active && (
           <span
-            className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--tmux-status-ok)]"
+            className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--status-ok)]"
             aria-hidden="true"
           />
         )}

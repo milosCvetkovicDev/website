@@ -8,8 +8,8 @@ import { THEME_INIT_SCRIPT } from '../src/lib/theme';
  * unwinds past the root layout and Next answers with its bare `<html id="__next_error__">` recovery
  * shell instead. The layout's <head> never reaches the HTML, so the theme init script is absent and
  * the client re-creates it — a React-created <script> never executes, leaving a dark-theme visitor
- * with a flash of the light theme. `dynamicParams = false` on /work/[slug] keeps unknown slugs at
- * the routing layer, where they render through the layout like any other 404.
+ * with a flash of the light theme. `dynamicParams = false` on /work/[slug] and /blog/[slug] keeps
+ * unknown slugs at the routing layer, where they render through the layout like any other 404.
  *
  * `console-clean.spec.ts` only catches this locally: React's "Encountered a script tag" warning is
  * dev-only and CI serves the production build, where it is stripped. This spec is the CI-visible
@@ -17,7 +17,7 @@ import { THEME_INIT_SCRIPT } from '../src/lib/theme';
  */
 
 /** Paths that must answer 404 while still rendering the full layout. */
-const NOT_FOUND_PATHS = ['/no-such-page', '/work/does-not-exist'];
+const NOT_FOUND_PATHS = ['/no-such-page', '/work/does-not-exist', '/blog/does-not-exist'];
 
 for (const path of NOT_FOUND_PATHS) {
   test(`${path} is server-rendered through the root layout`, async ({ request }) => {

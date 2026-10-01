@@ -58,7 +58,7 @@ function SkillBar({ name, years, level, context }: CoreSkill) {
           aria-valuenow={level}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`${name} proficiency: ${level}%`}
+          aria-label={`${name} self-assessed proficiency: ${level}%`}
         >
           <div
             className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/70 transition-all duration-500"
@@ -110,11 +110,12 @@ export default function SkillsPage() {
           </p>
         </div>
 
-        {/* Core skills with depth */}
+        {/* Core skills with depth: the note says what the bars and years are before they show */}
         <section className="mb-20">
-          <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
+          <h2 className="mb-3 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {skillsCopy.headings.coreSkills}
           </h2>
+          <p className="mb-6 text-sm text-[var(--muted)]">{skillsCopy.coreSkillsNote}</p>
           <div className="grid gap-4 md:grid-cols-2">
             {coreSkills.map((skill) => (
               <SkillBar key={skill.name} {...skill} />

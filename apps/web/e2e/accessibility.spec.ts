@@ -1,7 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import { PAGE_ROUTES, expectedStatus } from './routes';
+import { publishedPosts, type PostBlock } from '../src/data/posts';
+import { PAGE_ROUTES, POST_ROUTES, expectedStatus, postRoute } from './routes';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
+import { TMUX_LOG_STREAM, tmuxLogStreamProblems } from './support/tmux-log-stream';
 // The rule map and the result readers are shared with e2e/mobile/accessibility.spec.ts: only
 // e2e/mobile/ is selected by the two phone projects, and importing one spec file from another would
 // register its tests twice, so they live in their own module.
@@ -92,12 +94,21 @@ import {
  */
 
 /**
- * Every page route, from the one shared list in `e2e/routes.ts`: the seven static routes, the three case
- * studies and a 404. This used to be `['/', '/work/self-healing-agent']` — two of ten — which is why
- * every defect the audit found on `/about`, `/skills`, `/contact`, `/blog` or a 404 was invisible to a
- * green gate. `console-clean.spec.ts` reads the same module, so a new route reaches both gates at once.
+ * Every page route, from the one shared list in `e2e/routes.ts`: the static routes, every case
+ * study and every published post, and a 404. This used to be `['/', '/work/self-healing-agent']` —
+ * two of ten — which is why every defect the audit found on `/about`, `/skills`, `/contact`,
+ * `/blog` or a 404 was invisible to a green gate. `console-clean.spec.ts` reads the same module, so
+ * a new route reaches both gates at once.
  */
 const pages = PAGE_ROUTES;
+
+/**
+ * The text a post's body puts in front of axe at the least: one element per block, and one per item
+ * of a list, since a paragraph, a heading, a list item, a code block and a quote each hold text of
+ * their own, and `posts.test.ts` refuses an empty one. Inline code and links only add to it.
+ */
+const bodyTextElements = (body: readonly PostBlock[]) =>
+  body.reduce((count, block) => count + (block.kind === 'list' ? block.items.length : 1), 0);
 
 /**
  * Fewest colour-contrast nodes each page must still measure at rest. A floor, not a target: the
@@ -121,6 +132,18 @@ const pages = PAGE_ROUTES;
  * matters for that route.
  */
 const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
+  // Every published post (#61, 61b), first, so that an entry written below for one post wins over
+  // this one: a later key replaces an earlier one in an object literal. No post is published yet,
+  // so this is derived rather than measured: 8 for the page around the body (its title, the two
+  // labelled dates, the back link, the header and the footer), as for the bare 404, plus the
+  // body's own text elements, so a body that drops out of the measurement fails even on a long
+  // post. Measured locally over two fixture posts while 61b was built: a one-paragraph post
+  // measured 16 against a floor of 9, and a post of every block kind (twelve text elements)
+  // measured 32 against 20, so the page around a body measures 15. Re-measure when the first post
+  // lands, and give it an entry of its own below if its count says the derivation is loose.
+  ...Object.fromEntries(
+    publishedPosts.map(({ slug, body }) => [postRoute(slug), 8 + bodyTextElements(body)]),
+  ),
   '/': 80,
   '/about': 45,
   '/work': 5,
@@ -161,24 +184,40 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * the same day. The node #48 added is the hero's line naming who the site is about, which was
  * sr-only and is now visible text on the island; `e2e/hero-contrast.spec.ts` measures its colour.
  *
- * Nine of the eleven routes have a budget of **zero**, which is the strongest form this can take: on those
- * pages axe decides every text node, and the first blurred panel or gradient put behind text fails here.
- * The two that are not zero are the two surfaces the audit already found, and between them they account
- * for every undecidable node on the site — 167 of them, against 103 and 8 decided.
+ * Every route but `/` and `/work` has a budget of **zero**, which is the strongest form this can
+ * take: on those pages axe decides every text node, and the first blurred panel or gradient put
+ * behind text fails here. The two that are not zero are the two surfaces the audit already found,
+ * and between them they account for every undecidable node on the site — 167 of them, against 103
+ * and 8 decided.
  *
- * `/` gets a margin of a few nodes and the others do not, for a measured reason rather than out of
- * caution: the hero's tmux chrome animates its tab labels and status line through `opacity`, and axe
- * skips a node at `opacity: 0`, so the count depends on which frame the audit samples. Two consecutive
- * dark-theme runs gave 111 and 112. `/work` and the nine zeroes are static and were identical across
- * every run. Never widen a margin to quieten a failure: read the nodes the message names first, because
- * a genuinely new blurred surface looks exactly like this.
+ * `/` gets a margin of a few nodes and the others do not. The reason this comment gave until #180 was
+ * wrong: the tmux chrome's tab labels, pane titles and status lines are static, and its clock changes
+ * its text, never its node count. The count varied because of the tmux background's log stream. Its
+ * five panes start after an idle callback plus up to 2 s, then each adds a line about every 400-850
+ * ms and never settles, and axe answers every slot holding text with `incomplete` (`bgOverlap`: the
+ * background sits under the hero island). So the count was a constant plus however many lines had
+ * streamed when axe collected its nodes: 111 and 112 on 2026-09-12, before #48 added a node (above),
+ * 119 and 120 in the runs that failed, CI's among them, and 128-140 after an extra 3 s. The at-rest
+ * pass on `/` now leaves the stream out (`TMUX_LOG_STREAM`, below). Without it the count measured 112
+ * in both schemes, six production-build runs a scheme on 2026-09-30, the same 112 nodes every run.
+ * The margin over that, six nodes to the budget of 118, stays by the owner's decision on #180 of
+ * 2026-09-30 until #47's slices 47c and 47e, #49's 49d and #58's 58a have all landed, so that none of
+ * them has to raise a budget; a pull request of its own then lowers it to the re-measured constant.
+ * `/work` and the zeroes are static and were identical across every run. Never widen a margin to
+ * quieten a failure: read the nodes the message names first, because a genuinely new blurred surface
+ * looks exactly like this.
  *
  * The positive control at the bottom of this file proves the comparison can fail at all.
  */
 const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }> = {
+  // Every published post (#61, 61b), first, so that an entry written below for one post wins over
+  // this one: plain text on the page background, no blur or gradient behind it, so zero.
+  // Re-measure with the floor above when the first post lands.
+  ...Object.fromEntries(POST_ROUTES.map((route) => [route, { light: 0, dark: 0 }])),
   '/': { light: 118, dark: 118 },
   '/about': { light: 0, dark: 0 },
-  '/work': { light: 55, dark: 55 },
+  // 55 until #58 dropped /work's "0 / Left Unfinished" stat, two nodes over the grid; 53 measured.
+  '/work': { light: 53, dark: 53 },
   '/skills': { light: 0, dark: 0 },
   '/blog': { light: 0, dark: 0 },
   '/contact': { light: 0, dark: 0 },
@@ -188,6 +227,64 @@ const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }
   '/work/nx-remote-cache': { light: 0, dark: 0 },
   '/no-such-page': { light: 0, dark: 0 },
 };
+
+/**
+ * The tmux background's log stream on `/` (`TMUX_LOG_STREAM` in `support/tmux-log-stream.ts`): the
+ * slot container in each of its five panes, which the at-rest pass on `/` excludes from the audit.
+ *
+ * Its node count is a clock reading, not a property of the page: the panes write a line into their
+ * slots about every 400-850 ms for as long as the page is open, and axe cannot decide any slot that
+ * holds text. What leaves the audit is pure decoration, which WCAG 1.4.3 exempts from contrast; that
+ * it sits under `aria-hidden` is part of the evidence, not the exemption, since `aria-hidden` alone
+ * exempts nothing (see the top of this file). The tab bar, the pane titles and status bars, the
+ * clock and the hero island stay audited. Two alternatives were measured on #180 and refused.
+ * Excluding the whole background stops auditing static chrome that is already deterministic.
+ * Pausing the clock, as `no-js-text.spec.ts` does, freezes the stream but breaks this pass:
+ * `expectGsapLoaded` never sees its mark, axe's own timers never fire, and the story's closing panel
+ * rests visible instead of transparent.
+ *
+ * axe's `exclude` takes the containers out of every rule, not only colour contrast. What makes that
+ * safe is `tmuxLogStreamProblems`: it admits only plain `div`s holding text, which no rule in the set
+ * but colour contrast has anything to examine. This function is the one way this file uses the
+ * selector, and it runs that check before and after the audit.
+ *
+ * The at-rest audit of `/`, with the log stream left out once `tmuxLogStreamProblems` has found
+ * nothing wrong with it, and checked again afterwards: axe runs for seconds while the panes keep
+ * writing and resizing, so what it left out must still be decoration when it has finished.
+ */
+async function auditExcludingTmuxLogStream(page: Page) {
+  // Until a pane's first line its slots hold a no-break space: wait for real output, so that the
+  // check reads what the audit will leave out rather than empty slots. The panes start on an idle
+  // callback, which a busy main thread defers: under `next dev` on a loaded machine two runs in five
+  // outlasted the 5 s default with two and four panes streaming, so the wait has a bound of its own.
+  await expect
+    .poll(
+      () =>
+        page
+          .locator(TMUX_LOG_STREAM)
+          .evaluateAll(
+            (containers) =>
+              containers.filter((container) =>
+                [...container.children].some((slot) => slot.textContent?.trim()),
+              ).length,
+          ),
+      {
+        message:
+          `the five ${TMUX_LOG_STREAM} containers should each hold a streamed line before the ` +
+          'audit: fewer means a container is missing or its pane never started streaming',
+        timeout: 30_000,
+      },
+    )
+    .toBe(5);
+  const why =
+    `the at-rest pass on / excludes ${TMUX_LOG_STREAM} as decoration, so it must match only the ` +
+    'log-stream slots under aria-hidden: whatever else sits there goes unaudited';
+  expect(await tmuxLogStreamProblems(page), `${why} (before the audit)`).toEqual([]);
+  const excluded = [TMUX_LOG_STREAM];
+  const results = await audit(page, excluded);
+  expect(await tmuxLogStreamProblems(page), `${why} (after the audit)`).toEqual([]);
+  return { results, excluded };
+}
 
 const colorSchemes = ['light', 'dark'] as const;
 
@@ -299,11 +396,14 @@ test.describe('Accessibility', () => {
         page,
       }) => {
         await openPage(page, path, colorScheme);
-
-        const results = await audit(page);
+        // `/` only, and only this pass: the log stream is guarded and left out (TMUX_LOG_STREAM).
+        const { results, excluded } =
+          path === '/'
+            ? await auditExcludingTmuxLogStream(page)
+            : { results: await audit(page), excluded: [] };
         await test.info().attach('axe-results', {
           body: JSON.stringify(
-            { violations: results.violations, incomplete: results.incomplete },
+            { excluded, violations: results.violations, incomplete: results.incomplete },
             null,
             2,
           ),
@@ -542,5 +642,82 @@ test.describe('Accessibility', () => {
     const pretendBudget = undecided - 1;
     expect(() => expect(undecided, 'over budget').toBeLessThanOrEqual(pretendBudget)).toThrow();
     expect(undecided).toBeLessThanOrEqual(undecided);
+  });
+
+  test('negative control: the log-stream check fails on anything but the stream', async ({
+    page,
+  }) => {
+    // The at-rest pass on `/` leaves TMUX_LOG_STREAM unaudited on the strength of
+    // tmuxLogStreamProblems, so that check needs a control of its own: one that could never fail
+    // would exclude whatever came to sit there. No server: five panes shaped as AnimatedPane renders
+    // them, a clean copy first, then one break at a time.
+    const slot = '<div style="height: 23.1px; overflow: hidden; color: #888">[ok] line</div>';
+    const pane =
+      '<div data-tmux-pane=""><div>' +
+      `<div data-tmux-slots="" class="absolute" style="font-size: 14px">${slot}${slot}</div>` +
+      '</div></div>';
+    const content = `<!doctype html>
+      <html lang="en">
+        <head><title>Control</title></head>
+        <body>
+          <main>
+            <h1>Control</h1>
+            <div id="background" aria-hidden="true">${pane.repeat(5)}</div>
+            <div id="elsewhere" aria-hidden="true"><div>not a pane</div></div>
+          </main>
+        </body>
+      </html>`;
+    await page.setContent(content);
+    expect(await tmuxLogStreamProblems(page), 'the clean copy must pass').toEqual([]);
+
+    const breaks: Record<string, () => void> = {
+      'a link beside the slots': () => {
+        const link = Object.assign(document.createElement('a'), { href: '/', textContent: 'x' });
+        document.querySelectorAll('[data-tmux-slots]')[1].append(link);
+      },
+      'a button inside a slot': () => {
+        const button = Object.assign(document.createElement('button'), { textContent: 'x' });
+        document.querySelector('[data-tmux-slots] > div')!.append(button);
+      },
+      'loose text in a container': () => {
+        document.querySelector('[data-tmux-slots]')!.append('loose text');
+      },
+      'a line with no pinned height, as StaticPane renders': () => {
+        document.querySelector<HTMLElement>('[data-tmux-slots] > div')!.style.height = '';
+      },
+      'a container that became a section': () => {
+        const container = document.querySelector('[data-tmux-slots]')!;
+        const section = document.createElement('section');
+        section.setAttribute('data-tmux-slots', '');
+        section.append(...container.childNodes);
+        container.replaceWith(section);
+      },
+      'a container given a role': () => {
+        document.querySelector('[data-tmux-slots]')!.setAttribute('role', 'region');
+      },
+      'a container given a tabindex': () => {
+        document.querySelector('[data-tmux-slots]')!.setAttribute('tabindex', '0');
+      },
+      'a pane that lost the attribute': () => {
+        document.querySelectorAll('[data-tmux-slots]')[2].removeAttribute('data-tmux-slots');
+      },
+      'a sixth match outside the panes': () => {
+        document.querySelector('#elsewhere > div')!.setAttribute('data-tmux-slots', '');
+      },
+      'the attribute moved out of a pane, five matches still': () => {
+        document.querySelectorAll('[data-tmux-slots]')[2].removeAttribute('data-tmux-slots');
+        document.querySelector('#elsewhere > div')!.setAttribute('data-tmux-slots', '');
+      },
+      'the background no longer aria-hidden': () => {
+        document.querySelector('#background')!.removeAttribute('aria-hidden');
+      },
+    };
+    for (const [name, breakIt] of Object.entries(breaks)) {
+      await test.step(name, async () => {
+        await page.setContent(content);
+        await page.evaluate(breakIt);
+        expect(await tmuxLogStreamProblems(page), `${name} must fail the check`).not.toEqual([]);
+      });
+    }
   });
 });

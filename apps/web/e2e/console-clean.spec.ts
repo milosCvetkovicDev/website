@@ -24,12 +24,15 @@ interface Route {
 }
 
 const routes: Route[] = [
-  // The shared list: the six static routes, every case study derived from the data file, and a 404.
+  // The shared list: the seven static routes, every case study and published post derived from the
+  // data files, and a 404.
   ...PAGE_ROUTES.map((path) => ({ path, status: expectedStatus(path) })),
   // The second 404 shape, which the shared list does not carry: an unknown *slug* is kept at the
   // routing layer by `dynamicParams = false` rather than reaching a render-time notFound() (ADR 0015),
-  // so it is a different path through the app from an unknown route.
+  // so it is a different path through the app from an unknown route. Both slug routes have one; the
+  // post route's is every slug while no post is published (#61).
   { path: '/work/does-not-exist', status: 404 },
+  { path: '/blog/does-not-exist', status: 404 },
 ];
 
 const colorSchemes = ['light', 'dark'] as const;

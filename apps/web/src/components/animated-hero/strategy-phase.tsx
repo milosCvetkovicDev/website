@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
-import { storyClosings } from '@/data/pages/home';
+import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const techChoices = [
   {
@@ -45,6 +45,7 @@ const synergies = [
 
 export function StrategyPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const techTreeRef = useRef<HTMLDivElement>(null);
   const synergiesRef = useRef<HTMLDivElement>(null);
   const architectureRef = useRef<HTMLDivElement>(null);
@@ -152,18 +153,21 @@ export function StrategyPhase() {
   return (
     <section
       ref={sectionRef}
+      aria-labelledby={titleId}
       className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
     >
       <div className="w-full max-w-5xl">
-        {/* Phase Header */}
-        <div className="mb-8 flex items-center gap-3">
+        {/* Phase Header: the section's heading and its name, ahead of the panels. The space keeps
+            "PHASE 2" and the title apart in that name (a flex row lays it out as nothing), and
+            `story-phases.test.tsx` holds the name. */}
+        <h2 id={titleId} className="mb-8 flex items-center gap-3">
           <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
-            <AnimatedText animation="perspective">PHASE 2</AnimatedText>
-          </span>
+            <AnimatedText animation="perspective">{storyTitles.strategy.phase}</AnimatedText>
+          </span>{' '}
           <AnimatedText animation="scramble" className="font-mono text-sm text-[var(--muted)]">
-            STRATEGY
+            {storyTitles.strategy.title}
           </AnimatedText>
-        </div>
+        </h2>
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Tech Tree */}
@@ -349,9 +353,9 @@ export function StrategyPhase() {
 
         {/* Headline */}
         <div ref={headlineRef} className="mt-16 text-center">
-          <h2 className="mb-3 text-2xl font-bold md:text-4xl">
+          <h3 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="magnetic">{storyClosings.strategy.heading}</AnimatedText>
-          </h2>
+          </h3>
           <p className="text-lg text-[var(--muted)]">
             <AnimatedText animation="elastic">{storyClosings.strategy.paragraphs[0]}</AnimatedText>
           </p>

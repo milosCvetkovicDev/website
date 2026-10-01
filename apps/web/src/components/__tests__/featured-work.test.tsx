@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FeaturedWork } from '../featured-work';
 import { getActiveConnections } from '@/data/architecture-graph';
+import { formatMetric } from '@/data/case-studies';
 import { featuredProjects } from '@/data/featured-projects';
 
 function stubMatchMedia(matches: boolean) {
@@ -42,7 +43,8 @@ const linkByAccessibleName = (title: string) => screen.getByRole('link', { name:
 // Resolving once gives up two things getByRole did for free, so linkFor takes them back: it
 // normalises whitespace the way an accessible name is normalised, rather than trusting how the
 // JSX happens to wrap; and it refuses an ambiguous name instead of quietly binding to whichever
-// element came last, which matters because the section also renders "view all work" links.
+// element came last, which matters because the section also renders the "VIEW ARCHIVE" and
+// "Explore All Projects" links to /work.
 function renderFeaturedWork() {
   const utils = render(<FeaturedWork projects={featuredProjects} />);
   const byName = new Map<string, HTMLElement[]>();
@@ -120,9 +122,40 @@ describe('FeaturedWork', () => {
     expect(retired).toHaveClass('text-[var(--tmux-bar-text)]');
     expect(retired.previousElementSibling).not.toHaveClass('animate-pulse');
 
+    // A status is a status role, so it takes the ADR 0010 token that /work uses for the same
+    // string, not the tmux chrome's green; a retired one stays neutral.
     const live = screen.getByText('LIVE', { exact: true });
-    expect(live).toHaveClass('text-[var(--tmux-status-ok)]');
-    expect(live.previousElementSibling).toHaveClass('animate-pulse');
+    expect(live).toHaveClass('text-[var(--status-ok)]');
+    expect(live.previousElementSibling).toHaveClass('animate-pulse', 'bg-[var(--status-ok)]');
+  });
+
+  it('colours the active card metric with the status token, undimmed', () => {
+    // Reduced motion, so the counter shows its final value at once.
+    stubMatchMedia(true);
+    const { linkFor } = renderFeaturedWork();
+    const [project] = featuredProjects;
+    const value = () => screen.getByText(formatMetric(project.metric), { exact: true });
+    expect(value()).not.toHaveClass('text-[var(--status-ok)]');
+
+    const link = linkFor(project.title);
+    act(() => link.focus());
+    expect(link).toHaveFocus();
+    expect(value()).toHaveClass('text-[var(--status-ok)]');
+    // No alpha on the token and no opacity of any kind on the text or on anything between it and
+    // the card, which would dim it just the same (ADR 0010).
+    const card = link.closest('.isolate');
+    expect(card).not.toBeNull();
+    const dimming: string[] = [];
+    for (let element: Element | null = value(); element; element = element.parentElement) {
+      for (const token of element.classList) {
+        if (/status-ok\)\]\/|opacity/.test(token)) dimming.push(token);
+      }
+      if (element === card) break;
+    }
+    expect(dimming).toEqual([]);
+    const dot = value().parentElement?.querySelector('[aria-hidden="true"]') ?? null;
+    expect(dot).not.toBeNull();
+    expect(dot).toHaveClass('bg-[var(--status-ok)]', 'animate-pulse');
   });
 
   it('activates a project and its architecture nodes on keyboard focus', () => {

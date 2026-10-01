@@ -11,7 +11,7 @@ import {
  * timeout, so that a load that never settles fails here, with the message below, rather than as a
  * bare test timeout.
  */
-const GSAP_SETTLE_TIMEOUT_MS = LOAD_TIMEOUT_MS + 2_000;
+export const GSAP_SETTLE_TIMEOUT_MS = LOAD_TIMEOUT_MS + 2_000;
 
 /**
  * Sends the visitor's first intent, which is what starts the GSAP load on `/`: a `scroll` event on

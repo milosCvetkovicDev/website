@@ -4,6 +4,7 @@ import { featuredProjects } from '../src/data/featured-projects';
 import { formatMetric } from '../src/data/case-studies';
 import { expectGsapLoaded } from './support/gsap';
 import { gotoHydrated } from './support/hydration';
+import { cardFor } from './support/work-card';
 
 /** How long the story's scroll-triggered timers may take to finish; see the hover test. */
 const STORY_SETTLE_TIMEOUT_MS = 20_000;
@@ -163,11 +164,23 @@ test.describe('Featured Work', () => {
       await expect(card.getByText(project.metric.label, { exact: true })).toBeVisible();
     }
 
-    // Each project's own card on /work too, so a metric shown on the wrong card cannot pass.
+    // Each project's own card on /work too, so a metric shown on the wrong card cannot pass. The card
+    // link there carries only the title, so the card is found by walking up from it. cardFor takes
+    // the first link and the nearest ancestor, so it never matches twice: the page-wide link count
+    // catches a second link to the study, and the card's own link count catches a walk that reached
+    // a wrapper around several cards.
     await gotoHydrated(page, '/work');
     for (const project of featuredProjects) {
-      const card = page.locator(`a[href="/work/${project.slug}"]`);
+      await expect(
+        page.locator(`a[href="/work/${project.slug}"]`),
+        `links to ${project.title} on /work`,
+      ).toHaveCount(1);
+      const card = cardFor(page, project.slug);
       await expect(card, `the ${project.title} card on /work`).toHaveCount(1);
+      await expect(
+        card.locator('a[href^="/work/"]'),
+        `case-study links on the ${project.title} card`,
+      ).toHaveCount(1);
       await expect(card.getByText(formatMetric(project.metric), { exact: true })).toBeVisible();
       await expect(card.getByText(project.metric.label, { exact: true })).toBeVisible();
     }

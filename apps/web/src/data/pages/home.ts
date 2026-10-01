@@ -18,6 +18,21 @@ export interface StoryClosing extends ProseSection {
   paragraphs: readonly [string];
 }
 
+/**
+ * The title each story section shows at its top, keyed like `storyClosings` and in the same order:
+ * the phase badge and title of each header row, and the closing section's `SESSION COMPLETE`. Each
+ * phase renders it as the heading its section is named by, and the section progress dots take their
+ * names from the same strings, so a dot and the section it goes to cannot drift apart (#47, hero-10).
+ */
+export const storyTitles = {
+  discovery: { phase: 'PHASE 1', title: 'DISCOVERY' },
+  strategy: { phase: 'PHASE 2', title: 'STRATEGY' },
+  execution: { phase: 'PHASE 3', title: 'EXECUTION' },
+  gauntlet: { phase: 'PHASE 4', title: 'THE GAUNTLET' },
+  loop: { phase: 'PHASE 5', title: 'THE LOOP' },
+  complete: { title: 'SESSION COMPLETE' },
+} as const satisfies Record<keyof typeof storyClosings, { phase?: string; title: string }>;
+
 /** Each story section's closing pair, keyed by its section, in the order the story tells them. */
 export const storyClosings = {
   discovery: {

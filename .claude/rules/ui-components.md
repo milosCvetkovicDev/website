@@ -16,17 +16,18 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 ## Quality gates
 
 - Accessibility is gated. `apps/web/e2e/accessibility.spec.ts` runs axe-core with the rule set
-  behind Lighthouse's accessibility category (kept in `e2e/axe.ts`) on all eleven routes in
-  `e2e/routes.ts`, in both colour schemes at the desktop viewport, at rest; again on `/` after the
-  whole story has been scrolled; and again on `/` with a header nav link hovered and with one focused.
+  behind Lighthouse's accessibility category (kept in `e2e/axe.ts`) on every route in
+  `e2e/routes.ts` (eleven while no post is published, one more per published post), in both colour
+  schemes at the desktop viewport, at rest; again on `/` after the whole story has been scrolled;
+  and again on `/` with a header nav link hovered and with one focused.
   `e2e/mobile/accessibility.spec.ts` runs the at-rest pass on `/` and `/work/self-healing-agent`
   under both phone projects. Any violation fails the `e2e` job. Each pass asserts a floor on how many
   nodes it measured, so content that stops being rendered or goes transparent fails too. Each
   desktop at-rest pass also holds a per-route, per-scheme budget of `incomplete` colour-contrast
   nodes (`INCOMPLETE_CONTRAST_BUDGET`): axe cannot decide text over a `backdrop-filter` or a
   gradient and does not count it as a violation, so that undecidable region may shrink but never
-  grow. The budget is zero on nine of the eleven routes, so the first blurred panel put behind text
-  there fails; never widen a budget or lower a floor to quieten a failure. A new
+  grow. The budget is zero on every route but `/` and `/work`, so the first blurred panel put behind
+  text there fails; never widen a budget or lower a floor to quieten a failure. A new
   `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
   Conventions and ADR 0011, which superseded 0008.
 

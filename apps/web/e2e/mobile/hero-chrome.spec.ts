@@ -11,7 +11,8 @@ import { gotoHydrated } from '../support/hydration';
  * markup is the same at every width (ADR 0006). Below `md` the background's clock and log ticks do
  * not run either: its effects start them only while `(min-width: 48rem)` matches. The desktop
  * project keeps the full chrome, which `e2e/hero.spec.ts` covers (five panes, the log lines, the
- * indicator fading on scroll).
+ * indicator fading on scroll at a viewport tall enough to display it: from `lg` the indicator also
+ * needs 960 px and 60rem of height, or it would cover the hero card).
  *
  * Both motion settings are checked, because the reduced-motion snapshot renders its own panes.
  */

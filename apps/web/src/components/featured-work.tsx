@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { ArchitectureNode } from '@/data/architecture-graph';
 import type { FeaturedProject } from '@/data/featured-projects';
+import { CARD_LINK } from './card-link';
 import { ArchitectureBackground } from './featured-work/architecture-background';
 import { MetricCounter } from './featured-work/metric-counter';
 
@@ -47,27 +48,16 @@ interface ProjectCardProps {
   onFocusChange: (focused: boolean) => void;
 }
 
-// The title link is stretched over the whole card by its ::after pseudo-element, so the card stays
-// a single click, hover and focus target while the link's accessible name is exactly its visible
-// text, as WCAG 2.5.3 (Label in Name) requires. Everything else on the card is ordinary content for
-// assistive technology, and the description is attached to the link with aria-describedby. The
-// overlay reaches 1px past the padding box so the border ring is part of the hit area too. The
-// focus outline is drawn on the overlay so it frames the card, and it is an outline rather than a
-// ring so it survives forced-colors mode, where box-shadow is not painted.
-// Constraint: the overlay is the pointer target for the whole card, so nothing else inside the
-// card may be interactive, and text inside it cannot be selected with the mouse.
-const CARD_LINK =
-  'rounded after:absolute after:-inset-px after:z-10 after:rounded focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-[var(--accent)]';
-
 function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }: ProjectCardProps) {
   const descriptionId = `featured-${project.slug}-description`;
   const retired = project.status === 'RETIRED';
 
+  // One click, hover and focus target through the title link's overlay (./card-link.ts).
   return (
     <div
       className={`relative isolate rounded border bg-[var(--card)]/75 p-6 backdrop-blur-md transition-all duration-500 ${
         isActive
-          ? 'border-[var(--accent)]/50 shadow-[0_0_30px_rgba(139,92,246,0.1)]'
+          ? 'border-[var(--accent)]/50 shadow-[0_0_30px] shadow-(color:--accent)/10'
           : 'border-[var(--tmux-border)]/30'
       }`}
     >
@@ -97,12 +87,12 @@ function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }:
           <span
             aria-hidden="true"
             className={`h-1.5 w-1.5 rounded-full ${
-              retired ? 'bg-[var(--tmux-bar-text)]' : 'animate-pulse bg-[var(--tmux-status-ok)]'
+              retired ? 'bg-[var(--tmux-bar-text)]' : 'animate-pulse bg-[var(--status-ok)]'
             }`}
           />
           <span
             className={`font-mono text-xs ${
-              retired ? 'text-[var(--tmux-bar-text)]' : 'text-[var(--tmux-status-ok)]'
+              retired ? 'text-[var(--tmux-bar-text)]' : 'text-[var(--status-ok)]'
             }`}
           >
             {project.status}
@@ -125,7 +115,7 @@ function ProjectCard({ project, index, isActive, onHoverChange, onFocusChange }:
               onMouseLeave={() => onHoverChange(false)}
               onFocus={() => onFocusChange(true)}
               onBlur={() => onFocusChange(false)}
-              className={CARD_LINK}
+              className={`${CARD_LINK} after:rounded`}
             >
               {project.title}
             </Link>
@@ -269,7 +259,7 @@ export function FeaturedWork({ projects }: FeaturedWorkProps) {
           </p>
           <Link
             href="/work"
-            className={`inline-flex items-center gap-2 rounded border border-[var(--tmux-border)] bg-[var(--card)]/75 px-8 py-4 font-mono text-sm text-[var(--tmux-bar-text-bright)] backdrop-blur-md transition-all duration-300 hover:border-[var(--accent)] hover:text-[var(--tmux-pane-title-text)] hover:shadow-[0_0_20px_rgba(139,92,246,0.1)] ${FOCUS_RING}`}
+            className={`inline-flex items-center gap-2 rounded border border-[var(--tmux-border)] bg-[var(--card)]/75 px-8 py-4 font-mono text-sm text-[var(--tmux-bar-text-bright)] backdrop-blur-md transition-all duration-300 hover:border-[var(--accent)] hover:text-[var(--tmux-pane-title-text)] hover:shadow-[0_0_20px] hover:shadow-(color:--accent)/10 ${FOCUS_RING}`}
           >
             <span>Explore All Projects</span>
             <svg

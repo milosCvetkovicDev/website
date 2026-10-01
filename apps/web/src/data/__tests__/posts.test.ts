@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { formatContentDate, isPublishableContentDate } from '@/lib/content-date';
+import { NO_PUBLISHED_POST_SLUG } from '@/lib/post-static-params';
 import { draftPost, everyBlockPost, fixturePosts, hostileTitlePost } from '@/test/fixtures/posts';
 import {
   buildPostIndex,
@@ -763,6 +764,13 @@ describe('posts', () => {
     for (const post of posts.filter((candidate) => candidate.draft)) {
       expect(getPost(post.slug), post.slug).toBeUndefined();
     }
+  });
+
+  it('can never take the placeholder slug the development server is given', () => {
+    // `postStaticParams` hands `next dev` this slug while nothing is published; the slug rule is
+    // what keeps a real post from ever answering at it.
+    expect(SLUG.test(NO_PUBLISHED_POST_SLUG)).toBe(false);
+    expect(getPost(NO_PUBLISHED_POST_SLUG)).toBeUndefined();
   });
 });
 

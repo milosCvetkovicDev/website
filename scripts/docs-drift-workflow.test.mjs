@@ -10,9 +10,12 @@
 //     pull request body file;
 //   - the write token reaches exactly one step, which runs no agent, no package code and no hook;
 //   - nothing merges, and every job that can reach a secret runs only on main;
-//   - the open-pull-request guards ignore pull requests from forks.
+//   - the open-pull-request guards ignore pull requests from forks;
+//   - the agent runs on the `sonnet` alias at high effort, under a pin where that alias names
+//     Sonnet 5.5 or later, and nothing in the workflow points the alias at another model.
 // Nothing here runs Claude Code: the flags are checked as written against the documented meaning
-// of Claude Code 2.1.273, the pinned version.
+// of the Claude Code version in FLAGS_CHECKED_AGAINST, which must be the pinned one, so moving the
+// pin fails these tests until someone has read the new version's flags and changelog.
 //
 // The repository has no YAML parser at the root, and the workflow is plain enough to split by
 // indentation: jobs at two spaces under `jobs:`, steps at `      - name:`.
@@ -26,6 +29,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const WORKFLOW = readFileSync(join(ROOT, '.github/workflows/docs-drift.yml'), 'utf8');
 const PROMPT = readFileSync(join(ROOT, '.github/prompts/docs-drift.md'), 'utf8');
+const FLAGS_CHECKED_AGAINST = '2.1.285';
+// Claude Code 2.1.284 added Sonnet 5.5 as the model the `sonnet` alias names.
+const FIRST_SONNET_5_5 = [2, 1, 284];
 
 /**
  * The value, failing the test that asked for it when it is missing.
@@ -206,6 +212,44 @@ describe('the job the agent runs in', () => {
     }
     assert.ok(!args.includes('--dangerously-skip-permissions'));
     assert.ok(!args.includes('--add-dir'));
+  });
+
+  it('runs claude on the sonnet alias at high effort, and nothing redirects the alias', () => {
+    const args = claudeArgs(agentStep().text);
+    for (const [flag, value] of [
+      ['--model', 'sonnet'],
+      ['--effort', 'high'],
+    ]) {
+      assert.equal(args.filter((arg) => arg === flag).length, 1, `${flag} is not given once`);
+      assert.equal(args[args.indexOf(flag) + 1], value, `${flag} is not ${value}`);
+    }
+    // These variables change which model an alias names, or which model a run uses.
+    assert.doesNotMatch(
+      WORKFLOW,
+      /ANTHROPIC_MODEL|ANTHROPIC_DEFAULT_\w+_MODEL|ANTHROPIC_SMALL_FAST_MODEL|CLAUDE_CODE_SUBAGENT_MODEL/,
+    );
+  });
+
+  it('installs the one pinned Claude Code, whose flags these tests were checked against', () => {
+    assert.equal(WORKFLOW.match(/CLAUDE_CODE_VERSION:/g)?.length, 1, 'more than one pin');
+    assert.match(
+      WORKFLOW,
+      /npm install --global "@anthropic-ai\/claude-code@\$\{CLAUDE_CODE_VERSION\}"/,
+    );
+    const pin = found(/^ {2}CLAUDE_CODE_VERSION: '(\d+\.\d+\.\d+)'$/m.exec(WORKFLOW), 'the pin')[1];
+    assert.equal(
+      pin,
+      FLAGS_CHECKED_AGAINST,
+      `the pin moved to ${pin}: check the flags against its help and changelog, then update FLAGS_CHECKED_AGAINST`,
+    );
+    const [major, minor, patch] = pin.split('.').map(Number);
+    const [firstMajor, firstMinor, firstPatch] = FIRST_SONNET_5_5;
+    assert.ok(
+      major > firstMajor ||
+        (major === firstMajor &&
+          (minor > firstMinor || (minor === firstMinor && patch >= firstPatch))),
+      `Claude Code ${pin} names a model older than Sonnet 5.5 as sonnet`,
+    );
   });
 
   it('allows edits only to docs/** and the pull request body file', () => {

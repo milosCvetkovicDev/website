@@ -7,8 +7,9 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * A configuration of its own, over a directory of its own: the main suite in `playwright.config.ts`
  * starts the server it tests and runs every spec under `e2e/`, and what this one checks exists only
- * on Vercel, where `VERCEL_ENV` turns Web Analytics on (ADR 0026). So it starts no server and never
- * sees the main suite's specs, which never see its spec either.
+ * on Vercel: Web Analytics, which `VERCEL_ENV` turns on (ADR 0026), and the CDN's cache in front of
+ * the negotiated Markdown twins (ADR 0030). So it starts no server and never sees the main suite's
+ * specs, which never see its specs either.
  *
  * `LIVE_URL` overrides the target, the apex by default. Vercel's own deployment URLs sit behind
  * Vercel Authentication, so the public apex is what this checks.
