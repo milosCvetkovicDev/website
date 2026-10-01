@@ -48,6 +48,13 @@ const APP_ROUTES = {
 };
 
 /**
+ * `APP_ROUTES` with the site's one server function, the MCP server's `POST` handler (#62), as a
+ * build of this repository lists it: an app route with no prerendered path. The command checks
+ * against the real `ALLOWED_FUNCTIONS`, so the trees it is handed carry it.
+ */
+const BUILT_ROUTES = { ...APP_ROUTES, '/mcp/route': '/mcp' };
+
+/**
  * One `routes` entry of `prerender-manifest.json`, with the fields the gate reads.
  *
  * @param {string} srcRoute
@@ -501,6 +508,35 @@ describe('collectProblems', () => {
     assert.match(problems[0], /^\/mcp: .*ALLOWED_FUNCTIONS/);
   });
 
+  it('passes the site as built, with ALLOWED_FUNCTIONS, reporting /mcp as its one function', () => {
+    const { problems, functions } = check({ appRoutes: BUILT_ROUTES, allowed: ALLOWED_FUNCTIONS });
+    assert.deepEqual(problems, []);
+    assert.deepEqual(functions, ['/mcp']);
+  });
+
+  it('fails a second function beside /mcp under ALLOWED_FUNCTIONS, naming only the second', () => {
+    const { problems, functions } = check({
+      appRoutes: { ...BUILT_ROUTES, '/llms-full.txt/route': '/llms-full.txt' },
+      allowed: ALLOWED_FUNCTIONS,
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/llms-full\.txt: .*function/);
+    assert.deepEqual(functions, ['/mcp']);
+  });
+
+  it('fails a page that became a function beside /mcp under ALLOWED_FUNCTIONS', () => {
+    const prerender = cleanPrerender();
+    delete prerender.routes['/about'];
+    const { problems } = check({
+      appRoutes: BUILT_ROUTES,
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => b !== 'about.html'),
+      allowed: ALLOWED_FUNCTIONS,
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/about: is not prerendered/);
+  });
+
   it('fails a route that revalidates every 0 s too', () => {
     const prerender = cleanPrerender();
     prerender.routes['/about'] = prerendered('/about', { initialRevalidateSeconds: 0 });
@@ -636,8 +672,8 @@ describe('collectOtherFunctions', () => {
 });
 
 describe('ALLOWED_FUNCTIONS', () => {
-  it('is empty: nothing in this site needs a server function until #62 adds /mcp', () => {
-    assert.deepEqual([...ALLOWED_FUNCTIONS], []);
+  it('is exactly /mcp, the MCP server (#62): the one route on this site that runs per request', () => {
+    assert.deepEqual([...ALLOWED_FUNCTIONS], ['/mcp']);
   });
 });
 
@@ -679,7 +715,7 @@ describe('REQUIRED_ROUTES', () => {
  *   a string is written as the file's text as it is, and `null` leaves the file out
  */
 function writeTree({
-  appRoutes = APP_ROUTES,
+  appRoutes = BUILT_ROUTES,
   prerender = cleanPrerender(),
   other = {},
   buildId = 'test-build-id',
@@ -740,7 +776,7 @@ describe('the command', () => {
     withTree({}, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, /9 routes, 12 prerendered bodies, no server function/);
+      assert.match(result.stdout, /10 routes, 12 prerendered bodies, server functions: \/mcp /);
       assert.match(result.stdout, /\(BUILD_ID test-build-id, written \d{4}-\d\d-\d\dT[\d:.]+Z\)/);
     });
   });
@@ -762,19 +798,58 @@ describe('the command', () => {
     });
   });
 
-  it('exits 1 on an unlisted function, naming the route', () => {
-    withTree({ appRoutes: { ...APP_ROUTES, '/llms-full.txt/route': '/llms-full.txt' } }, (dist) => {
+  it('exits 1 on a second function beside /mcp, naming only the second', () => {
+    // #62's AC 10: the allowlist is one entry long, so a handler that forgot `force-static` fails
+    // the build even though a function is now allowed.
+    withTree(
+      { appRoutes: { ...BUILT_ROUTES, '/llms-full.txt/route': '/llms-full.txt' } },
+      (dist) => {
+        const result = run([dist]);
+        assert.equal(result.status, 1);
+        const problems = result.stderr.split('\n').filter((line) => line.startsWith('  - '));
+        assert.equal(problems.length, 1, result.stderr);
+        assert.match(problems[0], /^ {2}- \/llms-full\.txt: .*function/);
+      },
+    );
+  });
+
+  it('exits 1 when a page route quietly became a function beside /mcp', () => {
+    const prerender = cleanPrerender();
+    delete prerender.routes['/about'];
+    const bodies = CLEAN_BODIES.filter((b) => b !== 'about.html');
+    withTree({ prerender, bodies }, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 1);
-      assert.match(result.stderr, /\/llms-full\.txt/);
+      assert.match(result.stderr, /\/about: is not prerendered/);
+      assert.doesNotMatch(result.stderr, /- \/mcp/);
+    });
+  });
+
+  it('exits 1 on a function Next configured for a route other than /mcp', () => {
+    const functionsConfig = { version: 1, functions: { '/mcp': {}, '/about': {} } };
+    withTree({ other: { functionsConfig } }, (dist) => {
+      const result = run([dist]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /\/about: Next configured it/);
+      assert.doesNotMatch(result.stderr, /- \/mcp/);
+    });
+  });
+
+  it('exits 1 when the build has no /mcp, since the allowlist must be exact', () => {
+    withTree({ appRoutes: APP_ROUTES }, (dist) => {
+      const result = run([dist]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /\/mcp: is in ALLOWED_FUNCTIONS but the build has no such route/);
     });
   });
 
   it('exits 1 when a required route is gone, naming it', () => {
-    withTree(without('/work/[slug]/index.json'), (dist) => {
+    const tree = without('/work/[slug]/index.json');
+    withTree({ ...tree, appRoutes: { ...tree.appRoutes, '/mcp/route': '/mcp' } }, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 1);
       assert.match(result.stderr, /\/work\/\[slug\]\/index\.json: is in REQUIRED_ROUTES/);
+      assert.doesNotMatch(result.stderr, /- \/mcp/);
     });
   });
 

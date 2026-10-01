@@ -16,13 +16,13 @@ import {
  *
  * Every path comes from `endpoints.ts`. Each test's title and `fixed-by` annotation name the task
  * that ships its endpoint: #59 the Markdown twins, #60 `/llms.txt` and the JSON representation, #61
- * the Atom feed, #62 the MCP server. The twins (#59) and the case-study JSON (#60) are served, so
- * their rows run the contract alone; for each endpoint not yet served, `expectNotServedYet` makes
- * its test an expected failure for that one reason only. It first requires the status to be the 404
- * of an endpoint that is not there, outside the declared failure, so a 5xx, a timeout or a server
- * that never started fails the run; only then does it call `test.fail()` and fail on the status. A
- * 200 fails the run too, so the change that ships an endpoint must delete that one call, and the
- * rest of the test is then that endpoint's contract.
+ * the Atom feed, #62 the MCP server. The twins (#59), the case-study JSON (#60) and the MCP server
+ * (#62) are served, so their rows run the contract alone; for each endpoint not yet served,
+ * `expectNotServedYet` makes its test an expected failure for that one reason only. It first
+ * requires the status to be the 404 of an endpoint that is not there, outside the declared failure,
+ * so a 5xx, a timeout or a server that never started fails the run; only then does it call
+ * `test.fail()` and fail on the status. A 200 fails the run too, so the change that ships an
+ * endpoint must delete that one call, and the rest of the test is then that endpoint's contract.
  *
  * Everything here goes through `request`, the served bytes, because that is all an agent's fetch
  * tool reads. `retries: 0`, as for every spec that carries an expected failure (`e2e-tests.md`): a
@@ -281,8 +281,9 @@ test(`#62: POST ${MCP} answers tools/list without a session`, async ({ request }
   // https://modelcontextprotocol.io/specification/2026-07-28/basic). Streamable HTTP mirrors the
   // version and the method into `MCP-Protocol-Version` and `Mcp-Method`, and wants both types in
   // `Accept` (https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http).
-  // #62's smoke curl puts `_meta` beside `params` and leaves out `clientCapabilities`; the task that
-  // ships the server owns this request's shape and corrects either copy against the revision.
+  // #62's smoke curl put `_meta` beside `params`; the server #62 shipped answers that with a 400
+  // (-32602, the envelope missing), so this shape is the one checked against the revision.
+  // `e2e/mcp.spec.ts` is the server's fuller contract.
   const response = await request.post(MCP, {
     headers: {
       'content-type': 'application/json',
@@ -303,7 +304,6 @@ test(`#62: POST ${MCP} answers tools/list without a session`, async ({ request }
       },
     },
   });
-  expectNotServedYet(response, `POST ${MCP}`, '#62');
   expect(response.status()).toBe(200);
   expect(response.headers()['mcp-session-id'], 'a stateless server hands out no session').toBe(
     undefined,

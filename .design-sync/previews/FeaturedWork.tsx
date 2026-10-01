@@ -32,7 +32,11 @@ export const AsOnTheSite = () => {
       tags: ['Claude Agent SDK', 'Bun', 'Elysia', 'Azure'],
       category: 'AI AGENT',
       status: 'RETIRED' as const,
-      metric: { value: 73, suffix: '%', label: 'faster resolution' },
+      metric: {
+        value: 73,
+        suffix: '%',
+        label: 'errors resolved autonomously',
+      },
       activeNodes: ['client', 'gateway', 'worker', 'ai'] as const,
     },
     {
@@ -43,7 +47,11 @@ export const AsOnTheSite = () => {
       tags: ['React', 'Node.js', 'PostgreSQL', 'Terraform'],
       category: 'PLATFORM',
       status: 'PRODUCTION' as const,
-      metric: { value: 40, suffix: '%', label: 'less complexity' },
+      metric: {
+        value: 40,
+        suffix: '%',
+        label: 'less complexity',
+      },
       activeNodes: ['client', 'gateway', 'backend', 'db'] as const,
     },
     {
@@ -54,7 +62,11 @@ export const AsOnTheSite = () => {
       tags: ['Bun', 'Elysia', 'Azure Blob Storage'],
       category: 'DEVOPS',
       status: 'PRODUCTION' as const,
-      metric: { value: 5, suffix: '×', label: 'faster builds' },
+      metric: {
+        value: 5,
+        suffix: '×',
+        label: 'faster builds',
+      },
       activeNodes: ['client', 'gateway', 'worker', 'storage'] as const,
     },
   ];
@@ -71,7 +83,11 @@ export const DarkTheme = () => {
       tags: ['Claude Agent SDK', 'Bun', 'Elysia', 'Azure'],
       category: 'AI AGENT',
       status: 'RETIRED' as const,
-      metric: { value: 73, suffix: '%', label: 'faster resolution' },
+      metric: {
+        value: 73,
+        suffix: '%',
+        label: 'errors resolved autonomously',
+      },
       activeNodes: ['client', 'gateway', 'worker', 'ai'] as const,
     },
   ];

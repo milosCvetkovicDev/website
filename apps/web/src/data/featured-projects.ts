@@ -1,11 +1,16 @@
 import type { ArchitectureNode } from './architecture-graph';
-import { caseStudies, type CaseStudyHighlight } from './case-studies';
+import { caseStudies, type CaseStudyFigure, type CaseStudyHighlight } from './case-studies';
 
-export interface FeaturedProject extends CaseStudyHighlight {
+export interface FeaturedProject extends Omit<CaseStudyHighlight, 'metric'> {
   slug: string;
   title: string;
   description: string;
   tags: string[];
+  /**
+   * The figure a card prints, without the study's `basis`: `FeaturedWork` is a client component, so
+   * every prop here is serialised into the home page's payload, and no card reads the basis.
+   */
+  metric: CaseStudyFigure;
   /** Architecture nodes this project touched. Every node must sit on a lit connection (tested). */
   activeNodes: ArchitectureNode[];
 }
@@ -21,12 +26,23 @@ export const featuredProjects: FeaturedProject[] = Object.entries(activeNodesByS
   ([slug, activeNodes]) => {
     const study = caseStudies.find((candidate) => candidate.slug === slug);
     if (!study) throw new Error(`Featured project "${slug}" has no case study`);
+    const { metric, ...highlight } = study.highlight;
+    const { value, label, prefix, suffix, decimals } = metric;
     return {
       slug,
       title: study.title,
       description: study.description,
       tags: study.tags,
-      ...study.highlight,
+      ...highlight,
+      // Named fields rather than a rest spread, so a field added to the metric later reaches the
+      // client only when it is added here too.
+      metric: {
+        value,
+        label,
+        ...(prefix === undefined ? {} : { prefix }),
+        ...(suffix === undefined ? {} : { suffix }),
+        ...(decimals === undefined ? {} : { decimals }),
+      },
       activeNodes,
     };
   },

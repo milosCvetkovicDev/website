@@ -12,6 +12,7 @@ import {
   caseStudies,
   formatMetric,
   formatMetricScope,
+  getCaseStudy,
   type MetricDefinition,
 } from '../case-studies';
 import { OWNER_TODO, ownerTodo, unfilledOwnerFields } from '../owner-todo';
@@ -75,7 +76,9 @@ function windowProblems({ from, to }: { from: string; to: string }, now: Date): 
 
 describe('formatMetric', () => {
   it('renders a whole number with a suffix', () => {
-    expect(formatMetric({ value: 73, suffix: '%', label: 'faster resolution' })).toBe('73%');
+    expect(formatMetric({ value: 73, suffix: '%', label: 'errors resolved autonomously' })).toBe(
+      '73%',
+    );
   });
 
   it('renders a prefix, decimals and a suffix together', () => {
@@ -148,6 +151,29 @@ describe('caseStudies', () => {
     for (const study of caseStudies) {
       expect(Number.isFinite(study.highlight.metric.value)).toBe(true);
       expect(study.highlight.metric.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("labels the self-healing agent's figure as what the owner decided it measures (#49)", () => {
+    // The owner decided on 2026-09-11 that 73% counts production errors resolved autonomously; the
+    // label used to say "faster resolution", a different claim about the same number.
+    const metric = getCaseStudy('self-healing-agent')?.highlight.metric;
+    expect(metric?.label).toBe('errors resolved autonomously');
+  });
+
+  it('gives every headline metric a basis: one line of what it counted, against what', () => {
+    // The case-study page prints it under the figure as it stands (#49), so it is copy: something
+    // to read, on one line. A placeholder marker would be served there, so there is none.
+    for (const { slug, highlight } of caseStudies) {
+      const { basis } = highlight.metric;
+      expect(typeof basis, slug).toBe('string');
+      expect(basis, slug).toBe(basis.trim());
+      expect(basis, slug).toMatch(/\p{L}/u);
+      expect(basis, slug).not.toMatch(/[\r\n]/);
+      expect(basis, slug).not.toContain(OWNER_TODO);
+      // "Against what baseline" is half of the contract: a basis names the whole it is a fraction
+      // of ("out of") or the state it is compared with ("against"), or it is only a description.
+      expect(basis, slug).toMatch(/\b(?:against|out of)\b/);
     }
   });
 

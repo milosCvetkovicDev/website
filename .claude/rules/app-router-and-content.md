@@ -32,6 +32,13 @@ never reaches a page that declares its own `openGraph`. The route handlers:
 - `work/[slug]/og-image.png/route.ts` draws the case-study card, whose alt text has to name the
   study, which an `opengraph-image` file's single `alt` cannot; the page points og:image at it
   through `buildMetadata()`'s `image`.
+- `blog/[slug]/og-image.png/route.ts` draws the post card the same way, under the `Writing`
+  eyebrow, with its own `generateStaticParams` over `publishedPosts` and `dynamicParams = false`,
+  so a draft has no card as it has no page (#61). Both post routes take their list from
+  `postStaticParams()` in `src/lib/post-static-params.ts`, which adds one placeholder slug under
+  `next dev` while no post is published: the dev server enforces `dynamicParams = false` only for
+  a non-empty list, and without it every `/blog/<slug>` page served Next's recovery shell
+  (ADR 0015) and every card answered 500.
 - The Markdown twins (#59): an `index.md/route.ts` in each static route's folder
   (`app/index.md/route.ts` for `/`), and `work/[slug]/index.md/route.ts` for the case studies, with
   its own `generateStaticParams` and `dynamicParams = false`. Each is three lines that hand a record
@@ -46,6 +53,13 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   of the page and `markdown` of its twin. The prerender fails on a metric value that is not finite
   and on a marker in any other field. `lib/__tests__/case-studies-json.test.ts` fails when an
   entry's keys are not the study's own plus those two, and calls both handlers.
+- The MCP server (#62), `mcp/route.ts`: `POST` only, a stateless, read-only server on protocol
+  revision 2026-07-28 built with `mcp-handler`, whose three tools in `mcp/tools.ts`
+  (`search_case_studies`, `get_case_study`, `get_tech_stack`) return the same serialiser's JSON. It
+  refuses a present `Origin` with 403 unless it is the canonical one, or the request's own on
+  Vercel or on a loopback host (never a DNS-rebound name), and logs nothing.
+  `mcp/__tests__/tools.test.ts` and `route.test.ts` call its `POST`, and `e2e/mcp.spec.ts` the
+  served route; `/mcp` is kept out of `e2e/routes.ts`, whose walks GET every route.
 
 `buildMetadata()` advertises the twin of every route that calls it as
 `alternates.types['text/markdown']`, at the path `markdownTwinPath()` in `src/lib/pathname.ts`
@@ -53,15 +67,25 @@ derives from the canonical's (a module with no imports, which the e2e helpers re
 folder with a `page.tsx` needs an `index.md/route.ts` beside it: `data/__tests__/pages.test.ts`
 fails one without, fails a static route without a record, and calls every handler to check it
 serves exactly the serialiser's output, statically. `e2e/markdown-twins.spec.ts` checks the served
-twins against the served pages. The sitemap lists no twin.
+twins against the served pages. The sitemap lists no twin. The page's own URL also answers with
+its twin when the request's `Accept` lists `text/markdown` (not at `q=0`), through one rewrite
+per route in `next.config.ts` (the rules and their limits are in `deploy-and-next-config.md`), so
+a route added here needs its twin for the rewrite as well: `src/test/next-config.test.ts` fails
+when the negotiated routes and the twin handlers differ. `src/data/static-routes.ts`,
+`src/data/case-studies.ts`, `src/lib/pathname.ts` and every module they import are loaded by
+`next.config.ts` and must import by relative path, never `@/`, or `next build` fails. The
+pattern, `force-static` included, is recorded in
+`docs/adr/0030-generated-endpoints-as-static-route-handlers.md`.
 
-All of the route handlers prerender at build time, and `pnpm check:build-output` (a `quality` step,
-`ci-and-scripts.md`) fails when a route does not: a `GET` handler is dynamic unless it exports
-`dynamic = 'force-static'`, and without it builds as a server function, as a handler that exports
-any other method does even with it. The same check fails a `proxy.ts` and any `'use server'`
-action, and a build that lacks a route in its `REQUIRED_ROUTES` (the JSON handlers above) or
-prerendered no path for one, or other slugs for `/work/[slug]/index.json` than for the page. `sitemap.ts`, `robots.ts`, `layout.tsx`, `components/json-ld.tsx`
-and `lib/serialise.ts` each read `NEXT_PUBLIC_SITE_URL`, falling back to
+Every route handler but `/mcp` prerenders at build time. `/mcp` is the site's one server function,
+because a `POST` handler cannot be prerendered, and `pnpm check:build-output` (a `quality` step,
+`ci-and-scripts.md`) allows it and fails any other route that does not prerender: a `GET` handler
+is dynamic unless it exports `dynamic = 'force-static'`, and without it builds as a server function,
+as a handler that exports any other method does even with it. The same check fails a `proxy.ts` and
+any `'use server'` action, and a build that lacks a route in its `REQUIRED_ROUTES` (the JSON
+handlers above) or prerendered no path for one, or other slugs for `/work/[slug]/index.json` than
+for the page. `sitemap.ts`, `robots.ts`, `layout.tsx`, `components/json-ld.tsx` and
+`lib/serialise.ts` each read `NEXT_PUBLIC_SITE_URL`, falling back to
 `https://miloscvetkovic.dev`. There is no middleware.
 `src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
 page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own
