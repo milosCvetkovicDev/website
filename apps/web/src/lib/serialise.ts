@@ -302,7 +302,8 @@ const CASE_STUDY_HEADINGS = {
 /**
  * A case study's twin: every field of the study, including those the page shows only in its
  * metadata and JSON-LD (the tagline, the highlight, the dates). The metric goes through
- * `formatMetric()`, the function the cards use, so the twin cannot render a figure differently.
+ * `formatMetric()`, the function the cards use, so the twin cannot render a figure differently, and
+ * its basis follows on a line of its own, as the page's metric panel prints it under the figure.
  * `lib/__tests__/serialise.test.ts` fails when a study holds a value the twin does not show.
  */
 export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
@@ -313,6 +314,7 @@ export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
     ['Category', highlight.category],
     ['Status', highlight.status],
     ['Metric', `${formatMetric(highlight.metric)} ${highlight.metric.label}`],
+    ['Basis', highlight.metric.basis],
     ['Tags', commaList(caseStudy.tags, where('the tags'))],
     ['Published', caseStudy.publishedAt],
     ['Updated', caseStudy.updatedAt],

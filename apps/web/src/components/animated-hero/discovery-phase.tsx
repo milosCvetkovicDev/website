@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, QuestItem, TypingCursor } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { useStoryVisibility } from '@/hooks/use-story-visibility';
 import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const requirements = [
@@ -16,6 +17,8 @@ const requirements = [
 
 export function DiscoveryPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  // Pauses the section's endless CSS animations while it is out of view (globals.css).
+  useStoryVisibility(sectionRef);
   const titleId = useId();
   const chatRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<HTMLDivElement>(null);

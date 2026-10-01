@@ -16,9 +16,10 @@
  *
  * Two decisions from the task, recorded because they shape what is asserted rather than how:
  *
- * - The About page's `40%` is **not** established. The owner confirms or drops it in #49, so this file
- *   forbids a hard-coded metric literal rather than asserting a value: it stays correct whichever way
- *   that decision goes.
+ * - The About page's `40%` was **not** established. #49 dropped it from the 2021 timeline entry
+ *   pending the owner's answer, and sourcing it from the enterprise study through `formatMetric()`
+ *   instead would pass here too: this file forbids a hard-coded metric literal rather than asserting
+ *   a value, so it stays correct whichever way that decision goes.
  * - Likewise the years of experience. A fixed count and `10+` used to contradict each other; the
  *   assertion is that there is one source, not which number wins. #49 made that source
  *   `data/profile.ts`, which derives the total from the year the career started.
@@ -125,9 +126,8 @@ describe('metrics and biography live in one place', () => {
       const source = readFileSync(join(SRC, file), 'utf8');
       expect(source.length, `${file} must be readable and non-empty`).toBeGreaterThan(100);
     }
-    // R33's import half reads ABOUT_COPY, and it only runs once #49 turns R33 into `it`: until then
-    // the literal half fails first. So its files are proven readable here, and inside the scanned
-    // set, or a rename would leave R33 passing as an expected failure and throwing ENOENT later.
+    // R33's import half reads ABOUT_COPY, so its files are proven readable here, and inside the
+    // scanned set: a rename would otherwise fail R33 with ENOENT rather than a finding.
     for (const file of ABOUT_COPY) {
       expect(COPY_MODULES, `${file} must be one of the scanned copy modules`).toContain(file);
       const source = readFileSync(join(SRC, file), 'utf8');
@@ -139,33 +139,30 @@ describe('metrics and biography live in one place', () => {
     expect(importsCaseStudies(readFileSync(join(SRC, 'data/pages/about.ts'), 'utf8'))).toBe(true);
   });
 
-  it.fails(
-    'R33 (#49): no page module restates a caseStudies metric literal, and the About page reads them from the data',
-    () => {
-      // Every metric as it renders: `formatMetric` is the one function that turns the data into copy,
-      // so its output is exactly the string a page must not contain in source.
-      const rendered = caseStudies.map(({ highlight }) => formatMetric(highlight.metric));
-      expect(rendered, 'the data file must actually define metrics').not.toHaveLength(0);
+  it('R33 (#49): no page module restates a caseStudies metric literal, and the About page reads them from the data', () => {
+    // Every metric as it renders: `formatMetric` is the one function that turns the data into copy,
+    // so its output is exactly the string a page must not contain in source.
+    const rendered = caseStudies.map(({ highlight }) => formatMetric(highlight.metric));
+    expect(rendered, 'the data file must actually define metrics').not.toHaveLength(0);
 
-      const restated = findLiterals(rendered);
-      expect(
-        restated.map(describeHit),
-        'the About timeline (data/pages/about.ts) hard-codes 40%, so the About page can contradict ' +
-          '/work and the home page without anything failing. Its 73% is already read from the study.',
-      ).toEqual([]);
+    const restated = findLiterals(rendered);
+    expect(
+      restated.map(describeHit),
+      'a page module states a case-study figure itself, so it can contradict /work and the home ' +
+        'page without anything failing: read it from the study through formatMetric()',
+    ).toEqual([]);
 
-      // The other half of the same row: the About copy has to read the figures from somewhere.
-      // Forbidding the literal without requiring the import would be satisfied by deleting the
-      // sentence. #59 moved the copy from the page into its record, so either module may hold it.
-      const importers = ABOUT_COPY.filter((file) =>
-        importsCaseStudies(readFileSync(join(SRC, file), 'utf8')),
-      );
-      expect(
-        importers,
-        `the About copy (${ABOUT_COPY.join(' or ')}) must import the case-study data it quotes figures from`,
-      ).not.toHaveLength(0);
-    },
-  );
+    // The other half of the same row: the About copy has to read the figures from somewhere.
+    // Forbidding the literal without requiring the import would be satisfied by deleting the
+    // sentence. #59 moved the copy from the page into its record, so either module may hold it.
+    const importers = ABOUT_COPY.filter((file) =>
+      importsCaseStudies(readFileSync(join(SRC, file), 'utf8')),
+    );
+    expect(
+      importers,
+      `the About copy (${ABOUT_COPY.join(' or ')}) must import the case-study data it quotes figures from`,
+    ).not.toHaveLength(0);
+  });
 
   it('R34 (#49): no page, layout or JSON-LD module hard-codes a years-of-experience figure', () => {
     // Two numbers used to ship for one fact: a fixed count of years in json-ld.tsx and

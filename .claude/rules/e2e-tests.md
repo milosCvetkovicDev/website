@@ -113,9 +113,10 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   machine-readable endpoints follow the same rule without a manifest row: `e2e/endpoints.ts` is the
   one list of their paths, and `e2e/machine-readable.spec.ts` holds one `test.fail()` per endpoint
   not yet served, its title and `fixed-by` annotation naming the issue that ships it (#60's
-  `/llms.txt` and #62). #59's Markdown twins, #60's case-study JSON and #61's Atom feed ship: the
-  JSON's rows there are its contract, and `e2e/markdown-twins.spec.ts` and `e2e/feed.spec.ts` are
-  the twins' and the feed's fuller ones. Its `expectNotServedYet` requires the 404 before it calls
+  `/llms.txt`). #59's Markdown twins, #60's case-study JSON, #61's Atom feed and #62's MCP server
+  ship: the JSON's and the server's rows there are their contract, and
+  `e2e/markdown-twins.spec.ts`, `e2e/feed.spec.ts` and `e2e/mcp.spec.ts` are the fuller ones of the
+  twins, the feed and the server. Its `expectNotServedYet` requires the 404 before it calls
   `test.fail()`, so a 5xx or a server that never answered fails the run instead of passing as the
   expected failure; the change that ships an endpoint deletes that call.
 - The two gate specs opt out of those retries: `e2e/console-clean.spec.ts` and

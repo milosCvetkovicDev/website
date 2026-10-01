@@ -4,6 +4,7 @@ import {
   beliefs,
   credentials,
   facts,
+  questions,
   timeline,
   type StoryParagraph,
 } from '@/data/pages/about';
@@ -64,8 +65,20 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Quick facts */}
+        {/* Questions a visitor asks: each heading's next element is its whole answer (#58) */}
+        <section className="mb-20 space-y-12">
+          {questions.map(({ question, answer }) => (
+            <div key={question}>
+              <h2 className="mb-4 text-2xl font-bold">{question}</h2>
+              <p className="text-lg leading-relaxed">{answer}</p>
+            </div>
+          ))}
+        </section>
+
+        {/* Quick facts. The heading is for screen readers: without it the grid would sit under the
+            last question in the heading outline (#58). */}
         <section className="mb-20">
+          <h2 className="sr-only">{aboutCopy.factsHeading}</h2>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {facts.map((fact) => (
               <div

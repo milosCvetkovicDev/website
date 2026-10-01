@@ -62,6 +62,13 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   with no post published too, as a feed with no entries.
   `app/__tests__/feed.test.ts` parses it with a real XML parser, and `e2e/feed.spec.ts` checks it
   as served.
+- The MCP server (#62), `mcp/route.ts`: `POST` only, a stateless, read-only server on protocol
+  revision 2026-07-28 built with `mcp-handler`, whose three tools in `mcp/tools.ts`
+  (`search_case_studies`, `get_case_study`, `get_tech_stack`) return the same serialiser's JSON. It
+  refuses a present `Origin` with 403 unless it is the canonical one, or the request's own on
+  Vercel or on a loopback host (never a DNS-rebound name), and logs nothing.
+  `mcp/__tests__/tools.test.ts` and `route.test.ts` call its `POST`, and `e2e/mcp.spec.ts` the
+  served route; `/mcp` is kept out of `e2e/routes.ts`, whose walks GET every route.
 
 `buildMetadata()` advertises the twin of every route that calls it as
 `alternates.types['text/markdown']`, at the path `markdownTwinPath()` in `src/lib/pathname.ts`
@@ -83,14 +90,15 @@ pattern, `force-static` included, is recorded in
 with the feed's own `FEED_TITLE` from `lib/metadata.ts`; until then no route links it, since an
 advertised feed with nothing in it helps no reader (ADR 0028).
 
-All of the route handlers prerender at build time, and `pnpm check:build-output` (a `quality` step,
-`ci-and-scripts.md`) fails when a route does not: a `GET` handler is dynamic unless it exports
-`dynamic = 'force-static'`, and without it builds as a server function, as a handler that exports
-any other method does even with it. The same check fails a `proxy.ts` and any `'use server'`
-action, and a build that lacks a route in its `REQUIRED_ROUTES` (the JSON handlers above) or
-prerendered no path for one, or other slugs for `/work/[slug]/index.json` than for the page.
-`sitemap.ts`, `robots.ts`, `layout.tsx`, `feed.xml/route.ts`, `components/json-ld.tsx`
-and `lib/serialise.ts` each read `NEXT_PUBLIC_SITE_URL`, falling back to
+Every route handler but `/mcp` prerenders at build time. `/mcp` is the site's one server function,
+because a `POST` handler cannot be prerendered, and `pnpm check:build-output` (a `quality` step,
+`ci-and-scripts.md`) allows it and fails any other route that does not prerender: a `GET` handler
+is dynamic unless it exports `dynamic = 'force-static'`, and without it builds as a server function,
+as a handler that exports any other method does even with it. The same check fails a `proxy.ts` and
+any `'use server'` action, and a build that lacks a route in its `REQUIRED_ROUTES` (the JSON
+handlers above) or prerendered no path for one, or other slugs for `/work/[slug]/index.json` than
+for the page. `sitemap.ts`, `robots.ts`, `layout.tsx`, `feed.xml/route.ts`,
+`components/json-ld.tsx` and `lib/serialise.ts` each read `NEXT_PUBLIC_SITE_URL`, falling back to
 `https://miloscvetkovic.dev`. There is no middleware.
 `src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
 page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own

@@ -8,11 +8,15 @@ import {
   PAGE_ROUTES,
   STATIC_ROUTES,
   expectedStatus,
+  postRoute,
 } from './routes';
 import { caseStudies } from '../src/data/case-studies';
+import { questions } from '../src/data/pages/about';
 import { coreSkills, skillsCopy } from '../src/data/pages/skills';
 import { workCopy } from '../src/data/pages/work';
+import { hasPublishedPosts, publishedPosts } from '../src/data/posts';
 import { RUNS_IN_PRODUCTION } from '../src/data/work-stats';
+import { restatedMetrics, wordCount } from '../src/test/answer-copy';
 import { formatContentDate } from '../src/lib/content-date';
 import { fetchHead, first } from './support/served-head';
 
@@ -208,16 +212,35 @@ test('robots.txt allows what the site serves and names nothing it does not', asy
   ).toEqual([]);
 });
 
-test('/blog is noindex while it is a placeholder', async ({ request }) => {
+// R26 (#48), rewritten by #61 from "/blog is noindex while it is a placeholder" to the conditional
+// contract: `hasPublishedPosts` (ADR 0028) is the switch, so the owner's commit that publishes the
+// first post flips this row by data, and the same row then holds /blog to being indexable.
+test('the /blog robots meta contains noindex if and only if publishedPosts is empty', async ({
+  request,
+}) => {
   const head = await fetchHead(request, '/blog');
-  const robots = (head.meta.get('robots') ?? []).join(' ');
+  expect(head.status).toBe(200);
+  const robots = head.meta.get('robots') ?? [];
+  expect(robots, '/blog should serve one robots tag').toHaveLength(1);
 
-  expect(
-    robots,
-    'the Coming Soon placeholder (blog/page.tsx:43) inherits the root `index, follow`, so an empty ' +
-      'page is offered to search. The owner decision of 2026-09-11 keeps the nav link and the ' +
-      'placeholder, and makes it noindex.',
-  ).toContain('noindex');
+  // The directives as tokens, so `noindex` is never read as containing `index`.
+  const directives = robots[0].split(',').map((directive) => directive.trim().toLowerCase());
+  if (hasPublishedPosts) {
+    expect(
+      directives,
+      `with ${publishedPosts.length} post(s) published /blog lists them, and must be indexable`,
+    ).toEqual(expect.arrayContaining(['index', 'follow']));
+    expect(
+      directives.filter((directive) => ['noindex', 'nofollow', 'none'].includes(directive)),
+    ).toEqual([]);
+  } else {
+    expect(
+      directives,
+      'with no post published /blog is the Coming Soon placeholder, and an empty page offered to ' +
+        'search is the defect #48 fixed: the owner decision of 2026-09-11 keeps the nav link and ' +
+        'the placeholder, and makes it noindex',
+    ).toContain('noindex');
+  }
 });
 
 test('a 404 serves exactly one robots tag, and it says noindex', async ({ request }) => {
@@ -311,10 +334,34 @@ test('the sitemap and robots.txt are served and agree with the routes', async ({
     new URL(url).pathname.replace(/(.)\/$/, '$1'),
   );
   expect(listed.length, 'the sitemap must list something').toBeGreaterThan(0);
-  // Every static route except /blog, which the owner decision of 2026-09-11 keeps out of the sitemap
-  // (and which R31 pins on the sitemap() output itself).
+  // Every static route but /blog, which is there only once a post is published (#61): while none
+  // is, the owner decision of 2026-09-11 keeps the noindex placeholder out of the sitemap. R31 pins
+  // both sides on the sitemap() output itself.
   for (const path of STATIC_ROUTES.filter((route) => route !== '/blog')) {
     expect(listed, `the sitemap must list ${path}`).toContain(path);
+  }
+  expect(
+    listed.includes('/blog'),
+    hasPublishedPosts
+      ? 'with a post published the sitemap must list /blog'
+      : 'with no post published /blog is a noindex placeholder, and the sitemap must not offer it',
+  ).toBe(hasPublishedPosts);
+
+  // Every published post, dated by the day what it says last changed (AC 8). None yet, so this loop
+  // runs once the owner publishes the first; `sitemap.test.ts` proves it over the fixture posts.
+  // Keyed as `listed` is, trailing slash dropped; an entry with no <loc> has no key to be under.
+  const lastmodOf = new Map(
+    [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].flatMap(([, entry]) => {
+      const loc = entry.match(/<loc>([^<]+)<\/loc>/)?.[1];
+      if (!loc) return [];
+      const path = new URL(loc).pathname.replace(/(.)\/$/, '$1');
+      return [[path, entry.match(/<lastmod>([^<]+)<\/lastmod>/)?.[1]] as const];
+    }),
+  );
+  for (const { slug, updatedAt } of publishedPosts) {
+    const path = postRoute(slug);
+    expect(listed, `the sitemap must list ${path}`).toContain(path);
+    expect(lastmodOf.get(path), `${path}'s lastmod must be its updatedAt`).toBe(updatedAt);
   }
 
   const robots = await request.get('/robots.txt');
@@ -451,6 +498,64 @@ test('the Person schema, the hero and the /about description carry one derived y
       ? `the build predates 1 January: it states ${served} years, the clock gives ${expected}; rebuild`
       : `yearsOfExperience() gives ${expected}`,
   ).toBe(expected);
+});
+
+test('/about answers three questions, each in one paragraph of 40 to 80 words that restates no case-study metric (#58)', async ({
+  page,
+  request,
+}) => {
+  // #58 AC 13. A question-shaped heading with a short answer under it is the unit an extractor can
+  // lift whole, so the served HTML, which no crawler runs, has to carry it. The browser's
+  // `DOMParser` reads the response, as `servedCaseStudy()` below does: the RSC flight payload
+  // repeats every heading inside a script, and parsed, a script's text is never an element. The
+  // served question headings are the `questions` of the page record, in order, so a stray `<h2>`
+  // ending in `?` elsewhere on the page fails rather than being counted; each is followed by a
+  // `<p>` holding its answer. Words and metrics are measured by `src/test/answer-copy.ts`, the
+  // helpers the unit test on the data uses. No FAQPage, HowTo or speakable markup goes with it:
+  // `scripts/ai-refusals.test.mjs` fails on those strings anywhere under apps/web/src.
+  const response = await request.get('/about');
+  expect(response.status(), 'GET /about').toBe(200);
+  const headings = await page.evaluate(
+    (markup) => {
+      const doc = new DOMParser().parseFromString(markup, 'text/html');
+      const text = (element: Element | null) =>
+        (element?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      return [...doc.body.querySelectorAll('h2')].map((heading) => ({
+        question: text(heading),
+        next: heading.nextElementSibling?.localName ?? null,
+        answer: text(heading.nextElementSibling),
+      }));
+    },
+    await response.text(),
+  );
+  // The control: a parser that found no heading at all would find no question either.
+  expect(headings.length, '/about should serve its section headings').toBeGreaterThan(0);
+
+  expect(questions, 'the page record asks three questions').toHaveLength(3);
+  const served = headings.filter(({ question }) => question.endsWith('?'));
+  expect(
+    served.map(({ question }) => question),
+    "/about serves exactly its record's questions as the h2s that end in a question mark",
+  ).toEqual(questions.map(({ question }) => question));
+
+  const metrics = caseStudies.map(({ highlight }) => highlight.metric);
+  expect(metrics, 'the case studies must define metrics for the check below').not.toHaveLength(0);
+  for (const { question, next, answer } of served) {
+    expect.soft(next, `"${question}" is followed by a paragraph`).toBe('p');
+    const words = wordCount(answer);
+    expect
+      .soft(words, `"${question}" is answered in at least 40 words: "${answer}"`)
+      .toBeGreaterThanOrEqual(40);
+    expect
+      .soft(words, `"${question}" is answered in at most 80 words: "${answer}"`)
+      .toBeLessThanOrEqual(80);
+    expect
+      .soft(
+        restatedMetrics(answer, metrics),
+        `"${question}" restates a case-study metric, which is the study's to state`,
+      )
+      .toEqual([]);
+  }
 });
 
 /** A date the served body shows: its `<dt>` label, then the `<time>` in the `<dd>` after it. */

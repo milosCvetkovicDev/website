@@ -432,8 +432,10 @@ Then walk the site by hand. The route items below are every page the App Router 
 with a `page.tsx` under `apps/web/src/app`, and one page per entry in
 `apps/web/src/data/case-studies.ts` (three today). `sitemap.ts` lists all of them except `/blog`,
 which is left out, and served `noindex`, while it is a Coming Soon placeholder;
-`apps/web/src/app/__tests__/sitemap.test.ts` fails if the sitemap drifts from that set. When a route
-or a case study is added, add its item here.
+`apps/web/src/app/__tests__/sitemap.test.ts` fails if the sitemap drifts from that set. Once a post
+in `apps/web/src/data/posts.ts` is published (none is yet), `/blog` lists the posts, is indexable
+and is in the sitemap, and so is each published post's `/blog/<slug>` (#61). When a route or a
+case study is added, add its item here.
 
 - [ ] `/` loads, the hero animation runs, and scrolling does not stall
 - [ ] `/about`
@@ -446,8 +448,13 @@ or a case study is added, add its item here.
 - [ ] `/contact`
 - [ ] `/privacy`, reached from the footer's **Privacy** link, names Vercel Web Analytics as what
       counts page views
-- [ ] `/sitemap.xml` lists exactly those URLs except `/blog`, all on the apex origin
-- [ ] `/blog` serves `<meta name="robots" content="noindex, follow">`
+- [ ] `/sitemap.xml` lists exactly those URLs except `/blog`, all on the apex origin; once a post is
+      published, `/blog` and each published post too, the post's `<lastmod>` its `updatedAt`
+- [ ] `/blog` serves `<meta name="robots" content="noindex, follow">` and Coming Soon while no post
+      is published; once one is, it lists the posts and serves neither
+- [ ] Once a post is published, each published `/blog/<slug>` loads with its title as the one `h1`,
+      its labelled Published and Updated days, and a robots meta without `noindex`; a draft's slug
+      and `/blog/does-not-exist` answer `404`, and `/sitemap.xml` names no draft
 - [ ] `/robots.txt` allows `/`, disallows nothing (`/_next/` holds the CSS, scripts and fonts a
       crawler renders with), and points at the apex sitemap
 - [ ] `/work/does-not-exist` answers `404` and renders the site not-found page

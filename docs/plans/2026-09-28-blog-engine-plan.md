@@ -104,13 +104,13 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
   `apps/web/e2e/seo-surface.spec.ts`, `apps/web/e2e/blog.spec.ts`
 - Create: `apps/web/src/app/blog/__tests__/blog-page.test.tsx`
 
-- [ ] **Step 1:** Tests over the fixtures: one list item per published post with its title and
+- [x] **Step 1:** Tests over the fixtures: one list item per published post with its title and
       labelled date, no draft, no placeholder; the sitemap lists `/blog` and each post with
       `lastmod` equal to its `updatedAt`. They fail.
-- [ ] **Step 2:** `/blog` lists `publishedPosts` and keeps the placeholder only while
+- [x] **Step 2:** `/blog` lists `publishedPosts` and keeps the placeholder only while
       `hasPublishedPosts` is false; its metadata becomes `index: hasPublishedPosts`; the sitemap
       follows the same switch (D4, D5).
-- [ ] **Step 3:** #48's two rows, the `/blog` robots meta and the sitemap's `/blog` entry, are
+- [x] **Step 3:** #48's two rows, the `/blog` robots meta and the sitemap's `/blog` entry, are
       rewritten to the conditional contract with a comment naming #61.
 
 ### Task 4: The Atom feed (61d)
