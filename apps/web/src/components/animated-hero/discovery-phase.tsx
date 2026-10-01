@@ -9,10 +9,10 @@ import { useStoryVisibility } from '@/hooks/use-story-visibility';
 import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const requirements = [
-  { id: 'monitoring', label: 'monitoring', delay: 0 },
-  { id: 'autonomous', label: 'autonomous', delay: 0.2 },
-  { id: 'pr-creation', label: 'PR creation', delay: 0.4 },
-  { id: 'safety', label: 'safety limits', delay: 0.6 },
+  { id: 'monitoring', label: 'monitoring' },
+  { id: 'autonomous', label: 'autonomous' },
+  { id: 'pr-creation', label: 'PR creation' },
+  { id: 'safety', label: 'safety limits' },
 ];
 
 export function DiscoveryPhase() {
@@ -176,10 +176,7 @@ export function DiscoveryPhase() {
                   // element a transition re-eases every frame GSAP writes, and GSAP's inline
                   // `scale: none` cancels hover:scale-105.
                   <span key={req.id} className="requirement-reveal inline-block">
-                    <span
-                      className="requirement-tag block cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent-text)] transition-[scale,color,background-color,border-color,box-shadow] duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]"
-                      style={{ animationDelay: `${index * 0.1}s` }}
-                    >
+                    <span className="requirement-tag block cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent-text)] transition-[scale,color,background-color,border-color,box-shadow] duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]">
                       <span className="mr-1 text-[var(--muted)]">#{index + 1}</span>
                       {req.label}
                     </span>

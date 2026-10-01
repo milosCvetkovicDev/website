@@ -1,4 +1,4 @@
-import { HudPanel, QuestItem, StatDisplay } from 'web';
+import { HudPanel, QuestItem } from 'web';
 
 export const QuestLog = () => (
   <HudPanel title="QUEST LOG">
@@ -31,18 +31,36 @@ export const WithGlow = () => (
 
 export const Untitled = () => (
   <HudPanel>
-    <StatDisplay label="Uptime" value="99.9%" />
-    <StatDisplay label="P95 latency" value="47ms" />
-    <StatDisplay label="Auto-fixes today" value={3} highlight />
+    <div className="flex items-center justify-between py-1">
+      <span className="font-mono text-xs text-[var(--muted)]">UPTIME</span>
+      <span className="font-mono text-[var(--accent-text)]">99.9%</span>
+    </div>
+    <div className="flex items-center justify-between py-1">
+      <span className="font-mono text-xs text-[var(--muted)]">P95 LATENCY</span>
+      <span className="font-mono text-[var(--accent-text)]">47ms</span>
+    </div>
+    <div className="flex items-center justify-between py-1">
+      <span className="font-mono text-xs text-[var(--muted)]">AUTO-FIXES TODAY</span>
+      <span className="font-mono text-[var(--accent-text)]">3</span>
+    </div>
   </HudPanel>
 );
 
 export const DarkTheme = () => (
   <div className="dark bg-[var(--background)] p-6 text-[var(--foreground)]">
     <HudPanel title="BUILD STATS" glow>
-      <StatDisplay label="Files changed" value={42} />
-      <StatDisplay label="Tests" value="318 passed" />
-      <StatDisplay label="Coverage" value="94%" highlight />
+      <div className="flex items-center justify-between py-1">
+        <span className="font-mono text-xs text-[var(--muted)]">FILES CHANGED</span>
+        <span className="font-mono text-[var(--accent-text)]">42</span>
+      </div>
+      <div className="flex items-center justify-between py-1">
+        <span className="font-mono text-xs text-[var(--muted)]">TESTS</span>
+        <span className="font-mono text-[var(--accent-text)]">318 passed</span>
+      </div>
+      <div className="flex items-center justify-between py-1">
+        <span className="font-mono text-xs text-[var(--muted)]">COVERAGE</span>
+        <span className="font-mono text-[var(--accent-text)]">94%</span>
+      </div>
     </HudPanel>
   </div>
 );
