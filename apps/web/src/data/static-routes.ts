@@ -10,7 +10,7 @@ import { experienceFigureSince } from './profile';
  * progress dots and readout name each section by its phase title), /work and /skills 2026-10-01
  * (#58: the stats bar's production figure counted from the studies' statuses and "Left Unfinished"
  * dropped, and the line saying the proficiency bars are self-assessed), /about 2026-09-28 (#49: the
- * years of experience read from data/profile.ts), /contact 2026-09-30 (#62, the "Connect an agent"
+ * years of experience read from data/profile.ts), /contact 2026-10-01 (#62, the "Connect an agent"
  * section and its connector snippets) and /blog 2026-01-27 (696c2ef). The later commits to /blog
  * changed only formatting, colour tokens, metadata or Open Graph images. /privacy was added on
  * 2026-09-27.
@@ -29,7 +29,7 @@ export const STATIC_ROUTE_UPDATED = {
   '/work': '2026-10-01',
   '/skills': '2026-10-01',
   '/blog': '2026-01-27',
-  '/contact': '2026-09-30',
+  '/contact': '2026-10-01',
   '/privacy': '2026-09-27',
 } as const satisfies Record<string, string>;
 

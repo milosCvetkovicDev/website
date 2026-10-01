@@ -4,12 +4,13 @@
  * into a config file is the whole way in, and each has to work unedited.
  *
  * Every snippet is rendered from `MCP_SERVER_URL`, which is `MCP_PATH` on the origin
- * `absoluteUrl()` in `lib/serialise.ts` reads (`NEXT_PUBLIC_SITE_URL`, else production), so there
- * is one endpoint and one origin in the repository. A preview build without the variable therefore
- * advertises the production server, as its sitemap and canonical URLs name production, and that
- * helper refuses anything but a bare http(s) origin, so the URL needs no shell quoting in the
- * Claude Code command. `MCP_PATH` is also the path `e2e/endpoints.ts` probes, whose expected
- * failure in `machine-readable.spec.ts` stands until a route answers there. `/contact` renders the
+ * `absoluteUrl()` in `lib/serialise.ts` reads (`NEXT_PUBLIC_SITE_URL`, else production), the same
+ * origin the server's own `Origin` check trusts, so the snippets name the site's one origin. A
+ * preview build without the variable therefore advertises the production server, as its sitemap
+ * and canonical URLs name production, and that helper refuses anything but a bare http(s) origin,
+ * so the URL needs no shell quoting in the Claude Code command. `MCP_PATH` restates `MCP` in
+ * `e2e/endpoints.ts`, the path `e2e/mcp.spec.ts` and the #62 row of `machine-readable.spec.ts` send
+ * their requests to, and the snippet test fails when the two differ. `/contact` renders the
  * snippets, and the README carries them between two markers;
  * `app/mcp/__tests__/connector-snippets.test.ts` fails when that copy differs from what this module
  * renders for production. Change a snippet here, then paste the test's expected block into the

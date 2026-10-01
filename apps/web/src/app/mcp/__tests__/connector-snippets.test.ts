@@ -78,9 +78,9 @@ describe('the connector snippets', () => {
     expect(MCP_SERVER_URL).toMatch(SHELL_SAFE_URL);
   });
 
-  // `e2e/endpoints.ts` is the manifest of machine-readable paths, and `machine-readable.spec.ts`
-  // holds an expected failure on POST to its `MCP` until a route answers there. The published path
-  // is that path, so the snippets cannot name an endpoint the suite does not probe.
+  // `e2e/endpoints.ts` is the manifest of machine-readable paths, and `e2e/mcp.spec.ts` and the #62
+  // row of `machine-readable.spec.ts` send their requests to its `MCP`. The published path is that
+  // path, so the snippets cannot name an endpoint the suite does not test.
   it('publish the path the e2e endpoint manifest probes', async () => {
     const { MCP_PATH } = await snippetsFor(undefined);
     expect(MCP_PATH).toBe(MCP);
