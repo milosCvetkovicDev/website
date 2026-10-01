@@ -27,8 +27,8 @@ interface ServedItem {
 }
 
 /**
- * `/blog` as served: its status, its `h2`s, the text of its `main`, every link's `href` on the page,
- * and each post list with its items.
+ * `/blog` as served: its status, the whole response, its `h2`s, the text of its `main`, every link's
+ * `href` on the page, and each post list with its items.
  */
 async function servedBlog(request: APIRequestContext, page: Page) {
   const response = await request.get('/blog');
@@ -79,7 +79,17 @@ async function servedBlog(request: APIRequestContext, page: Page) {
     },
     markup,
   );
-  return { status: response.status(), ...parsed };
+  return { status: response.status(), markup, ...parsed };
+}
+
+/**
+ * Whether `markup` names `route` as a whole path: the route not followed by a slug character, so a
+ * draft's `/blog/a` is not found inside a published post's `/blog/a-b`. Followed by anything else,
+ * `/`, a quote or `?` among them, it is the route itself, or a path under it such as its card.
+ */
+function mentionsRoute(markup: string, route: string): boolean {
+  const escaped = route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`${escaped}(?![a-z0-9-])`).test(markup);
 }
 
 // AC 3, by data: the first published post replaces the placeholder with the list, and no code
@@ -89,7 +99,7 @@ if (hasPublishedPosts) {
     page,
     request,
   }) => {
-    const { status, lists, subheadings, mainText, hrefs } = await servedBlog(request, page);
+    const { status, markup, lists, subheadings, mainText, hrefs } = await servedBlog(request, page);
     expect(status).toBe(200);
     expect(
       lists.map(({ tag }) => tag),
@@ -113,9 +123,14 @@ if (hasPublishedPosts) {
       expect(item.text, `${slug}: its summary`).toContain(summary);
     });
 
-    // Whole hrefs, not substrings: a draft's slug may be the start of a published one's.
+    // No draft is linked, or named anywhere else in the response, the flight payload included.
+    // Whole routes, not substrings: a draft's slug may be the start of a published one's.
     for (const draft of posts.filter((post) => post.draft)) {
-      expect(hrefs, `${draft.slug} is a draft`).not.toContain(postRoute(draft.slug));
+      const route = postRoute(draft.slug);
+      expect(hrefs, `${draft.slug} is a draft, and linked`).not.toContain(route);
+      expect(mentionsRoute(markup, route), `${draft.slug} is a draft, and named in /blog`).toBe(
+        false,
+      );
     }
     // The placeholder is gone: its heading and its paragraphs, by the copy the page renders it from.
     expect(subheadings).not.toContain(blogCopy.comingSoon.heading);
