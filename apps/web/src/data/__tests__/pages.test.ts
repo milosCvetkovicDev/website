@@ -23,12 +23,13 @@ import { describe, expect, it } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
 import { pages } from '@/data/pages';
 import { publishedPosts } from '@/data/posts';
-import { beliefs, facts, timeline } from '@/data/pages/about';
+import { beliefs, credentials, facts, timeline } from '@/data/pages/about';
 import { socialLinks } from '@/data/pages/contact';
 import { coreSkills, differentiators, skillCategories } from '@/data/pages/skills';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { caseStudyToMarkdown, pageToMarkdown } from '@/lib/serialise';
 import { visible } from '@/test/markdown';
+import { isOnlyEmoji, pictographsIn } from '@/test/pictographs';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const APP = join(SRC, 'app');
@@ -210,4 +211,49 @@ describe('the twin handlers', () => {
       }),
     ).rejects.toThrow('"no-such-study"');
   });
+});
+
+// `/about` and `/skills` draw each belief's, credential's and toolkit category's emoji in an
+// `aria-hidden` span, and the twins leave the `icon` field out (#46, pages-20). Both rest on the
+// emoji staying in that field: one put inside a title or a description would be read aloud on the
+// page and written into the twin. `e2e/pages.spec.ts` checks the served pages.
+describe('the decorative icons', () => {
+  const iconed = [
+    ...beliefs.map(({ icon, title, description }) => ({ icon, texts: [title, description] })),
+    ...credentials.map(({ icon, text }) => ({ icon, texts: [text] })),
+    ...skillCategories.map(({ icon, name, description, skills }) => ({
+      icon,
+      texts: [name, description, ...skills],
+    })),
+  ];
+
+  it('keeps each icon one emoji, in a field of its own', () => {
+    expect(iconed.length).toBeGreaterThan(0);
+    for (const { icon, texts } of iconed) {
+      expect(isOnlyEmoji(icon), `the icon beside "${texts[0]}" is ${JSON.stringify(icon)}`).toBe(
+        true,
+      );
+    }
+  });
+
+  it('keeps every emoji out of the text beside the icons and of the core skills', () => {
+    const texts = [
+      ...iconed.flatMap(({ texts }) => texts),
+      ...coreSkills.flatMap(({ name, years, context }) => [name, years, context]),
+    ];
+    for (const text of texts) expect(pictographsIn(text), text).toEqual([]);
+  });
+
+  it.each(records)('leaves every emoji out of the %s twin', (_route, record) => {
+    expect(pictographsIn(pageToMarkdown(record))).toEqual([]);
+  });
+});
+
+// The bar is a `meter` from 0 to 100 whose fill is `level`% wide: a level outside that range, or
+// not a whole number, is an invalid meter and a fill wider than its track.
+it('gives every core skill a whole-number level from 0 to 100', () => {
+  expect(coreSkills.length).toBeGreaterThan(0);
+  for (const { name, level } of coreSkills) {
+    expect(Number.isInteger(level) && level >= 0 && level <= 100, `${name}: ${level}`).toBe(true);
+  }
 });

@@ -53,13 +53,17 @@ function SkillBar({ name, years, level, context }: CoreSkill) {
       </div>
       <div className="mb-3">
         {/* A fixed level within a known range, so a meter: a progressbar would announce a task
-            under way. Its name carries the level; the fill inside is decoration. */}
+            under way. The value text makes every screen reader say the value as "95%" rather than
+            a bare number. The name repeats the level on purpose: a reader without meter support
+            announces the name alone. A meter's children are presentational, so the fill inside
+            is decoration. */}
         <div
           className="h-2 overflow-hidden rounded-full bg-[var(--border)]"
           role="meter"
           aria-valuenow={level}
           aria-valuemin={0}
           aria-valuemax={100}
+          aria-valuetext={`${level}%`}
           aria-label={`${name} self-assessed proficiency: ${level}%`}
         >
           <div
