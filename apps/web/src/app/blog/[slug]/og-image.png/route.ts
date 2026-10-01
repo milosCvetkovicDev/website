@@ -1,5 +1,6 @@
 import { getPost, publishedPosts } from '@/data/posts';
 import { socialCard } from '@/lib/og-image';
+import { postStaticParams } from '@/lib/post-static-params';
 
 // The post card, as a route handler, as the case studies' is (`work/[slug]/og-image.png`): its alt
 // text names the post, which an `opengraph-image` file's one static `alt` cannot, and a per-post
@@ -12,7 +13,7 @@ export const dynamic = 'force-static';
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return publishedPosts.map(({ slug }) => ({ slug }));
+  return postStaticParams(publishedPosts);
 }
 
 export async function GET(

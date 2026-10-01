@@ -34,7 +34,10 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   through `buildMetadata()`'s `image`.
 - `blog/[slug]/og-image.png/route.ts` draws the post card the same way, under the `Writing`
   eyebrow, with its own `generateStaticParams` over `publishedPosts` and `dynamicParams = false`,
-  so a draft has no card as it has no page (#61).
+  so a draft has no card as it has no page (#61). Both post routes take their list from
+  `postStaticParams()` in `src/lib/post-static-params.ts`, which adds one placeholder slug under
+  `next dev` while no post is published: the dev server enforces `dynamicParams = false` only for
+  a non-empty list, and without it every `/blog/<slug>` served Next's recovery shell (ADR 0015).
 - The Markdown twins (#59): an `index.md/route.ts` in each static route's folder
   (`app/index.md/route.ts` for `/`), and `work/[slug]/index.md/route.ts` for the case studies, with
   its own `generateStaticParams` and `dynamicParams = false`. Each is three lines that hand a record

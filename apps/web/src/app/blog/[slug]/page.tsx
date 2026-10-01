@@ -6,6 +6,7 @@ import { getPost, publishedPosts } from '@/data/posts';
 import { formatContentDates } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
 import { cardAlt } from '@/lib/og-image';
+import { postStaticParams } from '@/lib/post-static-params';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -19,11 +20,12 @@ interface PageProps {
 // params makes that a routing-level 404, as `/work/[slug]` does, instead of a render-time
 // notFound() that unwinds past the root layout and serves Next's bare recovery shell without the
 // theme init script (docs/adr/0015-static-case-study-params.md). With no post published the list
-// is empty, and the route still prerenders, as zero pages: every `/blog/<slug>` is that 404.
+// is empty, and the route still prerenders, as zero pages: every `/blog/<slug>` is that 404. The
+// development server needs one placeholder in an empty list to do the same: `postStaticParams`.
 export const dynamicParams = false;
 
 export async function generateStaticParams() {
-  return publishedPosts.map(({ slug }) => ({ slug }));
+  return postStaticParams(publishedPosts);
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
