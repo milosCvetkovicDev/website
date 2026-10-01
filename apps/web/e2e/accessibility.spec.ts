@@ -93,12 +93,21 @@ import {
  */
 
 /**
- * Every page route, from the one shared list in `e2e/routes.ts`: the seven static routes, the three case
- * studies and a 404. This used to be `['/', '/work/self-healing-agent']` — two of ten — which is why
- * every defect the audit found on `/about`, `/skills`, `/contact`, `/blog` or a 404 was invisible to a
- * green gate. `console-clean.spec.ts` reads the same module, so a new route reaches both gates at once.
+ * Every page route, from the one shared list in `e2e/routes.ts`: the static routes, every case
+ * study and every published post, and a 404. This used to be `['/', '/work/self-healing-agent']` —
+ * two of ten — which is why every defect the audit found on `/about`, `/skills`, `/contact`,
+ * `/blog` or a 404 was invisible to a green gate. `console-clean.spec.ts` reads the same module, so
+ * a new route reaches both gates at once.
  */
 const pages = PAGE_ROUTES;
+
+/**
+ * The text a post's body puts in front of axe at the least: one element per block, and one per item
+ * of a list, since a paragraph, a heading, a list item, a code block and a quote each hold text of
+ * their own, and `posts.test.ts` refuses an empty one. Inline code and links only add to it.
+ */
+const bodyTextElements = (body: readonly PostBlock[]) =>
+  body.reduce((count, block) => count + (block.kind === 'list' ? block.items.length : 1), 0);
 
 /**
  * Fewest colour-contrast nodes each page must still measure at rest. A floor, not a target: the
@@ -121,14 +130,6 @@ const pages = PAGE_ROUTES;
  * `incomplete` instead. The floor there is nearly meaningless; the budget below is the number that
  * matters for that route.
  */
-/**
- * The text a post's body puts in front of axe at the least: one element per block, and one per item
- * of a list, since a paragraph, a heading, a list item, a code block and a quote each hold text of
- * their own, and `posts.test.ts` refuses an empty one. Inline code and links only add to it.
- */
-const bodyTextElements = (body: readonly PostBlock[]) =>
-  body.reduce((count, block) => count + (block.kind === 'list' ? block.items.length : 1), 0);
-
 const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
   // Every published post (#61, 61b), first, so that an entry written below for one post wins over
   // this one: a later key replaces an earlier one in an object literal. No post is published yet,
@@ -182,10 +183,11 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * the same day. The node #48 added is the hero's line naming who the site is about, which was
  * sr-only and is now visible text on the island; `e2e/hero-contrast.spec.ts` measures its colour.
  *
- * Nine of the eleven routes have a budget of **zero**, which is the strongest form this can take: on those
- * pages axe decides every text node, and the first blurred panel or gradient put behind text fails here.
- * The two that are not zero are the two surfaces the audit already found, and between them they account
- * for every undecidable node on the site — 167 of them, against 103 and 8 decided.
+ * Every route but `/` and `/work` has a budget of **zero**, which is the strongest form this can
+ * take: on those pages axe decides every text node, and the first blurred panel or gradient put
+ * behind text fails here. The two that are not zero are the two surfaces the audit already found,
+ * and between them they account for every undecidable node on the site — 167 of them, against 103
+ * and 8 decided.
  *
  * `/` gets a margin of a few nodes and the others do not. The reason this comment gave until #180 was
  * wrong: the tmux chrome's tab labels, pane titles and status lines are static, and its clock changes
@@ -200,7 +202,7 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * The margin over that, six nodes to the budget of 118, stays by the owner's decision on #180 of
  * 2026-09-30 until #47's slices 47c and 47e, #49's 49d and #58's 58a have all landed, so that none of
  * them has to raise a budget; a pull request of its own then lowers it to the re-measured constant.
- * `/work` and the nine zeroes are static and were identical across every run. Never widen a margin to
+ * `/work` and the zeroes are static and were identical across every run. Never widen a margin to
  * quieten a failure: read the nodes the message names first, because a genuinely new blurred surface
  * looks exactly like this.
  *
