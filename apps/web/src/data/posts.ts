@@ -10,7 +10,9 @@
  *   needs no dates. Everything that shows posts reads `publishedPosts` or `getPost`, never `posts`.
  * - Publish it by setting `draft: false` with `publishedAt` and `updatedAt`, both the day it goes
  *   live as `YYYY-MM-DD`. Later, bump `updatedAt` in the commit that changes what the post says,
- *   and only then: it is the date readers and crawlers are shown as the last change.
+ *   and only then: it is the date readers and crawlers are shown as the last change. /blog lists
+ *   the title and summary, so a commit that changes either, or unpublishes or removes a post, also
+ *   bumps `STATIC_ROUTE_UPDATED['/blog']` in `static-routes.ts`.
  * - Every string is plain text and is shown as written: no Markdown, no HTML, no entities. Inline
  *   code and links are pieces of their own; a link goes to an `https://` URL or to a page on this
  *   site. Only a code block may hold a line break.
