@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { PAGE_ROUTES, expectedStatus } from './routes';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
+import { TMUX_LOG_STREAM, tmuxLogStreamProblems } from './support/tmux-log-stream';
 // The rule map and the result readers are shared with e2e/mobile/accessibility.spec.ts: only
 // e2e/mobile/ is selected by the two phone projects, and importing one spec file from another would
 // register its tests twice, so they live in their own module.
@@ -201,8 +202,8 @@ const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }
 };
 
 /**
- * The tmux background's log stream on `/`: the slot container in each of its five panes
- * (`AnimatedPane` in `tmux-background.tsx`), which the at-rest pass on `/` excludes from the audit.
+ * The tmux background's log stream on `/` (`TMUX_LOG_STREAM` in `support/tmux-log-stream.ts`): the
+ * slot container in each of its five panes, which the at-rest pass on `/` excludes from the audit.
  *
  * Its node count is a clock reading, not a property of the page: the panes write a line into their
  * slots about every 400-850 ms for as long as the page is open, and axe cannot decide any slot that
@@ -217,61 +218,9 @@ const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }
  *
  * axe's `exclude` takes the containers out of every rule, not only colour contrast. What makes that
  * safe is `tmuxLogStreamProblems`: it admits only plain `div`s holding text, which no rule in the set
- * but colour contrast has anything to examine. `auditExcludingTmuxLogStream` is the one way to use
- * the selector, and it runs that check before and after the audit.
- */
-const TMUX_LOG_STREAM = '[data-tmux-slots]';
-
-/**
- * Everything wrong with what `TMUX_LOG_STREAM` matches, as messages, empty when it is safe to
- * exclude. It must match five elements, one in each `[data-tmux-pane]`, in a tree under
- * `aria-hidden="true"`. Each must be a `div` carrying only `data-tmux-slots`, `class` and `style`,
- * so it is itself no link, button, heading, landmark or focus stop. Each may hold only the slots
- * `createSlot` makes: a `div` with text, a pinned height and no attribute but `style`. A slot has no
- * child element, so nothing can sit deeper, and `StaticPane`'s reduced-motion lines, which pin no
- * height, fail. The negative control at the bottom of this file proves each part can fail.
- */
-async function tmuxLogStreamProblems(page: Page): Promise<string[]> {
-  return page.evaluate((selector) => {
-    const containers = [...document.querySelectorAll(selector)];
-    const found: string[] = [];
-    if (containers.length !== 5) {
-      found.push(`${selector} matches ${containers.length} elements, not the five slot containers`);
-    }
-    const panes = new Set<Element>();
-    containers.forEach((container, index) => {
-      const name = `slot container ${index + 1} of ${containers.length}`;
-      const pane = container.closest('[data-tmux-pane]');
-      if (!pane) found.push(`${name} is not inside a [data-tmux-pane]`);
-      else if (panes.has(pane)) found.push(`${name} shares its pane with another`);
-      else if (!pane.closest('[aria-hidden="true"]')) {
-        found.push(`${name} is in a pane with no aria-hidden="true" ancestor`);
-      }
-      if (pane) panes.add(pane);
-      if (container.tagName !== 'DIV') found.push(`${name} is a <${container.localName}>`);
-      const allowed = ['data-tmux-slots', 'class', 'style'];
-      for (const attribute of container.getAttributeNames()) {
-        if (!allowed.includes(attribute)) found.push(`${name} carries ${attribute}`);
-      }
-      for (const node of container.childNodes) {
-        const slot =
-          node instanceof HTMLDivElement &&
-          node.childElementCount === 0 &&
-          node.getAttributeNames().every((attribute) => attribute === 'style') &&
-          node.style.height !== '';
-        if (slot) continue;
-        const shown =
-          node instanceof Element
-            ? node.outerHTML.slice(0, 120)
-            : `the text ${JSON.stringify(node.textContent)}`;
-        found.push(`${name} holds ${shown}, which is not a slot div with a pinned height`);
-      }
-    });
-    return found;
-  }, TMUX_LOG_STREAM);
-}
-
-/**
+ * but colour contrast has anything to examine. This function is the one way this file uses the
+ * selector, and it runs that check before and after the audit.
+ *
  * The at-rest audit of `/`, with the log stream left out once `tmuxLogStreamProblems` has found
  * nothing wrong with it, and checked again afterwards: axe runs for seconds while the panes keep
  * writing and resizing, so what it left out must still be decoration when it has finished.
