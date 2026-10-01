@@ -452,6 +452,9 @@ case study is added, add its item here.
       published, `/blog` and each published post too, the post's `<lastmod>` its `updatedAt`
 - [ ] `/blog` serves `<meta name="robots" content="noindex, follow">` and Coming Soon while no post
       is published; once one is, it lists the posts and serves neither
+- [ ] Once a post is published, each published `/blog/<slug>` loads with its title as the one `h1`,
+      its labelled Published and Updated days, and a robots meta without `noindex`; a draft's slug
+      and `/blog/does-not-exist` answer `404`, and `/sitemap.xml` names no draft
 - [ ] `/robots.txt` allows `/`, disallows nothing (`/_next/` holds the CSS, scripts and fonts a
       crawler renders with), and points at the apex sitemap
 - [ ] `/work/does-not-exist` answers `404` and renders the site not-found page

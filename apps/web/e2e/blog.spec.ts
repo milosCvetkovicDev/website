@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { blogCopy } from '../src/data/pages/blog';
 import { hasPublishedPosts, posts, publishedPosts } from '../src/data/posts';
 import { formatContentDate } from '../src/lib/content-date';
 import { UNKNOWN_POST_ROUTE, postRoute } from './routes';
@@ -25,15 +26,27 @@ interface ServedItem {
   text: string;
 }
 
-/** `/blog` as served: its status, the markup, its `h2`s, and each post list with its items. */
+/**
+ * `/blog` as served: its status, its `h2`s, the text of its `main`, every link's `href` on the page,
+ * and each post list with its items.
+ */
 async function servedBlog(request: APIRequestContext, page: Page) {
   const response = await request.get('/blog');
   const markup = await response.text();
   const parsed = await page.evaluate(
-    (html): { lists: { tag: string; items: ServedItem[] }[]; subheadings: string[] } => {
+    (
+      html,
+    ): {
+      lists: { tag: string; items: ServedItem[] }[];
+      subheadings: string[];
+      mainText: string;
+      hrefs: (string | null)[];
+    } => {
       const doc = new DOMParser().parseFromString(html, 'text/html');
       return {
         subheadings: [...doc.body.querySelectorAll('main h2')].map((h2) => h2.textContent ?? ''),
+        mainText: doc.body.querySelector('main')?.textContent ?? '',
+        hrefs: [...doc.querySelectorAll('a')].map((link) => link.getAttribute('href')),
         lists: [...doc.body.querySelectorAll('[data-post-list]')].map((list) => ({
           tag: list.localName,
           items: [...list.children].map((item) => ({
@@ -66,7 +79,7 @@ async function servedBlog(request: APIRequestContext, page: Page) {
     },
     markup,
   );
-  return { status: response.status(), markup, ...parsed };
+  return { status: response.status(), ...parsed };
 }
 
 // AC 3, by data: the first published post replaces the placeholder with the list, and no code
@@ -76,7 +89,7 @@ if (hasPublishedPosts) {
     page,
     request,
   }) => {
-    const { status, markup, lists } = await servedBlog(request, page);
+    const { status, lists, subheadings, mainText, hrefs } = await servedBlog(request, page);
     expect(status).toBe(200);
     expect(
       lists.map(({ tag }) => tag),
@@ -100,20 +113,27 @@ if (hasPublishedPosts) {
       expect(item.text, `${slug}: its summary`).toContain(summary);
     });
 
+    // Whole hrefs, not substrings: a draft's slug may be the start of a published one's.
     for (const draft of posts.filter((post) => post.draft)) {
-      expect(markup, `${draft.slug} is a draft`).not.toContain(postRoute(draft.slug));
+      expect(hrefs, `${draft.slug} is a draft`).not.toContain(postRoute(draft.slug));
     }
-    // Anywhere in the response, the flight payload included: the placeholder is gone, not hidden.
-    expect(markup).not.toContain('Coming Soon');
+    // The placeholder is gone: its heading and its paragraphs, by the copy the page renders it from.
+    expect(subheadings).not.toContain(blogCopy.comingSoon.heading);
+    for (const paragraph of blogCopy.comingSoon.paragraphs) {
+      expect(mainText).not.toContain(paragraph);
+    }
   });
 } else {
   test('/blog keeps its Coming Soon placeholder and noindex while no post is published', async ({
     page,
     request,
   }) => {
-    const { status, lists, subheadings } = await servedBlog(request, page);
+    const { status, lists, subheadings, mainText } = await servedBlog(request, page);
     expect(status).toBe(200);
-    expect(subheadings).toEqual(['Coming Soon']);
+    expect(subheadings).toEqual([blogCopy.comingSoon.heading]);
+    for (const paragraph of blogCopy.comingSoon.paragraphs) {
+      expect(mainText).toContain(paragraph);
+    }
     expect(lists, 'no post list while nothing is published').toEqual([]);
 
     const robots = (await fetchHead(request, '/blog')).meta.get('robots') ?? [];

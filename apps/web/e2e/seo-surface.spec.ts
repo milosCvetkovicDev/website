@@ -218,14 +218,24 @@ test('the /blog robots meta contains noindex if and only if publishedPosts is em
   const robots = head.meta.get('robots') ?? [];
   expect(robots, '/blog should serve one robots tag').toHaveLength(1);
 
-  expect(
-    robots[0].includes('noindex'),
-    publishedPosts.length === 0
-      ? 'with no post published /blog is the Coming Soon placeholder, and an empty page offered ' +
-          'to search is the defect #48 fixed: the owner decision of 2026-09-11 keeps the nav ' +
-          'link and the placeholder, and makes it noindex'
-      : `with ${publishedPosts.length} post(s) published /blog lists them, and must be indexable`,
-  ).toBe(publishedPosts.length === 0);
+  // The directives as tokens, so `noindex` is never read as containing `index`.
+  const directives = robots[0].split(',').map((directive) => directive.trim().toLowerCase());
+  if (hasPublishedPosts) {
+    expect(
+      directives,
+      `with ${publishedPosts.length} post(s) published /blog lists them, and must be indexable`,
+    ).toEqual(expect.arrayContaining(['index', 'follow']));
+    expect(
+      directives.filter((directive) => ['noindex', 'nofollow', 'none'].includes(directive)),
+    ).toEqual([]);
+  } else {
+    expect(
+      directives,
+      'with no post published /blog is the Coming Soon placeholder, and an empty page offered to ' +
+        'search is the defect #48 fixed: the owner decision of 2026-09-11 keeps the nav link and ' +
+        'the placeholder, and makes it noindex',
+    ).toContain('noindex');
+  }
 });
 
 test('a 404 serves exactly one robots tag, and it says noindex', async ({ request }) => {
@@ -334,10 +344,13 @@ test('the sitemap and robots.txt are served and agree with the routes', async ({
 
   // Every published post, dated by the day what it says last changed (AC 8). None yet, so this loop
   // runs once the owner publishes the first; `sitemap.test.ts` proves it over the fixture posts.
+  // Keyed as `listed` is, trailing slash dropped; an entry with no <loc> has no key to be under.
   const lastmodOf = new Map(
-    [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].map(([, entry]) => {
+    [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].flatMap(([, entry]) => {
       const loc = entry.match(/<loc>([^<]+)<\/loc>/)?.[1];
-      return [loc && new URL(loc).pathname, entry.match(/<lastmod>([^<]+)<\/lastmod>/)?.[1]];
+      if (!loc) return [];
+      const path = new URL(loc).pathname.replace(/(.)\/$/, '$1');
+      return [[path, entry.match(/<lastmod>([^<]+)<\/lastmod>/)?.[1]] as const];
     }),
   );
   for (const { slug, updatedAt } of publishedPosts) {

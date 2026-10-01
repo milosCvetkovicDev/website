@@ -33,7 +33,9 @@ export default function BlogPage() {
  */
 function PostList({ posts }: { posts: readonly PublishedPost[] }) {
   return (
-    <ol data-post-list className="space-y-6">
+    // `role="list"` restates the element's own role because Safari drops list semantics from a list
+    // styled without markers, and VoiceOver would then announce neither the list nor its count.
+    <ol role="list" data-post-list className="space-y-6">
       {posts.map((post) => {
         // Checked as the post page checks it: a date that does not format fails the prerender.
         const { published } = formatContentDates(
@@ -49,7 +51,7 @@ function PostList({ posts }: { posts: readonly PublishedPost[] }) {
             <h2 className="mb-2 text-xl font-semibold wrap-break-word md:text-2xl">
               <Link
                 href={`/blog/${post.slug}`}
-                className="transition-colors hover:text-[var(--accent-text)]"
+                className="transition-colors hover:text-[var(--accent-text)] focus-visible:text-[var(--accent-text)]"
               >
                 {post.title}
               </Link>

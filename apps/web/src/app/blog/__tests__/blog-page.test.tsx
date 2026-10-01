@@ -57,11 +57,16 @@ describe('/blog with posts published', () => {
     expect(list.tagName, 'an ordered list: the order, newest first, is part of what it says').toBe(
       'OL',
     );
+    // Safari drops list semantics from a list styled without markers, so the role is stated on the
+    // element: jsdom would report `list` from the tag alone, which is why the attribute is pinned.
+    expect(list).toHaveAttribute('role', 'list');
+    expect(screen.getByRole('list')).toBe(list);
 
     // The fixtures are in data order, oldest first, with the draft between the two.
     const expected = [hostileTitlePost, everyBlockPost];
     const items = [...list.children];
     expect(items.map((item) => item.tagName)).toEqual(expected.map(() => 'LI'));
+    expect(within(list as HTMLElement).getAllByRole('listitem')).toEqual(items);
 
     items.forEach((item, index) => {
       const post = expected[index];
@@ -82,6 +87,24 @@ describe('/blog with posts published', () => {
 
       expect(within(scope).getByText(post.summary, { selector: 'p' })).toBeInTheDocument();
     });
+  });
+
+  it('gives keyboard focus the colour a pointer hover gives each title link', async () => {
+    // A hover style with no focus twin leaves keyboard users without the affordance, as on /work.
+    const { default: BlogPage } = await pageOver(fixturePosts);
+    const { container } = render(<BlogPage />);
+    const links = [...container.querySelectorAll('[data-post-list] a')];
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      const classes = [...link.classList];
+      const hovers = classes.filter((token) => token.startsWith('hover:'));
+      expect(hovers).not.toEqual([]);
+      for (const hover of hovers) {
+        expect(classes, `${hover} needs a focus-visible twin`).toContain(
+          `focus-visible:${hover.slice('hover:'.length)}`,
+        );
+      }
+    }
   });
 
   it('shows no draft, and no placeholder', async () => {

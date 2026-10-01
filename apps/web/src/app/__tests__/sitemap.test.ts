@@ -138,19 +138,41 @@ describe('sitemap()', () => {
   });
 });
 
-/** `sitemap()`, with `@/data/posts` built over `list` in place of the real, still empty, posts. */
-async function sitemapOver(list: readonly Post[]) {
+/**
+ * /blog's own copy date in the block below, in place of the live one in `static-routes.ts`: the
+ * fixtures' days are fixed, and the owner moves the live date whenever /blog's copy changes, so
+ * these tests compare the fixtures with this day rather than with whatever the live date is.
+ */
+const BLOG_COPY_DAY = '2026-01-27';
+
+/**
+ * `sitemap()`, with `@/data/posts` built over `list` in place of the real, still empty, posts, and
+ * /blog's own date fixed at `blogCopyDay`.
+ */
+async function sitemapOver(list: readonly Post[], blogCopyDay = BLOG_COPY_DAY) {
   vi.resetModules();
   vi.doMock('@/data/posts', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@/data/posts')>();
     return { ...actual, posts: list, ...actual.buildPostIndex(list) };
   });
+  vi.doMock('@/data/static-routes', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@/data/static-routes')>();
+    return {
+      ...actual,
+      STATIC_ROUTE_UPDATED: { ...actual.STATIC_ROUTE_UPDATED, '/blog': blogCopyDay },
+    };
+  });
   return (await import('../sitemap')).default;
 }
+
+/** Each URL of `entries` with its lastmod. */
+const lastmods = (entries: ReturnType<typeof sitemap>) =>
+  new Map(entries.map(({ url, lastModified }) => [url, lastModified]));
 
 describe('sitemap() once a post is published (#61, over the fixture posts)', () => {
   afterEach(() => {
     vi.doUnmock('@/data/posts');
+    vi.doUnmock('@/data/static-routes');
     vi.resetModules();
   });
 
@@ -162,44 +184,35 @@ describe('sitemap() once a post is published (#61, over the fixture posts)', () 
     expect(urls.filter((url) => url.includes(draftPost.slug))).toEqual([]);
   });
 
-  it('dates each post by its updatedAt, and /blog by the newest of them', async () => {
-    const byUrl = new Map(
-      (await sitemapOver(fixturePosts))().map(({ url, lastModified }) => [url, lastModified]),
-    );
+  it('dates each post by its updatedAt, and /blog by the newest publication', async () => {
+    const byUrl = lastmods((await sitemapOver(fixturePosts))());
     for (const { slug, updatedAt } of [everyBlockPost, hostileTitlePost]) {
       expect(byUrl.get(`${BASE}/blog/${slug}`), slug).toBe(updatedAt);
     }
-    // /blog shows each post's title, summary and day, so it last changed when the newest of them
-    // did; that is later than its own copy's date in static-routes.ts, which it never precedes.
-    const newest = [everyBlockPost.updatedAt, hostileTitlePost.updatedAt].sort().at(-1);
-    expect(newest! > STATIC_ROUTE_UPDATED['/blog']).toBe(true);
+    // /blog shows each post's title, summary and publication day, so a new post is what changes
+    // it; both fixtures were published after /blog's own copy date.
+    const newest = [everyBlockPost.publishedAt, hostileTitlePost.publishedAt].sort().at(-1);
+    expect(newest! > BLOG_COPY_DAY).toBe(true);
     expect(byUrl.get(`${BASE}/blog`)).toBe(newest);
   });
 
-  it("dates /blog by an older post's later update, not by the newest post's day", async () => {
-    // Newest first is by publication day, so the post at the top of the list need not be the one
-    // updated last: an update to an older post's summary changes /blog all the same.
+  it("leaves /blog's date alone when a post's body is updated", async () => {
+    // A post's updatedAt moves with its body, which /blog does not show; the post's own entry
+    // carries that change. A changed title or summary bumps /blog's own date instead.
     const revised = { ...everyBlockPost, updatedAt: '2026-09-20' };
-    expect(revised.updatedAt > hostileTitlePost.updatedAt).toBe(true);
-    const byUrl = new Map(
-      (await sitemapOver([revised, hostileTitlePost]))().map(({ url, lastModified }) => [
-        url,
-        lastModified,
-      ]),
-    );
-    expect(byUrl.get(`${BASE}/blog`)).toBe('2026-09-20');
+    expect(revised.updatedAt > hostileTitlePost.publishedAt).toBe(true);
+    const byUrl = lastmods((await sitemapOver([revised, hostileTitlePost]))());
+    expect(byUrl.get(`${BASE}/blog`)).toBe(hostileTitlePost.publishedAt);
+    expect(byUrl.get(`${BASE}/blog/${revised.slug}`)).toBe('2026-09-20');
   });
 
-  it("dates /blog by its own copy when that changed after every post's last update", async () => {
-    // The page's heading and intro are its own copy, dated in static-routes.ts: when the owner
-    // rewrites them after the last post update, that is the day /blog last changed.
-    const early = { ...hostileTitlePost, publishedAt: '2026-01-02', updatedAt: '2026-01-03' };
-    expect(early.updatedAt < STATIC_ROUTE_UPDATED['/blog']).toBe(true);
-    const byUrl = new Map(
-      (await sitemapOver([early]))().map(({ url, lastModified }) => [url, lastModified]),
-    );
-    expect(byUrl.get(`${BASE}/blog`)).toBe(STATIC_ROUTE_UPDATED['/blog']);
-    expect(byUrl.get(`${BASE}/blog/${early.slug}`)).toBe('2026-01-03');
+  it("dates /blog by its own copy when that changed after every post's publication", async () => {
+    // The page's heading and intro, and the titles and summaries it lists, are dated in
+    // static-routes.ts: when the owner changes one after the last publication, that is the day
+    // /blog last changed.
+    const byUrl = lastmods((await sitemapOver(fixturePosts, '2026-09-25'))());
+    expect(byUrl.get(`${BASE}/blog`)).toBe('2026-09-25');
+    expect(byUrl.get(`${BASE}/blog/${hostileTitlePost.slug}`)).toBe(hostileTitlePost.updatedAt);
   });
 
   it('lists nothing of the blog while the only post is a draft', async () => {

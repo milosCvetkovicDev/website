@@ -3,13 +3,18 @@ import { caseStudies } from '@/data/case-studies';
 import { hasPublishedPosts, publishedPosts } from '@/data/posts';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
-/** The later of `YYYY-MM-DD` days, which compare as strings. */
-const latest = (days: readonly string[]): string => days.reduce((a, b) => (b > a ? b : a));
+/**
+ * The latest of `YYYY-MM-DD` days, which compare as strings. `posts.test.ts` holds every published
+ * post's days to that shape and `sitemap.test.ts` every lastmod; the first day is required, so the
+ * reduce always has a seed.
+ */
+const latest = (first: string, ...rest: readonly string[]): string =>
+  rest.reduce((a, b) => (b > a ? b : a), first);
 
 // Every `lastmod` is a content date: `STATIC_ROUTE_UPDATED` for the static routes, each case
-// study's and each post's `updatedAt`, and for /blog the latest of its own date and its posts'. It
-// used to be the build clock on every entry, which told crawlers the whole site changed on every
-// deploy, and they learn to ignore a field that says that.
+// study's and each post's `updatedAt`, and for /blog the latest of its own date and its posts'
+// `publishedAt`. It used to be the build clock on every entry, which told crawlers the whole site
+// changed on every deploy, and they learn to ignore a field that says that.
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
 
@@ -40,15 +45,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
     // /blog only once a post is published (`hasPublishedPosts`, ADR 0028, #61). Until then it is a
     // noindex Coming Soon placeholder (`blog/page.tsx`), and a sitemap offering it would contradict
-    // that. It lists the posts, so it last changed on the latest of its own date and their updates.
+    // that. It lists each post's title, summary and publication day, so a new post changes it, and
+    // a post's `updatedAt` does not: that moves with the post's body, which /blog does not show. A
+    // change to a listed title or summary, or an unpublished post, bumps /blog's own date instead
+    // (`static-routes.ts`).
     ...(hasPublishedPosts
       ? [
           {
             url: `${baseUrl}/blog`,
-            lastModified: latest([
+            lastModified: latest(
               STATIC_ROUTE_UPDATED['/blog'],
-              ...publishedPosts.map((post) => post.updatedAt),
-            ]),
+              ...publishedPosts.map((post) => post.publishedAt),
+            ),
             changeFrequency: 'weekly' as const,
             priority: 0.6,
           },

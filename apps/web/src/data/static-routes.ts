@@ -6,9 +6,11 @@ import { experienceFigureSince } from './profile';
  * learns to ignore the field. Bump a route's date by hand in the commit that changes what it says.
  * A case study's dates live on its entry in `case-studies.ts`, and a post's in `posts.ts`.
  *
- * /blog's date covers its own copy only. Once a post is published, /blog lists the posts and its
- * `lastmod` comes from them too: the latest of this date and every published post's `updatedAt`
- * (`sitemap.ts`, #61). Publishing or updating a post therefore needs no bump here.
+ * /blog's date covers what /blog itself says. Once a post is published, /blog lists each post's
+ * title, summary and publication day, and its `lastmod` is the latest of this date and every
+ * published post's `publishedAt` (`sitemap.ts`, #61). Publishing a post, or updating only its body,
+ * needs no bump here. Changing a published post's title or summary, unpublishing a post or removing
+ * one changes the list without a new `publishedAt`: bump /blog's date in that commit.
  *
  * From git, the last commit to change what each route visibly says: `/` 2026-09-30 (#47: the story's
  * progress dots and readout name each section by its phase title), /work 2026-09-25 (the
