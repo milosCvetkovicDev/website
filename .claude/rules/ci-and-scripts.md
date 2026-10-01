@@ -135,8 +135,8 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   when an allowlisted route turns out static or absent, when a prerendered path has no body file,
   and when the build has a `proxy.ts` or middleware, a Server Action or a Pages Router entry (the
   four `server/*-manifest.json` files the App Router manifests do not cover). It also fails a build
-  that lacks a route handler in its `REQUIRED_ROUTES` (the case-study JSON since #60; #59's twins
-  are not listed yet), builds one as a page, allowlists one as a function, or where a dynamic one
+  that lacks a route handler in its `REQUIRED_ROUTES` (the case-study JSON since #60, the Atom feed
+  since #61; #59's twins are not listed yet), builds one as a page, allowlists one as a function, or where a dynamic one
   prerendered no path or other params than the page above it (`/work/[slug]`). A manifest field it
   decides on that is missing or holds an unknown value, or a prerendered path it cannot attribute to
   a route, exits 2 rather than passing. The allowlist is `/mcp` alone, the MCP server (#62), whose

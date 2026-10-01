@@ -96,7 +96,7 @@ because a `POST` handler cannot be prerendered, and `pnpm check:build-output` (a
 is dynamic unless it exports `dynamic = 'force-static'`, and without it builds as a server function,
 as a handler that exports any other method does even with it. The same check fails a `proxy.ts` and
 any `'use server'` action, and a build that lacks a route in its `REQUIRED_ROUTES` (the JSON
-handlers above) or prerendered no path for one, or other slugs for `/work/[slug]/index.json` than
+handlers and the feed above) or prerendered no path for one, or other slugs for `/work/[slug]/index.json` than
 for the page. `sitemap.ts`, `robots.ts`, `layout.tsx`, `feed.xml/route.ts`,
 `components/json-ld.tsx` and `lib/serialise.ts` each read `NEXT_PUBLIC_SITE_URL`, falling back to
 `https://miloscvetkovic.dev`. There is no middleware.

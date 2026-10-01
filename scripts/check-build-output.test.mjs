@@ -42,6 +42,7 @@ const APP_ROUTES = {
   '/robots.txt/route': '/robots.txt',
   '/opengraph-image/route': '/opengraph-image',
   '/case-studies.json/route': '/case-studies.json',
+  '/feed.xml/route': '/feed.xml',
   '/work/[slug]/page': '/work/[slug]',
   '/work/[slug]/og-image.png/route': '/work/[slug]/og-image.png',
   '/work/[slug]/index.json/route': '/work/[slug]/index.json',
@@ -99,6 +100,7 @@ const cleanPrerender = () => ({
     '/robots.txt': prerendered('/robots.txt'),
     '/opengraph-image': prerendered('/opengraph-image'),
     '/case-studies.json': prerendered('/case-studies.json'),
+    '/feed.xml': prerendered('/feed.xml'),
     '/work/a': prerendered('/work/[slug]'),
     '/work/b': prerendered('/work/[slug]'),
     '/work/a/og-image.png': prerendered('/work/[slug]/og-image.png'),
@@ -121,6 +123,7 @@ const CLEAN_BODIES = [
   'robots.txt.body',
   'opengraph-image.body',
   'case-studies.json.body',
+  'feed.xml.body',
   'work/a.html',
   'work/b.html',
   'work/a/og-image.png.body',
@@ -168,8 +171,12 @@ function without(route) {
     if ((entry.srcRoute ?? path) === route) delete prerender.routes[path];
   }
   delete prerender.dynamicRoutes[route];
-  const gone = route === '/case-studies.json' ? /^case-studies\.json/ : /\/index\.json\.body$/;
-  return { appRoutes, prerender, bodies: CLEAN_BODIES.filter((b) => !gone.test(b)) };
+  // A static handler's one body is its path plus `.body`; the dynamic one's are every slug's.
+  const gone = (/** @type {string} */ body) =>
+    route === '/work/[slug]/index.json'
+      ? body.endsWith('/index.json.body')
+      : body === `${route.slice(1)}.body`;
+  return { appRoutes, prerender, bodies: CLEAN_BODIES.filter((b) => !gone(b)) };
 }
 
 describe('bodyFile', () => {
@@ -365,7 +372,7 @@ describe('collectProblems', () => {
     assert.match(problems[0], /^\/case-studies\.json: .*function.*force-static/);
   });
 
-  for (const route of ['/case-studies.json', '/work/[slug]/index.json']) {
+  for (const route of ['/case-studies.json', '/feed.xml', '/work/[slug]/index.json']) {
     it(`fails a build without the required ${route}, naming it`, () => {
       const { problems } = check(without(route));
       assert.equal(problems.length, 1);
@@ -609,32 +616,30 @@ describe('collectProblems', () => {
 });
 
 describe('the Atom feed (#61)', () => {
-  // `app/feed.xml/route.ts` as `next build` writes it: a static handler whose body is
-  // `server/app/feed.xml.body`, prerendered even with no post published (an empty feed).
-  const appRoutes = { ...APP_ROUTES, '/feed.xml/route': '/feed.xml' };
-  const withFeed = () => {
-    const prerender = cleanPrerender();
-    prerender.routes['/feed.xml'] = prerendered('/feed.xml');
-    return prerender;
-  };
-  const bodies = [...CLEAN_BODIES, 'feed.xml.body'];
+  // `app/feed.xml/route.ts` as `next build` writes it, part of the clean tree above: a static
+  // handler whose body is `server/app/feed.xml.body`, prerendered even with no post published (an
+  // empty feed). It is in REQUIRED_ROUTES, so a build without it fails with the other required
+  // routes in `collectProblems`.
+  const withoutBody = CLEAN_BODIES.filter((b) => b !== 'feed.xml.body');
 
   it('passes the feed prerendered with its body', () => {
-    const result = check({ appRoutes, prerender: withFeed(), bodies });
-    assert.deepEqual(result.problems, []);
-    assert.equal(result.bodies, bodies.length);
+    assert.ok(CLEAN_BODIES.includes('feed.xml.body'));
+    assert.deepEqual(check().problems, []);
   });
 
   it('fails the feed without its body, naming server/app/feed.xml.body', () => {
-    const { problems } = check({ appRoutes, prerender: withFeed(), bodies: CLEAN_BODIES });
+    const { problems } = check({ bodies: withoutBody });
     assert.equal(problems.length, 1);
     assert.match(problems[0], /^\/feed\.xml \(\/feed\.xml\): .*server\/app\/feed\.xml\.body/);
   });
 
-  it('fails the feed built without force-static, as a function', () => {
+  it('fails the feed built without force-static once, as a function', () => {
     // The handler without `export const dynamic = 'force-static'`: in the app manifest, never
-    // prerendered, so no body either. The feed must not be on the allowlist (#62 adds only /mcp).
-    const { problems } = check({ appRoutes, bodies: CLEAN_BODIES });
+    // prerendered, so no body either. The function finding names it, and being required adds no
+    // second one. The feed must not be on the allowlist (#62 adds only /mcp).
+    const prerender = cleanPrerender();
+    delete prerender.routes['/feed.xml'];
+    const { problems } = check({ prerender, bodies: withoutBody });
     assert.equal(problems.length, 1);
     assert.match(problems[0], /^\/feed\.xml: .*function.*force-static/);
     assert.equal(ALLOWED_FUNCTIONS.includes('/feed.xml'), false);
@@ -727,8 +732,11 @@ describe('paramsSibling', () => {
 });
 
 describe('REQUIRED_ROUTES', () => {
-  it('names the case-study JSON #60 serves, and no function', () => {
-    assert.deepEqual([...REQUIRED_ROUTES], ['/case-studies.json', '/work/[slug]/index.json']);
+  it('names the case-study JSON #60 serves and the feed #61 serves, and no function', () => {
+    assert.deepEqual(
+      [...REQUIRED_ROUTES],
+      ['/case-studies.json', '/feed.xml', '/work/[slug]/index.json'],
+    );
     assert.deepEqual(
       REQUIRED_ROUTES.filter((route) => ALLOWED_FUNCTIONS.includes(route)),
       [],
@@ -810,7 +818,7 @@ describe('the command', () => {
     withTree({}, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, /10 routes, 12 prerendered bodies, server functions: \/mcp /);
+      assert.match(result.stdout, /11 routes, 13 prerendered bodies, server functions: \/mcp /);
       assert.match(result.stdout, /\(BUILD_ID test-build-id, written \d{4}-\d\d-\d\dT[\d:.]+Z\)/);
     });
   });
