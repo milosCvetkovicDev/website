@@ -290,6 +290,30 @@ main {
   animation-play-state: paused;
 }
 
+/* Nor should the story's endless animations (ADR 0009 rule 4). useStoryVisibility
+   (src/hooks/use-story-visibility.ts) marks the hero and each phase section data-story-visible
+   'false' while no pixel of it is in the viewport, and every endless animation inside one waits
+   where it is until the section returns. The list names the endless animations the story draws:
+   text-free decoration, and two spinning status glyphs. Finite ones, such as the healing log's
+   .animate-fade-in, are left alone: paused on their first frame they would hold a new row at
+   opacity 0. An attribute and a class, the selector outranks this file's unlayered animation
+   classes by specificity wherever they are declared, and Tailwind's layered utilities by being
+   unlayered. */
+[data-story-visible='false']
+  :is(
+    .animate-pulse,
+    .animate-spin,
+    .animate-bounce,
+    .animate-blink,
+    .animate-shimmer,
+    .animate-hero-breathe,
+    .animate-hero-scroll-bounce,
+    .animate-hero-status-pulse,
+    .animate-caret-pulse
+  ) {
+  animation-play-state: paused;
+}
+
 /* Hover lift effect */
 .hover-lift {
   transition:
@@ -363,6 +387,22 @@ html:has(dialog:modal) {
   50% {
     opacity: 0.4;
   }
+}
+
+/* Classes rather than inline `animation` shorthands: an inline shorthand resets
+   animation-play-state to running with inline precedence, so no stylesheet rule could pause it. */
+.animate-hero-breathe {
+  animation: hero-breathe 6s ease-in-out infinite;
+}
+.animate-hero-scroll-bounce {
+  animation: hero-scroll-bounce 1.5s ease-in-out infinite;
+}
+.animate-hero-status-pulse {
+  animation: hero-status-pulse 2s ease-in-out infinite;
+}
+/* The Execution terminal's caret: Tailwind's pulse keyframes, at twice animate-pulse's pace. */
+.animate-caret-pulse {
+  animation: pulse 1s ease-in-out infinite;
 }
 
 /* Reduced motion support */

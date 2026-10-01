@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { useStoryVisibility } from '@/hooks/use-story-visibility';
 import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const healingTimeline = [
@@ -27,6 +28,8 @@ const healingTimeline = [
 
 export function LoopPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  // Pauses the section's endless CSS animations while it is out of view (globals.css).
+  useStoryVisibility(sectionRef);
   const titleId = useId();
   const dashboardRef = useRef<HTMLDivElement>(null);
   const alertRef = useRef<HTMLDivElement>(null);

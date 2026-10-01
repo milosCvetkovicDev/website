@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { useStoryVisibility } from '@/hooks/use-story-visibility';
 import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const techChoices = [
@@ -45,6 +46,8 @@ const synergies = [
 
 export function StrategyPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  // Pauses the section's endless CSS animations while it is out of view (globals.css).
+  useStoryVisibility(sectionRef);
   const titleId = useId();
   const techTreeRef = useRef<HTMLDivElement>(null);
   const synergiesRef = useRef<HTMLDivElement>(null);
