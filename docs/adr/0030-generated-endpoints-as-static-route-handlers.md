@@ -112,12 +112,16 @@ down.
   handler sets its own `Vary` (`rsc` and the three `next-router-*` request headers) with
   `setHeader` after the `headers()` entries have been applied, in
   `next/dist/build/templates/app-page-runtime.js` of 16.3.6, so on a page the `Accept` entry is
-  replaced. Every Markdown response, negotiated or requested by its path, carries Next's `Vary`
-  and `Accept` both (measured 2026-10-01). A cache that honours `Vary`, as RFC 9111 requires, can
-  therefore never hand the twin to a request that did not ask for it, while it may hand the page
-  to an agent that asked for Markdown, which is what that agent got before this record. Issue #59 cites Vercel's markdown-access
-  documentation (last updated 2026-09-03) for this rewrite and for its CDN keying the cache on
-  `Accept`; how Vercel's edge answers is not measured here, and is a post-deploy check.
+  replaced. Every negotiated Markdown answer carries Next's `Vary` and `Accept` both, and a twin
+  requested by its own URL, which serves one representation, carries Next's `Vary` only (measured
+  2026-10-01). A cache that honours `Vary`, as RFC 9111 requires, can therefore never hand the
+  twin to a request for the page that did not ask for it, while it may hand the page to an agent
+  that asked for Markdown, which is what that agent got before this record. Issue #59 cites
+  Vercel's markdown-access documentation (last updated 2026-09-03) for this rewrite and for its CDN
+  keying the cache on `Accept`. `next start` has no shared cache to measure that on, so the live
+  check of [ADR 0026](0026-vercel-web-analytics.md) measures it on the apex after every production
+  deployment and daily: `apps/web/e2e-live/markdown-negotiation.spec.ts` asks each negotiating
+  route for Markdown and then as a browser, and the other way round, without busting the cache.
 - **`next.config.ts` now imports the data modules** (`static-routes.ts`, `case-studies.ts`) and
   `lib/pathname.ts`. Next's config loader compiles every module it requires with one set of
   options and no file name, so an `@/` import becomes `./src/…`, a path that is right only beside

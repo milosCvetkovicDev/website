@@ -1,7 +1,8 @@
 import { get as httpGet } from 'node:http';
-import { expect, test, type APIRequestContext, type APIResponse } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
 import { MARKDOWN_TWINS } from './endpoints';
 import { NOT_FOUND_ROUTE, caseStudyRoute } from './routes';
+import { ASKS_FOR_MARKDOWN, BROWSER_ACCEPT, MARKDOWN, varyOf } from './support/negotiation';
 
 /**
  * Content negotiation on `Accept` (#59, AC 15; ADR 0030): the canonical URL of every page with a
@@ -16,7 +17,8 @@ import { NOT_FOUND_ROUTE, caseStudyRoute } from './routes';
  * representation and does not vary. On an HTML page Next writes its own `Vary` after `headers()`
  * has run and the `Accept` entry does not survive there (measured under `next start`, 2026-10-01,
  * and recorded in ADR 0030); what this spec holds for the page is that Next's own `Vary` is left
- * intact, `rsc` standing for it.
+ * intact, `rsc` standing for it. Whether the CDN in front of the deployment keys its cache on
+ * `Accept` only the deployed site can show: `e2e-live/markdown-negotiation.spec.ts` checks that.
  *
  * The routes come from `endpoints.ts`, so a new static route or case study is checked here without
  * touching this file.
@@ -24,32 +26,12 @@ import { NOT_FOUND_ROUTE, caseStudyRoute } from './routes';
 
 test.describe.configure({ timeout: 60_000 });
 
-/** RFC 7763's type with the charset it requires, as `markdownResponse()` writes it. */
-const MARKDOWN = 'text/markdown; charset=utf-8';
-
-/** What Claude Code and the other clients acceptmarkdown.com lists send. */
-const ASKS_FOR_MARKDOWN = 'text/markdown, */*';
-
 /**
  * Chromium's `Accept` for a navigation, a bare `text/html`, the wildcard range (what Playwright's
  * request context sends when a call names none) and an explicit refusal of Markdown, which
  * RFC 9110 spells as a weight of zero.
  */
-const PAGE_ACCEPTS = [
-  'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-  'text/html',
-  '*/*',
-  'text/markdown;q=0, text/html',
-];
-
-/** Every token of every `Vary` header on a response, lower-cased: the header may come twice. */
-const varyOf = (response: APIResponse): string[] =>
-  response
-    .headersArray()
-    .filter(({ name }) => name.toLowerCase() === 'vary')
-    .flatMap(({ value }) => value.split(','))
-    .map((token) => token.trim().toLowerCase())
-    .filter(Boolean);
+const PAGE_ACCEPTS = [BROWSER_ACCEPT, 'text/html', '*/*', 'text/markdown;q=0, text/html'];
 
 const get = (request: APIRequestContext, path: string, accept?: string) =>
   request.get(path, accept === undefined ? undefined : { headers: { accept } });

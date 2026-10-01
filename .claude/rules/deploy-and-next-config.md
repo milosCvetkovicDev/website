@@ -47,7 +47,10 @@ both; on an HTML page Next's App Router handler sets its `Vary` after `headers()
 absent there under `next start`, and ADR 0030 says what that leaves open.
 `src/test/next-config.test.ts` pins the rules through `unstable_getResponseFromNextConfig` and
 fails when the negotiated routes and the twin handlers under `src/app` differ;
-`e2e/markdown-negotiation.spec.ts` checks them on the wire.
+`e2e/markdown-negotiation.spec.ts` checks them on the wire, and
+`e2e-live/markdown-negotiation.spec.ts`, run by the live check after every production deployment
+and daily, checks that Vercel's CDN keys its cache on `Accept` (`.github/workflows/live-check.yml`,
+`ci-and-scripts.md`).
 
 ## Gotchas
 

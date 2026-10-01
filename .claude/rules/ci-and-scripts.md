@@ -160,11 +160,15 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   `playwright.config.ts`. It targets the apex because a deployment's own URL is behind Vercel
   Authentication, so it can test the previous deployment when the alias has not moved yet; the
   daily run covers that race and changes that reach the apex without a status (rollback,
-  promotion). It asserts the tracker tag and its script's 200, a console without errors or
-  warnings, no `Set-Cookie`, cookie or storage entry, on desktop Chromium only; never a page-view
-  beacon or the intake's CSP `connect-src`: the tracker sends nothing when `navigator.webdriver`
-  is true. A failed deployment or scheduled run opens the issue "Live check failed on the
-  production site", or comments on the open one; the job holds `issues: write` for that step alone.
+  promotion). `analytics.spec.ts` asserts the tracker tag and its script's 200, a console without
+  errors or warnings, no `Set-Cookie`, cookie or storage entry, on desktop Chromium only; never a
+  page-view beacon or the intake's CSP `connect-src`: the tracker sends nothing when
+  `navigator.webdriver` is true. `markdown-negotiation.spec.ts` checks that the CDN keys on
+  `Accept` (ADR 0030): on every route with a Markdown twin, a Markdown request then a browser's,
+  and the reverse, with no cache-busting query, the browser must get `text/html` and the agent
+  `text/markdown; charset=utf-8` with `accept` in `Vary`. A failed deployment or scheduled run
+  opens the issue "Live check failed on the production site", or comments on the open one; the job
+  holds `issues: write` for that step alone.
   Locally: `pnpm --filter web exec playwright test --config playwright.live.config.ts`, with
   `LIVE_URL` for another target.
 - `.github/workflows/flake-hunt.yml` hunts flaky e2e tests every night at 02:17 UTC and on manual

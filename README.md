@@ -79,7 +79,7 @@ CodeQL default setup is on as well. GitHub manages it outside `.github/workflows
 
 `.github/workflows/flake-hunt.yml` is not a check: every night it runs the e2e suite 30 times with `scripts/flake-hunt.sh` and opens an issue for flaky tests no open `flake-hunt` issue tracks yet.
 
-`.github/workflows/live-check.yml` is not a check either: after each production deployment and every morning it loads every page of the live site with `apps/web/playwright.live.config.ts`, fails when a page does not load the Web Analytics tracker, logs an error or warning to the console, or stores a cookie or a storage entry, and opens an issue when it fails. It cannot see a page view reach Vercel: the tracker sends none to an automated browser.
+`.github/workflows/live-check.yml` is not a check either: after each production deployment and every morning it loads every page of the live site with `apps/web/playwright.live.config.ts`, fails when a page does not load the Web Analytics tracker, logs an error or warning to the console, or stores a cookie or a storage entry, or when a page's URL, asked in both orders, serves a browser Markdown or an agent that asks for Markdown the HTML page, and opens an issue when it fails. It cannot see a page view reach Vercel: the tracker sends none to an automated browser.
 
 Useful extras: `pnpm lint:fix`, `pnpm format`, `pnpm clean`.
 
