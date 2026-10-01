@@ -294,7 +294,7 @@ type FinderWindow = { __findAnimatedText: (text: string) => HTMLElement | null }
 
 /**
  * Installs `__findAnimatedText(text)` in the page, which returns the `AnimatedText` root showing
- * `text`, or null while there is none: the only spans in the story that carry `cursor-pointer`,
+ * `text`, or null while there is none: the only spans in the story that carry `data-animation`,
  * matched on their text or on the visually hidden copy some variants carry. Two roots showing the
  * same text throw, because every step after it would then pick one of them silently. An init
  * script, like the probe, because the site's CSP refuses code built from a string in the page. Must
@@ -304,7 +304,7 @@ async function installAnimatedTextFinder(page: Page) {
   await page.addInitScript(() => {
     (window as unknown as Record<string, unknown>).__findAnimatedText = (text: string) => {
       const roots = [
-        ...document.querySelectorAll<HTMLElement>('main section span[class*="cursor-pointer"]'),
+        ...document.querySelectorAll<HTMLElement>('main section span[data-animation]'),
       ].filter(
         (el) =>
           el.textContent?.trim() === text ||
@@ -363,9 +363,18 @@ async function openAnimatedText(
       const root = (window as unknown as FinderWindow).__findAnimatedText(wanted);
       if (!root) return false;
       const section = root.closest('section');
-      const headline = section?.querySelector('h2');
+      // The closing headline, the last heading that is not the section's title: the title is the
+      // header row the section is labelled by (#47, hero-10), which no entrance fades, so waiting on
+      // it would be over at once. Excluded by reference, so a section that lost its closing
+      // headline throws below rather than falling back to the title.
+      const titleId = section?.getAttribute('aria-labelledby');
+      const headline = [...(section?.querySelectorAll('h2, h3') ?? [])]
+        .filter((heading) => heading.id !== titleId)
+        .at(-1);
       // Without it the wait below would be over at once, mid-entrance.
-      if (!headline) throw new Error(`no h2 in the section holding "${wanted}"`);
+      if (!titleId || !headline) {
+        throw new Error(`no closing headline beside the title in the section holding "${wanted}"`);
+      }
       const opaque = (from: Element) => {
         for (let el: Element | null = from; el && el !== section; el = el.parentElement) {
           if (getComputedStyle(el).opacity !== '1') return false;

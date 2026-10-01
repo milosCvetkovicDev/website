@@ -110,10 +110,28 @@ function resizeViewportTo(height: number) {
   settle();
 }
 
-const mobileBar = () => document.querySelector<HTMLElement>('.will-change-\\[width\\]');
-const progressLine = () => document.querySelector<HTMLElement>('.will-change-\\[height\\]');
+/**
+ * The one element under `root` matching `selector`. It fails naming `what` when there is none or
+ * more than one, so a missing hook, or a second element carrying it, cannot leave an assertion
+ * reading the wrong node.
+ */
+function only(root: ParentNode, selector: string, what: string) {
+  const found = root.querySelectorAll<HTMLElement>(selector);
+  if (found.length !== 1) throw new Error(`expected one ${what}, found ${found.length}`);
+  return found[0];
+}
+
+const mobileBar = () => only(document, '[data-progress="bar"]', 'phone progress bar');
+const progressLine = () => only(document, '[data-progress="line"]', 'progress line');
 const dotButton = (label: string) => screen.getByRole('button', { name: `Go to ${label} section` });
-const dot = (label: string) => dotButton(label).firstElementChild;
+
+/**
+ * The dot inside a button: its direct child carrying `data-state`, which drives the fill. Direct
+ * children only, so a descendant with a `data-state` of its own cannot stand in for it.
+ */
+const dot = (label: string) =>
+  only(dotButton(label), ':scope > [data-state]', `dot in the ${label} button`);
+
 const currentDots = () =>
   screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-current'));
 
@@ -140,21 +158,21 @@ describe('SectionProgress', () => {
   it('advances the readout, dots and progress bars on scroll under reduced motion', () => {
     installMatchMedia(true);
     render(<Story />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     // A quarter of the way down: the bar follows the scroll fraction, the line the section index.
     scrollWindowTo(STORY_TOP + STORY_RANGE / 4);
 
-    expect(readout).toHaveTextContent('[02/07] DISCOVER');
-    expect(dot('DISCOVER')).toHaveClass('bg-[var(--accent)]');
-    expect(dot('PLAN')).toHaveClass('bg-[var(--border)]');
-    expect(mobileBar()?.style.width).toBe('25%');
-    expect(progressLine()?.style.height).toBe(`${(1 / 6) * 100}%`);
+    expect(readout).toHaveTextContent('[02/07] DISCOVERY');
+    expect(dot('DISCOVERY')).toHaveAttribute('data-state', 'lit');
+    expect(dot('STRATEGY')).toHaveAttribute('data-state', 'unlit');
+    expect(mobileBar().style.width).toBe('25%');
+    expect(progressLine().style.height).toBe(`${(1 / 6) * 100}%`);
 
     scrollWindowTo(STORY_TOP + STORY_RANGE / 2);
 
-    expect(readout).toHaveTextContent('[04/07] BUILD');
-    expect(mobileBar()?.style.width).toBe('50%');
+    expect(readout).toHaveTextContent('[04/07] EXECUTION');
+    expect(mobileBar().style.width).toBe('50%');
   });
 
   it('measures the restored scroll position on mount, before any scroll event', () => {
@@ -164,23 +182,34 @@ describe('SectionProgress', () => {
     render(<Story />);
     settle();
 
-    expect(screen.getByText('[04/07] BUILD')).toBeInTheDocument();
-    expect(dot('BUILD')).toHaveClass('bg-[var(--accent)]');
+    expect(screen.getByText('[04/07] EXECUTION')).toBeInTheDocument();
+    const [discoveryDot, executionDot, gauntletDot] = [
+      'DISCOVERY',
+      'EXECUTION',
+      'THE GAUNTLET',
+    ].map(dot);
+    expect(executionDot).toHaveAttribute('data-state', 'lit');
     // The dot after it stays unlit: reaching a section is not the same as lighting them all.
-    expect(dot('TEST')).toHaveClass('bg-[var(--border)]');
-    expect(mobileBar()?.style.width).toBe('50%');
-    expect(progressLine()?.style.height).toBe('50%');
+    expect(gauntletDot).toHaveAttribute('data-state', 'unlit');
+    // The attribute drives the fill, through a `data-[state=lit]` variant, so a lit dot and an
+    // unlit one that are both off the current section carry the same classes: the fill is not
+    // chosen in JavaScript. That the variant paints it is pinned in a browser, where the CSS runs
+    // (`e2e/section-progress.spec.ts`).
+    expect(discoveryDot).toHaveAttribute('data-state', 'lit');
+    expect(discoveryDot.className).toBe(gauntletDot.className);
+    expect(mobileBar().style.width).toBe('50%');
+    expect(progressLine().style.height).toBe('50%');
   });
 
   it('applies the last update of a scroll stream that ends inside the throttle window', () => {
     render(<Story />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
     settle();
 
     // One update, which opens a throttle window the next one has to wait out.
     dispatchScrollTo(STORY_TOP + STORY_RANGE / 4);
     runFrame();
-    expect(readout).toHaveTextContent('[02/07] DISCOVER');
+    expect(readout).toHaveTextContent('[02/07] DISCOVERY');
 
     // The frame right after an update falls inside that window. Nothing follows this event —
     // momentum has settled, or `scrollTo({ behavior: 'instant' })` dispatched its single event —
@@ -191,20 +220,20 @@ describe('SectionProgress', () => {
     // Still on the previous value, because this frame is inside the window. Without the throttle
     // the indicator would already be at the end of the story here, so this is what pins the
     // throttle itself; the assertions below are what pin its trailing edge.
-    expect(readout).toHaveTextContent('[02/07] DISCOVER');
-    expect(mobileBar()?.style.width).toBe('25%');
+    expect(readout).toHaveTextContent('[02/07] DISCOVERY');
+    expect(mobileBar().style.width).toBe('25%');
 
     settle();
 
-    expect(readout).toHaveTextContent('[07/07] CTA');
-    expect(mobileBar()?.style.width).toBe('100%');
+    expect(readout).toHaveTextContent('[07/07] SESSION COMPLETE');
+    expect(mobileBar().style.width).toBe('100%');
   });
 
   it('stops measuring once it is unmounted', () => {
     const { unmount } = render(<Story />);
 
     scrollWindowTo(STORY_TOP + STORY_RANGE / 4);
-    expect(mobileBar()?.style.width).toBe('25%');
+    expect(mobileBar().style.width).toBe('25%');
 
     unmount();
     const scheduled = vi.spyOn(window, 'requestAnimationFrame');
@@ -230,29 +259,29 @@ describe('SectionProgress', () => {
         <Story />
       </StrictMode>,
     );
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     scrollWindowTo(STORY_TOP + STORY_RANGE);
 
-    expect(readout).toHaveTextContent('[07/07] CTA');
-    expect(mobileBar()?.style.width).toBe('100%');
+    expect(readout).toHaveTextContent('[07/07] SESSION COMPLETE');
+    expect(mobileBar().style.width).toBe('100%');
   });
 
   it('re-measures the story when the viewport is resized', () => {
     render(<Story />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     scrollWindowTo(STORY_TOP + STORY_RANGE / 2);
 
-    expect(readout).toHaveTextContent('[04/07] BUILD');
-    expect(mobileBar()?.style.width).toBe('50%');
+    expect(readout).toHaveTextContent('[04/07] EXECUTION');
+    expect(mobileBar().style.width).toBe('50%');
 
     // A viewport twice as tall leaves 5,000px of story to scroll rather than 6,000, so the same
     // position is 60% of the way through it instead of half way.
     resizeViewportTo(VIEWPORT_HEIGHT * 2);
 
-    expect(readout).toHaveTextContent('[05/07] TEST');
-    expect(mobileBar()?.style.width).toBe('60%');
+    expect(readout).toHaveTextContent('[05/07] THE GAUNTLET');
+    expect(mobileBar().style.width).toBe('60%');
   });
 
   it('moves aria-current with the active section and leaves it on exactly one dot', () => {
@@ -260,14 +289,17 @@ describe('SectionProgress', () => {
     // technology, and every dot up to the active one shares the fill, so `aria-current` is the
     // only thing that says which of them the visitor is on.
     render(<Story />);
+    // Resolved once: a name-filtered role query recomputes every candidate's accessible name.
+    const hero = dotButton('HERO');
+    const execution = dotButton('EXECUTION');
 
-    expect(currentDots()).toEqual([dotButton('INIT')]);
-    expect(dotButton('INIT')).toHaveAttribute('aria-current', 'location');
+    expect(currentDots()).toEqual([hero]);
+    expect(hero).toHaveAttribute('aria-current', 'location');
 
     scrollWindowTo(STORY_TOP + STORY_RANGE / 2);
 
-    expect(currentDots()).toEqual([dotButton('BUILD')]);
-    expect(dotButton('INIT')).not.toHaveAttribute('aria-current');
+    expect(currentDots()).toEqual([execution]);
+    expect(hero).not.toHaveAttribute('aria-current');
   });
 
   it('keeps aria-current on the last dot once the story is behind the viewport', () => {
@@ -277,7 +309,42 @@ describe('SectionProgress', () => {
 
     scrollWindowTo(DOCUMENT_RANGE);
 
-    expect(currentDots()).toEqual([dotButton('CTA')]);
+    expect(currentDots()).toEqual([dotButton('SESSION COMPLETE')]);
+  });
+
+  it('names each dot for the title its section shows, and draws a word of it', () => {
+    // The dots said DISCOVER, PLAN, BUILD, TEST, SHIP and CTA beside sections titled DISCOVERY,
+    // STRATEGY, EXECUTION, THE GAUNTLET, THE LOOP and SESSION COMPLETE (#47, hero-10). The hero
+    // shows no title of its own, so its dot takes the name its region is announced by.
+    const titles = [
+      'HERO',
+      'DISCOVERY',
+      'STRATEGY',
+      'EXECUTION',
+      'THE GAUNTLET',
+      'THE LOOP',
+      'SESSION COMPLETE',
+    ];
+    // What each dot draws: the title's last word, so the column stays as narrow as it was.
+    const labels = ['HERO', 'DISCOVERY', 'STRATEGY', 'EXECUTION', 'GAUNTLET', 'LOOP', 'COMPLETE'];
+    render(<Story />);
+
+    const buttons = within(screen.getByRole('navigation', { name: 'Story sections' })).getAllByRole(
+      'button',
+    );
+
+    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual(
+      titles.map((title) => `Go to ${title} section`),
+    );
+    expect(buttons.map((button) => button.textContent)).toEqual(labels);
+    // Label in Name (WCAG 2.5.3): a voice-control user says the words drawn, and they have to be
+    // inside the name the button is announced by, as a whole word of the title.
+    for (const [index, button] of buttons.entries()) {
+      const drawn = button.textContent ?? '';
+      expect(drawn, 'the dot draws a label').not.toBe('');
+      expect(titles[index].split(' '), `${drawn} is a word of the name`).toContain(drawn);
+    }
+    expect(screen.getByText(`[01/07] ${titles[0]}`)).toBeInTheDocument();
   });
 
   it('names the dot group and gives it the set semantics of a list', () => {
@@ -285,8 +352,8 @@ describe('SectionProgress', () => {
 
     const group = screen.getByRole('navigation', { name: 'Story sections' });
 
-    expect(group).toContainElement(dotButton('INIT'));
-    expect(group).toContainElement(dotButton('CTA'));
+    expect(group).toContainElement(dotButton('HERO'));
+    expect(group).toContainElement(dotButton('SESSION COMPLETE'));
     // The list is what makes a screen reader announce "4 of 7"; the `[04/07]` readout that says
     // so on screen is aria-hidden, so without it the ordinal reaches nobody.
     expect(within(group).getByRole('list')).toBeInTheDocument();
@@ -296,95 +363,95 @@ describe('SectionProgress', () => {
   it('tracks the scroll position in a browser without window.matchMedia', () => {
     Reflect.deleteProperty(window, 'matchMedia');
     render(<Story />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     scrollWindowTo(STORY_TOP + STORY_RANGE);
 
-    expect(readout).toHaveTextContent('[07/07] CTA');
+    expect(readout).toHaveTextContent('[07/07] SESSION COMPLETE');
   });
 
   it('reaches the last section at the end of the story, not the end of the document', () => {
     render(<Story />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     // Still less than 56% of the way down the document, where Featured Work and Tech Stack follow.
     scrollWindowTo(STORY_TOP + STORY_RANGE);
 
-    expect(readout).toHaveTextContent('[07/07] CTA');
-    expect(mobileBar()?.style.width).toBe('100%');
+    expect(readout).toHaveTextContent('[07/07] SESSION COMPLETE');
+    expect(mobileBar().style.width).toBe('100%');
   });
 
   it('holds the first section until the story reaches the top of the viewport', () => {
     render(<Story />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     // Scrolled past the nav but not yet into the story.
     scrollWindowTo(STORY_TOP);
 
-    expect(readout).toHaveTextContent('[01/07] INIT');
-    expect(mobileBar()?.style.width).toBe('0%');
+    expect(readout).toHaveTextContent('[01/07] HERO');
+    expect(mobileBar().style.width).toBe('0%');
   });
 
   it('stays on the last section once the story is behind the viewport', () => {
     render(<Story />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     scrollWindowTo(DOCUMENT_RANGE);
 
-    expect(readout).toHaveTextContent('[07/07] CTA');
-    expect(mobileBar()?.style.width).toBe('100%');
+    expect(readout).toHaveTextContent('[07/07] SESSION COMPLETE');
+    expect(mobileBar().style.width).toBe('100%');
   });
 
   it('stays on the first section when the story fits the viewport', () => {
     const { container } = render(<Story height={VIEWPORT_HEIGHT} />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     scrollWindowTo(STORY_TOP);
 
-    expect(readout).toHaveTextContent('[01/07] INIT');
+    expect(readout).toHaveTextContent('[01/07] HERO');
     expect(container.textContent).not.toContain('NaN');
-    expect(mobileBar()?.style.width).toBe('0%');
+    expect(mobileBar().style.width).toBe('0%');
   });
 
   it('stays put and scrolls nowhere until the story wrapper has been laid out', () => {
     render(<SectionProgress storyRef={{ current: null }} />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     scrollWindowTo(STORY_TOP + STORY_RANGE);
 
-    expect(readout).toHaveTextContent('[01/07] INIT');
-    expect(mobileBar()?.style.width).toBe('0%');
+    expect(readout).toHaveTextContent('[01/07] HERO');
+    expect(mobileBar().style.width).toBe('0%');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go to CTA section' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Go to SESSION COMPLETE section' }));
 
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
   });
 
   it('clamps a rubber-band scroll past the bottom to the last section', () => {
     render(<Story />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     scrollWindowTo(DOCUMENT_RANGE + 120);
 
-    expect(readout).toHaveTextContent('[07/07] CTA');
-    expect(mobileBar()?.style.width).toBe('100%');
+    expect(readout).toHaveTextContent('[07/07] SESSION COMPLETE');
+    expect(mobileBar().style.width).toBe('100%');
   });
 
   it('clamps a rubber-band scroll above the top to the first section', () => {
     render(<Story />);
-    const readout = screen.getByText('[01/07] INIT');
+    const readout = screen.getByText('[01/07] HERO');
 
     scrollWindowTo(-120);
 
-    expect(readout).toHaveTextContent('[01/07] INIT');
-    expect(mobileBar()?.style.width).toBe('0%');
+    expect(readout).toHaveTextContent('[01/07] HERO');
+    expect(mobileBar().style.width).toBe('0%');
   });
 
   it('jumps to a section without smooth scrolling under reduced motion', () => {
     installMatchMedia(true);
     render(<Story />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go to TEST section' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Go to THE GAUNTLET section' }));
 
     expect(window.scrollTo).toHaveBeenCalledWith({
       top: STORY_TOP + (4 / 6) * STORY_RANGE,
@@ -395,7 +462,7 @@ describe('SectionProgress', () => {
   it('scrolls smoothly to a section when motion is allowed', () => {
     render(<Story />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go to TEST section' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Go to THE GAUNTLET section' }));
 
     expect(window.scrollTo).toHaveBeenCalledWith({
       top: STORY_TOP + (4 / 6) * STORY_RANGE,
@@ -406,7 +473,7 @@ describe('SectionProgress', () => {
   it('sends the first dot to the top of the story rather than the top of the document', () => {
     render(<Story />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go to INIT section' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Go to HERO section' }));
 
     expect(window.scrollTo).toHaveBeenCalledWith({ top: STORY_TOP, behavior: 'smooth' });
   });
@@ -414,7 +481,7 @@ describe('SectionProgress', () => {
   it('sends the last dot to the end of the story rather than the footer', () => {
     render(<Story />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Go to CTA section' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Go to SESSION COMPLETE section' }));
 
     expect(window.scrollTo).toHaveBeenCalledWith({
       top: STORY_TOP + STORY_RANGE,

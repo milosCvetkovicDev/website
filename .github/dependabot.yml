@@ -36,6 +36,13 @@ updates:
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
     groups:
+      # A security update of lighthouse itself is red by design for the reason given at the
+      # `lighthouse` group below, so it gets its own security pull request instead of turning the
+      # batch red and holding every other security fix. It sits ahead of `security` because
+      # Dependabot puts a dependency in the first group that matches it.
+      lighthouse-security:
+        applies-to: security-updates
+        patterns: ['lighthouse']
       # Security updates are triggered by alerts, not the Monday schedule. This batches each run's
       # security updates into one pull request, so several advisories arriving together cannot fill
       # the five-slot cap. Automated security updates are switched on in the repository settings only
@@ -51,6 +58,18 @@ updates:
       # group that matches it. See docs/adr/0018-dependency-update-policy.md.
       vite:
         patterns: ['vite', '@vitejs/*', 'vitest', '@vitest/*']
+        update-types: [major, minor, patch]
+      # lighthouse is pinned exactly in apps/web/package.json, and the Lighthouse audit spec fails
+      # on any version other than LIGHTHOUSE_VERSION in apps/web/e2e/support/lighthouse.ts until
+      # someone re-reads the audit ids and scoring rules it asserts (.claude/rules/dependencies.md).
+      # A bump is red by design, so it arrives alone rather than inside minor-and-patch, where it
+      # would hold every other minor and patch bump. `update-types` lists every level, which is
+      # also the default, to match vite and to say that a major comes through this group too. The
+      # pattern matches the exact name only: lighthouse-logger and the rest of its tree are
+      # transitive and change only when a lighthouse bump requires it. It sits ahead of
+      # minor-and-patch because Dependabot puts a dependency in the first group that matches it.
+      lighthouse:
+        patterns: ['lighthouse']
         update-types: [major, minor, patch]
       minor-and-patch:
         update-types: [minor, patch]
