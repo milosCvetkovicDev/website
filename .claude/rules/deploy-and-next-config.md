@@ -31,18 +31,23 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
 The same file negotiates the Markdown twins (#59,
 `docs/adr/0030-generated-endpoints-as-static-route-handlers.md`). `rewrites()` returns one
 `beforeFiles` rule per route in `MARKDOWN_ROUTES` (the keys of `STATIC_ROUTE_UPDATED` plus
-`/work/<slug>` per case study), each a literal source with `/` among them, keyed on an `accept`
-header matching `.*text/markdown.*` and rewriting to `markdownTwinPath(route)`. Never widen a source
-to `/:path*`: a Markdown-asking request for `robots.txt`, the sitemap, an Open Graph image or a
-`/_next/static` chunk would then be rewritten to an `index.md` that does not exist. The match reads
-no q-value and is case-sensitive, so `text/markdown;q=0` still gets Markdown; ranking q-values needs
-the middleware ADR 0017 refuses. `varyOnAccept()` appends one `headers()` entry per route and per
-twin with `Vary: Accept`, after the two entries above, which stay as they are. A Markdown response
-carries Next's own `Vary` and `Accept` both; on an HTML page Next's App Router handler sets its
-`Vary` after `headers()`, so `Accept` is absent there under `next start`, and ADR 0030 says why that
-direction is harmless. `src/test/next-config.test.ts` pins the rules through
-`unstable_getResponseFromNextConfig` and fails when the negotiated routes and the twin handlers
-under `src/app` differ; `e2e/markdown-negotiation.spec.ts` checks them on the wire.
+`/work/<slug>` per case study), each a literal source with `/` among them, rewriting to
+`markdownTwinPath(route)` when the `accept` header lists the media range `text/markdown`
+(`ACCEPTS_MARKDOWN` in `has`) and does not give it a weight of zero (`REFUSES_MARKDOWN` in
+`missing`, so `text/markdown;q=0` gets the page). Never widen a source to `/:path*`: a
+Markdown-asking request for `robots.txt`, the sitemap, an Open Graph image or a `/_next/static`
+chunk would then be rewritten to an `index.md` that does not exist. Next matches both values as
+anchored, case-sensitive regular expressions, so a non-zero weight is not ranked
+(`text/html, text/markdown;q=0.1` still gets Markdown; ranking needs the middleware ADR 0017
+refuses) and `Text/Markdown` gets the page. `varyOnAccept()` appends one `headers()` entry per
+negotiating route with `Vary: Accept`, after the two entries above, which stay as they are; the
+twin URLs get none, since each serves one representation. Next applies `headers()` to the requested
+path, before the rewrite, so a negotiated Markdown answer carries Next's own `Vary` and `Accept`
+both; on an HTML page Next's App Router handler sets its `Vary` after `headers()`, so `Accept` is
+absent there under `next start`, and ADR 0030 says what that leaves open.
+`src/test/next-config.test.ts` pins the rules through `unstable_getResponseFromNextConfig` and
+fails when the negotiated routes and the twin handlers under `src/app` differ;
+`e2e/markdown-negotiation.spec.ts` checks them on the wire.
 
 ## Gotchas
 
@@ -60,7 +65,10 @@ under `src/app` differ; `e2e/markdown-negotiation.spec.ts` checks them on the wi
   requires with the same options and no file name, so an `@/` import becomes `./src/...`, right
   only beside the config: every module that chain reaches imports by relative path. The last test
   in `src/test/next-config.test.ts` loads the config through that loader in a child process and
-  fails on an alias there, which Vitest's own `resolve.alias` would hide.
+  fails on an alias there, which Vitest's own `resolve.alias` would hide. `next dev` restarts only
+  when a `next.config.*` file itself changes, not a module it imports, so a static route or case
+  study added under a running dev server is served, twin included, but not negotiated until the
+  server is restarted.
 - `apps/web/next.config.ts` also sends the security headers (ADR 0023), and its CSP allows this
   origin only: a script, stylesheet, font, image (a `data:` one included) or connection from
   anywhere else is refused, and the browser logs the refusal as a console error.

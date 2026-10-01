@@ -1,3 +1,4 @@
+import { get as httpGet } from 'node:http';
 import { expect, test, type APIRequestContext, type APIResponse } from '@playwright/test';
 import { MARKDOWN_TWINS } from './endpoints';
 import { NOT_FOUND_ROUTE, caseStudyRoute } from './routes';
@@ -10,11 +11,12 @@ import { NOT_FOUND_ROUTE, caseStudyRoute } from './routes';
  * the rules, and this spec proves what reaches the wire, under `next start` (CI) and `next dev`
  * (locally) alike.
  *
- * `Vary: Accept`: every response that carries Markdown names `Accept` in its `Vary`, so no cache
- * hands the twin to a request that did not ask for it. On an HTML page Next writes its own `Vary`
- * after `headers()` has run and the `Accept` entry does not survive there (measured under
- * `next start`, 2026-10-01, and recorded in ADR 0030); what this spec holds for the page is that
- * Next's own `Vary` is left intact.
+ * `Vary: Accept`: every negotiated Markdown answer names `Accept` in its `Vary`, so no cache that
+ * honours `Vary` hands the twin to a request that did not ask for it; the twin's own URL serves one
+ * representation and does not vary. On an HTML page Next writes its own `Vary` after `headers()`
+ * has run and the `Accept` entry does not survive there (measured under `next start`, 2026-10-01,
+ * and recorded in ADR 0030); what this spec holds for the page is that Next's own `Vary` is left
+ * intact, `rsc` standing for it.
  *
  * The routes come from `endpoints.ts`, so a new static route or case study is checked here without
  * touching this file.
@@ -28,10 +30,16 @@ const MARKDOWN = 'text/markdown; charset=utf-8';
 /** What Claude Code and the other clients acceptmarkdown.com lists send. */
 const ASKS_FOR_MARKDOWN = 'text/markdown, */*';
 
-/** Chromium's `Accept` for a navigation, and a bare `text/html`. */
-const BROWSER_ACCEPTS = [
+/**
+ * Chromium's `Accept` for a navigation, a bare `text/html`, the wildcard range (what Playwright's
+ * request context sends when a call names none) and an explicit refusal of Markdown, which
+ * RFC 9110 spells as a weight of zero.
+ */
+const PAGE_ACCEPTS = [
   'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
   'text/html',
+  '*/*',
+  'text/markdown;q=0, text/html',
 ];
 
 /** Every token of every `Vary` header on a response, lower-cased: the header may come twice. */
@@ -46,9 +54,32 @@ const varyOf = (response: APIResponse): string[] =>
 const get = (request: APIRequestContext, path: string, accept?: string) =>
   request.get(path, accept === undefined ? undefined : { headers: { accept } });
 
+/**
+ * A request with no `Accept` header at all, which Playwright's request context cannot send (it
+ * fills in the wildcard range): `node:http` sends only `Host` and `Connection`.
+ */
+const getWithoutAccept = (url: string) =>
+  new Promise<{ status: number; contentType: string; vary: string[] }>((resolve, reject) => {
+    httpGet(url, (response) => {
+      response.resume();
+      response.on('end', () =>
+        resolve({
+          status: response.statusCode ?? 0,
+          contentType: response.headers['content-type'] ?? '',
+          vary: (response.headers.vary ?? '')
+            .split(',')
+            .map((token) => token.trim().toLowerCase())
+            .filter(Boolean),
+        }),
+      );
+      response.on('error', reject);
+    }).on('error', reject);
+  });
+
 for (const { route, twin } of MARKDOWN_TWINS) {
   test(`${route} answers with its twin to a request for Markdown, and with the page otherwise`, async ({
     request,
+    baseURL,
   }) => {
     const direct = await get(request, twin);
     expect(direct.status(), `${twin} should answer 200`).toBe(200);
@@ -65,15 +96,14 @@ for (const { route, twin } of MARKDOWN_TWINS) {
     // browser would otherwise guess at.
     expect(negotiated.headers()['x-content-type-options']).toBe('nosniff');
 
-    for (const response of [negotiated, direct]) {
-      expect(varyOf(response), `every Markdown answer for ${route} varies on Accept`).toContain(
-        'accept',
-      );
-    }
+    expect(varyOf(negotiated), `the negotiated answer for ${route} varies on Accept`).toContain(
+      'accept',
+    );
+    expect(varyOf(direct), `${twin} serves one representation`).not.toContain('accept');
 
-    for (const accept of [...BROWSER_ACCEPTS, undefined]) {
+    for (const accept of PAGE_ACCEPTS) {
       const page = await get(request, route, accept);
-      const label = `${route} [${accept ?? 'no Accept'}]`;
+      const label = `${route} [${accept}]`;
       expect(page.status(), `${label} should answer 200`).toBe(200);
       expect(page.headers()['content-type'], `${label} should serve the page`).toMatch(
         /^text\/html\b/,
@@ -81,6 +111,11 @@ for (const { route, twin } of MARKDOWN_TWINS) {
       // Next's own Vary on an App Router page, which a `headers()` entry must never replace.
       expect(varyOf(page), `${label} keeps Next's own Vary`).toContain('rsc');
     }
+
+    const bare = await getWithoutAccept(new URL(route, baseURL).href);
+    expect(bare.status, `${route} [no Accept] should answer 200`).toBe(200);
+    expect(bare.contentType, `${route} [no Accept] should serve the page`).toMatch(/^text\/html\b/);
+    expect(bare.vary, `${route} [no Accept] keeps Next's own Vary`).toContain('rsc');
   });
 }
 
@@ -104,7 +139,8 @@ test('assets, metadata routes and the twins themselves answer as before to a req
   request,
 }) => {
   const html = await (await get(request, '/')).text();
-  const chunk = html.match(/["'](\/_next\/static\/[^"']+\.js)["']/)?.[1];
+  // A chunk URL may carry a query (`?dpl=` on Vercel, `?v=` under `next dev`): keep it.
+  const chunk = html.match(/["'](\/_next\/static\/[^"'?]+\.js(?:\?[^"']*)?)["']/)?.[1];
   expect(chunk, 'the home page must reference a /_next/static chunk to check').toBeTruthy();
 
   const twin = MARKDOWN_TWINS.find(({ route }) => route === '/about')?.twin;

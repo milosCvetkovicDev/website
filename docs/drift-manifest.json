@@ -7401,11 +7401,20 @@
     {
       "id": "adr-0030-accept-match",
       "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
-      "anchor": "here `.*text/markdown.*`",
-      "claim": "next.config.ts keys the Markdown rewrites on an accept header matching .*text/markdown.*.",
+      "anchor": "`ACCEPTS_MARKDOWN` matches `text/markdown` as a",
+      "claim": "next.config.ts keys each Markdown rewrite on ACCEPTS_MARKDOWN in its has conditions.",
       "method": "file-line",
       "evaluation": "live",
-      "check": { "path": "apps/web/next.config.ts", "contains": "value: '.*text/markdown.*'" }
+      "check": { "path": "apps/web/next.config.ts", "contains": "has: [ACCEPTS_MARKDOWN]," }
+    },
+    {
+      "id": "adr-0030-refuses-match",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`REFUSES_MARKDOWN` matches it with a",
+      "claim": "next.config.ts skips each Markdown rewrite on REFUSES_MARKDOWN, a weight of zero, in its missing conditions.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": { "path": "apps/web/next.config.ts", "contains": "missing: [REFUSES_MARKDOWN]," }
     },
     {
       "id": "adr-0030-before-files",

@@ -74,11 +74,13 @@ down.
    `apps/web/next.config.ts`. The routes are the keys of `STATIC_ROUTE_UPDATED` and one per case
    study, the same list the twins are built from, and `/` has its rule like the rest. Each rule's
    source is the literal route, never a pattern such as `/:path*`, its destination is the route's
-   twin, and it matches when the `accept` request header contains `text/markdown`. Every other
-   request, a browser's included, is served the page.
-5. **Each negotiating route and its twin send `Vary: Accept`,** from `headers()` entries over
-   exactly those paths, beside the entries of [ADR 0023](0023-static-security-headers.md) and
-   [ADR 0025](0025-production-alias-noindex.md), which are unchanged.
+   twin, and it matches when the `accept` request header lists the media range `text/markdown`
+   (`has`) without giving it a weight of zero (`missing`). Every other request, a browser's
+   included, is served the page.
+5. **Each negotiating route sends `Vary: Accept`,** from one `headers()` entry per route, beside the
+   entries of [ADR 0023](0023-static-security-headers.md) and
+   [ADR 0025](0025-production-alias-noindex.md), which are unchanged. A twin's own URL serves one
+   representation whatever the request accepts, and gets no entry.
 
 ## Consequences
 
@@ -97,21 +99,23 @@ down.
 
 ### Trade-offs
 
-- **The rewrite reads no q-value.** Next matches a `has` value as an anchored regular expression
-  over the raw header, here `.*text/markdown.*`, so `text/markdown;q=0` still gets Markdown and
-  `text/html, text/markdown;q=0.1` gets Markdown rather than the HTML it prefers. It is also
-  case-sensitive, so `Text/Markdown` gets HTML, although RFC 9110 makes media types
-  case-insensitive. acceptmarkdown.com's Next.js recipe records the same q-value limit for the
-  rewrite form. Honouring q-values needs code that runs per request, which is the middleware
-  ADR 0017 refuses.
+- **The rewrite ranks no q-value.** Next matches a `has` or `missing` value as an anchored regular
+  expression over the raw header (`^value$`). `ACCEPTS_MARKDOWN` matches `text/markdown` as a
+  whole media range, so `text/markdownx` does not count, and `REFUSES_MARKDOWN` matches it with a
+  weight of zero, which RFC 9110 makes a refusal, so `text/markdown;q=0` gets the page. A non-zero
+  weight is not compared with the others: `text/html, text/markdown;q=0.1` gets Markdown rather
+  than the HTML it prefers. acceptmarkdown.com's Next.js recipe records the same limit for the
+  rewrite form. Ranking weights against each other needs code that runs per request, which is the
+  middleware ADR 0017 refuses. The match is also case-sensitive, so `Text/Markdown` gets HTML,
+  although RFC 9110 makes media types case-insensitive.
 - **`Vary: Accept` does not reach the HTML page under `next start`.** Next's App Router page
   handler sets its own `Vary` (`rsc` and the three `next-router-*` request headers) with
   `setHeader` after the `headers()` entries have been applied, in
   `next/dist/build/templates/app-page-runtime.js` of 16.3.6, so on a page the `Accept` entry is
   replaced. Every Markdown response, negotiated or requested by its path, carries Next's `Vary`
-  and `Accept` both (measured 2026-10-01). A shared cache can therefore never hand the twin to a
-  request that did not ask for it, while it may hand the page to an agent that asked for Markdown,
-  which is what that agent got before this record. Issue #59 cites Vercel's markdown-access
+  and `Accept` both (measured 2026-10-01). A cache that honours `Vary`, as RFC 9111 requires, can
+  therefore never hand the twin to a request that did not ask for it, while it may hand the page
+  to an agent that asked for Markdown, which is what that agent got before this record. Issue #59 cites Vercel's markdown-access
   documentation (last updated 2026-09-03) for this rewrite and for its CDN keying the cache on
   `Accept`; how Vercel's edge answers is not measured here, and is a post-deploy check.
 - **`next.config.ts` now imports the data modules** (`static-routes.ts`, `case-studies.ts`) and
@@ -119,13 +123,15 @@ down.
   options and no file name, so an `@/` import becomes `./src/…`, a path that is right only beside
   `next.config.ts`. No module in that chain may use the alias; `case-studies.ts` imports
   `content-date.ts` by relative path for that reason, and a unit test loads the config through
-  Next's own loader to catch the next one.
+  Next's own loader to catch the next one. `next dev` restarts only when the config file itself
+  changes, so a route or case study added under a running dev server is not negotiated until it
+  restarts.
 - **Adopting Cache Components breaks every endpoint here.** `force-static` and `dynamicParams` are
   removed under it, so each handler would need `'use cache'` instead, and `generateStaticParams`
   could no longer return an empty list. Enabling `cacheComponents` means revisiting this record
   first.
-- The rule list grows with the routes and case studies: ten rewrites and twenty `Vary` entries
-  today, one of each per route and one more `Vary` entry per twin.
+- The rule list grows with the routes and case studies: one rewrite and one `Vary` entry per route
+  with a twin.
 
 ## Alternatives considered
 
@@ -155,3 +161,6 @@ down.
 - **A case-insensitive match written as character classes** (`[Tt][Ee][Xx][Tt]/…`). It would
   follow RFC 9110, at the cost of a value a reader cannot check at a glance, and
   acceptmarkdown.com's matrix records its clients sending the lower-case `text/markdown`.
+- **The refusal as a negative lookahead inside the `has` value.** It matches the same requests;
+  a separate `missing` condition keeps each value one readable pattern and asks nothing of the
+  router's regular-expression engine beyond groups and repetition.

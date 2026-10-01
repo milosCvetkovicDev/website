@@ -34,6 +34,7 @@ import nextConfig, {
   MARKDOWN_ROUTES,
   markdownRewrites,
   PRODUCTION_ALIAS_HEADERS,
+  REFUSES_MARKDOWN,
   SECURITY_HEADERS_SOURCE,
   securityHeaders,
   varyOnAccept,
@@ -388,11 +389,11 @@ describe('markdown negotiation', () => {
   });
 
   /** What Next's matcher does with one request: the rewritten path, or null, and its headers. */
-  const negotiate = async (path: string, accept?: string) => {
+  const negotiate = async (path: string, accept?: string, host = 'miloscvetkovic.dev') => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VERCEL_ENV', '');
     const response = await unstable_getResponseFromNextConfig({
-      url: `https://miloscvetkovic.dev${path}`,
+      url: `https://${host}${path}`,
       nextConfig,
       headers: accept === undefined ? {} : { accept },
     });
@@ -409,6 +410,9 @@ describe('markdown negotiation', () => {
     'text/markdown, */*',
     'text/markdown, text/html, */*',
     'text/html;q=0.9, text/markdown',
+    'text/html,text/markdown',
+    'text/markdown;q=0.9, */*;q=0.1',
+    'text/markdown; charset=utf-8',
   ];
   const OTHER_ACCEPTS = [
     undefined,
@@ -417,26 +421,56 @@ describe('markdown negotiation', () => {
     'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'text/plain',
     'application/json',
+    // Other types that merely contain the name.
+    'text/markdownx',
+    'text/markdown-extra, text/html',
+    'application/vnd.example+text/markdown',
+    // An explicit refusal: a weight of zero, in each form RFC 9110 allows, after other parameters.
+    'text/markdown;q=0',
+    'text/markdown; q=0, text/html',
+    'text/html, text/markdown;q=0',
+    'text/markdown;q=0.000, */*',
+    'text/markdown;Q=0',
+    'text/markdown;charset=utf-8;q=0',
+    'text/markdown ;q=0 ,text/html',
   ];
 
+  // The dynamic segments whose twin handler serves one route per record, and those records.
+  const DYNAMIC_TWIN_ROUTES: Record<string, () => string[]> = {
+    '/work/[slug]': () => caseStudies.map(({ slug }) => `/work/${slug}`),
+  };
+  const ROUTE_FILES = ['route.ts', 'route.tsx', 'route.js', 'route.jsx', 'route.mjs'];
+
   const handlerRoutes = () => {
-    // Every `index.md/route.ts` under src/app, as the route whose twin it serves.
+    // Every `index.md/route.*` under src/app, as the route whose twin it serves. A route group
+    // adds no URL segment, and a private folder or a parallel-route slot serves no URL of its own.
     const found: string[] = [];
     const walk = (dir: string, route: string) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
         const child = path.join(dir, entry.name);
         if (entry.name === 'index.md') {
-          if (existsSync(path.join(child, 'route.ts'))) found.push(route || '/');
-        } else if (!entry.name.startsWith('(') && !entry.name.startsWith('_')) {
+          if (ROUTE_FILES.some((file) => existsSync(path.join(child, file)))) {
+            found.push(route || '/');
+          }
+        } else if (entry.name.startsWith('(') && entry.name.endsWith(')')) {
+          walk(child, route);
+        } else if (!entry.name.startsWith('_') && !entry.name.startsWith('@')) {
           walk(child, `${route}/${entry.name}`);
         }
       }
     };
     walk(path.join(appDir, 'src/app'), '');
-    return found.flatMap((route) =>
-      route === '/work/[slug]' ? caseStudies.map(({ slug }) => `/work/${slug}`) : [route],
-    );
+    return found.flatMap((route) => {
+      if (!route.includes('[')) return [route];
+      const expand = DYNAMIC_TWIN_ROUTES[route];
+      if (!expand) {
+        throw new Error(
+          `${route}/index.md has no entry in DYNAMIC_TWIN_ROUTES: map it to its records, and add them to MARKDOWN_ROUTES in next.config.ts`,
+        );
+      }
+      return expand();
+    });
   };
 
   it('negotiates exactly the routes that have a twin: the static routes and every case study', () => {
@@ -456,14 +490,19 @@ describe('markdown negotiation', () => {
     expect(markdownRewrites()).toEqual(
       MARKDOWN_ROUTES.map((route) => ({
         source: route,
-        has: [{ type: 'header', key: 'accept', value: '.*text/markdown.*' }],
+        has: [ACCEPTS_MARKDOWN],
+        missing: [REFUSES_MARKDOWN],
         destination: markdownTwinPath(route),
       })),
     );
+    expect(ACCEPTS_MARKDOWN).toEqual({ type: 'header', key: 'accept', value: expect.any(String) });
+    expect(REFUSES_MARKDOWN).toEqual({ type: 'header', key: 'accept', value: expect.any(String) });
     // A literal path each, never a parameter or a wildcard such as `/:path*`: a broad source would
     // also rewrite a Markdown-asking request for a path that exists without a twin (`robots.txt`,
     // the sitemap, an Open Graph image, a `/_next/static` chunk) to an `index.md` that does not.
-    for (const { source } of markdownRewrites()) expect(source).not.toMatch(/[:*()?+]/);
+    // An allowlist, so no character path-to-regexp gives a meaning to (`:`, `*`, `(`, `{`, `[`...)
+    // gets through; `src/data/__tests__/case-studies.test.ts` holds the slugs to it as well.
+    for (const { source } of markdownRewrites()) expect(source).toMatch(/^\/[a-z0-9/-]*$/);
   });
 
   it("serves each route's twin to a request that asks for Markdown, through Next's matcher", async () => {
@@ -488,6 +527,8 @@ describe('markdown negotiation', () => {
 
   it('rewrites nothing that has no twin, the twins themselves included', async () => {
     const chunk = '/_next/static/chunks/app.js';
+    const study = caseStudies[0];
+    expect(study, 'a case study is needed to check its twin').toBeDefined();
     for (const path of [
       '/nope',
       '/work/does-not-exist',
@@ -497,39 +538,57 @@ describe('markdown negotiation', () => {
       '/sitemap.xml',
       '/index.md',
       '/about/index.md',
-      markdownTwinPath(`/work/${caseStudies[0]?.slug}`),
+      markdownTwinPath(`/work/${study!.slug}`),
     ]) {
       expect((await negotiate(path, 'text/markdown, */*')).to, path).toBeNull();
     }
   });
 
-  // Recorded, not fixed (ADR 0030): Next's `has` value is an anchored, case-sensitive regular
-  // expression over the raw header, so a q-value is never read. Ranking by q-value would need a
-  // function in front of every page, which ADR 0017 refuses.
-  it('reads no q-value and matches the media type case-sensitively', async () => {
-    expect(ACCEPTS_MARKDOWN.value).toBe('.*text/markdown.*');
-    expect((await negotiate('/about', 'text/markdown;q=0, text/html')).to).toBe('/about/index.md');
+  // Recorded, not fixed (ADR 0030): Next's `has` and `missing` values are anchored, case-sensitive
+  // regular expressions over the raw header. A weight of zero is a refusal the rule can see, but
+  // ranking one non-zero weight against another would need a function in front of every page,
+  // which ADR 0017 refuses.
+  it('ranks no non-zero q-value and matches the media type case-sensitively', async () => {
+    expect((await negotiate('/about', 'text/html, text/markdown;q=0.1')).to).toBe(
+      '/about/index.md',
+    );
+    expect((await negotiate('/about', 'text/markdown;q=0.001, text/html')).to).toBe(
+      '/about/index.md',
+    );
     expect((await negotiate('/about', 'Text/Markdown')).to).toBeNull();
+    expect((await negotiate('/about', 'text/x-markdown')).to).toBeNull();
   });
 
-  it('sends Vary: Accept on each route and its twin, whatever was asked for', async () => {
+  // ADR 0025: the production alias sends `noindex` on every path, and a negotiated answer is one.
+  it('keeps the alias noindex on a negotiated answer', async () => {
+    for (const route of ['/', '/about']) {
+      const { to, headers } = await negotiate(route, 'text/markdown, */*', PRODUCTION_ALIAS_HOST);
+      expect(to, route).toBe(markdownTwinPath(route));
+      expect(headers.get('x-robots-tag'), route).toBe('noindex');
+      expect(headers.get('vary'), route).toBe('Accept');
+    }
+    expect((await negotiate('/about', 'text/markdown')).headers.get('x-robots-tag')).toBeNull();
+  });
+
+  // These are the config's rules as Next's matcher applies them, not the served response: on an
+  // HTML page Next's App Router handler replaces this Vary with its own after `headers()` has run,
+  // so under `next start` `Accept` reaches only the Markdown answers (ADR 0030, and
+  // `e2e/markdown-negotiation.spec.ts` on the wire).
+  it('declares Vary: Accept on each negotiating route, and not on the twin URLs', async () => {
     expect(varyOnAccept()).toEqual(
-      MARKDOWN_ROUTES.flatMap((route) =>
-        [route, markdownTwinPath(route)].map((source) => ({
-          source,
-          headers: [{ key: 'Vary', value: 'Accept' }],
-        })),
-      ),
+      MARKDOWN_ROUTES.map((source) => ({ source, headers: [{ key: 'Vary', value: 'Accept' }] })),
     );
     for (const route of MARKDOWN_ROUTES) {
-      for (const path of [route, markdownTwinPath(route)]) {
-        for (const accept of ['text/markdown, */*', 'text/html']) {
-          const { headers } = await negotiate(path, accept);
-          expect(headers.get('vary'), `${path} [${accept}]`).toBe('Accept');
-          // The security headers still reach the negotiated response.
-          expect(headers.get('x-content-type-options'), path).toBe('nosniff');
-        }
+      for (const accept of ['text/markdown, */*', 'text/html']) {
+        const { headers } = await negotiate(route, accept);
+        expect(headers.get('vary'), `${route} [${accept}]`).toBe('Accept');
+        // The security headers still reach the negotiated response.
+        expect(headers.get('x-content-type-options'), route).toBe('nosniff');
       }
+      // A twin's own URL serves one representation, so it does not vary.
+      const twin = await negotiate(markdownTwinPath(route), 'text/markdown, */*');
+      expect(twin.headers.get('vary'), markdownTwinPath(route)).toBeNull();
+      expect(twin.headers.get('x-content-type-options'), markdownTwinPath(route)).toBe('nosniff');
     }
     for (const path of ['/nope', '/work/does-not-exist', '/_next/static/chunks/app.js']) {
       expect((await negotiate(path, 'text/markdown')).headers.get('vary'), path).toBeNull();
@@ -538,21 +597,39 @@ describe('markdown negotiation', () => {
 
   // Vitest resolves `@/` for every module it loads; Next's config loader turns it into `./src/...`
   // in every module, a path that is right only beside `next.config.ts`, so an alias in a module the
-  // config reaches passes every test above and fails `next build`. This loads the file the way `next build` does, in a
-  // child process because the loader rewrites `require.extensions`, and compares the result.
+  // config reaches passes every test above and fails `next build`. This loads the file the way
+  // `next build` does, in a child process because the loader rewrites `require.extensions`, and
+  // compares the result. `transpile-config` is internal to Next and has no stability promise: when
+  // a Next bump moves it, the failure below names the module, and the fix is to find where
+  // `next build` loads a TypeScript config in the new version.
   it("loads through Next's own config loader to the same rules", async () => {
+    const BEGIN = '<<<next-config-rules>>>';
+    const END = '<<<end>>>';
     const script = [
       "const { transpileConfig } = require('next/dist/build/next-config-ts/transpile-config');",
       "const path = require('node:path');",
       "transpileConfig({ nextConfigPath: path.resolve('next.config.ts'), dir: process.cwd() })",
       // The CommonJS module the loader compiles the file to, whose default export is the config.
       '  .then(async ({ default: config }) => {',
-      '    const headers = await config.headers();',
-      '    process.stdout.write(JSON.stringify({ rewrites: await config.rewrites(), vary: headers.slice(2) }));',
+      "    const vary = (await config.headers()).filter(({ headers }) => headers.some(({ key }) => key === 'Vary'));",
+      `    process.stdout.write('${BEGIN}' + JSON.stringify({ rewrites: await config.rewrites(), vary }) + '${END}');`,
       '  })',
       '  .catch((error) => { console.error(error); process.exit(1); });',
     ].join('\n');
-    let output: string;
+    const fail = (why: string, error: unknown, output = ''): never => {
+      const { stderr = '', stdout = output } = (error ?? {}) as {
+        stderr?: string;
+        stdout?: string;
+      };
+      throw new Error(
+        `next.config.ts does not load through Next's config loader (${why}). An \`@/\` import in a ` +
+          `module it reaches fails here with "Cannot find module './src/..."; a moved ` +
+          `next/dist/build/next-config-ts/transpile-config with "Cannot find module 'next/dist/...'".` +
+          `\n--- stderr ---\n${stderr}\n--- stdout ---\n${stdout}`,
+        { cause: error },
+      );
+    };
+    let output = '';
     try {
       output = execFileSync(process.execPath, ['-e', script], {
         cwd: appDir,
@@ -561,12 +638,18 @@ describe('markdown negotiation', () => {
         timeout: 30_000,
       });
     } catch (error) {
-      throw new Error(
-        "next.config.ts does not load through Next's config loader: is there an `@/` import in a module it reaches?",
-        { cause: error },
-      );
+      fail('the child process failed', error);
     }
-    expect(JSON.parse(output)).toEqual({
+    const start = output.indexOf(BEGIN);
+    const end = output.indexOf(END, start);
+    if (start < 0 || end < 0) fail('no rules in its output', undefined, output);
+    let loaded: unknown;
+    try {
+      loaded = JSON.parse(output.slice(start + BEGIN.length, end));
+    } catch (error) {
+      fail('its rules are not JSON', error, output);
+    }
+    expect(loaded).toEqual({
       rewrites: await nextConfig.rewrites?.(),
       vary: varyOnAccept(),
     });

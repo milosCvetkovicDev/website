@@ -161,15 +161,28 @@ export const MARKDOWN_ROUTES: readonly string[] = [
 ];
 
 /**
- * A request that names `text/markdown` anywhere in its `Accept` header. Next anchors the value
- * (`^…$`) and matches it case-sensitively, and nothing here reads a q-value: `text/markdown;q=0`
- * matches too. ADR 0030 records both limits; ranking by q-value would need a function in front of
- * every page, which ADR 0017 refuses.
+ * A request whose `Accept` header lists the media range `text/markdown`: at the start of the header
+ * or after a comma, and followed by its end, a parameter or the next range, so `text/markdownx` or
+ * `application/vnd.x+text/markdown` does not count. Next anchors the value (`^…$`) and matches it
+ * case-sensitively, so `Text/Markdown` does not count either (ADR 0030).
  */
 export const ACCEPTS_MARKDOWN = {
   type: 'header',
   key: 'accept',
-  value: '.*text/markdown.*',
+  value: String.raw`(?:.*,)?\s*text/markdown\s*(?:[;,].*)?`,
+} as const;
+
+/**
+ * A request that lists `text/markdown` with a weight of zero (`q=0` up to `q=0.000`, after any
+ * other parameters), which RFC 9110 makes a refusal. It goes in the rule's `missing`, so such a
+ * request is served the page. Any other weight is not ranked against the other ranges:
+ * `text/html, text/markdown;q=0.1` still gets Markdown, because ranking needs code that runs per
+ * request, which ADR 0017 refuses (ADR 0030).
+ */
+export const REFUSES_MARKDOWN = {
+  type: 'header',
+  key: 'accept',
+  value: String.raw`(?:.*,)?\s*text/markdown\s*(?:;[^,]*)?;\s*[qQ]=0(?:\.0{0,3})?\s*(?:[;,].*)?`,
 } as const;
 
 /**
@@ -183,22 +196,25 @@ export function markdownRewrites() {
   return MARKDOWN_ROUTES.map((route) => ({
     source: route,
     has: [ACCEPTS_MARKDOWN],
+    missing: [REFUSES_MARKDOWN],
     destination: markdownTwinPath(route),
   }));
 }
 
 /**
- * `Vary: Accept` on each route that negotiates and on its twin, so a shared or browser cache keeps
- * the two representations of one URL apart. Its own entries, over exactly those paths: the key is
- * one ADR 0023's and ADR 0025's entries do not set.
+ * `Vary: Accept` on each route that negotiates, so a shared or browser cache keeps the two
+ * representations of one URL apart. Next matches `headers()` against the requested path, before
+ * the rewrite, so the negotiated Markdown answer carries it. The twin's own URL is left out: it
+ * serves one representation whatever the request accepts, and varying it would only split caches
+ * by `Accept` string. Its own entries, over exactly these paths: the key is one ADR 0023's and
+ * ADR 0025's entries do not set. On an HTML page Next replaces this `Vary` with its own after
+ * `headers()` has run (ADR 0030).
  */
 export function varyOnAccept() {
-  return MARKDOWN_ROUTES.flatMap((route) =>
-    [route, markdownTwinPath(route)].map((source) => ({
-      source,
-      headers: [{ key: 'Vary', value: 'Accept' }],
-    })),
-  );
+  return MARKDOWN_ROUTES.map((source) => ({
+    source,
+    headers: [{ key: 'Vary', value: 'Accept' }],
+  }));
 }
 
 const nextConfig: NextConfig = {
