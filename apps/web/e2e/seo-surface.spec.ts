@@ -804,7 +804,7 @@ test('/skills says above its proficiency bars that they are self-assessed (#58)'
         note: note ? { tag: note.localName, text: text(note) } : null,
         skillsAfterNote: bars ? [...bars.querySelectorAll('h3')].map(text) : [],
         barNames: bars
-          ? [...bars.querySelectorAll('[role="progressbar"]')].map(
+          ? [...bars.querySelectorAll('[role="meter"]')].map(
               (bar) => bar.getAttribute('aria-label') ?? '',
             )
           : [],
@@ -828,7 +828,7 @@ test('/skills says above its proficiency bars that they are self-assessed (#58)'
   );
   // A screen reader user moving through the bars hears each bar's name, not the note above them, so
   // every name carries the same qualifier.
-  expect(served.barNames, 'one progressbar per core skill').toHaveLength(coreSkills.length);
+  expect(served.barNames, 'one meter per core skill').toHaveLength(coreSkills.length);
   for (const name of served.barNames) {
     expect(name, 'each bar names its level as self-assessed').toMatch(/self-assessed/i);
   }

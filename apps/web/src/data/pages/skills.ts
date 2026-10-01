@@ -18,6 +18,10 @@ export interface CoreSkill {
 /** A category of the full toolkit: its icon, a one-line description, and the skills under it. */
 export interface ToolkitCategory {
   name: string;
+  /**
+   * An emoji drawn beside the name as decoration. The page hides it from screen readers and the
+   * twin leaves it out, so it stays a field of its own and never goes inside the text.
+   */
   icon: string;
   description: string;
   skills: readonly string[];

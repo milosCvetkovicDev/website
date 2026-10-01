@@ -40,6 +40,10 @@ export interface TimelineEntry {
 export interface Belief {
   readonly title: string;
   readonly description: string;
+  /**
+   * An emoji drawn beside the title as decoration. The page hides it from screen readers and the
+   * twin leaves it out, so it stays a field of its own and never goes inside the text.
+   */
   readonly icon: string;
 }
 
@@ -49,6 +53,10 @@ export interface Fact {
 }
 
 export interface Credential {
+  /**
+   * An emoji drawn beside the text as decoration. The page hides it from screen readers and the
+   * twin leaves it out, so it stays a field of its own and never goes inside the text.
+   */
   readonly icon: string;
   readonly text: string;
 }
