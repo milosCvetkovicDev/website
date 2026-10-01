@@ -136,12 +136,12 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   and when the build has a `proxy.ts` or middleware, a Server Action or a Pages Router entry (the
   four `server/*-manifest.json` files the App Router manifests do not cover). It also fails a build
   that lacks a route handler in its `REQUIRED_ROUTES` (the case-study JSON since #60, the Atom feed
-  since #61; #59's twins are not listed yet), builds one as a page, allowlists one as a function, or where a dynamic one
-  prerendered no path or other params than the page above it (`/work/[slug]`). A manifest field it
-  decides on that is missing or holds an unknown value, or a prerendered path it cannot attribute to
-  a route, exits 2 rather than passing. The allowlist is `/mcp` alone, the MCP server (#62), whose
-  `POST` handler cannot be prerendered. A route handler without
-  `export const dynamic = 'force-static'` is the failure it exists for: it still serves the
+  since #61; #59's twins are not listed yet), builds one as a page, allowlists one as a function,
+  or where a dynamic one prerendered no path or other params than the page above it
+  (`/work/[slug]`). A manifest field it decides on that is missing or holds an unknown value, or a
+  prerendered path it cannot attribute to a route, exits 2 rather than passing. The allowlist is
+  `/mcp` alone, the MCP server (#62), whose `POST` handler cannot be prerendered. A route handler
+  without `export const dynamic = 'force-static'` is the failure it exists for: it still serves the
   right bytes, as a function billed per request. Its parsing is tested in `test:scripts`, which runs
   before the build.
   `e2e`: install chromium and webkit, build web, run the Playwright specs on all three projects with

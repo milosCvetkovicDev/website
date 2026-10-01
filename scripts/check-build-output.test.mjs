@@ -623,8 +623,14 @@ describe('the Atom feed (#61)', () => {
   const withoutBody = CLEAN_BODIES.filter((b) => b !== 'feed.xml.body');
 
   it('passes the feed prerendered with its body', () => {
+    // The clean tree carries the feed as a build writes it: a route handler, one static path whose
+    // source route is itself, and that path's body.
+    assert.equal(APP_ROUTES['/feed.xml/route'], '/feed.xml');
+    assert.deepEqual(cleanPrerender().routes['/feed.xml'], prerendered('/feed.xml'));
     assert.ok(CLEAN_BODIES.includes('feed.xml.body'));
-    assert.deepEqual(check().problems, []);
+    const result = check();
+    assert.deepEqual(result.problems, []);
+    assert.equal(result.bodies, CLEAN_BODIES.length);
   });
 
   it('fails the feed without its body, naming server/app/feed.xml.body', () => {
