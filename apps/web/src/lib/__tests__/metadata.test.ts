@@ -13,7 +13,7 @@
  * fast half that names the field that went missing.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildMetadata, SITE_NAME, TWITTER_HANDLE } from '../metadata';
+import { buildMetadata, FEED_TITLE, SITE_NAME, TWITTER_HANDLE } from '../metadata';
 
 // `hasPublishedPosts` is false until the owner publishes the first post, and these tests must not
 // change meaning the day that happens, so the switch is this file's own: off unless a test turns it
@@ -72,11 +72,13 @@ describe('buildMetadata()', () => {
       postIndex.published = true;
       for (const path of ['/', '/about', '/blog', '/blog/a-post', '/work/nx-remote-cache']) {
         const metadata = buildMetadata({ title: 't', description: 'd', path });
-        // One path for every route: the feed is the site's, not the page's.
+        // One path for every route: the feed is the site's, not the page's. Titled as the feed
+        // titles itself, so a reader listing the page's feeds shows a name rather than a URL.
         expect(metadata.alternates?.types, path).toEqual({
           'text/markdown': path === '/' ? '/index.md' : `${path}/index.md`,
-          'application/atom+xml': '/feed.xml',
+          'application/atom+xml': [{ url: '/feed.xml', title: 'Milos Cvetkovic — Writing' }],
         });
+        expect(FEED_TITLE).toBe('Milos Cvetkovic — Writing');
         expect(metadata.alternates?.canonical, path).toBe(path);
       }
     });

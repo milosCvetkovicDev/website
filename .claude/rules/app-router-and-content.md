@@ -45,11 +45,13 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   from `pages` in `src/data/pages/index.ts`, or a study, to the serialiser below.
 - `feed.xml/route.ts` serves the Atom feed of `publishedPosts` (#61) as
   `application/atom+xml; charset=utf-8`, written by `buildAtomFeed()` in `src/lib/atom.ts`: entries
-  newest first with the summary only, ids and links absolute on the site's origin, an author name
-  and URI and no address, and `updated` from the latest post update or, with nothing published,
-  `/blog`'s date in `static-routes.ts`, never the clock. It builds with no post published too, as a
-  feed with no entries. `app/__tests__/feed.test.ts` parses it with a real XML parser, and
-  `e2e/feed.spec.ts` checks it as served.
+  newest first with the summary only, links absolute on the site's origin, ids on the fixed
+  `https://miloscvetkovic.dev` whatever the origin (RFC 4287 ids never change), an author name and
+  URI and no address, and `updated` the later of the latest post update and `/blog`'s date in
+  `static-routes.ts`, never the clock: bump `/blog`'s date when a post is unpublished or the feed's
+  title or author changes. It builds with no post published too, as a feed with no entries.
+  `app/__tests__/feed.test.ts` parses it with a real XML parser, and `e2e/feed.spec.ts` checks it
+  as served.
 
 `buildMetadata()` advertises the twin of every route that calls it as
 `alternates.types['text/markdown']`, at the path `markdownTwinPath()` in `src/lib/pathname.ts`
@@ -59,8 +61,9 @@ fails one without, fails a static route without a record, and calls every handle
 serves exactly the serialiser's output, statically. `e2e/markdown-twins.spec.ts` checks the served
 twins against the served pages. The sitemap lists no twin. Once `hasPublishedPosts` is true,
 `buildMetadata()` also advertises the feed on every route, as
-`alternates.types['application/atom+xml']` at `FEED_PATH` from the same module; until then no
-route links it, since an advertised feed with nothing in it helps no reader (ADR 0028).
+`alternates.types['application/atom+xml']` at `FEED_PATH` from the same module, titled with the
+feed's own `FEED_TITLE` from `lib/metadata.ts`; until then no route links it, since an advertised
+feed with nothing in it helps no reader (ADR 0028).
 
 All of the route handlers prerender at build time, and `pnpm check:build-output` (a `quality` step,
 `ci-and-scripts.md`) fails when a route does not: a `GET` handler is dynamic unless it exports

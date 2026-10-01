@@ -8,8 +8,9 @@
  *
  * The real `posts` array stays empty until the owner publishes the first post, so the feed with
  * entries is built from the fixtures (`src/test/fixtures/posts.ts`): two published posts listed
- * oldest first, a draft between them, and a title holding `&`, `<` and `"`. The route itself is
- * checked over the real, empty data, and once over the fixtures to prove it passes the index in.
+ * oldest first, a draft between them, and a title holding `&`, `<` and `"`. The route is checked
+ * over an empty mock of `@/data/posts` and over the fixtures, never over the real posts, so no test
+ * here changes meaning the day the owner publishes the first one.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Post, PublishedPost } from '@/data/posts';
@@ -19,6 +20,8 @@ import { draftPost, everyBlockPost, fixturePosts, hostileTitlePost } from '@/tes
 
 const ATOM_NS = 'http://www.w3.org/2005/Atom';
 const SITE = 'https://example.test';
+/** The origin every id is on, whatever `siteUrl` is: ids never change (RFC 4287, 4.2.6). */
+const ID = 'https://miloscvetkovic.dev';
 const FALLBACK = '2026-01-27';
 
 /** Parses `xml` as XML, failing the test with the parser's own message when it is not well-formed. */
@@ -64,10 +67,12 @@ describe('buildAtomFeed()', () => {
     expect(xml.startsWith('<?xml version="1.0" encoding="utf-8"?>\n')).toBe(true);
     expect(feed.localName).toBe('feed');
     expect(feed.namespaceURI).toBe(ATOM_NS);
+    // The language of every title and summary, for a reader's hyphenation and screen reader.
+    expect(feed.getAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang')).toBe('en');
   });
 
   it('gives the feed the elements RFC 4287 requires, each once', () => {
-    expect(text(feed, 'id')).toBe(`${SITE}/blog`);
+    expect(text(feed, 'id')).toBe(`${ID}/blog`);
     expect(text(feed, 'title')).toBe('Milos Cvetkovic — Writing');
     expect(text(feed, 'updated')).toMatch(DATE_TIME);
   });
@@ -95,8 +100,8 @@ describe('buildAtomFeed()', () => {
   it('holds one entry per published post, newest first, and no draft', () => {
     const entries = children(feed, 'entry');
     expect(entries.map((entry) => text(entry, 'id'))).toEqual([
-      `${SITE}/blog/${hostileTitlePost.slug}`,
-      `${SITE}/blog/${everyBlockPost.slug}`,
+      `${ID}/blog/${hostileTitlePost.slug}`,
+      `${ID}/blog/${everyBlockPost.slug}`,
     ]);
     expect(xml).not.toContain(draftPost.slug);
     expect(xml).not.toContain(draftPost.title);
@@ -106,7 +111,7 @@ describe('buildAtomFeed()', () => {
     '%s: id, title, dates, an absolute link and the summary, as written',
     (_slug, post) => {
       const entry = children(feed, 'entry').find(
-        (candidate) => text(candidate, 'id') === `${SITE}/blog/${post.slug}`,
+        (candidate) => text(candidate, 'id') === `${ID}/blog/${post.slug}`,
       );
       if (!entry) throw new Error(`no entry for ${post.slug}`);
       expect(text(entry, 'title')).toBe(post.title);
@@ -142,8 +147,46 @@ describe('buildAtomFeed()', () => {
     expect(text(later, 'updated')).toBe('2026-09-20T00:00:00Z');
     // Order stays by publication: a revision does not move a post to the top.
     expect(children(later, 'entry').map((entry) => text(entry, 'id'))).toEqual([
-      `${SITE}/blog/${hostileTitlePost.slug}`,
-      `${SITE}/blog/${everyBlockPost.slug}`,
+      `${ID}/blog/${hostileTitlePost.slug}`,
+      `${ID}/blog/${everyBlockPost.slug}`,
+    ]);
+  });
+
+  it('never dates the feed before the fallback, so unpublishing a post cannot move it back', () => {
+    // The commit that unpublishes the newest post bumps /blog's date, the fallback; the feed takes
+    // the later of the two rather than falling back to the older post that remains.
+    expect(hostileTitlePost.updatedAt > everyBlockPost.updatedAt).toBe(true);
+    const unpublished = feedOf([everyBlockPost], '2026-09-30');
+    expect(text(unpublished, 'updated')).toBe('2026-09-30T00:00:00Z');
+    expect(children(unpublished, 'entry')).toHaveLength(1);
+  });
+
+  it('keeps every id when the site moves, and only the links follow it', () => {
+    const elsewhere = parse(
+      buildAtomFeed(fixturePosts, {
+        siteUrl: 'https://staging.example.test',
+        fallbackUpdated: FALLBACK,
+      }),
+    ).documentElement;
+    const ids = (root: Element) => [
+      text(root, 'id'),
+      ...children(root, 'entry').map((entry) => text(entry, 'id')),
+    ];
+    expect(ids(elsewhere)).toEqual(ids(feed));
+    expect(ids(feed)).toEqual([
+      `${ID}/blog`,
+      `${ID}/blog/${hostileTitlePost.slug}`,
+      `${ID}/blog/${everyBlockPost.slug}`,
+    ]);
+    expect(links(elsewhere, 'self')[0].getAttribute('href')).toBe(
+      'https://staging.example.test/feed.xml',
+    );
+    const entryLinks = children(elsewhere, 'entry').map((entry) =>
+      links(entry, 'alternate')[0].getAttribute('href'),
+    );
+    expect(entryLinks).toEqual([
+      `https://staging.example.test/blog/${hostileTitlePost.slug}`,
+      `https://staging.example.test/blog/${everyBlockPost.slug}`,
     ]);
   });
 
@@ -151,13 +194,16 @@ describe('buildAtomFeed()', () => {
     for (const list of [[], [draftPost]] as const) {
       const empty = feedOf(list);
       expect(children(empty, 'entry')).toEqual([]);
-      expect(text(empty, 'id')).toBe(`${SITE}/blog`);
+      expect(text(empty, 'id')).toBe(`${ID}/blog`);
       expect(text(empty, 'updated')).toBe(`${FALLBACK}T00:00:00Z`);
       expect(links(empty, 'self')).toHaveLength(1);
     }
   });
 
   it('never reads the clock: the same posts give the same bytes on any day', () => {
+    // Both built under real timers, before the clock is faked, so a clock-derived value in either
+    // build would differ from these whatever format it took.
+    const empty = buildAtomFeed([], { siteUrl: SITE, fallbackUpdated: FALLBACK });
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date('2027-03-01T12:00:00Z'));
@@ -165,8 +211,7 @@ describe('buildAtomFeed()', () => {
       vi.setSystemTime(new Date('2031-11-30T23:59:59Z'));
       const second = buildAtomFeed([], { siteUrl: SITE, fallbackUpdated: FALLBACK });
       expect(first).toBe(xml);
-      expect(second).toBe(buildAtomFeed([], { siteUrl: SITE, fallbackUpdated: FALLBACK }));
-      expect(second).not.toMatch(/2027|2031/);
+      expect(second).toBe(empty);
     } finally {
       vi.useRealTimers();
     }
@@ -188,13 +233,31 @@ describe('buildAtomFeed()', () => {
     expect(() => buildAtomFeed([bad], { siteUrl: SITE, fallbackUpdated: FALLBACK })).toThrow(
       everyBlockPost.slug,
     );
-    const backwards: PublishedPost = { ...everyBlockPost, updatedAt: '2026-08-01' };
+    // The day before the fixture's own publication, whatever that is.
+    const dayBefore = new Date(`${everyBlockPost.publishedAt}T00:00:00Z`);
+    dayBefore.setUTCDate(dayBefore.getUTCDate() - 1);
+    const backwards: PublishedPost = {
+      ...everyBlockPost,
+      updatedAt: dayBefore.toISOString().slice(0, 10),
+    };
+    expect(backwards.updatedAt < backwards.publishedAt).toBe(true);
     expect(() => buildAtomFeed([backwards], { siteUrl: SITE, fallbackUpdated: FALLBACK })).toThrow(
       /updatedAt/,
     );
     expect(() => buildAtomFeed([], { siteUrl: SITE, fallbackUpdated: '27 January 2026' })).toThrow(
       /fallbackUpdated/,
     );
+  });
+
+  it('writes tab, LF and CR as references, so a reader gets them back as written', () => {
+    const summary = `${hostileTitlePost.summary}\r\nA second line,\ta tab and a lone\rCR.`;
+    const written = buildAtomFeed([{ ...hostileTitlePost, summary }], {
+      siteUrl: SITE,
+      fallbackUpdated: FALLBACK,
+    });
+    expect(written).toContain('&#xD;&#xA;A second line,&#x9;a tab and a lone&#xD;CR.');
+    const entry = children(parse(written).documentElement, 'entry')[0];
+    expect(text(entry, 'summary')).toBe(summary);
   });
 
   it('refuses text XML 1.0 cannot carry, rather than write a feed no reader parses', () => {
@@ -222,6 +285,12 @@ describe('the /feed.xml route', () => {
 
   it('serves an empty Atom feed dated by /blog while nothing is published', async () => {
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', '');
+    // Nothing published, whatever the real posts hold: this case must not change the day the owner
+    // publishes the first post.
+    vi.doMock('@/data/posts', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@/data/posts')>();
+      return { ...actual, posts: [], ...actual.buildPostIndex([]) };
+    });
     const { GET } = await import('../feed.xml/route');
     const response = GET();
     expect(response.status).toBe(200);
@@ -230,7 +299,7 @@ describe('the /feed.xml route', () => {
     const feed = parse(await response.text()).documentElement;
     expect(children(feed, 'entry')).toEqual([]);
     // Production when the variable is blank, as the sitemap and the twins fall back.
-    expect(text(feed, 'id')).toBe('https://miloscvetkovic.dev/blog');
+    expect(links(feed, 'self')[0].getAttribute('href')).toBe('https://miloscvetkovic.dev/feed.xml');
     expect(text(feed, 'updated')).toBe(`${STATIC_ROUTE_UPDATED['/blog']}T00:00:00Z`);
   });
 

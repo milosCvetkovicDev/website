@@ -15,6 +15,12 @@ import { assertPathname, FEED_PATH, markdownTwinPath } from './pathname';
  */
 
 export const SITE_NAME = 'Milos Cvetkovic';
+/**
+ * The Atom feed's title (#61): the site's name, then the blog's, as `/blog`'s heading names it. The
+ * feed's own `<title>` and the `title` of the link that advertises it, so a reader that lists the
+ * feeds a page offers shows the same name the feed gives itself.
+ */
+export const FEED_TITLE = `${SITE_NAME} — Writing`;
 /** The Twitter card's `creator`: the X profile's handle from `data/social.ts`, after an `@`. */
 export const TWITTER_HANDLE = `@${social.x.handle}`;
 
@@ -64,7 +70,9 @@ export function buildMetadata({
       canonical: path,
       types: {
         'text/markdown': markdownTwinPath(path),
-        ...(hasPublishedPosts && { 'application/atom+xml': FEED_PATH }),
+        ...(hasPublishedPosts && {
+          'application/atom+xml': [{ url: FEED_PATH, title: FEED_TITLE }],
+        }),
       },
     },
     openGraph: {

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { hasPublishedPosts, publishedPosts } from '../src/data/posts';
 import { FEED, SITE_ORIGIN } from './endpoints';
 import { NOT_FOUND_ROUTE, PAGE_ROUTES, postRoute } from './routes';
-import { alternates, attributeText, fetchHead } from './support/served-head';
+import { alternateLinks, alternates, attributeText, fetchHead } from './support/served-head';
 
 /**
  * The Atom feed (#61, AC 7) and its discovery link, as served: `request.get(path)`, the bytes a feed
@@ -20,6 +20,8 @@ import { alternates, attributeText, fetchHead } from './support/served-head';
 
 /** RFC 4287's media type, with the charset the handler writes (`ATOM_CONTENT_TYPE`). */
 const ATOM = 'application/atom+xml; charset=utf-8';
+/** The feed's own title (`FEED_TITLE`), which the link that advertises it carries too. */
+const FEED_TITLE = 'Milos Cvetkovic — Writing';
 
 test(`${FEED} is served as Atom: one entry per published post, newest first`, async ({
   page,
@@ -41,6 +43,7 @@ test(`${FEED} is served as Atom: one entry per published post, newest first`, as
       return {
         error: doc.querySelector('parsererror')?.textContent ?? null,
         root: `${root.namespaceURI} ${root.localName}`,
+        lang: root.getAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang'),
         required: ['id', 'title', 'updated'].map((name) => own(root, name).length),
         self: own(root, 'link')
           .filter((link) => link.getAttribute('rel') === 'self')
@@ -59,6 +62,7 @@ test(`${FEED} is served as Atom: one entry per published post, newest first`, as
 
   expect(feed.error, `${FEED} should be well-formed XML`).toBeNull();
   expect(feed.root).toBe('http://www.w3.org/2005/Atom feed');
+  expect(feed.lang, 'the language of its titles and summaries').toBe('en');
   expect(feed.required, 'one id, title and updated on the feed').toEqual([1, 1, 1]);
   expect(feed.self, 'one absolute self link').toEqual([`${SITE_ORIGIN}${FEED}`]);
   expect(feed.entries).toEqual(
@@ -76,10 +80,12 @@ for (const route of PAGE_ROUTES.filter((path) => path !== NOT_FOUND_ROUTE)) {
   test(`${route} advertises the feed ${HOW_OFTEN}`, async ({ request }) => {
     const head = await fetchHead(request, route);
     expect(head.status, `${route} should answer 200`).toBe(200);
-    const hrefs = alternates(head, 'application/atom+xml');
-    expect(hrefs, `${route}: Atom alternates`).toHaveLength(hasPublishedPosts ? 1 : 0);
+    const links = alternateLinks(head, 'application/atom+xml');
+    expect(links, `${route}: Atom alternates`).toHaveLength(hasPublishedPosts ? 1 : 0);
 
-    for (const href of hrefs) {
+    for (const { href = '', title } of links) {
+      // Named as the feed names itself, so a reader listing the page's feeds shows the name.
+      expect(title && attributeText(title), `${route}'s feed link title`).toBe(FEED_TITLE);
       // `metadataBase` resolves the path `buildMetadata()` sets into the site's origin.
       const advertised = new URL(attributeText(href), SITE_ORIGIN);
       expect(`${advertised.origin}${advertised.pathname}${advertised.search}`).toBe(
