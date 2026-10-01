@@ -92,6 +92,12 @@ function Block({ block }: { block: PostBlock }) {
           </p>
         </blockquote>
       );
+    default: {
+      // A sixth `PostBlock` kind fails typecheck here until it has a renderer, rather than
+      // returning nothing and dropping its block from the page.
+      const unhandled: never = block;
+      throw new Error(`PostBody: no renderer for ${JSON.stringify(unhandled)}`);
+    }
   }
 }
 
