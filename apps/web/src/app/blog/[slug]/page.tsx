@@ -70,7 +70,7 @@ export default async function PostPage({ params }: PageProps) {
 
   return (
     <div className="py-16 md:py-24">
-      <article className="mx-auto max-w-3xl px-6">
+      <div className="mx-auto max-w-3xl px-6">
         <Link
           href="/blog"
           className="mb-8 flex w-fit items-center gap-2 text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
@@ -93,26 +93,30 @@ export default async function PostPage({ params }: PageProps) {
           Back to Writing
         </Link>
 
-        <header className="mb-12">
-          <h1 className="mb-6 text-4xl font-bold wrap-break-word md:text-5xl">{post.title}</h1>
-          <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-            <div className="flex gap-2">
-              <dt className="text-[var(--muted)]">Published</dt>
-              <dd>
-                <time dateTime={post.publishedAt}>{published}</time>
-              </dd>
-            </div>
-            <div className="flex gap-2">
-              <dt className="text-[var(--muted)]">Updated</dt>
-              <dd>
-                <time dateTime={post.updatedAt}>{updated}</time>
-              </dd>
-            </div>
-          </dl>
-        </header>
+        {/* The post itself, without the way back: an extractor that reads the article gets the
+            title, the dates and the body, and nothing of the page around them. */}
+        <article>
+          <header className="mb-12">
+            <h1 className="mb-6 text-4xl font-bold wrap-break-word md:text-5xl">{post.title}</h1>
+            <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+              <div className="flex gap-2">
+                <dt className="text-[var(--muted)]">Published</dt>
+                <dd>
+                  <time dateTime={post.publishedAt}>{published}</time>
+                </dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="text-[var(--muted)]">Updated</dt>
+                <dd>
+                  <time dateTime={post.updatedAt}>{updated}</time>
+                </dd>
+              </div>
+            </dl>
+          </header>
 
-        <PostBody blocks={post.body} />
-      </article>
+          <PostBody blocks={post.body} />
+        </article>
+      </div>
     </div>
   );
 }

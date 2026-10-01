@@ -114,6 +114,19 @@ describe('the post page', () => {
     );
   });
 
+  it('keeps the way back out of the article, which holds the title, the dates and the body', async () => {
+    const { container } = render(await PostPage(paramsOf(everyBlockPost.slug)));
+    const articles = container.querySelectorAll('article');
+    expect(articles).toHaveLength(1);
+    const [article] = articles;
+    expect(article.querySelector('h1')?.textContent).toBe(everyBlockPost.title);
+    expect(article.querySelectorAll('time')).toHaveLength(2);
+    expect(article.querySelector('[data-post-body]')).not.toBeNull();
+    const back = screen.getByRole('link', { name: 'Back to Writing' });
+    expect(back).toHaveAttribute('href', '/blog');
+    expect(article.contains(back)).toBe(false);
+  });
+
   it('puts no text under aria-hidden, which the axe gate would measure anyway', async () => {
     for (const post of publishedPosts) {
       const { container, unmount } = render(await PostPage(paramsOf(post.slug)));
