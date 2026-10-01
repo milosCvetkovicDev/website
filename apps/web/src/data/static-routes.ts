@@ -7,13 +7,12 @@ import { experienceFigureSince } from './profile';
  * A case study's dates live on its entry in `case-studies.ts`.
  *
  * From git, the last commit to change what each route visibly says: `/` 2026-09-30 (#47: the story's
- * progress dots and readout name each section by its phase title), /about 2026-09-30 (#58: the
- * three questions answered after the story), /work and /skills 2026-10-01 (#58: the stats bar's
- * production figure counted from the studies' statuses and "Left Unfinished" dropped, and the line
- * saying the proficiency bars are self-assessed), /contact 2026-09-23 (d1da60f, #116, which changed
- * the hero subtitle and the eyebrows) and /blog 2026-01-27 (696c2ef). The later commits to /blog
- * changed only formatting, colour tokens, metadata or Open Graph images. /privacy was added on
- * 2026-09-27.
+ * progress dots and readout name each section by its phase title), /about, /work and /skills
+ * 2026-10-01 (#58: the three questions answered after the /about story, the stats bar's production
+ * figure counted from the studies' statuses and "Left Unfinished" dropped, and the line saying the
+ * proficiency bars are self-assessed), /contact 2026-09-23 (d1da60f, #116, which changed the hero
+ * subtitle and the eyebrows) and /blog 2026-01-27 (696c2ef). The later commits to /blog changed
+ * only formatting, colour tokens, metadata or Open Graph images. /privacy was added on 2026-09-27.
  *
  * One change needs no commit: `/` (the hero's XP row) and /about (its description and first quick
  * fact) print the years of experience, which `data/profile.ts` derives from the build's clock, so
@@ -25,7 +24,7 @@ const laterOf = (recorded: string, derived: string) => (recorded > derived ? rec
 
 export const STATIC_ROUTE_UPDATED = {
   '/': laterOf('2026-09-30', figureSince),
-  '/about': laterOf('2026-09-30', figureSince),
+  '/about': laterOf('2026-10-01', figureSince),
   '/work': '2026-10-01',
   '/skills': '2026-10-01',
   '/blog': '2026-01-27',
