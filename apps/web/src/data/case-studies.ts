@@ -178,7 +178,7 @@ export interface CaseStudy {
 // which also relabelled the self-healing agent's figure. The change before it, on 2026-09-25, moved
 // that study to the past tense and aligned the enterprise study's claims with the public record.
 const PUBLISHED_AT = '2026-09-09';
-const UPDATED_AT = '2026-09-30';
+const UPDATED_AT = '2026-10-01';
 
 export const caseStudies: CaseStudy[] = [
   {
