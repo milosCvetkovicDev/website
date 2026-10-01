@@ -698,6 +698,11 @@ test('/skills says above its proficiency bars that they are self-assessed (#58)'
         heading: Boolean(h2),
         note: note ? { tag: note.localName, text: text(note) } : null,
         skillsAfterNote: bars ? [...bars.querySelectorAll('h3')].map(text) : [],
+        barNames: bars
+          ? [...bars.querySelectorAll('[role="progressbar"]')].map(
+              (bar) => bar.getAttribute('aria-label') ?? '',
+            )
+          : [],
       };
     },
     [await response.text(), skillsCopy.headings.coreSkills] as const,
@@ -716,4 +721,10 @@ test('/skills says above its proficiency bars that they are self-assessed (#58)'
   expect(served.skillsAfterNote, 'the bars follow the note, every core skill among them').toEqual(
     coreSkills.map(({ name }) => name),
   );
+  // A screen reader user moving through the bars hears each bar's name, not the note above them, so
+  // every name carries the same qualifier.
+  expect(served.barNames, 'one progressbar per core skill').toHaveLength(coreSkills.length);
+  for (const name of served.barNames) {
+    expect(name, 'each bar names its level as self-assessed').toMatch(/self-assessed/i);
+  }
 });

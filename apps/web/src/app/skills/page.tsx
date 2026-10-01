@@ -110,7 +110,7 @@ export default function SkillsPage() {
           </p>
         </div>
 
-        {/* Core skills with depth: the note says what the bars and the years are before they show */}
+        {/* Core skills with depth: the note says what the bars and years are before they show */}
         <section className="mb-20">
           <h2 className="mb-3 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {skillsCopy.headings.coreSkills}
