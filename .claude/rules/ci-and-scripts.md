@@ -17,7 +17,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 - `scripts/` at the repository root holds the scripts that run outside the apps:
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `check-adr-index.mjs`
   (`pnpm check:adrs`, the ADR records against their index), `check-build-output.mjs`
-  (`pnpm check:build-output`, that the web build stays function-free), `vercel-ignore-build.mjs`
+  (`pnpm check:build-output`, that `/mcp` is the build's one function), `vercel-ignore-build.mjs`
   (Vercel's ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log
   check), `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22 runs directly),
   `docs-drift-patch.mjs` (the docs drift workflow's check on what its agent changed),
@@ -53,7 +53,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `pnpm format:check`                                                     | Prettier in check mode, no writes                                                                                                                                                                           |
 | `pnpm check:allowbuilds`                                                | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                                                     |
 | `pnpm check:adrs`                                                       | Checks each ADR's status, H1 title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules; exit 1 on a disagreement, 2 if it could not run                         |
-| `pnpm check:build-output [<distDir>]`                                   | After `pnpm --filter web build`: every route in `apps/web/.next` is prerendered with its body file and none needs a server function outside `ALLOWED_FUNCTIONS`; exit 1 on a finding, 2 if it could not run |
+| `pnpm check:build-output [<distDir>]`                                   | After `pnpm --filter web build`: every route, and each one in `REQUIRED_ROUTES`, is prerendered with its body file, none a function outside `ALLOWED_FUNCTIONS`; exit 1 on a finding, 2 if it could not run |
 | `pnpm check:docs-drift`                                                 | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                                         |
 | `pnpm test:scripts`                                                     | `node:test` tests for the root `scripts/`                                                                                                                                                                   |
 | `scripts/flake-hunt.sh [runs]`                                          | Runs the whole e2e suite N times (30 by default) and ranks specs by failure rate in `flake-hunt/flake-report.json`                                                                                          |
@@ -134,10 +134,14 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   revalidation, or a partially prerendered page) unless it is in the script's `ALLOWED_FUNCTIONS`,
   when an allowlisted route turns out static or absent, when a prerendered path has no body file,
   and when the build has a `proxy.ts` or middleware, a Server Action or a Pages Router entry (the
-  four `server/*-manifest.json` files the App Router manifests do not cover). A manifest field it
+  four `server/*-manifest.json` files the App Router manifests do not cover). It also fails a build
+  that lacks a route handler in its `REQUIRED_ROUTES` (the case-study JSON since #60; #59's twins
+  are not listed yet), builds one as a page, allowlists one as a function, or where a dynamic one
+  prerendered no path or other params than the page above it (`/work/[slug]`). A manifest field it
   decides on that is missing or holds an unknown value, or a prerendered path it cannot attribute to
-  a route, exits 2 rather than passing. The allowlist is empty; #62 adds `/mcp`. A route handler
-  without `export const dynamic = 'force-static'` is the failure it exists for: it still serves the
+  a route, exits 2 rather than passing. The allowlist is `/mcp` alone, the MCP server (#62), whose
+  `POST` handler cannot be prerendered. A route handler without
+  `export const dynamic = 'force-static'` is the failure it exists for: it still serves the
   right bytes, as a function billed per request. Its parsing is tested in `test:scripts`, which runs
   before the build.
   `e2e`: install chromium and webkit, build web, run the Playwright specs on all three projects with
@@ -160,11 +164,15 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   `playwright.config.ts`. It targets the apex because a deployment's own URL is behind Vercel
   Authentication, so it can test the previous deployment when the alias has not moved yet; the
   daily run covers that race and changes that reach the apex without a status (rollback,
-  promotion). It asserts the tracker tag and its script's 200, a console without errors or
-  warnings, no `Set-Cookie`, cookie or storage entry, on desktop Chromium only; never a page-view
-  beacon or the intake's CSP `connect-src`: the tracker sends nothing when `navigator.webdriver`
-  is true. A failed deployment or scheduled run opens the issue "Live check failed on the
-  production site", or comments on the open one; the job holds `issues: write` for that step alone.
+  promotion). `analytics.spec.ts` asserts the tracker tag and its script's 200, a console without
+  errors or warnings, no `Set-Cookie`, cookie or storage entry, on desktop Chromium only; never a
+  page-view beacon or the intake's CSP `connect-src`: the tracker sends nothing when
+  `navigator.webdriver` is true. `markdown-negotiation.spec.ts` checks that the CDN keys on
+  `Accept` (ADR 0030): on every route with a Markdown twin, a Markdown request then a browser's,
+  and the reverse, with no cache-busting query, the browser must get `text/html` and the agent
+  `text/markdown; charset=utf-8` with `accept` in `Vary`. A failed deployment or scheduled run
+  opens the issue "Live check failed on the production site", or comments on the open one; the job
+  holds `issues: write` for that step alone.
   Locally: `pnpm --filter web exec playwright test --config playwright.live.config.ts`, with
   `LIVE_URL` for another target.
 - `.github/workflows/flake-hunt.yml` hunts flaky e2e tests every night at 02:17 UTC and on manual

@@ -7,9 +7,10 @@ import { STATIC_ROUTES, caseStudyRoute } from './routes';
  *
  * Every path an agent-facing endpoint answers on is written here once, and the specs and tasks that
  * build or test one import it rather than restating it: #59 (the Markdown twins), #60 (`/llms.txt`
- * and the JSON representation), #61 (the Atom feed) and #62 (the MCP server). The twins are served;
- * the rest are not yet. `machine-readable.spec.ts` holds one expected failure per endpoint not yet
- * served, and the task that ships an endpoint deletes its annotation in the same change.
+ * and the JSON representation), #61 (the Atom feed) and #62 (the MCP server). The twins, the
+ * case-study JSON and the MCP server are served; the rest are not yet. `machine-readable.spec.ts`
+ * holds one expected failure per endpoint not yet served, and the task that ships an endpoint
+ * deletes its annotation in the same change.
  *
  * The page routes come from `routes.ts`, so a new static route or case study gets a twin row without
  * touching this file.
@@ -29,7 +30,10 @@ import { STATIC_ROUTES, caseStudyRoute } from './routes';
  */
 export { markdownTwinPath };
 
-/** One case study as JSON (#60), `/work/<slug>/index.json` for the same reason as the twins. */
+/**
+ * One case study as JSON (#60), `/work/<slug>/index.json` for the same reason as the twins, served by
+ * `src/app/work/[slug]/index.json/route.ts`.
+ */
 export function caseStudyJsonPath(slug: string): string {
   return `${caseStudyRoute(slug)}/index.json`;
 }
@@ -59,8 +63,9 @@ export const MARKDOWN_TWINS = [
 export const LLMS_TXT = '/llms.txt';
 
 /**
- * Every case study as one JSON array (#60). Deliberately not under `/api/`, and with the per-slug
- * shape below matching the twins; both paths are the ones #60 fixes.
+ * Every case study as one JSON array (#60), served by `src/app/case-studies.json/route.ts`.
+ * Deliberately not under `/api/`, and with the per-slug shape above matching the twins; both paths
+ * are the ones #60 fixes.
  */
 export const CASE_STUDIES_JSON = '/case-studies.json';
 

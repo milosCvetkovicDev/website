@@ -61,6 +61,7 @@ const COPY_MODULES = [
   'app/skills/page.tsx',
   'app/work/page.tsx',
   'app/work/[slug]/page.tsx',
+  'app/blog/[slug]/page.tsx',
   'app/not-found.tsx',
   'app/error.tsx',
   'components/json-ld.tsx',

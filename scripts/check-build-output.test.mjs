@@ -17,9 +17,11 @@ import { fileURLToPath } from 'node:url';
 import {
   ALLOWED_FUNCTIONS,
   CheckError,
+  REQUIRED_ROUTES,
   bodyFile,
   collectOtherFunctions,
   collectProblems,
+  paramsSibling,
   readAppRoutes,
   readPrerender,
 } from './check-build-output.mjs';
@@ -30,7 +32,8 @@ const thisScript = join(dirname(fileURLToPath(import.meta.url)), 'check-build-ou
 
 /**
  * `app-path-routes-manifest.json` for a small site shaped like this one: static pages, metadata
- * routes, a force-static handler, and a dynamic page and handler with fixed params (ADR 0015).
+ * routes, force-static handlers, and a dynamic page and handlers with fixed params (ADR 0015),
+ * the routes in `REQUIRED_ROUTES` among them.
  */
 const APP_ROUTES = {
   '/page': '/',
@@ -38,9 +41,18 @@ const APP_ROUTES = {
   '/about/page': '/about',
   '/robots.txt/route': '/robots.txt',
   '/opengraph-image/route': '/opengraph-image',
+  '/case-studies.json/route': '/case-studies.json',
   '/work/[slug]/page': '/work/[slug]',
   '/work/[slug]/og-image.png/route': '/work/[slug]/og-image.png',
+  '/work/[slug]/index.json/route': '/work/[slug]/index.json',
 };
+
+/**
+ * `APP_ROUTES` with the site's one server function, the MCP server's `POST` handler (#62), as a
+ * build of this repository lists it: an app route with no prerendered path. The command checks
+ * against the real `ALLOWED_FUNCTIONS`, so the trees it is handed carry it.
+ */
+const BUILT_ROUTES = { ...APP_ROUTES, '/mcp/route': '/mcp' };
 
 /**
  * One `routes` entry of `prerender-manifest.json`, with the fields the gate reads.
@@ -86,14 +98,18 @@ const cleanPrerender = () => ({
     '/about': prerendered('/about'),
     '/robots.txt': prerendered('/robots.txt'),
     '/opengraph-image': prerendered('/opengraph-image'),
+    '/case-studies.json': prerendered('/case-studies.json'),
     '/work/a': prerendered('/work/[slug]'),
     '/work/b': prerendered('/work/[slug]'),
     '/work/a/og-image.png': prerendered('/work/[slug]/og-image.png'),
     '/work/b/og-image.png': prerendered('/work/[slug]/og-image.png'),
+    '/work/a/index.json': prerendered('/work/[slug]/index.json'),
+    '/work/b/index.json': prerendered('/work/[slug]/index.json'),
   },
   dynamicRoutes: {
     '/work/[slug]': { fallback: false },
     '/work/[slug]/og-image.png': { fallback: false },
+    '/work/[slug]/index.json': { fallback: false },
   },
 });
 
@@ -104,10 +120,13 @@ const CLEAN_BODIES = [
   'about.html',
   'robots.txt.body',
   'opengraph-image.body',
+  'case-studies.json.body',
   'work/a.html',
   'work/b.html',
   'work/a/og-image.png.body',
   'work/b/og-image.png.body',
+  'work/a/index.json.body',
+  'work/b/index.json.body',
 ];
 
 /**
@@ -116,6 +135,7 @@ const CLEAN_BODIES = [
  *   prerender?: PrerenderManifest,
  *   bodies?: string[],
  *   allowed?: readonly string[],
+ *   required?: readonly string[],
  * }} [overrides]
  */
 function check({
@@ -123,14 +143,33 @@ function check({
   prerender = cleanPrerender(),
   bodies = CLEAN_BODIES,
   allowed = [],
+  required = REQUIRED_ROUTES,
 } = {}) {
   const present = new Set(bodies);
   return collectProblems({
     appRoutes: readAppRoutes(JSON.stringify(appRoutes)),
     prerender: readPrerender(JSON.stringify(prerender)),
     allowed,
+    required,
     hasBody: (file) => present.has(file),
   });
+}
+
+/**
+ * The clean tree without one route: its app-manifest entry, its prerendered paths, its dynamic
+ * entry and its bodies, as a build without that route's folder would write it.
+ *
+ * @param {string} route
+ */
+function without(route) {
+  const appRoutes = Object.fromEntries(Object.entries(APP_ROUTES).filter(([, r]) => r !== route));
+  const prerender = cleanPrerender();
+  for (const [path, entry] of Object.entries(prerender.routes)) {
+    if ((entry.srcRoute ?? path) === route) delete prerender.routes[path];
+  }
+  delete prerender.dynamicRoutes[route];
+  const gone = route === '/case-studies.json' ? /^case-studies\.json/ : /\/index\.json\.body$/;
+  return { appRoutes, prerender, bodies: CLEAN_BODIES.filter((b) => !gone.test(b)) };
 }
 
 describe('bodyFile', () => {
@@ -142,6 +181,8 @@ describe('bodyFile', () => {
     ['/work/a/og-image.png', 'route', 'work/a/og-image.png.body'],
     ['/index.md', 'route', 'index.md.body'],
     ['/about/index.md', 'route', 'about/index.md.body'],
+    ['/case-studies.json', 'route', 'case-studies.json.body'],
+    ['/work/a/index.json', 'route', 'work/a/index.json.body'],
   ]) {
     it(`finds ${route} (${kind}) at server/app/${file}`, () => {
       assert.equal(bodyFile(route, /** @type {'page' | 'route'} */ (kind)), file);
@@ -302,6 +343,113 @@ describe('collectProblems', () => {
     assert.match(problems[0], /^\/work\/b .*server\/app\/work\/b\.html/);
   });
 
+  it('fails a missing JSON body of one case study, naming the file', () => {
+    const { problems } = check({
+      bodies: CLEAN_BODIES.filter((b) => b !== 'work/b/index.json.body'),
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/work\/b\/index\.json .*server\/app\/work\/b\/index\.json\.body/);
+  });
+
+  it('fails a required handler built without force-static once, as a function', () => {
+    // `app/case-studies.json/route.ts` without its `dynamic` export: in the app manifest, not
+    // prerendered. The function finding names it; being required adds no second one.
+    const prerender = cleanPrerender();
+    delete prerender.routes['/case-studies.json'];
+    const { problems } = check({
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => b !== 'case-studies.json.body'),
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/case-studies\.json: .*function.*force-static/);
+  });
+
+  for (const route of ['/case-studies.json', '/work/[slug]/index.json']) {
+    it(`fails a build without the required ${route}, naming it`, () => {
+      const { problems } = check(without(route));
+      assert.equal(problems.length, 1);
+      assert.ok(problems[0].startsWith(`${route}: is in REQUIRED_ROUTES`), problems[0]);
+      assert.match(problems[0], /no such route/);
+    });
+  }
+
+  it('passes the same tree when nothing is required', () => {
+    assert.deepEqual(check({ ...without('/case-studies.json'), required: [] }).problems, []);
+  });
+
+  it('fails a required dynamic route whose params produced no path', () => {
+    // Passes the function check (fixed params, nothing on demand) but serves only 404s.
+    const prerender = cleanPrerender();
+    delete prerender.routes['/work/a/index.json'];
+    delete prerender.routes['/work/b/index.json'];
+    const { problems } = check({
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => !b.endsWith('/index.json.body')),
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/work\/\[slug\]\/index\.json: .*REQUIRED_ROUTES.*no path/);
+  });
+
+  it('fails a required dynamic route that drops a param its page serves, naming the path', () => {
+    // `/work/b` answers 200 while its JSON would be a 404: at least one path is not enough.
+    const prerender = cleanPrerender();
+    delete prerender.routes['/work/b/index.json'];
+    const { problems } = check({
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => b !== 'work/b/index.json.body'),
+    });
+    assert.equal(problems.length, 1);
+    assert.match(
+      problems[0],
+      /^\/work\/\[slug\]\/index\.json: .*nothing for \/work\/b, which \/work\/\[slug\] serves/,
+    );
+  });
+
+  it('fails a required dynamic route that prerenders a param its page does not serve', () => {
+    const prerender = cleanPrerender();
+    prerender.routes['/work/c/index.json'] = prerendered('/work/[slug]/index.json');
+    const { problems } = check({ prerender, bodies: [...CLEAN_BODIES, 'work/c/index.json.body'] });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/work\/\[slug\]\/index\.json: .*prerendered \/work\/c, which/);
+  });
+
+  it('fails a required route rebuilt as a page, which serves HTML', () => {
+    const appRoutes = Object.fromEntries(
+      Object.entries(APP_ROUTES).map(([entry, route]) =>
+        route === '/case-studies.json' ? ['/case-studies.json/page', route] : [entry, route],
+      ),
+    );
+    const { problems } = check({
+      appRoutes,
+      bodies: [
+        ...CLEAN_BODIES.filter((b) => b !== 'case-studies.json.body'),
+        'case-studies.json.html',
+      ],
+    });
+    assert.equal(problems.length, 1);
+    assert.match(
+      problems[0],
+      /^\/case-studies\.json: .*REQUIRED_ROUTES.*a page, not a route handler/,
+    );
+  });
+
+  it('fails a required route that is also allowlisted as a function, even with no path', () => {
+    // The allowlist would accept its function finding, and the required check must not.
+    const prerender = cleanPrerender();
+    delete prerender.routes['/case-studies.json'];
+    const { problems, functions } = check({
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => b !== 'case-studies.json.body'),
+      allowed: ['/case-studies.json'],
+    });
+    assert.deepEqual(functions, ['/case-studies.json']);
+    assert.equal(problems.length, 1);
+    assert.match(
+      problems[0],
+      /^\/case-studies\.json: .*both REQUIRED_ROUTES and ALLOWED_FUNCTIONS/,
+    );
+  });
+
   it('fails a dynamic route that renders unknown params on demand', () => {
     const prerender = cleanPrerender();
     prerender.dynamicRoutes['/work/[slug]'] = { fallback: null };
@@ -358,6 +506,35 @@ describe('collectProblems', () => {
     const { problems } = check({ allowed: ['/mcp'] });
     assert.equal(problems.length, 1);
     assert.match(problems[0], /^\/mcp: .*ALLOWED_FUNCTIONS/);
+  });
+
+  it('passes the site as built, with ALLOWED_FUNCTIONS, reporting /mcp as its one function', () => {
+    const { problems, functions } = check({ appRoutes: BUILT_ROUTES, allowed: ALLOWED_FUNCTIONS });
+    assert.deepEqual(problems, []);
+    assert.deepEqual(functions, ['/mcp']);
+  });
+
+  it('fails a second function beside /mcp under ALLOWED_FUNCTIONS, naming only the second', () => {
+    const { problems, functions } = check({
+      appRoutes: { ...BUILT_ROUTES, '/llms-full.txt/route': '/llms-full.txt' },
+      allowed: ALLOWED_FUNCTIONS,
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/llms-full\.txt: .*function/);
+    assert.deepEqual(functions, ['/mcp']);
+  });
+
+  it('fails a page that became a function beside /mcp under ALLOWED_FUNCTIONS', () => {
+    const prerender = cleanPrerender();
+    delete prerender.routes['/about'];
+    const { problems } = check({
+      appRoutes: BUILT_ROUTES,
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => b !== 'about.html'),
+      allowed: ALLOWED_FUNCTIONS,
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/about: is not prerendered/);
   });
 
   it('fails a route that revalidates every 0 s too', () => {
@@ -495,8 +672,33 @@ describe('collectOtherFunctions', () => {
 });
 
 describe('ALLOWED_FUNCTIONS', () => {
-  it('is empty: nothing in this site needs a server function until #62 adds /mcp', () => {
-    assert.deepEqual([...ALLOWED_FUNCTIONS], []);
+  it('is exactly /mcp, the MCP server (#62): the one route on this site that runs per request', () => {
+    assert.deepEqual([...ALLOWED_FUNCTIONS], ['/mcp']);
+  });
+});
+
+describe('paramsSibling', () => {
+  for (const [route, sibling] of [
+    ['/work/[slug]/index.json', '/work/[slug]'],
+    ['/work/[slug]/og-image.png', '/work/[slug]'],
+    ['/a/[x]/b/[y]/c/d', '/a/[x]/b/[y]'],
+    ['/work/[slug]', null],
+    ['/case-studies.json', null],
+    ['/', null],
+  ]) {
+    it(`gives ${JSON.stringify(sibling)} for ${route}`, () => {
+      assert.equal(paramsSibling(/** @type {string} */ (route)), sibling);
+    });
+  }
+});
+
+describe('REQUIRED_ROUTES', () => {
+  it('names the case-study JSON #60 serves, and no function', () => {
+    assert.deepEqual([...REQUIRED_ROUTES], ['/case-studies.json', '/work/[slug]/index.json']);
+    assert.deepEqual(
+      REQUIRED_ROUTES.filter((route) => ALLOWED_FUNCTIONS.includes(route)),
+      [],
+    );
   });
 });
 
@@ -513,7 +715,7 @@ describe('ALLOWED_FUNCTIONS', () => {
  *   a string is written as the file's text as it is, and `null` leaves the file out
  */
 function writeTree({
-  appRoutes = APP_ROUTES,
+  appRoutes = BUILT_ROUTES,
   prerender = cleanPrerender(),
   other = {},
   buildId = 'test-build-id',
@@ -574,7 +776,7 @@ describe('the command', () => {
     withTree({}, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, /7 routes, 9 prerendered bodies, no server function/);
+      assert.match(result.stdout, /10 routes, 12 prerendered bodies, server functions: \/mcp /);
       assert.match(result.stdout, /\(BUILD_ID test-build-id, written \d{4}-\d\d-\d\dT[\d:.]+Z\)/);
     });
   });
@@ -596,11 +798,58 @@ describe('the command', () => {
     });
   });
 
-  it('exits 1 on an unlisted function, naming the route', () => {
-    withTree({ appRoutes: { ...APP_ROUTES, '/llms-full.txt/route': '/llms-full.txt' } }, (dist) => {
+  it('exits 1 on a second function beside /mcp, naming only the second', () => {
+    // #62's AC 10: the allowlist is one entry long, so a handler that forgot `force-static` fails
+    // the build even though a function is now allowed.
+    withTree(
+      { appRoutes: { ...BUILT_ROUTES, '/llms-full.txt/route': '/llms-full.txt' } },
+      (dist) => {
+        const result = run([dist]);
+        assert.equal(result.status, 1);
+        const problems = result.stderr.split('\n').filter((line) => line.startsWith('  - '));
+        assert.equal(problems.length, 1, result.stderr);
+        assert.match(problems[0], /^ {2}- \/llms-full\.txt: .*function/);
+      },
+    );
+  });
+
+  it('exits 1 when a page route quietly became a function beside /mcp', () => {
+    const prerender = cleanPrerender();
+    delete prerender.routes['/about'];
+    const bodies = CLEAN_BODIES.filter((b) => b !== 'about.html');
+    withTree({ prerender, bodies }, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 1);
-      assert.match(result.stderr, /\/llms-full\.txt/);
+      assert.match(result.stderr, /\/about: is not prerendered/);
+      assert.doesNotMatch(result.stderr, /- \/mcp/);
+    });
+  });
+
+  it('exits 1 on a function Next configured for a route other than /mcp', () => {
+    const functionsConfig = { version: 1, functions: { '/mcp': {}, '/about': {} } };
+    withTree({ other: { functionsConfig } }, (dist) => {
+      const result = run([dist]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /\/about: Next configured it/);
+      assert.doesNotMatch(result.stderr, /- \/mcp/);
+    });
+  });
+
+  it('exits 1 when the build has no /mcp, since the allowlist must be exact', () => {
+    withTree({ appRoutes: APP_ROUTES }, (dist) => {
+      const result = run([dist]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /\/mcp: is in ALLOWED_FUNCTIONS but the build has no such route/);
+    });
+  });
+
+  it('exits 1 when a required route is gone, naming it', () => {
+    const tree = without('/work/[slug]/index.json');
+    withTree({ ...tree, appRoutes: { ...tree.appRoutes, '/mcp/route': '/mcp' } }, (dist) => {
+      const result = run([dist]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /\/work\/\[slug\]\/index\.json: is in REQUIRED_ROUTES/);
+      assert.doesNotMatch(result.stderr, /- \/mcp/);
     });
   });
 

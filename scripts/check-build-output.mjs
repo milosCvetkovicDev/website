@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// Checks that the web build stays function-free: every App Router route was prerendered, its body
-// file is on disk, nothing else in the build runs per request, and the only routes that need a
-// server function are the ones on an explicit allowlist, which is empty.
+// Checks that the web build stays static: every App Router route was prerendered, its body file is
+// on disk, nothing else in the build runs per request, and the only routes that need a server
+// function are the ones on an explicit allowlist, which names `/mcp` (#62) and nothing else.
 //
 // The failure this catches is silent. Since Next 15 a `GET` route handler is dynamic unless it says
 // otherwise, so a handler that forgets `export const dynamic = 'force-static'` still serves the right
 // bytes; it just becomes a function, and every crawl of it an invocation on the Hobby plan. Measured
 // in this repository on 2026-09-12 (Next 16.3.4): the same handler built as `○ /llms.txt` with
-// `force-static` and as `ƒ /llms-full.txt` without it. Issue #55 lands this gate before the first of
-// the epic's handlers (#59 to #62), and #62 adds `/mcp`, the one function the site is meant to have.
+// `force-static` and as `ƒ /llms-full.txt` without it. Issue #55 landed this gate before the first of
+// the epic's handlers (#59 to #62), and #62 added `/mcp`, the one function the site is meant to have.
 //
 // It reads what `next build` wrote, not the route table it printed, because Next 16 redesigned its
 // terminal output and a grep over it breaks on a minor upgrade. The manifest shapes below are the
@@ -24,8 +24,9 @@
 //   (ADR 0015).
 // - `server/app/`: the prerendered bodies, `<path>.html` for a page (`index.html` for `/`) and
 //   `<path>.body` for a handler.
-// - Four manifests of what runs outside the App Router's routes, each empty in a function-free
-//   build: `server/functions-config-manifest.json` (a `proxy.ts` or Node.js middleware appears as
+// - Four manifests of what runs outside the App Router's routes, each empty in this build (`/mcp`
+//   exports no segment config, so it has no entry either; checked 2026-09-30):
+//   `server/functions-config-manifest.json` (a `proxy.ts` or Node.js middleware appears as
 //   `/_middleware`), `server/middleware-manifest.json` (Edge middleware), `server/server-reference-
 //   manifest.json` (Server Actions, which run in a function when a form posts to them even from a
 //   prerendered page), and `server/pages-manifest.json` (a Pages Router entry, where only the static
@@ -41,6 +42,12 @@
 // Each of those fails unless the route is in ALLOWED_FUNCTIONS, and a route in ALLOWED_FUNCTIONS
 // that is not a function fails too, so the list stays exactly the set of functions. Every prerendered
 // path must also have its body file, allowlisted routes included.
+//
+// All of that judges the routes the build has, so an endpoint whose handler vanished outright (its
+// folder renamed or deleted) would pass it. REQUIRED_ROUTES names handlers that must be in every
+// build: each must be an App Router route handler, not allowlisted as a function, with at least one
+// prerendered path (for a dynamic one, the params of the route above its last dynamic segment when
+// that is a route), and each path's body file is then required like any other.
 //
 // Usage: `pnpm check:build-output`, after `pnpm --filter web build`, or
 // `node scripts/check-build-output.mjs [<distDir>]`, which defaults to apps/web/.next. Prints what it
@@ -61,12 +68,27 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_DIST = join(repoRoot, 'apps', 'web', '.next');
 
 /**
- * The routes permitted to need a server function, as `app-path-routes-manifest.json` names them.
- * Empty: nothing on this site renders per request. #62 adds '/mcp' and nothing else.
+ * The routes permitted to need a server function, as `app-path-routes-manifest.json` names them:
+ * the read-only MCP server (#62), whose `POST` handler cannot be prerendered, and nothing else.
+ * Every page and every other handler renders at build time. The list must be exact: a route on it
+ * that the build has not got, or that was built static, fails the check as well.
  *
  * @type {readonly string[]}
  */
-export const ALLOWED_FUNCTIONS = Object.freeze([]);
+export const ALLOWED_FUNCTIONS = Object.freeze(['/mcp']);
+
+/**
+ * Route handlers every build must contain, prerendered, as `app-path-routes-manifest.json` names
+ * them. It lists the machine-readable endpoints from #60 on, and not yet #59's Markdown twins. A
+ * dynamic one's paths come from its `generateStaticParams`: it must prerender at least one, and when
+ * the route above its last dynamic segment is a route too, exactly that route's params, so
+ * `/work/[slug]/index.json` needs one body per `/work/<slug>` page without this list naming a
+ * slug. A required route is never a function, so it cannot be in `ALLOWED_FUNCTIONS` as well.
+ * #60 adds the case-study JSON; each later endpoint adds its own route.
+ *
+ * @type {readonly string[]}
+ */
+export const REQUIRED_ROUTES = Object.freeze(['/case-studies.json', '/work/[slug]/index.json']);
 
 /** Next's `PrerenderCompute`; every value but `static` finishes the response in a function. */
 const COMPUTE_VALUES = new Set(['static', 'blocking', 'resuming']);
@@ -250,19 +272,33 @@ export function bodyFile(path, kind) {
 const ownerOf = (path, entry) => (typeof entry.srcRoute === 'string' ? entry.srcRoute : path);
 
 /**
+ * The route a dynamic route's params must match: its own path up to its last dynamic segment, when
+ * static segments follow it (`/work/[slug]` for `/work/[slug]/index.json`), and `null` otherwise.
+ *
+ * @param {string} route
+ * @returns {string | null}
+ */
+export function paramsSibling(route) {
+  const segments = route.split('/');
+  const last = segments.findLastIndex((segment) => segment.startsWith('['));
+  return last === -1 || last === segments.length - 1 ? null : segments.slice(0, last + 1).join('/');
+}
+
+/**
  * Every problem with the App Router routes of the build, and what was checked.
  *
  * @param {{
  *   appRoutes: AppRoute[],
  *   prerender: PrerenderManifest,
  *   allowed: readonly string[],
+ *   required: readonly string[],
  *   hasBody: (file: string) => boolean,
  * }} build `hasBody` answers whether a file exists under `server/app`
  * @returns {{ problems: string[], routes: number, bodies: number, functions: string[] }}
  * @throws {CheckError} when a prerendered path or dynamic route matches no App Router route, or a
  *   path's `routeType` disagrees with its entry's name
  */
-export function collectProblems({ appRoutes, prerender, allowed, hasBody }) {
+export function collectProblems({ appRoutes, prerender, allowed, required, hasBody }) {
   /** @type {string[]} */
   const problems = [];
   /** @type {string[]} */
@@ -362,6 +398,67 @@ export function collectProblems({ appRoutes, prerender, allowed, hasBody }) {
     if (!known.has(route)) {
       problems.push(
         `${route}: is in ALLOWED_FUNCTIONS but the build has no such route. Drop it from the list.`,
+      );
+    }
+  }
+
+  /** @param {string} route */
+  const pathsOf = (route) =>
+    prerenderedPaths
+      .filter(([path, entry]) => ownerOf(path, entry) === route)
+      .map(([path]) => path);
+
+  for (const route of new Set(required)) {
+    const kind = appRoutes.find((appRoute) => appRoute.route === route)?.kind;
+    const paths = pathsOf(route);
+    if (kind === undefined) {
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES but the build has no such route. Restore its handler, or ` +
+          'drop it from the list in the change that retires the endpoint.',
+      );
+      continue;
+    }
+    if (kind !== 'route') {
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES but is built as a ${kind}, not a route handler, so it ` +
+          'serves HTML. Restore its `route.ts`.',
+      );
+    }
+    if (allowedSet.has(route)) {
+      // The allowlist would otherwise turn its function findings into an accepted function.
+      problems.push(
+        `${route}: is in both REQUIRED_ROUTES and ALLOWED_FUNCTIONS, but a required route must be ` +
+          'prerendered. Take it out of one list.',
+      );
+    }
+    if (prerender.dynamicRoutes[route] === undefined) continue;
+    if (paths.length === 0) {
+      // A static route with no path is already a finding above; a dynamic one with fixed params and
+      // none passes it, and serves nothing but 404s.
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES but prerendered no path, so every URL under it is a 404. ` +
+          'Its `generateStaticParams` returned nothing.',
+      );
+      continue;
+    }
+    const sibling = paramsSibling(route);
+    if (sibling === null || !known.has(sibling)) continue;
+    const depth = route.split('/').length - sibling.split('/').length;
+    const own = new Set(paths.map((path) => path.split('/').slice(0, -depth).join('/')));
+    const theirs = new Set(pathsOf(sibling));
+    const missing = [...theirs].filter((path) => !own.has(path)).sort();
+    const extra = [...own].filter((path) => !theirs.has(path)).sort();
+    if (missing.length > 0) {
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES but prerendered nothing for ${missing.join(', ')}, which ` +
+          `${sibling} serves, so those URLs are 404s. Its \`generateStaticParams\` has drifted ` +
+          "from the page's.",
+      );
+    }
+    if (extra.length > 0) {
+      problems.push(
+        `${route}: is in REQUIRED_ROUTES and prerendered ${extra.join(', ')}, which ${sibling} ` +
+          "does not serve. Its `generateStaticParams` has drifted from the page's.",
       );
     }
   }
@@ -494,6 +591,7 @@ function main(args) {
       appRoutes,
       prerender,
       allowed: ALLOWED_FUNCTIONS,
+      required: REQUIRED_ROUTES,
       hasBody: (file) => {
         try {
           return statSync(join(app, file)).isFile();
@@ -526,7 +624,7 @@ function main(args) {
   const problems = [...result.problems, ...other];
   if (problems.length > 0) {
     console.error(
-      `\nThe build at ${dist} (BUILD_ID ${build.id}) is not function-free ` +
+      `\nThe build at ${dist} (BUILD_ID ${build.id}) is not static outside ALLOWED_FUNCTIONS ` +
         '(scripts/check-build-output.mjs):\n',
     );
     for (const problem of problems) console.error(`  - ${problem}`);

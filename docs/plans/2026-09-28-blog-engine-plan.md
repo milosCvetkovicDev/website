@@ -77,19 +77,22 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
   `apps/web/src/app/__tests__/single-source-metrics.test.ts`, `CLAUDE.md` (Routes),
   `.claude/rules/app-router-and-content.md`
 
-- [ ] **Step 1:** The post page test against the fixtures, through `vi.mock('@/data/posts')`: one
+- [x] **Step 1:** The post page test against the fixtures, through `vi.mock('@/data/posts')`: one
       `h1`, both labelled dates as `<time dateTime>`, every block kind, drafts absent from
       `generateStaticParams`, and `force-static` on the card handler. It fails.
-- [ ] **Step 2:** The page, the body component and the card handler, copying the static params of
-      `/work/[slug]` (D6, D7, D8). Headings get ids from one rule the page and the checker share;
-      the checker then requires a link's `#fragment` to name a heading of the page it goes to, and
-      ids to be unique, not only heading texts. Decide whether `QuoteBlock` needs a `source` for
-      `<cite>`. Export the root title template once and derive the ` | Milos Cvetkovic` suffix
-      from it in `page-metadata.test.ts` and `posts.test.ts`, and settle whether a summary can be
-      the 155-character description.
-- [ ] **Step 3:** The post routes in `routes.ts`, derived from `publishedPosts`; a template contrast
+- **Step 2**, split when 61b landed, since only its first part was in that slice:
+  - [x] The page, the body component and the card handler, copying the static params of
+        `/work/[slug]` (D6, D7, D8). The summary is the description, so `page-metadata.test.ts`
+        holds a published post's summary to 155 characters.
+  - [ ] Headings get ids from one rule the page and the checker share; the checker then requires a
+        link's `#fragment` to name a heading of the page it goes to, and ids to be unique, not only
+        heading texts.
+  - [ ] Decide whether `QuoteBlock` needs a `source` for `<cite>` (61b renders none).
+  - [ ] Export the root title template once and derive the ` | Milos Cvetkovic` suffix from it in
+        `page-metadata.test.ts` and `posts.test.ts`.
+- [x] **Step 3:** The post routes in `routes.ts`, derived from `publishedPosts`; a template contrast
       floor for `/blog/<slug>`; `/blog/does-not-exist` in the unknown-slug lists; `blog.spec.ts`.
-- [ ] **Step 4:** The build table shows the post route and its card as prerendered, not as
+- [x] **Step 4:** The build table shows the post route and its card as prerendered, not as
       functions.
 
 ### Task 3: The `/blog` list, indexing and sitemap (61c)
