@@ -7,6 +7,7 @@ import {
   beliefs,
   credentials,
   facts,
+  questions,
   timeline,
   type StoryParagraph,
 } from '@/data/pages/about';
@@ -47,6 +48,7 @@ describe('/about', () => {
       aboutCopy.connect.heading,
       aboutCopy.connect.text,
       ...aboutCopy.story.map(readAs),
+      ...questions.flatMap(({ question, answer }) => [question, answer]),
       ...timeline.flatMap(({ year, role, company, highlight, description }) => [
         year,
         role,
@@ -84,6 +86,35 @@ describe('/about', () => {
     });
 
     expect(errors, 'rendering /about must not log an error').not.toHaveBeenCalled();
+  });
+
+  it('answers each question in the paragraph after its h2, and heads the facts with their own h2', () => {
+    // #58: a question-shaped h2 whose next element is the whole answer is the unit an extractor
+    // lifts, and the facts grid after the questions needs a heading of its own, or the outline
+    // files it under the last question.
+    const { container } = render(<AboutPage />);
+    const headings = Array.from(container.querySelectorAll('h2'));
+    const asked = headings.filter((heading) => heading.textContent?.endsWith('?'));
+    expect(asked.map((heading) => heading.textContent)).toEqual(
+      questions.map(({ question }) => question),
+    );
+    asked.forEach((heading, index) => {
+      const next = heading.nextElementSibling;
+      expect(next?.tagName, `${heading.textContent} is followed by a paragraph`).toBe('P');
+      expect(next?.textContent).toBe(questions[index].answer);
+    });
+
+    const factsHeading = headings.find((heading) => heading.textContent === aboutCopy.factsHeading);
+    expect(factsHeading, 'the facts grid has an h2').toBeDefined();
+    const lastQuestion = asked.at(-1);
+    if (!factsHeading || !lastQuestion) throw new Error('both headings must render');
+    expect(
+      lastQuestion.compareDocumentPosition(factsHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the facts heading comes after the last question',
+    ).toBeTruthy();
+    for (const { value } of facts) {
+      expect(factsHeading.nextElementSibling?.textContent).toContain(value);
+    }
   });
 
   it('renders two emphasised runs with the same text in one paragraph without a key clash', async () => {
