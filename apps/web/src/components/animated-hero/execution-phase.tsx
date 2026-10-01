@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, ActivityEntry } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { useStoryVisibility } from '@/hooks/use-story-visibility';
 import { storyClosings, storyTitles } from '@/data/pages/home';
 
 /** The code sample, one span per entry; exported so the served-story test counts the same lines. */
@@ -81,6 +82,8 @@ const AnimatedProgressBar = ({
 
 export function ExecutionPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  // Pauses the section's endless CSS animations while it is out of view (globals.css).
+  useStoryVisibility(sectionRef);
   const titleId = useId();
   const codeRef = useRef<HTMLDivElement>(null);
   const statsRef = useRef<HTMLDivElement>(null);
@@ -335,11 +338,11 @@ export function ExecutionPhase() {
                   ))}
                 </code>
                 {/* After the code rather than inside it: the caret is no line of the sample,
-                    and its pulse animates opacity for ever. */}
+                    and its pulse animates opacity for ever, paused while the section is out of
+                    view (globals.css). */}
                 <span
                   aria-hidden="true"
-                  className="ml-0.5 inline-block h-4 w-2 bg-[var(--accent)]"
-                  style={{ animation: 'pulse 1s ease-in-out infinite' }}
+                  className="animate-caret-pulse ml-0.5 inline-block h-4 w-2 bg-[var(--accent)]"
                 />
               </pre>
             </Terminal>

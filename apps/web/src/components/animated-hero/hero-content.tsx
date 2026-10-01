@@ -85,11 +85,10 @@ function PlayerCard() {
             className="min-w-0 font-mono text-[var(--status-ok)] max-sm:leading-[1.45]"
             style={{ fontSize: '12px' }}
           >
+            {/* A class, not an inline shorthand, so HeroSection's out-of-view pause reaches it from
+                the stylesheet: this card stays a server component. */}
             <span
-              className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-[var(--status-ok)]"
-              style={{
-                animation: 'hero-status-pulse 2s ease-in-out infinite',
-              }}
+              className="animate-hero-status-pulse mr-1.5 inline-block h-[7px] w-[7px] rounded-full bg-[var(--status-ok)]"
               aria-hidden="true"
             />
             Building at Obsidian 22
