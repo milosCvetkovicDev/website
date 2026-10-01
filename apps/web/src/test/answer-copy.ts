@@ -11,7 +11,7 @@
  * (`73 %`, `73 percent`, `5x`, `5 ×`, `5 times`, `5-fold`). Its limit: a figure spelled out in words
  * ("seventy-three percent") is not caught, and a bare number with no unit is not a metric here.
  */
-import { formatMetric, type CaseStudyMetric } from '@/data/case-studies';
+import { formatMetric, type CaseStudyFigure } from '@/data/case-studies';
 
 /** The words in `text`, as a reader counts them. */
 export function wordCount(text: string): number {
@@ -24,7 +24,7 @@ const UNIT = String.raw`\s*(?:%|per ?cent\b|×|x\b|times\b|-?fold\b)`;
 const escaped = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The metrics `text` restates, each as `formatMetric()` renders it; empty for none. */
-export function restatedMetrics(text: string, metrics: readonly CaseStudyMetric[]): string[] {
+export function restatedMetrics(text: string, metrics: readonly CaseStudyFigure[]): string[] {
   return metrics
     .filter((metric) => {
       if (!Number.isFinite(metric.value)) return false;

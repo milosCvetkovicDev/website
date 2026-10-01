@@ -11,12 +11,12 @@ import { warmRoutes } from './support/warm-routes';
  * slugs, the axe gate audited one of them, and `not-found-shell.spec.ts` checked a 404's shell. Greps
  * for `Back to Work` returned nothing.
  *
- * R35 is the mismatch between what a card promises and what the page delivers. Every card on `/` and
- * `/work` advertises a headline figure — `73% faster resolution` — and `work/[slug]/page.tsx` never
- * reads `metric` or `highlight` at all, so the one page a visitor lands on to see that claim
- * substantiated is the only one that does not state it. Asserted through `formatMetric` rather than
- * against a literal, so a data edit moves the test with the data and cannot be satisfied by typing the
- * number into the page.
+ * R35 was the mismatch between what a card promises and what the page delivers. Every card on `/`
+ * and `/work` advertises a headline figure, and `work/[slug]/page.tsx` never read `metric` or
+ * `highlight` at all, so the one page a visitor lands on to see that claim substantiated was the only
+ * one that did not state it. #49 gave it a metric panel with the figure, its label and its basis.
+ * Asserted through `formatMetric` rather than against a literal, so a data edit moves the test with
+ * the data and cannot be satisfied by typing the number into the page.
  */
 
 test.describe.configure({ retries: 0 });
@@ -85,30 +85,46 @@ test.describe(() => {
   });
 });
 
-test('every case study states the headline metric its cards advertise', async ({ page }) => {
-  test.fail();
-  test.info().annotations.push({ type: 'fixed-by', description: 'R35, #49' });
-
+test('every case study states the headline metric its cards advertise, and its basis', async ({
+  page,
+}) => {
   const missing: string[] = [];
   for (const study of caseStudies) {
     await page.goto(`/work/${study.slug}`);
     const { metric } = study.highlight;
     const value = formatMetric(metric);
 
-    // Through `formatMetric`, which is the one function that turns the data into copy: a page that
-    // hard-coded "73%" would satisfy a literal assertion while still being able to drift from the data.
-    if ((await page.getByText(value, { exact: false }).count()) === 0) {
-      missing.push(`/work/${study.slug}: does not state its metric value "${value}"`);
+    // The figure, its label and its basis together, in the one panel that states them: three
+    // strings found anywhere on the page would pass with the label in "More work" and the basis
+    // in the footer. The value goes through `formatMetric`, which is the one function that turns
+    // the data into copy: a page that hard-coded "73%" would satisfy a literal assertion while
+    // still being able to drift from the data.
+    const panel = page.getByRole('region', { name: 'Headline result' });
+    if ((await panel.count()) !== 1) {
+      missing.push(`/work/${study.slug}: has no single "Headline result" panel`);
+      continue;
     }
-    if ((await page.getByText(metric.label, { exact: false }).count()) === 0) {
-      missing.push(`/work/${study.slug}: does not state its metric label "${metric.label}"`);
+    const parts = [
+      ['value', value],
+      ['label', metric.label],
+      ['basis', metric.basis],
+    ] as const;
+    for (const [part, text] of parts) {
+      const shown = panel.getByText(text, { exact: true });
+      if ((await shown.count()) !== 1 || !(await shown.isVisible())) {
+        missing.push(`/work/${study.slug}: its panel does not show its metric ${part} "${text}"`);
+      }
+    }
+    // The basis is what makes the figure checkable: what it counted, against what. It is printed
+    // once on the page, so a second producer (#58's scope sentence) replaces this one, not joins it.
+    if ((await page.getByText(metric.basis, { exact: false }).count()) !== 1) {
+      missing.push(`/work/${study.slug}: prints its metric basis more than once`);
     }
   }
 
   expect(
     missing,
-    'work/[slug]/page.tsx never reads `metric` or `highlight`, so the page a visitor opens to see ' +
-      'the claim substantiated is the only one that does not state it. Only /work and FeaturedWork ' +
-      'render the figure their cards advertise.',
+    'work/[slug]/page.tsx must show the figure its cards advertise, with its label and basis, ' +
+      'read from case-studies.ts: the page a visitor opens to see the claim substantiated.',
   ).toEqual([]);
 });
