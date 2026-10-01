@@ -12,8 +12,18 @@
  * `e2e/seo-surface.spec.ts` checks the same fields in the served HTML (R22 and R24); this file is the
  * fast half that names the field that went missing.
  */
-import { describe, expect, it } from 'vitest';
-import { buildMetadata, SITE_NAME, TWITTER_HANDLE } from '../metadata';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildMetadata, FEED_TITLE, SITE_NAME, TWITTER_HANDLE } from '../metadata';
+
+// `hasPublishedPosts` is false until the owner publishes the first post, and these tests must not
+// change meaning the day that happens, so the switch is this file's own: off unless a test turns it
+// on (#61, ADR 0028). A getter, so `buildMetadata()` reads it at call time, as it reads the real one.
+const postIndex = vi.hoisted(() => ({ published: false }));
+vi.mock('@/data/posts', () => ({
+  get hasPublishedPosts() {
+    return postIndex.published;
+  },
+}));
 
 const about = buildMetadata({
   title: 'About',
@@ -41,6 +51,36 @@ describe('buildMetadata()', () => {
     const study = buildMetadata({ title: 't', description: 'd', path: '/work/nx-remote-cache' });
     expect(study.alternates?.types).toEqual({
       'text/markdown': '/work/nx-remote-cache/index.md',
+    });
+  });
+
+  describe('the Atom feed', () => {
+    afterEach(() => {
+      postIndex.published = false;
+    });
+
+    it('is advertised nowhere while no post is published', () => {
+      // `/feed.xml` is served either way, as an empty feed; an advertised feed with nothing in it
+      // helps no reader, so the link waits for the content (ADR 0028's switch).
+      for (const path of ['/', '/about', '/blog', '/work/nx-remote-cache']) {
+        const metadata = buildMetadata({ title: 't', description: 'd', path });
+        expect(metadata.alternates?.types, path).not.toHaveProperty(['application/atom+xml']);
+      }
+    });
+
+    it('is advertised on every route once a post is published, beside the Markdown twin', () => {
+      postIndex.published = true;
+      for (const path of ['/', '/about', '/blog', '/blog/a-post', '/work/nx-remote-cache']) {
+        const metadata = buildMetadata({ title: 't', description: 'd', path });
+        // One path for every route: the feed is the site's, not the page's. Titled as the feed
+        // titles itself, so a reader listing the page's feeds shows a name rather than a URL.
+        expect(metadata.alternates?.types, path).toEqual({
+          'text/markdown': path === '/' ? '/index.md' : `${path}/index.md`,
+          'application/atom+xml': [{ url: '/feed.xml', title: 'Milos Cvetkovic — Writing' }],
+        });
+        expect(FEED_TITLE).toBe('Milos Cvetkovic — Writing');
+        expect(metadata.alternates?.canonical, path).toBe(path);
+      }
     });
   });
 

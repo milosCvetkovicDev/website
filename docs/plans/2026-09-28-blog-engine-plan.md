@@ -122,14 +122,16 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
 - Modify: `apps/web/src/lib/metadata.ts` and its test, `apps/web/e2e/machine-readable.spec.ts`, the
   build-output gate under `scripts/`, `.claude/rules/app-router-and-content.md`
 
-- [ ] **Step 1:** `feed.test.ts` in jsdom, for its `DOMParser`: well-formed output, entries newest
+- [x] **Step 1:** `feed.test.ts` in jsdom, for its `DOMParser`: well-formed output, entries newest
       first with no draft, the fixture title with `&`, `<` and `"` still parsing, an empty feed, and
       `force-static`. It fails.
-- [ ] **Step 2:** `buildAtomFeed` and the route (D9, D12); the Atom alternate in `buildMetadata()`
+- [x] **Step 2:** `buildAtomFeed` and the route (D9, D12); the Atom alternate in `buildMetadata()`
       only while `hasPublishedPosts`.
-- [ ] **Step 3:** `feed.spec.ts`: `/feed.xml` answers 200 with the Atom type, and each page carries
+- [x] **Step 3:** `feed.spec.ts`: `/feed.xml` answers 200 with the Atom type, and each page carries
       one Atom alternate when a post is published and none otherwise. The `/feed.xml` expected
       failure in the machine-readable spec is removed and the gate expects the feed's body file.
+      (The gate requires `feed.xml.body` as it does every prerendered path's body, with fixtures in
+      its test; it has no list of routes that must exist, so `/feed.xml` joins one when there is.)
 
 ### Task 5: Markdown twins (61e)
 

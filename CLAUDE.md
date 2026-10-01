@@ -54,7 +54,8 @@ There is no shared ESLint or TypeScript config package (ADR 0018): `apps/web` li
 ## Routes (App Router)
 
 `/`, `/about`, `/blog`, `/blog/[slug]`, `/contact`, `/privacy`, `/skills`, `/work`, `/work/[slug]`.
-Force-static JSON handlers: `/case-studies.json`, `/work/<slug>/index.json`.
+Force-static JSON handlers: `/case-studies.json`, `/work/<slug>/index.json`; the Atom feed,
+`/feed.xml`. `/mcp` (the MCP server, `POST` only) is the one server function.
 
 Every route's head comes from `buildMetadata()` in `apps/web/src/lib/metadata.ts`, and every
 static route folder needs its own `opengraph-image`; see `app-router-and-content.md`.

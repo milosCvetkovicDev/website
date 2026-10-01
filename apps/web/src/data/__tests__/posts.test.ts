@@ -335,45 +335,101 @@ function problemsIn(list: readonly Post[], today: Date): string[] {
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const POSTS_MODULE = join(SRC, 'data', 'posts');
 
-/**
- * What one source file does against ADR 0028's third decision: import `posts` itself, or the whole
- * module as a namespace, rather than the index; or import the module's values into a client
- * component, which bundles the whole array, drafts and all, into JavaScript sent to the browser.
- * A type-only import compiles away, so it is always allowed.
- */
-function postsImportProblems(file: string, source: string): string[] {
-  const problems: string[] = [];
-  const at = relative(SRC, file);
-  const client = /^\s*['"]use client['"]/.test(source);
-  const isPostsModule = (from: string) => {
-    const target = from.startsWith('@/')
-      ? join(SRC, from.slice(2))
-      : from.startsWith('.')
-        ? resolve(dirname(file), from)
-        : '';
-    return target === POSTS_MODULE || target === `${POSTS_MODULE}.ts`;
-  };
+const isClient = (source: string) => /^\s*['"]use client['"]/.test(source);
+
+/** Where `from`, imported by `file`, points under `src`, without its extension; `''` for a package. */
+function targetOf(file: string, from: string): string {
+  const target = from.startsWith('@/')
+    ? join(SRC, from.slice(2))
+    : from.startsWith('.')
+      ? resolve(dirname(file), from)
+      : '';
+  return target.replace(/\.tsx?$/, '');
+}
+
+/** The import and re-export statements of `source` that bring in values: not `import type`. */
+function valueImports(source: string): { bindings: string; from: string; names: string[] }[] {
+  const found: { bindings: string; from: string; names: string[] }[] = [];
   const statements = source.matchAll(
     /^(?:import|export)\s+(type\s+)?([^;'"]*?)\s*from\s*['"]([^'"]+)['"]/gm,
   );
   for (const [, typeOnly, bindings, from] of statements) {
-    if (typeOnly || !isPostsModule(from)) continue;
+    if (typeOnly) continue;
     const names = (/\{([^}]*)\}/.exec(bindings)?.[1] ?? '')
       .split(',')
       .map((part) => part.trim())
       .filter((part) => part && !part.startsWith('type '))
       .map((part) => part.split(/\s+as\s+/)[0]);
-    if (names.includes('posts') || bindings.includes('*')) {
-      problems.push(`${at}: reads posts itself; read publishedPosts, hasPublishedPosts or getPost`);
-    } else if (client && names.length > 0) {
-      problems.push(`${at}: a client component imports ${from}, which ships the drafts`);
+    // `import { type A, type B } from` brings in nothing; a default or namespace import does.
+    const braces = /\{[^}]*\}/.exec(bindings);
+    const outside = bindings
+      .replace(/\{[^}]*\}/, '')
+      .replace(/,/g, '')
+      .trim();
+    if (names.length > 0 || outside || !braces) found.push({ bindings, from, names });
+  }
+  // A bare `import '...'` runs the module for its effects, which bundles it as surely.
+  for (const [, from] of source.matchAll(/^import\s*['"]([^'"]+)['"]/gm)) {
+    found.push({ bindings: '', from, names: [] });
+  }
+  return found;
+}
+
+/**
+ * The server modules that carry the posts module's values to whatever imports them: those that
+ * import it, then those that import one of them, and so on (`lib/metadata.ts` for
+ * `hasPublishedPosts`, `lib/atom.ts` for `buildPostIndex`, and every page reading either). A client
+ * component importing one bundles the posts as surely as importing them directly. Paths without
+ * their extension, as `targetOf` returns them.
+ */
+function postsCarriers(files: readonly { file: string; source: string }[]): Set<string> {
+  const carriers = new Set<string>();
+  const carries = (target: string) =>
+    target === POSTS_MODULE || carriers.has(target) || carriers.has(join(target, 'index'));
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const { file, source } of files) {
+      const self = file.replace(/\.tsx?$/, '');
+      if (self === POSTS_MODULE || carriers.has(self) || isClient(source)) continue;
+      if (valueImports(source).some(({ from }) => carries(targetOf(file, from)))) {
+        carriers.add(self);
+        grew = true;
+      }
     }
   }
-  if (client) {
-    for (const [, from] of source.matchAll(/^import\s*['"]([^'"]+)['"]/gm)) {
-      if (isPostsModule(from)) {
+  return carriers;
+}
+
+/**
+ * What one source file does against ADR 0028's third decision: import `posts` itself, or the whole
+ * module as a namespace, rather than the index; or import the module's values into a client
+ * component, which bundles the whole array, drafts and all, into JavaScript sent to the browser,
+ * whether directly or through one of `carriers` (`postsCarriers`). A type-only import compiles
+ * away, so it is always allowed.
+ */
+function postsImportProblems(
+  file: string,
+  source: string,
+  carriers: ReadonlySet<string> = new Set(),
+): string[] {
+  const problems: string[] = [];
+  const at = relative(SRC, file);
+  const client = isClient(source);
+  for (const { bindings, from, names } of valueImports(source)) {
+    const target = targetOf(file, from);
+    if (target === POSTS_MODULE) {
+      if (names.includes('posts') || bindings.includes('*')) {
+        problems.push(
+          `${at}: reads posts itself; read publishedPosts, hasPublishedPosts or getPost`,
+        );
+      } else if (client) {
         problems.push(`${at}: a client component imports ${from}, which ships the drafts`);
       }
+    } else if (client && (carriers.has(target) || carriers.has(join(target, 'index')))) {
+      problems.push(
+        `${at}: a client component imports ${from}, which imports the posts and ships the drafts`,
+      );
     }
   }
   return problems;
@@ -916,17 +972,57 @@ describe('imports of the posts module', () => {
   const sources = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter(
     (name) => /\.tsx?$/.test(name) && !/(?:^|[\\/])(?:__tests__|test)[\\/]/.test(name),
   );
+  const page = join(SRC, 'app', 'blog', 'page.tsx');
 
   it('read the index, never posts itself, and never from a client component', () => {
     expect(sources.length).toBeGreaterThan(50);
     expect(sources.map((name) => join('data', 'posts.ts') === name)).toContain(true);
-    const offenders = sources.flatMap((name) =>
-      postsImportProblems(join(SRC, name), readFileSync(join(SRC, name), 'utf8')),
+    const files = sources.map((name) => ({
+      file: join(SRC, name),
+      source: readFileSync(join(SRC, name), 'utf8'),
+    }));
+    const carriers = postsCarriers(files);
+    // The two modules that bring the posts into every head and into the feed, found by the walk.
+    expect(carriers).toContain(join(SRC, 'lib', 'metadata'));
+    expect(carriers).toContain(join(SRC, 'lib', 'atom'));
+    const offenders = files.flatMap(({ file, source }) =>
+      postsImportProblems(file, source, carriers),
     );
     expect(offenders).toEqual([]);
   });
 
-  const page = join(SRC, 'app', 'blog', 'page.tsx');
+  it.each([
+    ['by name', "'use client';\nimport { SITE_NAME } from '@/lib/metadata';"],
+    ['relatively', "'use client';\nimport { buildAtomFeed } from '../../lib/atom';"],
+    ['for its effects', "'use client';\nimport '@/lib/metadata';"],
+  ])('names a client component importing a module that carries the posts, %s', (_, source) => {
+    const carriers = new Set([join(SRC, 'lib', 'metadata'), join(SRC, 'lib', 'atom')]);
+    expect(postsImportProblems(page, source, carriers)).toEqual([
+      expect.stringMatching(/a client component imports .*, which imports the posts/),
+    ]);
+    // A server module may import it, and a client one may import its types.
+    expect(postsImportProblems(page, source.replace("'use client';\n", ''), carriers)).toEqual([]);
+    expect(
+      postsImportProblems(
+        page,
+        "'use client';\nimport type { Metadata } from '@/lib/metadata';",
+        carriers,
+      ),
+    ).toEqual([]);
+  });
+
+  it('finds the carriers through any number of server modules, and stops at a client one', () => {
+    const at = (path: string) => join(SRC, path);
+    const carriers = postsCarriers([
+      { file: at('lib/a.ts'), source: "import { hasPublishedPosts } from '@/data/posts';" },
+      { file: at('lib/b.ts'), source: "import { a } from './a';" },
+      { file: at('lib/c.ts'), source: "import type { a } from './a';" },
+      { file: at('lib/d.tsx'), source: "'use client';\nimport { b } from './b';" },
+      { file: at('lib/e.ts'), source: "import { d } from './d';" },
+    ]);
+    expect([...carriers].sort()).toEqual([at('lib/a'), at('lib/b')]);
+  });
+
   it.each([
     ['posts by name', "import { posts } from '@/data/posts';"],
     ['posts under another name', "import { getPost, posts as all } from '../../data/posts';"],
