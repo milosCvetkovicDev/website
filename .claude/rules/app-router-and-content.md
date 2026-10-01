@@ -48,8 +48,8 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   newest first with the summary only, links absolute on the site's origin, ids on the fixed
   `https://miloscvetkovic.dev` whatever the origin (RFC 4287 ids never change), an author name and
   URI and no address, and `updated` the later of the latest post update and `/blog`'s date in
-  `static-routes.ts`, never the clock: bump `/blog`'s date when a post is unpublished or the feed's
-  title or author changes. It builds with no post published too, as a feed with no entries.
+  `static-routes.ts`, never the clock: bump `/blog`'s date when a post is unpublished. It builds
+  with no post published too, as a feed with no entries.
   `app/__tests__/feed.test.ts` parses it with a real XML parser, and `e2e/feed.spec.ts` checks it
   as served.
 

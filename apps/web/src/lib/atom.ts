@@ -152,8 +152,7 @@ function entry(post: PublishedPost, origin: string): string {
  *
  * The feed's `updated` is the later of its latest post update, which can be an older post's since
  * revising a post changes the feed, and `fallbackUpdated`. So it never moves backwards when a post
- * is unpublished, as long as the commit that does so bumps `/blog`'s date, as the commit that
- * changes the feed's title or author does too.
+ * is unpublished, as long as the commit that does so bumps `/blog`'s date.
  *
  * Throws on a date that is not a real day, a post updated before it was published, a `siteUrl` that
  * is not an origin, or text XML cannot carry, so a broken feed fails the prerender instead of
