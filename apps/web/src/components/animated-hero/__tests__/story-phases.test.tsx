@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -673,44 +673,56 @@ describe.each(phases)('$name, its from-states', ({ Phase }) => {
 // (`data/pages/__tests__/home.test.ts`): what a visitor reads and what the twin carries are one pair
 // of strings. Each pair is found by its place in the markup rather than by its text, so a phase that
 // rendered anything but its record's strings would fail here.
+/**
+ * A phase's closing headline: an h3 under the h2 that names its section (#47, hero-10), in the block
+ * that sits straight in the section's column. Strategy's panel titles are h3s as well, deeper in.
+ */
+const CLOSING_HEADLINE = 'section > div > div > h3';
+
 const closings = [
   {
     name: 'DiscoveryPhase',
     Phase: DiscoveryPhase,
     closing: storyClosings.discovery,
-    headline: 'h2',
+    headline: CLOSING_HEADLINE,
+    region: 'PHASE 1 DISCOVERY',
   },
   {
     name: 'StrategyPhase',
     Phase: StrategyPhase,
     closing: storyClosings.strategy,
-    headline: 'h2',
+    headline: CLOSING_HEADLINE,
+    region: 'PHASE 2 STRATEGY',
   },
   {
     name: 'ExecutionPhase',
     Phase: ExecutionPhase,
     closing: storyClosings.execution,
-    headline: 'h2',
+    headline: CLOSING_HEADLINE,
+    region: 'PHASE 3 EXECUTION',
   },
   {
     name: 'GauntletPhase',
     Phase: GauntletPhase,
     closing: storyClosings.gauntlet,
-    headline: 'h2',
+    headline: CLOSING_HEADLINE,
+    region: 'PHASE 4 THE GAUNTLET',
   },
   {
     name: 'LoopPhase',
     Phase: LoopPhase,
     closing: storyClosings.loop,
-    headline: 'h2',
+    headline: CLOSING_HEADLINE,
+    region: 'PHASE 5 THE LOOP',
   },
-  // The last section closes inside its terminal, on a paragraph rather than a heading. Whether it
-  // becomes a heading is the page outline's call (#47), not this move's, which changes no markup.
+  // The last section closes inside its terminal, on a paragraph rather than a heading: its one
+  // heading is its title, SESSION COMPLETE (#47, hero-10).
   {
     name: 'GameComplete',
     Phase: GameComplete,
     closing: storyClosings.complete,
     headline: 'p.text-xl',
+    region: 'SESSION COMPLETE',
   },
 ];
 
@@ -721,7 +733,7 @@ function textWithout(root: Element, selector: string): string {
   return copy.textContent ?? '';
 }
 
-describe.each(closings)('$name, its closing lines', ({ Phase, closing, headline }) => {
+describe.each(closings)('$name, its closing lines', ({ Phase, closing, headline, region }) => {
   beforeEach(() => {
     // jsdom lays nothing out, so with motion every trigger starts in view and GauntletPhase
     // schedules timers.
@@ -746,8 +758,30 @@ describe.each(closings)('$name, its closing lines', ({ Phase, closing, headline 
     ({ reduce }) => {
       media.reduce = reduce;
       const { container } = render(<Phase />);
-      const headlines = container.querySelectorAll(headline);
+      // Each section is a region named by its title, an h2 of its own at the top (#47, hero-10), and
+      // the closing headline comes below it. The name as it is computed, not only the reference: the
+      // space between the phase badge and the title is what keeps "PHASE 1 DISCOVERY" two words.
+      // Resolved once per mount: a name-filtered role query is the costly one.
+      const section = container.querySelector('section');
+      expect(within(container).getByRole('region', { name: region }), 'the region').toBe(section);
+      const labelledBy = section?.getAttribute('aria-labelledby');
+      const title = labelledBy ? document.getElementById(labelledBy) : null;
+      expect(title?.tagName, 'the section is named by a heading of its own').toBe('H2');
+      if (!title) throw new Error('no heading names the section');
+      // And it heads the section's outline: its first heading and its only h2, so every other
+      // heading in the section, the closing headline included, reads as part of it.
+      const headings = [...(section?.querySelectorAll('h1, h2, h3, h4, h5, h6') ?? [])];
+      expect(headings[0], 'the title is the first heading').toBe(title);
+      expect(
+        headings.slice(1).filter((heading) => heading.tagName <= 'H2'),
+        'no other heading at the level of the title or above',
+      ).toEqual([]);
+      const headlines = [...container.querySelectorAll(headline)].filter((el) => el !== title);
       expect(headlines, `exactly one ${headline} closes the section`).toHaveLength(1);
+      expect(
+        title.compareDocumentPosition(headlines[0]) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'the title comes before the closing headline',
+      ).toBeTruthy();
       const line = headlines[0].nextElementSibling;
       expect(line?.tagName, 'the line under the headline').toBe('P');
 

@@ -166,12 +166,22 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * The two that are not zero are the two surfaces the audit already found, and between them they account
  * for every undecidable node on the site — 167 of them, against 103 and 8 decided.
  *
- * `/` gets a margin of a few nodes and the others do not, for a measured reason rather than out of
- * caution: the hero's tmux chrome animates its tab labels and status line through `opacity`, and axe
- * skips a node at `opacity: 0`, so the count depends on which frame the audit samples. Two consecutive
- * dark-theme runs gave 111 and 112. `/work` and the nine zeroes are static and were identical across
- * every run. Never widen a margin to quieten a failure: read the nodes the message names first, because
- * a genuinely new blurred surface looks exactly like this.
+ * `/` gets a margin of a few nodes and the others do not. The reason this comment gave until #180 was
+ * wrong: the tmux chrome's tab labels, pane titles and status lines are static, and its clock changes
+ * its text, never its node count. The count varied because of the tmux background's log stream. Its
+ * five panes start after an idle callback plus up to 2 s, then each adds a line about every 400-850
+ * ms and never settles, and axe answers every slot holding text with `incomplete` (`bgOverlap`: the
+ * background sits under the hero island). So the count was a constant plus however many lines had
+ * streamed when axe collected its nodes: 111 and 112 on 2026-09-12, before #48 added a node (above),
+ * 119 and 120 in the runs that failed, CI's among them, and 128-140 after an extra 3 s. The at-rest
+ * pass on `/` now leaves the stream out (`TMUX_LOG_STREAM`, below). Without it the count measured 112
+ * in both schemes, six production-build runs a scheme on 2026-09-30, the same 112 nodes every run.
+ * The margin over that, six nodes to the budget of 118, stays by the owner's decision on #180 of
+ * 2026-09-30 until #47's slices 47c and 47e, #49's 49d and #58's 58a have all landed, so that none of
+ * them has to raise a budget; a pull request of its own then lowers it to the re-measured constant.
+ * `/work` and the nine zeroes are static and were identical across every run. Never widen a margin to
+ * quieten a failure: read the nodes the message names first, because a genuinely new blurred surface
+ * looks exactly like this.
  *
  * The positive control at the bottom of this file proves the comparison can fail at all.
  */
@@ -188,6 +198,116 @@ const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }
   '/work/nx-remote-cache': { light: 0, dark: 0 },
   '/no-such-page': { light: 0, dark: 0 },
 };
+
+/**
+ * The tmux background's log stream on `/`: the slot container in each of its five panes
+ * (`AnimatedPane` in `tmux-background.tsx`), which the at-rest pass on `/` excludes from the audit.
+ *
+ * Its node count is a clock reading, not a property of the page: the panes write a line into their
+ * slots about every 400-850 ms for as long as the page is open, and axe cannot decide any slot that
+ * holds text. What leaves the audit is pure decoration, which WCAG 1.4.3 exempts from contrast; that
+ * it sits under `aria-hidden` is part of the evidence, not the exemption, since `aria-hidden` alone
+ * exempts nothing (see the top of this file). The tab bar, the pane titles and status bars, the
+ * clock and the hero island stay audited. Two alternatives were measured on #180 and refused.
+ * Excluding the whole background stops auditing static chrome that is already deterministic.
+ * Pausing the clock, as `no-js-text.spec.ts` does, freezes the stream but breaks this pass:
+ * `expectGsapLoaded` never sees its mark, axe's own timers never fire, and the story's closing panel
+ * rests visible instead of transparent.
+ *
+ * axe's `exclude` takes the containers out of every rule, not only colour contrast. What makes that
+ * safe is `tmuxLogStreamProblems`: it admits only plain `div`s holding text, which no rule in the set
+ * but colour contrast has anything to examine. `auditExcludingTmuxLogStream` is the one way to use
+ * the selector, and it runs that check before and after the audit.
+ */
+const TMUX_LOG_STREAM = '[data-tmux-slots]';
+
+/**
+ * Everything wrong with what `TMUX_LOG_STREAM` matches, as messages, empty when it is safe to
+ * exclude. It must match five elements, one in each `[data-tmux-pane]`, in a tree under
+ * `aria-hidden="true"`. Each must be a `div` carrying only `data-tmux-slots`, `class` and `style`,
+ * so it is itself no link, button, heading, landmark or focus stop. Each may hold only the slots
+ * `createSlot` makes: a `div` with text, a pinned height and no attribute but `style`. A slot has no
+ * child element, so nothing can sit deeper, and `StaticPane`'s reduced-motion lines, which pin no
+ * height, fail. The negative control at the bottom of this file proves each part can fail.
+ */
+async function tmuxLogStreamProblems(page: Page): Promise<string[]> {
+  return page.evaluate((selector) => {
+    const containers = [...document.querySelectorAll(selector)];
+    const found: string[] = [];
+    if (containers.length !== 5) {
+      found.push(`${selector} matches ${containers.length} elements, not the five slot containers`);
+    }
+    const panes = new Set<Element>();
+    containers.forEach((container, index) => {
+      const name = `slot container ${index + 1} of ${containers.length}`;
+      const pane = container.closest('[data-tmux-pane]');
+      if (!pane) found.push(`${name} is not inside a [data-tmux-pane]`);
+      else if (panes.has(pane)) found.push(`${name} shares its pane with another`);
+      else if (!pane.closest('[aria-hidden="true"]')) {
+        found.push(`${name} is in a pane with no aria-hidden="true" ancestor`);
+      }
+      if (pane) panes.add(pane);
+      if (container.tagName !== 'DIV') found.push(`${name} is a <${container.localName}>`);
+      const allowed = ['data-tmux-slots', 'class', 'style'];
+      for (const attribute of container.getAttributeNames()) {
+        if (!allowed.includes(attribute)) found.push(`${name} carries ${attribute}`);
+      }
+      for (const node of container.childNodes) {
+        const slot =
+          node instanceof HTMLDivElement &&
+          node.childElementCount === 0 &&
+          node.getAttributeNames().every((attribute) => attribute === 'style') &&
+          node.style.height !== '';
+        if (slot) continue;
+        const shown =
+          node instanceof Element
+            ? node.outerHTML.slice(0, 120)
+            : `the text ${JSON.stringify(node.textContent)}`;
+        found.push(`${name} holds ${shown}, which is not a slot div with a pinned height`);
+      }
+    });
+    return found;
+  }, TMUX_LOG_STREAM);
+}
+
+/**
+ * The at-rest audit of `/`, with the log stream left out once `tmuxLogStreamProblems` has found
+ * nothing wrong with it, and checked again afterwards: axe runs for seconds while the panes keep
+ * writing and resizing, so what it left out must still be decoration when it has finished.
+ */
+async function auditExcludingTmuxLogStream(page: Page) {
+  // Until a pane's first line its slots hold a no-break space: wait for real output, so that the
+  // check reads what the audit will leave out rather than empty slots. The panes start on an idle
+  // callback, which a busy main thread defers: under `next dev` on a loaded machine two runs in five
+  // outlasted the 5 s default with two and four panes streaming, so the wait has a bound of its own.
+  await expect
+    .poll(
+      () =>
+        page
+          .locator(TMUX_LOG_STREAM)
+          .evaluateAll(
+            (containers) =>
+              containers.filter((container) =>
+                [...container.children].some((slot) => slot.textContent?.trim()),
+              ).length,
+          ),
+      {
+        message:
+          `the five ${TMUX_LOG_STREAM} containers should each hold a streamed line before the ` +
+          'audit: fewer means a container is missing or its pane never started streaming',
+        timeout: 30_000,
+      },
+    )
+    .toBe(5);
+  const why =
+    `the at-rest pass on / excludes ${TMUX_LOG_STREAM} as decoration, so it must match only the ` +
+    'log-stream slots under aria-hidden: whatever else sits there goes unaudited';
+  expect(await tmuxLogStreamProblems(page), `${why} (before the audit)`).toEqual([]);
+  const excluded = [TMUX_LOG_STREAM];
+  const results = await audit(page, excluded);
+  expect(await tmuxLogStreamProblems(page), `${why} (after the audit)`).toEqual([]);
+  return { results, excluded };
+}
 
 const colorSchemes = ['light', 'dark'] as const;
 
@@ -299,11 +419,14 @@ test.describe('Accessibility', () => {
         page,
       }) => {
         await openPage(page, path, colorScheme);
-
-        const results = await audit(page);
+        // `/` only, and only this pass: the log stream is guarded and left out (TMUX_LOG_STREAM).
+        const { results, excluded } =
+          path === '/'
+            ? await auditExcludingTmuxLogStream(page)
+            : { results: await audit(page), excluded: [] };
         await test.info().attach('axe-results', {
           body: JSON.stringify(
-            { violations: results.violations, incomplete: results.incomplete },
+            { excluded, violations: results.violations, incomplete: results.incomplete },
             null,
             2,
           ),
@@ -542,5 +665,82 @@ test.describe('Accessibility', () => {
     const pretendBudget = undecided - 1;
     expect(() => expect(undecided, 'over budget').toBeLessThanOrEqual(pretendBudget)).toThrow();
     expect(undecided).toBeLessThanOrEqual(undecided);
+  });
+
+  test('negative control: the log-stream check fails on anything but the stream', async ({
+    page,
+  }) => {
+    // The at-rest pass on `/` leaves TMUX_LOG_STREAM unaudited on the strength of
+    // tmuxLogStreamProblems, so that check needs a control of its own: one that could never fail
+    // would exclude whatever came to sit there. No server: five panes shaped as AnimatedPane renders
+    // them, a clean copy first, then one break at a time.
+    const slot = '<div style="height: 23.1px; overflow: hidden; color: #888">[ok] line</div>';
+    const pane =
+      '<div data-tmux-pane=""><div>' +
+      `<div data-tmux-slots="" class="absolute" style="font-size: 14px">${slot}${slot}</div>` +
+      '</div></div>';
+    const content = `<!doctype html>
+      <html lang="en">
+        <head><title>Control</title></head>
+        <body>
+          <main>
+            <h1>Control</h1>
+            <div id="background" aria-hidden="true">${pane.repeat(5)}</div>
+            <div id="elsewhere" aria-hidden="true"><div>not a pane</div></div>
+          </main>
+        </body>
+      </html>`;
+    await page.setContent(content);
+    expect(await tmuxLogStreamProblems(page), 'the clean copy must pass').toEqual([]);
+
+    const breaks: Record<string, () => void> = {
+      'a link beside the slots': () => {
+        const link = Object.assign(document.createElement('a'), { href: '/', textContent: 'x' });
+        document.querySelectorAll('[data-tmux-slots]')[1].append(link);
+      },
+      'a button inside a slot': () => {
+        const button = Object.assign(document.createElement('button'), { textContent: 'x' });
+        document.querySelector('[data-tmux-slots] > div')!.append(button);
+      },
+      'loose text in a container': () => {
+        document.querySelector('[data-tmux-slots]')!.append('loose text');
+      },
+      'a line with no pinned height, as StaticPane renders': () => {
+        document.querySelector<HTMLElement>('[data-tmux-slots] > div')!.style.height = '';
+      },
+      'a container that became a section': () => {
+        const container = document.querySelector('[data-tmux-slots]')!;
+        const section = document.createElement('section');
+        section.setAttribute('data-tmux-slots', '');
+        section.append(...container.childNodes);
+        container.replaceWith(section);
+      },
+      'a container given a role': () => {
+        document.querySelector('[data-tmux-slots]')!.setAttribute('role', 'region');
+      },
+      'a container given a tabindex': () => {
+        document.querySelector('[data-tmux-slots]')!.setAttribute('tabindex', '0');
+      },
+      'a pane that lost the attribute': () => {
+        document.querySelectorAll('[data-tmux-slots]')[2].removeAttribute('data-tmux-slots');
+      },
+      'a sixth match outside the panes': () => {
+        document.querySelector('#elsewhere > div')!.setAttribute('data-tmux-slots', '');
+      },
+      'the attribute moved out of a pane, five matches still': () => {
+        document.querySelectorAll('[data-tmux-slots]')[2].removeAttribute('data-tmux-slots');
+        document.querySelector('#elsewhere > div')!.setAttribute('data-tmux-slots', '');
+      },
+      'the background no longer aria-hidden': () => {
+        document.querySelector('#background')!.removeAttribute('aria-hidden');
+      },
+    };
+    for (const [name, breakIt] of Object.entries(breaks)) {
+      await test.step(name, async () => {
+        await page.setContent(content);
+        await page.evaluate(breakIt);
+        expect(await tmuxLogStreamProblems(page), `${name} must fail the check`).not.toEqual([]);
+      });
+    }
   });
 });
