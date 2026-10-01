@@ -1,9 +1,10 @@
 /**
  * The copy `/about` renders, and the page record its Markdown twin reads (#59). The page keeps the
  * layout, the classes and its `h1`, and maps over what is here, so a page and its twin cannot
- * disagree. Every string is text the page already showed, with two exceptions that only the twin
- * reads: the `Quick facts` heading and the timeline's column names. Every record section needs a
- * heading and a table needs columns, and the page shows those parts without either.
+ * disagree. Every string is text the page shows, with two exceptions: the `Quick facts` heading,
+ * which the page gives screen readers only (#58), and the timeline's column names, which only the
+ * twin reads. Every record section needs a heading and a table needs columns, and the page shows
+ * those parts without either.
  */
 import { formatMetric, getCaseStudy } from '@/data/case-studies';
 import { experienceFact, yearsOfExperience } from '@/data/profile';
@@ -14,6 +15,19 @@ import type { PageRecord, PageSection, Paragraph } from './types';
 const agentStudy = getCaseStudy('self-healing-agent');
 if (!agentStudy) throw new Error('The About page quotes the "self-healing-agent" case study');
 const agentMetric = agentStudy.highlight.metric;
+
+/**
+ * What the agent's case study lists first under `category` in its tech stack. The About answer
+ * about the agent names its stack from there, so the two cannot drift apart (#58).
+ */
+function agentStack(category: string): string {
+  const item = agentStudy?.techStack.find((entry) => entry.category === category)?.items[0];
+  if (!item) throw new Error(`The About page names the agent's ${category} from its case study`);
+  return item;
+}
+
+/** The name the questions ask about: each one names its subject, so it stands alone when lifted. */
+const FULL_NAME = 'Milos Cvetkovic';
 
 export interface TimelineEntry {
   readonly year: string;
@@ -37,6 +51,12 @@ export interface Fact {
 export interface Credential {
   readonly icon: string;
   readonly text: string;
+}
+
+/** A question a visitor asks, as a heading, and its answer in one self-contained paragraph. */
+export interface Question {
+  readonly question: string;
+  readonly answer: string;
 }
 
 /** A profile the closing call to action links to; the primary one is the filled button. */
@@ -133,6 +153,35 @@ const story: readonly StoryParagraph[] = [
   ],
 ];
 
+/**
+ * Three questions a visitor asks, answered after the story (#58). A question-shaped heading with a
+ * short answer under it is the unit a text extractor can lift whole, so each question names its
+ * subject and each answer stands on its own in 40 to 80 words. An answer restates no case-study
+ * metric (a study's headline figure, in any numeric spelling), names the agent's safeguards without
+ * their figures, and reads the agent's stack from its study: the study is the one source for all
+ * three. `src/test/answer-copy.ts` measures both rules, for the unit test on this list and for
+ * `e2e/seo-surface.spec.ts` on the served HTML. The pattern is the visible text alone, with no
+ * structured data for it: ADR 0017 refuses that markup, and `scripts/ai-refusals.test.mjs` fails
+ * on its type name anywhere under `src`, comments included. The self-healing agent is retired, so
+ * it is in the past tense.
+ */
+export const questions: readonly Question[] = [
+  {
+    question: `What does ${FULL_NAME} build?`,
+    answer:
+      'Two kinds of system. The first is the legacy platform nobody wants to touch: I introduce boundaries one module at a time, so every pull request ships value while the architecture improves underneath it. The second is AI that repairs what breaks — a self-healing agent, since retired, that watched production, diagnosed errors and opened pull requests a person reviewed and merged.',
+  },
+  {
+    question: `What stack does ${FULL_NAME} work in?`,
+    answer:
+      'TypeScript end to end. React and Next.js on the front, NestJS, Node and Bun with Elysia behind it, PostgreSQL for state. Infrastructure is Azure — Container Apps, Blob Storage, Log Analytics — described in Terraform and shipped through GitHub Actions with Nx. The AI work runs on the Claude Agent SDK. Clean Architecture and domain-driven design are the habits underneath all of it.',
+  },
+  {
+    question: `What was ${FULL_NAME}'s self-healing agent, exactly?`,
+    answer: `A service on Azure that watched production logs, read the codebase, and when something broke, diagnosed the error and opened a pull request with a fix. It ran on ${agentStack('Runtime')} and ${agentStack('Framework')} with the ${agentStack('AI')}, and it shipped with limits: a daily cap, a budget cap, confidence thresholds, capped CI retries and a kill switch. A person reviewed and merged every fix.`,
+  },
+];
+
 const connectLinks: readonly ProfileLink[] = [
   { name: social.linkedin.name, href: social.linkedin.href, primary: true },
   { name: social.github.name, href: social.github.href, primary: false },
@@ -142,7 +191,7 @@ const connectLinks: readonly ProfileLink[] = [
 
 /** The rest of what `/about` renders in its main element, in page order, less the `h1` (#58's). */
 export const aboutCopy = {
-  socialTitle: 'About Milos Cvetkovic',
+  socialTitle: `About ${FULL_NAME}`,
   eyebrow: 'The short version',
   lede: 'Then I make them better than they were before the problems started.',
   story,
@@ -171,6 +220,11 @@ const sections: readonly PageSection[] = [
     heading: aboutCopy.eyebrow,
     paragraphs: [aboutCopy.lede, ...story.map(plainText), aboutCopy.storyClose],
   },
+  ...questions.map(({ question, answer }): PageSection => ({
+    kind: 'prose',
+    heading: question,
+    paragraphs: [answer],
+  })),
   {
     kind: 'list',
     heading: aboutCopy.factsHeading,

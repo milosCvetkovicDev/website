@@ -11,10 +11,12 @@ import {
   postRoute,
 } from './routes';
 import { caseStudies } from '../src/data/case-studies';
+import { questions } from '../src/data/pages/about';
 import { coreSkills, skillsCopy } from '../src/data/pages/skills';
 import { workCopy } from '../src/data/pages/work';
 import { hasPublishedPosts, publishedPosts } from '../src/data/posts';
 import { RUNS_IN_PRODUCTION } from '../src/data/work-stats';
+import { restatedMetrics, wordCount } from '../src/test/answer-copy';
 import { formatContentDate } from '../src/lib/content-date';
 import { fetchHead, first } from './support/served-head';
 
@@ -496,6 +498,64 @@ test('the Person schema, the hero and the /about description carry one derived y
       ? `the build predates 1 January: it states ${served} years, the clock gives ${expected}; rebuild`
       : `yearsOfExperience() gives ${expected}`,
   ).toBe(expected);
+});
+
+test('/about answers three questions, each in one paragraph of 40 to 80 words that restates no case-study metric (#58)', async ({
+  page,
+  request,
+}) => {
+  // #58 AC 13. A question-shaped heading with a short answer under it is the unit an extractor can
+  // lift whole, so the served HTML, which no crawler runs, has to carry it. The browser's
+  // `DOMParser` reads the response, as `servedCaseStudy()` below does: the RSC flight payload
+  // repeats every heading inside a script, and parsed, a script's text is never an element. The
+  // served question headings are the `questions` of the page record, in order, so a stray `<h2>`
+  // ending in `?` elsewhere on the page fails rather than being counted; each is followed by a
+  // `<p>` holding its answer. Words and metrics are measured by `src/test/answer-copy.ts`, the
+  // helpers the unit test on the data uses. No FAQPage, HowTo or speakable markup goes with it:
+  // `scripts/ai-refusals.test.mjs` fails on those strings anywhere under apps/web/src.
+  const response = await request.get('/about');
+  expect(response.status(), 'GET /about').toBe(200);
+  const headings = await page.evaluate(
+    (markup) => {
+      const doc = new DOMParser().parseFromString(markup, 'text/html');
+      const text = (element: Element | null) =>
+        (element?.textContent ?? '').replace(/\s+/g, ' ').trim();
+      return [...doc.body.querySelectorAll('h2')].map((heading) => ({
+        question: text(heading),
+        next: heading.nextElementSibling?.localName ?? null,
+        answer: text(heading.nextElementSibling),
+      }));
+    },
+    await response.text(),
+  );
+  // The control: a parser that found no heading at all would find no question either.
+  expect(headings.length, '/about should serve its section headings').toBeGreaterThan(0);
+
+  expect(questions, 'the page record asks three questions').toHaveLength(3);
+  const served = headings.filter(({ question }) => question.endsWith('?'));
+  expect(
+    served.map(({ question }) => question),
+    "/about serves exactly its record's questions as the h2s that end in a question mark",
+  ).toEqual(questions.map(({ question }) => question));
+
+  const metrics = caseStudies.map(({ highlight }) => highlight.metric);
+  expect(metrics, 'the case studies must define metrics for the check below').not.toHaveLength(0);
+  for (const { question, next, answer } of served) {
+    expect.soft(next, `"${question}" is followed by a paragraph`).toBe('p');
+    const words = wordCount(answer);
+    expect
+      .soft(words, `"${question}" is answered in at least 40 words: "${answer}"`)
+      .toBeGreaterThanOrEqual(40);
+    expect
+      .soft(words, `"${question}" is answered in at most 80 words: "${answer}"`)
+      .toBeLessThanOrEqual(80);
+    expect
+      .soft(
+        restatedMetrics(answer, metrics),
+        `"${question}" restates a case-study metric, which is the study's to state`,
+      )
+      .toEqual([]);
+  }
 });
 
 /** A date the served body shows: its `<dt>` label, then the `<time>` in the `<dd>` after it. */

@@ -72,13 +72,17 @@ describe('the day the printed figure took effect', () => {
 
   it('moves the content dates of the two routes that print the figure, and only those', async () => {
     // `/` and /about change what they say every January with no commit, so their sitemap lastmod
-    // has to move with the figure; the other routes keep the dates recorded by hand.
-    const today = (await import('../static-routes')).STATIC_ROUTE_UPDATED;
-    expect(today['/']).toBe('2026-09-30');
-    expect(today['/about']).toBe('2026-09-28');
-
+    // has to move with the figure; the other routes keep the dates recorded by hand. The clock is
+    // frozen before the first read: on the real clock, 1 January 2027 would move `/` and /about
+    // past the recorded dates pinned here.
     vi.resetModules();
     vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-01T12:00:00Z'));
+    const today = (await import('../static-routes')).STATIC_ROUTE_UPDATED;
+    expect(today['/']).toBe('2026-09-30');
+    expect(today['/about']).toBe('2026-10-01');
+
+    vi.resetModules();
     vi.setSystemTime(new Date('2031-06-15T12:00:00Z'));
     const later = (await import('../static-routes')).STATIC_ROUTE_UPDATED;
     expect(later).toEqual({ ...today, '/': '2031-01-01', '/about': '2031-01-01' });
