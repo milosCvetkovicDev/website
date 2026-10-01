@@ -3,9 +3,12 @@
  *
  * `sitemap()`'s output, against the data file it should be derived from.
  *
- * Row R31 of the RED manifest, fixed by #48, plus the assertions around it. No DOM here, so `node`
- * rather than jsdom: building a jsdom window costs about two seconds in every worker and is the
- * largest single cost in this suite (CLAUDE.md, Testing).
+ * Row R31 of the RED manifest, fixed by #48, plus the assertions around it. #61 rewrote R31 and the
+ * /blog row from "never /blog" to "/blog and every published post once one is published": the
+ * `hasPublishedPosts` switch of ADR 0028. The real `posts` array is empty until the owner publishes
+ * the first post, so the last block loads the sitemap over the fixture posts for the other side.
+ * No DOM here, so `node` rather than jsdom: building a jsdom window costs about two seconds in
+ * every worker and is the largest single cost in this suite (CLAUDE.md, Testing).
  *
  * The sitemap lists the static routes by hand, with their dates from `src/data/static-routes.ts`,
  * while `e2e/routes.ts` keeps the spec side's own list; a module under `src/app` importing from
@@ -14,22 +17,33 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '../sitemap';
 import { caseStudies } from '@/data/case-studies';
+import { publishedPosts, type Post, type PublishedPost } from '@/data/posts';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
+import { draftPost, everyBlockPost, fixturePosts, hostileTitlePost } from '@/test/fixtures/posts';
 
 // The same expression as `baseUrl` in sitemap.ts, so a developer who has NEXT_PUBLIC_SITE_URL set
 // in their shell gets the assertions they should rather than a failure about an origin nobody is testing.
 const BASE = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
 
-/** The routes that belong in a sitemap: the static seven minus /blog, plus every case study. */
-const EXPECTED_URLS = [
-  BASE,
-  `${BASE}/about`,
-  `${BASE}/work`,
-  `${BASE}/skills`,
-  `${BASE}/contact`,
-  `${BASE}/privacy`,
-  ...caseStudies.map(({ slug }) => `${BASE}/work/${slug}`),
-];
+/**
+ * The routes that belong in a sitemap: the static seven and every case study, except that /blog is
+ * there only with a post published, and then with every published post (#61). While none is, /blog
+ * is a noindex Coming Soon placeholder.
+ */
+function expectedUrls(published: readonly PublishedPost[]): string[] {
+  return [
+    BASE,
+    `${BASE}/about`,
+    `${BASE}/work`,
+    `${BASE}/skills`,
+    `${BASE}/contact`,
+    `${BASE}/privacy`,
+    ...caseStudies.map(({ slug }) => `${BASE}/work/${slug}`),
+    ...(published.length > 0
+      ? [`${BASE}/blog`, ...published.map(({ slug }) => `${BASE}/blog/${slug}`)]
+      : []),
+  ];
+}
 
 describe('sitemap()', () => {
   it('is derived from the case-study data, not a hand-written list of slugs', () => {
@@ -56,9 +70,15 @@ describe('sitemap()', () => {
     }
   });
 
-  it('leaves out /blog while it is a noindex placeholder', () => {
-    // The page says noindex (R26); a sitemap entry would offer it to the same crawler anyway.
-    expect(sitemap().map(({ url }) => url)).not.toContain(`${BASE}/blog`);
+  it('lists /blog if and only if a post is published', () => {
+    // #61 rewrote this from "leaves out /blog": the page is noindex exactly while no post is
+    // published (R26), and a sitemap entry would offer it to the same crawler anyway. The fixture
+    // block below proves the other side while the real list is empty.
+    expect(
+      sitemap()
+        .map(({ url }) => url)
+        .includes(`${BASE}/blog`),
+    ).toBe(publishedPosts.length > 0);
   });
 
   it('lists no URL twice', () => {
@@ -67,15 +87,18 @@ describe('sitemap()', () => {
     expect(urls).toHaveLength(new Set(urls).size);
   });
 
-  it('R31 (#48): lists exactly the indexable routes, excludes /blog, and dates each by its content', () => {
+  it('R31 (#48, #61): lists exactly the indexable routes and dates each by its content', () => {
     const entries = sitemap();
 
     // Two defects in one row, because they were one edit: the URL set and the timestamps.
     //
-    // /blog is a Coming Soon placeholder. The owner decision of 2026-09-11 keeps its nav link, makes
-    // it noindex (R26) and takes it out of the sitemap: offering an empty page to search and telling
-    // the same crawler not to index it is a contradiction.
-    expect(entries.map(({ url }) => url).sort()).toEqual([...EXPECTED_URLS].sort());
+    // While no post is published /blog is a Coming Soon placeholder. The owner decision of
+    // 2026-09-11 keeps its nav link, makes it noindex (R26) and takes it out of the sitemap:
+    // offering an empty page to search and telling the same crawler not to index it is a
+    // contradiction. #61 made that conditional on `hasPublishedPosts` (ADR 0028), so the first
+    // published post puts /blog and itself back with no code change; the fixture block below
+    // holds the other side.
+    expect(entries.map(({ url }) => url).sort()).toEqual(expectedUrls(publishedPosts).sort());
 
     // Every entry used to be `lastModified: new Date()`, so all of them carried the one instant the
     // sitemap was generated. That tells a crawler the whole site changed on every deploy, which is
@@ -112,5 +135,75 @@ describe('sitemap()', () => {
         expect(new Date(`${String(date)}T00:00:00Z`).toISOString().slice(0, 10)).toBe(date);
       }
     });
+  });
+});
+
+/** `sitemap()`, with `@/data/posts` built over `list` in place of the real, still empty, posts. */
+async function sitemapOver(list: readonly Post[]) {
+  vi.resetModules();
+  vi.doMock('@/data/posts', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@/data/posts')>();
+    return { ...actual, posts: list, ...actual.buildPostIndex(list) };
+  });
+  return (await import('../sitemap')).default;
+}
+
+describe('sitemap() once a post is published (#61, over the fixture posts)', () => {
+  afterEach(() => {
+    vi.doUnmock('@/data/posts');
+    vi.resetModules();
+  });
+
+  it('lists /blog and every published post, and no draft', async () => {
+    const urls = (await sitemapOver(fixturePosts))().map(({ url }) => url);
+    // The fixtures hold two published posts and a draft between them.
+    expect(urls.sort()).toEqual(expectedUrls([hostileTitlePost, everyBlockPost]).sort());
+    expect(urls).not.toContain(`${BASE}/blog/${draftPost.slug}`);
+    expect(urls.filter((url) => url.includes(draftPost.slug))).toEqual([]);
+  });
+
+  it('dates each post by its updatedAt, and /blog by the newest of them', async () => {
+    const byUrl = new Map(
+      (await sitemapOver(fixturePosts))().map(({ url, lastModified }) => [url, lastModified]),
+    );
+    for (const { slug, updatedAt } of [everyBlockPost, hostileTitlePost]) {
+      expect(byUrl.get(`${BASE}/blog/${slug}`), slug).toBe(updatedAt);
+    }
+    // /blog shows each post's title, summary and day, so it last changed when the newest of them
+    // did; that is later than its own copy's date in static-routes.ts, which it never precedes.
+    const newest = [everyBlockPost.updatedAt, hostileTitlePost.updatedAt].sort().at(-1);
+    expect(newest! > STATIC_ROUTE_UPDATED['/blog']).toBe(true);
+    expect(byUrl.get(`${BASE}/blog`)).toBe(newest);
+  });
+
+  it("dates /blog by an older post's later update, not by the newest post's day", async () => {
+    // Newest first is by publication day, so the post at the top of the list need not be the one
+    // updated last: an update to an older post's summary changes /blog all the same.
+    const revised = { ...everyBlockPost, updatedAt: '2026-09-20' };
+    expect(revised.updatedAt > hostileTitlePost.updatedAt).toBe(true);
+    const byUrl = new Map(
+      (await sitemapOver([revised, hostileTitlePost]))().map(({ url, lastModified }) => [
+        url,
+        lastModified,
+      ]),
+    );
+    expect(byUrl.get(`${BASE}/blog`)).toBe('2026-09-20');
+  });
+
+  it("dates /blog by its own copy when that changed after every post's last update", async () => {
+    // The page's heading and intro are its own copy, dated in static-routes.ts: when the owner
+    // rewrites them after the last post update, that is the day /blog last changed.
+    const early = { ...hostileTitlePost, publishedAt: '2026-01-02', updatedAt: '2026-01-03' };
+    expect(early.updatedAt < STATIC_ROUTE_UPDATED['/blog']).toBe(true);
+    const byUrl = new Map(
+      (await sitemapOver([early]))().map(({ url, lastModified }) => [url, lastModified]),
+    );
+    expect(byUrl.get(`${BASE}/blog`)).toBe(STATIC_ROUTE_UPDATED['/blog']);
+    expect(byUrl.get(`${BASE}/blog/${early.slug}`)).toBe('2026-01-03');
+  });
+
+  it('lists nothing of the blog while the only post is a draft', async () => {
+    const urls = (await sitemapOver([draftPost]))().map(({ url }) => url);
+    expect(urls.sort()).toEqual(expectedUrls([]).sort());
   });
 });

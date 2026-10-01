@@ -4,7 +4,11 @@ import { experienceFigureSince } from './profile';
  * When the visible content of each static route last changed, as ISO dates (`YYYY-MM-DD`). The
  * sitemap sends them as `lastmod`; a crawler that sees every page claim to change on every deploy
  * learns to ignore the field. Bump a route's date by hand in the commit that changes what it says.
- * A case study's dates live on its entry in `case-studies.ts`.
+ * A case study's dates live on its entry in `case-studies.ts`, and a post's in `posts.ts`.
+ *
+ * /blog's date covers its own copy only. Once a post is published, /blog lists the posts and its
+ * `lastmod` comes from them too: the latest of this date and every published post's `updatedAt`
+ * (`sitemap.ts`, #61). Publishing or updating a post therefore needs no bump here.
  *
  * From git, the last commit to change what each route visibly says: `/` 2026-09-30 (#47: the story's
  * progress dots and readout name each section by its phase title), /work 2026-09-25 (the

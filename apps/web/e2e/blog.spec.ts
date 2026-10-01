@@ -1,18 +1,142 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
-import { posts, publishedPosts } from '../src/data/posts';
+import { hasPublishedPosts, posts, publishedPosts } from '../src/data/posts';
 import { formatContentDate } from '../src/lib/content-date';
 import { UNKNOWN_POST_ROUTE, postRoute } from './routes';
+import { fetchHead } from './support/served-head';
 
 /**
- * The post pages (#61, 61b), as served: `request.get(path)` and the browser's `DOMParser` over the
- * response, never the hydrated DOM, so what is checked is what a crawler or an extractor reads
- * without running a script. A `DOMParser` document runs none of its scripts, and the RSC flight
- * payload's copies of the title and the dates sit inside scripts, where they are never elements.
+ * The blog (#61): `/blog` (61c) and the post pages (61b), as served: `request.get(path)` and the
+ * browser's `DOMParser` over the response, never the hydrated DOM, so what is checked is what a
+ * crawler or an extractor reads without running a script. A `DOMParser` document runs none of its
+ * scripts, and the RSC flight payload's copies of the title and the dates sit inside scripts, where
+ * they are never elements.
  *
- * One test per published post, generated from the index the page reads, so a published post is
- * checked the moment it lands. None is published yet: until then the unknown-slug test is what runs
- * here, and `src/app/blog/__tests__/post-page.test.tsx` renders the page over the fixture posts.
+ * The tests follow the data the pages read, so a published post is checked the moment it lands.
+ * None is published yet: until then `/blog` is checked as the Coming Soon placeholder, the
+ * unknown-slug test runs, and `src/app/blog/__tests__/` renders both pages over the fixture posts.
  */
+
+/** One item of `/blog`'s post list as served: its element, its title link and its labelled days. */
+interface ServedItem {
+  tag: string;
+  headings: string[];
+  links: { text: string; href: string | null }[];
+  dates: { label: string; datetime: string; text: string }[];
+  text: string;
+}
+
+/** `/blog` as served: its status, the markup, its `h2`s, and each post list with its items. */
+async function servedBlog(request: APIRequestContext, page: Page) {
+  const response = await request.get('/blog');
+  const markup = await response.text();
+  const parsed = await page.evaluate(
+    (html): { lists: { tag: string; items: ServedItem[] }[]; subheadings: string[] } => {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      return {
+        subheadings: [...doc.body.querySelectorAll('main h2')].map((h2) => h2.textContent ?? ''),
+        lists: [...doc.body.querySelectorAll('[data-post-list]')].map((list) => ({
+          tag: list.localName,
+          items: [...list.children].map((item) => ({
+            tag: item.localName,
+            headings: [...item.querySelectorAll('h1, h2, h3, h4, h5, h6')].map(
+              (heading) => heading.localName,
+            ),
+            links: [...item.querySelectorAll('a')].map((link) => ({
+              text: link.textContent ?? '',
+              href: link.getAttribute('href'),
+            })),
+            // A label is read by structure: a `<dt>` followed by a `<dd>` holding a `<time>`.
+            dates: [...item.querySelectorAll('dt')].flatMap((dt) => {
+              const dd = dt.nextElementSibling;
+              const time = dd?.localName === 'dd' ? dd.querySelector(':scope > time') : null;
+              return time
+                ? [
+                    {
+                      label: (dt.textContent ?? '').trim(),
+                      datetime: time.getAttribute('datetime') ?? '',
+                      text: time.textContent ?? '',
+                    },
+                  ]
+                : [];
+            }),
+            text: item.textContent ?? '',
+          })),
+        })),
+      };
+    },
+    markup,
+  );
+  return { status: response.status(), markup, ...parsed };
+}
+
+// AC 3, by data: the first published post replaces the placeholder with the list, and no code
+// changes.
+if (hasPublishedPosts) {
+  test('/blog lists every published post, newest first, with its title and labelled day', async ({
+    page,
+    request,
+  }) => {
+    const { status, markup, lists } = await servedBlog(request, page);
+    expect(status).toBe(200);
+    expect(
+      lists.map(({ tag }) => tag),
+      'one ordered post list',
+    ).toEqual(['ol']);
+
+    const [{ items }] = lists;
+    expect(
+      items.map(({ tag }) => tag),
+      'one list item per published post',
+    ).toEqual(publishedPosts.map(() => 'li'));
+    items.forEach((item, index) => {
+      const { slug, title, summary, publishedAt } = publishedPosts[index];
+      expect(item.headings, `${slug}: its title is the item's one heading`).toEqual(['h2']);
+      expect(item.links, `${slug}: one link, its title, to the post`).toEqual([
+        { text: title, href: postRoute(slug) },
+      ]);
+      expect(item.dates, `${slug}: its day, labelled, as a <dt> with its <dd><time>`).toEqual([
+        { label: 'Published', datetime: publishedAt, text: formatContentDate(publishedAt) },
+      ]);
+      expect(item.text, `${slug}: its summary`).toContain(summary);
+    });
+
+    for (const draft of posts.filter((post) => post.draft)) {
+      expect(markup, `${draft.slug} is a draft`).not.toContain(postRoute(draft.slug));
+    }
+    // Anywhere in the response, the flight payload included: the placeholder is gone, not hidden.
+    expect(markup).not.toContain('Coming Soon');
+  });
+} else {
+  test('/blog keeps its Coming Soon placeholder and noindex while no post is published', async ({
+    page,
+    request,
+  }) => {
+    const { status, lists, subheadings } = await servedBlog(request, page);
+    expect(status).toBe(200);
+    expect(subheadings).toEqual(['Coming Soon']);
+    expect(lists, 'no post list while nothing is published').toEqual([]);
+
+    const robots = (await fetchHead(request, '/blog')).meta.get('robots') ?? [];
+    expect(robots).toHaveLength(1);
+    expect(robots[0]).toContain('noindex');
+  });
+}
+
+// The nav link stays in both states (the owner decision of 2026-09-11, ADR 0028 decision 4).
+test('/ still serves the main navigation link to /blog', async ({ page, request }) => {
+  const response = await request.get('/');
+  expect(response.status()).toBe(200);
+  const hrefs = await page.evaluate(
+    (html) =>
+      [
+        ...new DOMParser()
+          .parseFromString(html, 'text/html')
+          .querySelectorAll('header nav[aria-label="Main"] a'),
+      ].map((link) => link.getAttribute('href')),
+    await response.text(),
+  );
+  expect(hrefs).toContain('/blog');
+});
 
 /** A post as served: its status, its `<h1>` texts, and the labelled `<dt>`/`<dd><time>` dates. */
 async function servedPost(request: APIRequestContext, page: Page, path: string) {
