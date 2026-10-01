@@ -62,7 +62,7 @@ function PostList({ posts }: { posts: readonly PublishedPost[] }) {
                 <time dateTime={post.publishedAt}>{published}</time>
               </dd>
             </dl>
-            <p className="text-[var(--muted)]">{post.summary}</p>
+            <p className="wrap-break-word text-[var(--muted)]">{post.summary}</p>
           </li>
         );
       })}
@@ -76,6 +76,7 @@ function ComingSoon() {
     <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-12 text-center">
       <div className="mb-6">
         <svg
+          aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           width="48"
           height="48"

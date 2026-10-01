@@ -107,6 +107,34 @@ describe('/blog with posts published', () => {
     }
   });
 
+  it('never dims text, and never uses --accent as a text colour', async () => {
+    // ADR 0011 and 0010. The axe gate renders /blog only as the placeholder until a post is
+    // published, so a dimmed or --accent class in the list would first fail in the commit that
+    // publishes a post; this guards the list over fixtures, as post-body.test.tsx guards the body.
+    const { default: BlogPage } = await pageOver(fixturePosts);
+    const { container } = render(<BlogPage />);
+    const bases = [...container.querySelectorAll('[data-post-list] *')]
+      .flatMap((element) => [...element.classList])
+      .map((name) => name.split(':').at(-1) ?? name);
+    expect(bases).not.toEqual([]);
+    const step = String.raw`(?:\d+(?:\.\d+)?|\[[^\]]+\])`;
+    const dimmed = new RegExp(String.raw`^(?:text-.*\/${step}|opacity-${step})$`);
+    expect(bases.filter((name) => dimmed.test(name) && name !== 'opacity-100')).toEqual([]);
+    expect(bases).not.toContain('text-[var(--accent)]');
+  });
+
+  it('wraps a long title or summary inside its card instead of widening the page', async () => {
+    // Either is free text; an unbroken URL in it would overflow a phone-width card.
+    const { default: BlogPage } = await pageOver(fixturePosts);
+    const { container } = render(<BlogPage />);
+    const items = [...container.querySelectorAll('[data-post-list] > li')];
+    expect(items).toHaveLength(2);
+    for (const item of items) {
+      expect(item.querySelector('h2')).toHaveClass('wrap-break-word');
+      expect(item.querySelector(':scope > p')).toHaveClass('wrap-break-word');
+    }
+  });
+
   it('shows no draft, and no placeholder', async () => {
     const { default: BlogPage } = await pageOver(fixturePosts);
     const { container } = render(<BlogPage />);
@@ -144,6 +172,14 @@ describe.each([
     expect(container.querySelector('[data-post-list]')).toBeNull();
     expect(container.querySelector('ol, li, time')).toBeNull();
     expect(container.textContent).not.toContain(draftPost.title);
+  });
+
+  it('hides the decorative pen icon from assistive technology', async () => {
+    const { default: BlogPage } = await pageOver(list);
+    const { container } = render(<BlogPage />);
+    const icons = [...container.querySelectorAll('svg')];
+    expect(icons).toHaveLength(1);
+    expect(icons[0]).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('stays out of search', async () => {
