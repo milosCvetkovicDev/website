@@ -53,7 +53,15 @@ derives from the canonical's (a module with no imports, which the e2e helpers re
 folder with a `page.tsx` needs an `index.md/route.ts` beside it: `data/__tests__/pages.test.ts`
 fails one without, fails a static route without a record, and calls every handler to check it
 serves exactly the serialiser's output, statically. `e2e/markdown-twins.spec.ts` checks the served
-twins against the served pages. The sitemap lists no twin.
+twins against the served pages. The sitemap lists no twin. The page's own URL also answers with
+its twin when the request's `Accept` lists `text/markdown` (not at `q=0`), through one rewrite
+per route in `next.config.ts` (the rules and their limits are in `deploy-and-next-config.md`), so
+a route added here needs its twin for the rewrite as well: `src/test/next-config.test.ts` fails
+when the negotiated routes and the twin handlers differ. `src/data/static-routes.ts`,
+`src/data/case-studies.ts`, `src/lib/pathname.ts` and every module they import are loaded by
+`next.config.ts` and must import by relative path, never `@/`, or `next build` fails. The
+pattern, `force-static` included, is recorded in
+`docs/adr/0030-generated-endpoints-as-static-route-handlers.md`.
 
 All of the route handlers prerender at build time, and `pnpm check:build-output` (a `quality` step,
 `ci-and-scripts.md`) fails when a route does not: a `GET` handler is dynamic unless it exports
