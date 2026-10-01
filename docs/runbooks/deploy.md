@@ -476,8 +476,9 @@ case study is added, add its item here.
       or page error, React hydration mismatches and 404s for assets requested on load included.
       Confirm the `e2e` job was green on the deployed commit. The spec targets `next start` on
       localhost, so anything the hosting layer injects or blocks is outside it. On the live site,
-      `.github/workflows/live-check.yml` covers the console, the tracker's script and stored state
-      on desktop Chromium after every production deployment and daily: its `Live site` run on the
+      `.github/workflows/live-check.yml` covers the console, the tracker's script, stored state
+      and the CDN keeping each page apart from its Markdown twin (ADR 0030) on desktop Chromium
+      after every production deployment and daily: its `Live site` run on the
       deployed commit should be green (Actions tab; it is not a pull request check, and a failed
       run opens an issue). It loads the apex, so a run that starts before the domain points at the
       new deployment tests the previous one; if it passed within seconds of the deploy, dispatch it

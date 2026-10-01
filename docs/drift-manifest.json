@@ -7259,6 +7259,207 @@
       }
     },
     {
+      "id": "adr-readme-link-0030-generated-endpoints-as-static-route-handlers",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0030-generated-endpoints-as-static-route-handlers.md)",
+      "claim": "The link to 0030-generated-endpoints-as-static-route-handlers.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        { "kind": "link", "token": "0030-generated-endpoints-as-static-route-handlers.md" }
+      ],
+      "check": { "path": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md" }
+    },
+    {
+      "id": "adr-index-0030-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0030's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0030-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0030 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0030 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0030-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0030's record carries the Date \"2026-10-01\".",
+      "check": {
+        "file": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-01"
+      }
+    },
+    {
+      "id": "adr-index-0030-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0030 gives the record's Date, \"2026-10-01\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0030 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-01"
+      }
+    },
+    {
+      "id": "adr-index-0030-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0030's record carries the H1 title \"Generated endpoints are static route handlers; pages negotiate twins by rewrite\".",
+      "check": {
+        "file": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Generated endpoints are static route handlers; pages negotiate twins by rewrite"
+      }
+    },
+    {
+      "id": "adr-index-0030-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0030 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0030 gives the record's H1 title, \"Generated endpoints are static route handlers; pages negotiate twins by rewrite\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0030 \\| \\[(.+?)\\]\\(0030-",
+        "equals": "Generated endpoints are static route handlers; pages negotiate twins by rewrite"
+      }
+    },
+    {
+      "id": "adr-0030-link-0015-static-case-study-params",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0015-static-case-study-params.md)",
+      "claim": "The link to 0015-static-case-study-params.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0015-static-case-study-params.md" }],
+      "check": { "path": "docs/adr/0015-static-case-study-params.md" }
+    },
+    {
+      "id": "adr-0030-link-0017-ai-discoverability-policy",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0017-ai-discoverability-policy.md)",
+      "claim": "The link to 0017-ai-discoverability-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0017-ai-discoverability-policy.md" }],
+      "check": { "path": "docs/adr/0017-ai-discoverability-policy.md" }
+    },
+    {
+      "id": "adr-0030-link-0023-static-security-headers",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0023-static-security-headers.md)",
+      "claim": "The link to 0023-static-security-headers.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0023-static-security-headers.md" }],
+      "check": { "path": "docs/adr/0023-static-security-headers.md" }
+    },
+    {
+      "id": "adr-0030-link-0025-production-alias-noindex",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0025-production-alias-noindex.md)",
+      "claim": "The link to 0025-production-alias-noindex.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0025-production-alias-noindex.md" }],
+      "check": { "path": "docs/adr/0025-production-alias-noindex.md" }
+    },
+    {
+      "id": "adr-0030-link-0026-vercel-web-analytics",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0026-vercel-web-analytics.md)",
+      "claim": "The link to 0026-vercel-web-analytics.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0026-vercel-web-analytics.md" }],
+      "check": { "path": "docs/adr/0026-vercel-web-analytics.md" }
+    },
+    {
+      "id": "adr-0030-script-check-build-output",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`pnpm check:build-output`",
+      "claim": "`pnpm check:build-output` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [{ "kind": "script", "token": "check:build-output" }],
+      "check": { "package": ".", "script": "check:build-output" }
+    },
+    {
+      "id": "adr-0030-accept-match",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`ACCEPTS_MARKDOWN` matches `text/markdown` as a",
+      "claim": "next.config.ts keys each Markdown rewrite on ACCEPTS_MARKDOWN in its has conditions.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": { "path": "apps/web/next.config.ts", "contains": "has: [ACCEPTS_MARKDOWN]," }
+    },
+    {
+      "id": "adr-0030-refuses-match",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`REFUSES_MARKDOWN` matches it with a",
+      "claim": "next.config.ts skips each Markdown rewrite on REFUSES_MARKDOWN, a weight of zero, in its missing conditions.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": { "path": "apps/web/next.config.ts", "contains": "missing: [REFUSES_MARKDOWN]," }
+    },
+    {
+      "id": "adr-0030-before-files",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "one `beforeFiles` rewrite per route",
+      "claim": "next.config.ts returns the Markdown rewrites as its beforeFiles rewrites.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": { "path": "apps/web/next.config.ts", "contains": "beforeFiles: markdownRewrites()" }
+    },
+    {
+      "id": "adr-0030-live-negotiation-spec",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`apps/web/e2e-live/markdown-negotiation.spec.ts` asks each negotiating",
+      "claim": "The live check's directory holds the spec that asks each negotiating route for Markdown and as a browser in both orders.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e-live/markdown-negotiation.spec.ts",
+        "contains": "serves Markdown to an agent after a browser's request"
+      }
+    },
+    {
+      "id": "adr-0030-relative-import",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "`content-date.ts` by relative path",
+      "claim": "case-studies.ts imports content-date by a relative path, because next.config.ts reaches it through Next's config loader.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/case-studies.ts",
+        "contains": "from '../lib/content-date'"
+      }
+    },
+    {
       "id": "adr-index-0025-cell-date",
       "doc": "docs/adr/README.md",
       "anchor": "| 0025 |",
