@@ -27,9 +27,6 @@
     "AnimatedHero": "  children?: React.ReactNode;",
     "AnimatedText": "  children: string;\n  animation: 'scramble' | 'wave' | 'magnetic' | 'scatter' | 'glitch' | 'typewriter' | 'elastic' | 'stagger-up' | 'rainbow' | 'perspective' | 'gravity' | 'blur-reveal' | 'highlight' | 'morse';\n  className?: string;",
     "ArchitectureBackground": "  activeNodes?: ReadonlyArray<'client' | 'gateway' | 'auth' | 'backend' | 'worker' | 'db' | 'cache' | 'ai' | 'storage'>;",
-    "CircuitBackground": "  progressRef: React.RefObject<number>;",
-    "CodeLine": "  lineNumber?: number;\n  children: React.ReactNode;\n  className?: string;\n  highlighted?: boolean;",
-    "DataStream": "  className?: string;",
     "DiscoveryPhase": "  // Takes no props.",
     "ExecutionPhase": "  // Takes no props.",
     "FeaturedWork": "  projects: ReadonlyArray<{ slug: string; title: string; description: string; tags: Array<string>; metric: { value: number; label: string; prefix?: string; suffix?: string; decimals?: number }; activeNodes: Array<'client' | 'gateway' | 'auth' | 'backend' | 'worker' | 'db' | 'cache' | 'ai' | 'storage'>; category: string; status: 'LIVE' | 'PRODUCTION' | 'RETIRED' }>;",
@@ -38,7 +35,6 @@
     "GauntletPhase": "  // Takes no props.",
     "HeroContent": "  // Takes no props.",
     "HeroSection": "  children?: React.ReactNode;",
-    "HexBadge": "  children: React.ReactNode;\n  className?: string;",
     "HudPanel": "  children: React.ReactNode;\n  className?: string;\n  title?: React.ReactNode;\n  glow?: boolean;",
     "Logo": "  className?: string;\n  size?: number;",
     "LoopPhase": "  // Takes no props.",
@@ -46,10 +42,8 @@
     "Navigation": "  // Takes no props.",
     "NotificationToast": "  children: React.ReactNode;\n  type?: 'success' | 'warning' | 'error' | 'info';",
     "PipelineStage": "  name: string;\n  status: 'pending' | 'running' | 'passed' | 'failed';\n  progress?: number;\n  fillRef?: React.RefObject<HTMLDivElement | null>;",
-    "ProgressBar": "  progress: number;\n  label?: string;\n  className?: string;\n  variant?: 'default' | 'success' | 'warning' | 'error';",
     "QuestItem": "  completed: boolean;\n  children: React.ReactNode;",
     "SectionProgress": "  storyRef: React.RefObject<HTMLElement | null>;",
-    "StatDisplay": "  label: string;\n  value: string | number;\n  className?: string;\n  highlight?: boolean;",
     "StrategyPhase": "  // Takes no props.",
     "TechStack": "  // Takes no props.",
     "Terminal": "  children: React.ReactNode;\n  className?: string;\n  title?: string;",
@@ -120,11 +114,6 @@
     },
     "AnimatedText": {
       "cardMode": "column"
-    },
-    "CircuitBackground": {
-      "cardMode": "single",
-      "primaryStory": "FullyDrawn",
-      "viewport": "1200x800"
     },
     "TmuxBackground": {
       "cardMode": "column",

@@ -108,10 +108,9 @@ catches it.
 
 - GSAP is loaded lazily (ADR 0024; `.claude/rules/ui-components.md`, Conventions): effects reach it
   through `runWithGsap` and event handlers through `useWithGsap`. Lint already refuses a value
-  `import` of `gsap` in `src`, except in the runtime module, the tests and
-  `animated-hero/circuit-background.tsx`, which no route renders and which would have to load GSAP
-  through `runWithGsap` before one could (the comment on the exemption in
-  `apps/web/eslint.config.mjs`); rendering it without that is a finding. `import type` is fine.
+  `import` of `gsap` in `src`, except in the runtime module and the tests (the exemptions in
+  `apps/web/eslint.config.mjs`), so a new exemption for a component is a finding. `import type` is
+  fine.
   The effect creates its own `gsap.context()` inside the `runWithGsap` callback, and its cleanup
   calls the cancel function `runWithGsap` returns and then `ctx.revert()`, as in
   `apps/web/src/components/animated-hero/discovery-phase.tsx`. Nothing here wraps GSAP in a React

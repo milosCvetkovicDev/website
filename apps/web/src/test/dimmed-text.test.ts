@@ -4,7 +4,8 @@
  * included, since axe measures it either way". The axe gate (`e2e/accessibility.spec.ts`) enforces
  * it only on what a route renders, at the moment it samples: `CodeLine`'s line numbers,
  * `text-[var(--muted)]/50` at 2.74:1 on the Terminal, went unnoticed until #110 because no route
- * renders `CodeLine`. This reads the source instead, so it sees every component a page uses or not.
+ * rendered `CodeLine` (#47 has since deleted it). This reads the source instead, so it sees every
+ * component a page uses or not.
  *
  * It reads every module under `src/components` outside tests and flags dimming declared in the
  * markup that reaches text:
@@ -841,7 +842,7 @@ describe('what the scan leaves alone', () => {
       ['opacity-100', 'opacity-50'],
     ],
     [
-      "shapes inside an SVG beside text that is not dimmed, as HexBadge's polygons are",
+      "shapes inside an SVG beside text that is not dimmed, as HexBadge's polygons were",
       `export function HexBadge({ children }: { children: React.ReactNode }) {
         return (
           <div className="relative inline-flex">
@@ -1472,7 +1473,8 @@ interface KnownDefect {
  * audit remediation epic (.claude/epics/audit-remediation-2026-09/47.md). DIM1, the glitch
  * variant's two copies at `opacity-70` (critic-8), was fixed with R17 by #47's slice 47d; DIM3 and
  * DIM4, the hero skill tags and the Scroll label (hero-2), with R12 and R13 in
- * e2e/hero-contrast.spec.ts by slice 47c. Ids are not reused.
+ * e2e/hero-contrast.spec.ts by slice 47c; DIM6, CircuitBackground's SVG labels, by slice 47l, which
+ * deleted the component (hero-6). Ids are not reused.
  */
 const KNOWN_DEFECTS: KnownDefect[] = [
   {
@@ -1493,22 +1495,14 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     fixedBy: 'unassigned',
     why: 'the log lines of the tmux background take the --log-* colours, 0.35 to 0.55 alpha; the animated panes set the same colours from script, which the scan cannot see',
   },
-  {
-    id: 'DIM6',
-    file: 'src/components/animated-hero/circuit-background.tsx',
-    component: 'CircuitBackground',
-    tokens: ['fill={…}'],
-    sites: 1,
-    fixedBy: '#47',
-    why: 'SVG <text> labels filled at 0.7, 0.5 and 0.35 alpha; #47 deletes the component',
-  },
 ];
 
 /**
- * Dimmed classes the text rule allows because nothing under them renders text: the three sites this
- * guard was written to leave alone. Pinned with their counts to show the scan reaching and judging
- * them rather than missing them. A <text> added under one turns it into a finding, and the change
- * that deletes one of these components (#47 deletes HexBadge) deletes its row.
+ * Dimmed classes the text rule allows because nothing under them renders text: the sites this guard
+ * was written to leave alone, less HexBadge's polygons, which went with the component (#47, slice
+ * 47l). Pinned with their counts to show the scan reaching and judging them rather than missing
+ * them. A <text> added under one turns it into a finding, and the change that deletes one of these
+ * components deletes its row.
  */
 const DECORATIVE = [
   {
@@ -1523,20 +1517,6 @@ const DECORATIVE = [
     component: 'CornerBrackets',
     element: 'svg',
     token: 'opacity-50',
-    count: 1,
-  },
-  {
-    file: 'src/components/animated-hero/hud-elements.tsx',
-    component: 'HexBadge',
-    element: 'polygon',
-    token: 'opacity-50',
-    count: 1,
-  },
-  {
-    file: 'src/components/animated-hero/hud-elements.tsx',
-    component: 'HexBadge',
-    element: 'polygon',
-    token: 'opacity-10',
     count: 1,
   },
 ];

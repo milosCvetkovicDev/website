@@ -33,7 +33,6 @@ export function LoopPhase() {
   const titleId = useId();
   const dashboardRef = useRef<HTMLDivElement>(null);
   const alertRef = useRef<HTMLDivElement>(null);
-  const timelineRef = useRef<HTMLDivElement>(null);
   const protocolRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLDivElement>(null);
 
@@ -290,7 +289,7 @@ export function LoopPhase() {
         </div>
 
         {/* Healing Timeline */}
-        <div ref={timelineRef} className="mt-6">
+        <div className="mt-6">
           <HudPanel title="SELF-HEALING LOG">
             <div className="space-y-2 font-mono text-sm">
               {healingTimeline.slice(0, shownEvents).map((event, index) => (

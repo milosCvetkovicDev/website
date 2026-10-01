@@ -16,9 +16,6 @@ const eslintConfig = defineConfig([
     ignores: [
       // The one module that imports GSAP, fetched lazily by load-gsap.ts.
       'src/components/animated-hero/gsap-runtime.ts',
-      // Rendered by no route, and deleted by #47 (hero-6). Rendering it would ship GSAP and two
-      // plugins with the page, so it would have to load through load-gsap.ts first.
-      'src/components/animated-hero/circuit-background.tsx',
       // Tests import GSAP directly to drive and inspect it; they ship nowhere.
       'src/**/__tests__/**',
       'src/test/**',
