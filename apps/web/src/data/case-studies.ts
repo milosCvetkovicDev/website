@@ -5,12 +5,27 @@
 import { formatContentDate } from '../lib/content-date';
 import { OWNER_TODO } from './owner-todo';
 
-export interface CaseStudyMetric {
+/**
+ * A figure as a card prints it: the number, how it is written, and what it counts. `formatMetric`
+ * and `MetricCounter` take this shape, so a count-up or a test fixture needs no basis.
+ */
+export interface CaseStudyFigure {
   value: number;
   label: string;
   prefix?: string;
   suffix?: string;
   decimals?: number;
+}
+
+/** A study's headline figure, with what makes it checkable. */
+export interface CaseStudyMetric extends CaseStudyFigure {
+  /**
+   * One line, a sentence: what the figure counted, against what baseline (#49). The case-study
+   * page prints it under the figure, and its Markdown twin beside the figure. When and how it was
+   * measured is the study's `metricDefinition`, not this. `featured-projects.ts` drops it before the
+   * home page's client cards, which print no basis, so it is not serialised into that payload.
+   */
+  basis: string;
 }
 
 /** Short facts shown on project cards (home page and /work). One source, so they cannot contradict. */
@@ -27,7 +42,7 @@ export interface CaseStudyHighlight {
  * 0..20, inside the 0..100 that toFixed accepts, so a data edit cannot throw during server
  * rendering.
  */
-export function formatMetric(metric: CaseStudyMetric): string {
+export function formatMetric(metric: CaseStudyFigure): string {
   if (!Number.isFinite(metric.value)) return '—';
   const decimals = Math.min(20, Math.max(0, Math.trunc(metric.decimals ?? 0)));
   return `${metric.prefix ?? ''}${metric.value.toFixed(decimals)}${metric.suffix ?? ''}`;
@@ -98,10 +113,13 @@ function measuredSentences(definition: MetricDefinition): string | null {
 
 /**
  * The one sentence that says what a headline figure is a fraction of, over what period and how it
- * was measured: the metric's `basis` (#49; `null` until it exists), then the window, then the
- * method. It is the single producer of that sentence, so a page renders it and a serialiser writes
- * it rather than joining the parts again. Nothing renders it yet: #58 puts it on the case-study page
- * and in its Markdown twin together. It takes the basis as a parameter rather than reading
+ * was measured: the metric's `basis` (#49), then the window, then the method. It is meant to be
+ * the single producer of that sentence, so a page renders it and a serialiser writes it rather
+ * than joining the parts again. Nothing renders it yet. Until then the basis prints alone: in the
+ * case-study page's metric panel and on the `- Basis:` line of its Markdown twin (#49). #58 puts
+ * this sentence in both places *instead of* those two, not beside them, or the basis prints twice;
+ * `e2e/case-study.spec.ts` and `lib/__tests__/serialise.test.ts` each fail on a second copy. It
+ * takes the basis as a parameter rather than reading
  * `CaseStudyMetric`, so it depends on nothing about that interface's shape.
  *
  * Total, and never a half-built string: the basis alone, on one line, while the definition cannot be
@@ -156,11 +174,11 @@ export interface CaseStudy {
 
 // Every study went public with the site's first production deployment, on 2026-09-09
 // (docs/runbooks/deploy.md:14-18); acacce0 had written them on 2026-01-27. UPDATED_AT is the day
-// the self-healing agent's study moved to the past tense and the enterprise study's claims were
-// aligned with the public record. Every study page shows that change, in its own copy or in the
-// neighbour descriptions of its "More work" block.
+// every study page gained its metric panel, the headline figure with its label and basis (#49),
+// which also relabelled the self-healing agent's figure. The change before it, on 2026-09-25, moved
+// that study to the past tense and aligned the enterprise study's claims with the public record.
 const PUBLISHED_AT = '2026-09-09';
-const UPDATED_AT = '2026-09-25';
+const UPDATED_AT = '2026-10-01';
 
 export const caseStudies: CaseStudy[] = [
   {
@@ -170,7 +188,13 @@ export const caseStudies: CaseStudy[] = [
     highlight: {
       category: 'AI AGENT',
       status: 'RETIRED',
-      metric: { value: 73, suffix: '%', label: 'faster resolution' },
+      metric: {
+        value: 73,
+        suffix: '%',
+        label: 'errors resolved autonomously',
+        basis:
+          'Production errors the agent diagnosed and fixed in a pull request the team merged, out of all the production errors it monitored.',
+      },
     },
     metricDefinition: { state: OWNER_TODO },
     title: 'Self-Healing Agent',
@@ -221,7 +245,13 @@ export const caseStudies: CaseStudy[] = [
     highlight: {
       category: 'PLATFORM',
       status: 'PRODUCTION',
-      metric: { value: 40, suffix: '%', label: 'less complexity' },
+      metric: {
+        value: 40,
+        suffix: '%',
+        label: 'less complexity',
+        basis:
+          'Complexity of the codebase after its module-by-module move to Clean Architecture, against the legacy codebase before it.',
+      },
     },
     metricDefinition: { state: OWNER_TODO },
     title: 'Enterprise B2B Platform',
@@ -279,7 +309,13 @@ export const caseStudies: CaseStudy[] = [
     highlight: {
       category: 'DEVOPS',
       status: 'PRODUCTION',
-      metric: { value: 5, suffix: '×', label: 'faster builds' },
+      metric: {
+        value: 5,
+        suffix: '×',
+        label: 'faster builds',
+        basis:
+          'CI build time with the remote cache, against the same pipelines rebuilding the entire monorepo on every run.',
+      },
     },
     metricDefinition: { state: OWNER_TODO },
     title: 'Nx Remote Cache Server',

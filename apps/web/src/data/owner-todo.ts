@@ -79,7 +79,7 @@ export interface UnfilledOwnerField {
 export const unfilledOwnerFields: readonly UnfilledOwnerField[] = [
   {
     field: 'case-studies.0.metricDefinition',
-    why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the self-healing agent's 73% faster resolution: facts only the owner has.",
+    why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the self-healing agent's 73% errors resolved autonomously: facts only the owner has.",
     expires: '2026-10-31',
   },
   {
