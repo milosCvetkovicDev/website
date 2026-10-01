@@ -46,9 +46,9 @@ vi.hoisted(() => {
   });
 });
 
-/** The hover target an `AnimatedText` renders: its tag carries `cursor-pointer`. */
+/** The hover target an `AnimatedText` renders: its root names the variant in `data-animation`. */
 const hoverTarget = (view: ReturnType<typeof render>) => {
-  const target = view.container.querySelector<HTMLElement>('[class*="cursor-pointer"]');
+  const target = view.container.querySelector<HTMLElement>('[data-animation]');
   if (!target) throw new Error('AnimatedText rendered no hover target');
   return target;
 };
@@ -140,7 +140,7 @@ describe('before GSAP has loaded', () => {
     fireEvent.mouseEnter(leftTarget);
     fireEvent.mouseLeave(leftTarget);
 
-    // An enter and its leave, both early. The leave replaces the enter, so the scramble never
+    // An enter and its leave, both early. The leave cancels the queued enter, so the scramble never
     // starts after the pointer has gone.
     const scrambleTarget = hoverTarget(scramble);
     fireEvent.mouseEnter(scrambleTarget);
