@@ -10,6 +10,9 @@ import {
   expectedStatus,
 } from './routes';
 import { caseStudies } from '../src/data/case-studies';
+import { coreSkills, skillsCopy } from '../src/data/pages/skills';
+import { workCopy } from '../src/data/pages/work';
+import { RUNS_IN_PRODUCTION } from '../src/data/work-stats';
 import { formatContentDate } from '../src/lib/content-date';
 import { fetchHead, first } from './support/served-head';
 
@@ -576,3 +579,152 @@ for (const { slug, publishedAt, updatedAt } of caseStudies) {
     ).toEqual({ datePublished: shown('Published'), dateModified: shown('Updated') });
   });
 }
+
+test('/work counts the studies running in production and serves no claim without a denominator (#58)', async ({
+  page,
+  request,
+}) => {
+  // #58 AC 10. The stats bar read "100% In Production" and "0 Left Unfinished", two literals no
+  // record stood behind: the first went false when the self-healing agent was retired, and the
+  // second had no denominator at all. The figure is now productionFigure() over the studies'
+  // statuses, and "Left Unfinished" is gone until the owner supplies what it would count.
+  const response = await request.get('/work');
+  expect(response.status(), 'GET /work').toBe(200);
+  const html = await response.text();
+  // Neither withdrawn claim may be served anywhere: not in the raw body (the flight payload, the
+  // meta tags and JSON-LD included), and not in the text a reader sees, where the old bar's value and
+  // label sat in two elements and read "100%In Production". The context around a hit is the
+  // message, rather than the whole document.
+  const withdrawn = [/Left Unfinished/i, /100%\s*in production/i];
+  const pageText = await page.evaluate(
+    (markup) =>
+      new DOMParser().parseFromString(markup, 'text/html').documentElement.textContent ?? '',
+    html,
+  );
+  const around = (haystack: string, pattern: RegExp) => {
+    const at = haystack.search(pattern);
+    return at === -1 ? '' : haystack.slice(Math.max(0, at - 80), at + 40);
+  };
+  for (const pattern of withdrawn) {
+    expect(around(html, pattern), `/work must not serve ${pattern} in its body`).toBe('');
+    expect(around(pageText, pattern), `/work must not show ${pattern} as text`).toBe('');
+  }
+
+  // The bar is found by structure from its first label, the Projects count, which the base build
+  // served too, so a missing figure fails on the figure rather than on the lookup. The label must
+  // be the only leaf reading it, so another "Projects" in the page fails as an ambiguous lookup
+  // rather than as a wrong bar. `DOMParser` runs no scripts, so only real elements answer.
+  const [firstLabel] = workCopy.stats.map(({ label }) => label);
+  const statuses = Object.keys(RUNS_IN_PRODUCTION);
+  const served = await page.evaluate(
+    ([markup, label, statusNames]) => {
+      const main = new DOMParser()
+        .parseFromString(markup, 'text/html')
+        .querySelector('main#main-content');
+      const text = (element: Element) => (element.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const leaves = [...(main?.querySelectorAll('*') ?? [])].filter(
+        (element) => element.children.length === 0,
+      );
+      const labelled = leaves.filter(
+        (element) => element.localName === 'div' && text(element) === label,
+      );
+      // Each card's status badge, independent of the bar: the figure must agree with them.
+      const badges = leaves.map(text).filter((value) => statusNames.includes(value));
+      const bar = labelled.length === 1 ? labelled[0].parentElement?.parentElement : null;
+      return {
+        labelled: labelled.length,
+        badges,
+        stats: bar
+          ? [...bar.children].map((item) => ({
+              pieces: item.children.length,
+              value: item.children[0] ? text(item.children[0]) : '',
+              label: item.children[1] ? text(item.children[1]) : '',
+            }))
+          : null,
+      };
+    },
+    [html, firstLabel, statuses] as const,
+  );
+  expect(served.labelled, `exactly one "${firstLabel}" label in /work's main`).toBe(1);
+  const { stats } = served;
+  expect(stats, `/work must serve a stats bar with a "${firstLabel}" figure`).not.toBeNull();
+  const figures = (stats ?? []).map(({ value, label }) => ({ value, label }));
+
+  // Each figure and its label stay two elements, the figure drawn large and the label small. (Axe
+  // cannot decide either at rest, over the page's grid background, so they count against /work's
+  // incomplete budget in accessibility.spec.ts, not its floor.)
+  expect(
+    (stats ?? []).map(({ pieces }) => pieces),
+    'each figure is a value and a label',
+  ).toEqual(workCopy.stats.map(() => 2));
+  expect(figures, 'the bar serves the record, in order').toEqual([...workCopy.stats]);
+
+  // The served figure agrees with the served cards, counted from their badges rather than from
+  // the source: one badge per project, and the running ones by the classification the code uses.
+  const running = served.badges.filter(
+    (status) => RUNS_IN_PRODUCTION[status as keyof typeof RUNS_IN_PRODUCTION],
+  ).length;
+  expect(served.badges.length, 'a status badge on every served card').toBe(caseStudies.length);
+  expect(figures, "the bar's figures agree with the served cards' badges").toEqual([
+    { value: String(served.badges.length), label: firstLabel },
+    { value: `${running} of ${served.badges.length}`, label: workCopy.stats[1].label },
+  ]);
+  for (const { value, label } of figures) {
+    expect(value, `"${label}" must not be a bare percentage`).not.toMatch(/%/);
+  }
+});
+
+test('/skills says above its proficiency bars that they are self-assessed (#58)', async ({
+  page,
+  request,
+}) => {
+  // #58 AC 11, the /skills half: the bars show a level out of 100 and the badges a number of years,
+  // and nothing on the page said what either was a measure of. The line sits between the section's
+  // heading and the bars, in the served HTML, so a reader without JavaScript meets it first.
+  const response = await request.get('/skills');
+  expect(response.status(), 'GET /skills').toBe(200);
+  const served = await page.evaluate(
+    ([markup, heading]) => {
+      const main = new DOMParser()
+        .parseFromString(markup, 'text/html')
+        .querySelector('main#main-content');
+      const text = (element: Element) => (element.textContent ?? '').replace(/\s+/g, ' ').trim();
+      const h2 = [...(main?.querySelectorAll('h2') ?? [])].find(
+        (element) => text(element) === heading,
+      );
+      const note = h2?.nextElementSibling;
+      const bars = note?.nextElementSibling;
+      return {
+        heading: Boolean(h2),
+        note: note ? { tag: note.localName, text: text(note) } : null,
+        skillsAfterNote: bars ? [...bars.querySelectorAll('h3')].map(text) : [],
+        barNames: bars
+          ? [...bars.querySelectorAll('[role="progressbar"]')].map(
+              (bar) => bar.getAttribute('aria-label') ?? '',
+            )
+          : [],
+      };
+    },
+    [await response.text(), skillsCopy.headings.coreSkills] as const,
+  );
+
+  expect(served.heading, `/skills must serve the "${skillsCopy.headings.coreSkills}" h2`).toBe(
+    true,
+  );
+  expect(served.note, 'the paragraph straight after the heading is the note').toEqual({
+    tag: 'p',
+    text: skillsCopy.coreSkillsNote,
+  });
+  expect(skillsCopy.coreSkillsNote, 'the note says the levels are not measured').toMatch(
+    /self-assessed/i,
+  );
+  expect(served.skillsAfterNote, 'the bars follow the note, every core skill among them').toEqual(
+    coreSkills.map(({ name }) => name),
+  );
+  // A screen reader user moving through the bars hears each bar's name, not the note above them, so
+  // every name carries the same qualifier.
+  expect(served.barNames, 'one progressbar per core skill').toHaveLength(coreSkills.length);
+  for (const name of served.barNames) {
+    expect(name, 'each bar names its level as self-assessed').toMatch(/self-assessed/i);
+  }
+});

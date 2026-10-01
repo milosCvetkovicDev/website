@@ -99,8 +99,13 @@ describe('the /work record', () => {
 });
 
 describe('the /skills record', () => {
-  // The bar's width, its aria-valuenow (min 0, max 100) and the twin's "Proficiency: N%" all read
-  // `level`, and the badge and the twin both print `${years} years`.
+  // The bar's width, its aria-valuenow (min 0, max 100) and the twin's "Self-assessed proficiency:
+  // N%" all read `level`, and the badge and the twin both print `${years} years`.
+  it('names each core skill once, since the page keys its bars by name', () => {
+    const names = coreSkills.map(({ name }) => name);
+    expect(names.filter((name, at) => names.indexOf(name) !== at)).toEqual([]);
+  });
+
   it.each(coreSkills.map((skill) => [skill.name, skill] as const))(
     '%s has a level the bar can show and years the badge can print',
     (_, { level, years }) => {
