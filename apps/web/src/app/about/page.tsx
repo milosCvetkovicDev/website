@@ -94,7 +94,7 @@ export default function AboutPage() {
           <h2 className="mb-8 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {aboutCopy.timelineHeading}
           </h2>
-          <ScrollTable {...timelineTable} wide />
+          <ScrollTable {...timelineTable} />
         </section>
 
         {/* Beliefs */}

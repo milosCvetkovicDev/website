@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
 import { OWNER_TODO } from '@/data/owner-todo';
-import type { PageRecord, PageSection, Paragraph } from '@/data/pages/types';
+import type { PageRecord, PageSection, Paragraph, TableSection } from '@/data/pages/types';
 import { visible } from '@/test/markdown';
 import { buildMetadata } from '../metadata';
 import { markdownTwinPath } from '../pathname';
@@ -399,12 +399,59 @@ describe('pageToMarkdown() and renderSections()', () => {
       [
         '## The longer version',
         '',
+        'Table: Career timeline',
+        '',
         '| Year | Kit | What changed | Area |',
         '| --- | --- | --- | --- |',
         '| 2025 | Bun, Hono | Shipped the agent. It fixed bugs. | Agents |',
       ].join('\n'),
     );
   });
+
+  it('names a table by its caption, as the page does, unless the heading already does (#58)', () => {
+    const withCaption = (caption: string): PageSection => ({
+      kind: 'table',
+      heading: 'Quick facts',
+      caption,
+      columns: ['Fact', 'Figure'],
+      rows: [['Teams led', '4']],
+    });
+    expect(renderSections([withCaption('Facts at a glance')])).toBe(
+      [
+        '## Quick facts',
+        '',
+        'Table: Facts at a glance',
+        '',
+        '| Fact | Figure |',
+        '| --- | --- |',
+        '| Teams led | 4 |',
+      ].join('\n'),
+    );
+    expect(renderSections([withCaption('Quick facts')])).not.toContain('Table:');
+  });
+
+  it.each<[string, Partial<TableSection>, RegExp]>([
+    ['a blank caption', { caption: ' ' }, /the caption of the table under "T" is empty/],
+    ['a blank column', { columns: ['A', ''] }, /column 2 of the table under "T" is empty/],
+    ['a blank row header', { rows: [[' ', 'x']] }, /the header of row 1 of the table under "T"/],
+    [
+      'a decorated cell without text',
+      { rows: [['Row', { icon: '🤖', text: ' ' }]] },
+      /the B of row 1 of the table under "T" is empty/,
+    ],
+  ])(
+    'refuses a table with %s: the page would render an unnamed header or a bare icon',
+    (_, change, error) => {
+      const base: TableSection = {
+        kind: 'table',
+        heading: 'T',
+        caption: 'C',
+        columns: ['A', 'B'],
+        rows: [['Row', 'x']],
+      };
+      expect(() => renderSections([{ ...base, ...change }])).toThrow(error);
+    },
+  );
 
   it('refuses a list cell whose entry holds a comma, or that has no entries', () => {
     const withList = (list: readonly string[]): PageSection => ({
@@ -416,7 +463,7 @@ describe('pageToMarkdown() and renderSections()', () => {
     });
     expect(() => renderSections([withList(['React, Next.js'])])).toThrow(/holds a comma/);
     expect(() => renderSections([withList([])])).toThrow(
-      /the Skills of row 1 under "Toolkit" is empty/,
+      /the Skills of row 1 of the table under "Toolkit" is empty/,
     );
   });
 
@@ -652,6 +699,8 @@ describe('caseStudyToMarkdown()', () => {
         '',
         '## Tech Stack',
         '',
+        'Table: Tech stack for Nx Remote Cache Server',
+        '',
         '| Layer | Technologies |',
         '| --- | --- |',
         '| Runtime | Bun |',
@@ -720,11 +769,16 @@ describe('caseStudyToMarkdown()', () => {
     ['no tags', { tags: [] }, /the tags of nx-remote-cache is empty/],
     ['a blank tagline', { tagline: ' ' }, /the Tagline of nx-remote-cache is empty/],
     ['an empty challenge', { challenge: '' }, /the challenge of nx-remote-cache is empty/],
-    ['no tech stack', { techStack: [] }, /table under "Tech Stack" is empty/],
+    ['no tech stack', { techStack: [] }, /the tech stack of nx-remote-cache is empty/],
     [
       'a tech-stack category with no items',
       { techStack: [{ category: 'Runtime', items: [] }] },
-      /the Runtime items of nx-remote-cache is empty/,
+      /the Technologies of row 1 of the tech stack of nx-remote-cache is empty/,
+    ],
+    [
+      'a blank tech-stack category',
+      { techStack: [{ category: ' ', items: ['Bun'] }] },
+      /the header of row 1 of the tech stack of nx-remote-cache is empty/,
     ],
     [
       'a tag holding a comma',

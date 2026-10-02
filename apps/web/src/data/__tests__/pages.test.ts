@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
 import { pages } from '@/data/pages';
 import { publishedPosts } from '@/data/posts';
-import { beliefs, credentials, facts, timeline } from '@/data/pages/about';
+import { aboutCopy, beliefs, credentials, facts, timeline } from '@/data/pages/about';
 import { asSentence } from '@/data/pages/table';
 import { socialLinks } from '@/data/pages/contact';
 import { coreSkills, differentiators, skillCategories } from '@/data/pages/skills';
@@ -89,7 +89,12 @@ describe('the entries moved out of the page modules', () => {
     const about = twin('/about');
     // The timeline and the quick facts are tables on the page (#58), with the same columns here;
     // the timeline's last cell leads with the highlight, ended as a sentence, as the page sets it.
-    expect(about).toContain('| Year | Role | Company | What changed |');
+    // Each table named by its caption, as the page's <caption> names it: the timeline's sits under
+    // a heading that says something else, the quick facts' heading already says it.
+    expect(about).toContain(
+      `## ${aboutCopy.timelineHeading}\n\nTable: Career timeline\n\n| Year | Role | Company | What changed |`,
+    );
+    expect(about).toContain(`## Quick facts\n\n| Fact | Figure |`);
     for (const { year, role, company, highlight, description } of timeline) {
       expect(about).toContain(
         `| ${year} | ${role} | ${company} | ${asSentence(highlight)} ${description} |`,
@@ -116,7 +121,7 @@ describe('the entries moved out of the page modules', () => {
       expect(skills).toContain(`- **${title}**: ${description}`);
     }
     // The toolkit is a table on the page (#58), with the same columns here, its icon left out.
-    expect(skills).toContain('| Category | What it covers | Skills |');
+    expect(skills).toContain('Table: Skills by category\n\n| Category | What it covers | Skills |');
     for (const { name, description, skills: list } of skillCategories) {
       expect(skills).toContain(`| ${name} | ${description} | ${list.join(', ')} |`);
     }

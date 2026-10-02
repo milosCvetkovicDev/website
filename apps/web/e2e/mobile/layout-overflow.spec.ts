@@ -9,6 +9,7 @@ import {
   measureOverflow,
   type OverflowWindow,
 } from '../support/overflow';
+import { isWideTable } from '../../src/data/pages/table';
 import { TABLES } from '../support/tables';
 
 /**
@@ -171,15 +172,18 @@ for (const motion of MOTIONS) {
 }
 
 // #58: the routes that serve a data table, at every phone width rather than 320px alone. A table
-// cannot wrap the way a grid of cards does, so a wide one has to scroll inside its own region: the
-// page must not scroll sideways at any of the three widths, and each table's region must sit inside
-// the viewport, reachable by the keyboard, however wide the table inside it is.
+// cannot wrap the way a grid of cards does, so a wide one (`isWideTable()`) has to scroll inside its
+// own region, and a narrow one has to fit: the page must not scroll sideways at any of the three
+// widths, each table's box must sit inside the viewport, a wide table must really overflow its
+// region at 320px (so its tab stop is earned) and scroll from the keyboard, and a narrow one, which
+// is not a tab stop, must never overflow at all.
 test(`the routes with a table do not scroll sideways at ${PHONE_WIDTHS.join(', ')}px`, async ({
   page,
+  browserName,
 }) => {
   const routes = Object.keys(TABLES);
-  expect(routes, 'the routes that serve a table').toEqual(
-    expect.arrayContaining(['/about', '/skills', ...CASE_STUDY_ROUTES]),
+  expect([...routes].sort(), 'the routes that serve a table').toEqual(
+    ['/about', '/skills', ...CASE_STUDY_ROUTES].sort(),
   );
   // As above: a navigation, a hydration wait, two walks and three reads per route, per width.
   test.setTimeout(30_000 + routes.length * PHONE_WIDTHS.length * 5_000);
@@ -193,22 +197,55 @@ test(`the routes with a table do not scroll sideways at ${PHONE_WIDTHS.join(', '
         if (response?.status() !== 200) return;
         expectNoOverflow(await measureOverflow(page, READ_AND_WALK), `${route} at ${width}px`);
 
-        const regions = page.locator('main [role="region"]:has(> table)');
-        await expect
-          .soft(regions, `${route}: one scrolling region per table`)
-          .toHaveCount(TABLES[route]?.length ?? 0);
-        for (const region of await regions.all()) {
-          const name = (await region.getAttribute('aria-label')) ?? 'a table region';
+        const tables = TABLES[route] ?? [];
+        const boxes = page.locator('main div:has(> table)');
+        await expect.soft(boxes, `${route}: one box per table`).toHaveCount(tables.length);
+        for (const [index, table] of tables.entries()) {
+          const box = boxes.nth(index);
+          const name = table.caption;
+          const wide = isWideTable(table);
+          const measured = await box.evaluate((element) => ({
+            overflowX: getComputedStyle(element).overflowX,
+            scrollWidth: element.scrollWidth,
+            clientWidth: element.clientWidth,
+          }));
+          // The computed style, not a class name: a renamed or purged utility fails here.
+          expect.soft(measured.overflowX, `${name} scrolls inside its box`).toBe('auto');
+          const bounds = await box.boundingBox();
+          expect.soft(bounds, `${name} is rendered`).not.toBeNull();
+          if (bounds) {
+            expect.soft(bounds.x, `${name} starts off the left edge`).toBeGreaterThanOrEqual(0);
+            expect
+              .soft(bounds.x + bounds.width, `${name} ends past the ${width}px viewport`)
+              .toBeLessThanOrEqual(width);
+          }
+          if (!wide) {
+            await expect.soft(box, `${name} is not a tab stop`).not.toHaveAttribute('tabindex');
+            expect
+              .soft(measured.scrollWidth, `${name} is not a tab stop, so it must fit at ${width}px`)
+              .toBeLessThanOrEqual(measured.clientWidth);
+            continue;
+          }
+          await expect.soft(box, `${name} is a region`).toHaveAttribute('role', 'region');
           await expect
-            .soft(region, `${name} is reachable by the keyboard`)
+            .soft(box, `${name} is reachable by the keyboard`)
             .toHaveAttribute('tabindex', '0');
-          const box = await region.boundingBox();
-          expect.soft(box, `${name} is rendered`).not.toBeNull();
-          if (!box) continue;
-          expect.soft(box.x, `${name} starts off the left edge`).toBeGreaterThanOrEqual(0);
+          if (width !== PHONE_WIDTHS[0]) continue;
           expect
-            .soft(box.x + box.width, `${name} ends past the ${width}px viewport`)
-            .toBeLessThanOrEqual(width);
+            .soft(measured.scrollWidth, `${name} overflows its region at ${width}px`)
+            .toBeGreaterThan(measured.clientWidth);
+          // Scrolling from the keyboard is the browser's, once the region has focus. Asserted in
+          // Chromium only: WebKit's arrow-key scrolling of a focused box is not something this
+          // suite has been able to run locally (workflow shells stall WebKit), and the focusable
+          // region above is what the rule asks of the page in every engine.
+          if (browserName !== 'chromium') continue;
+          await box.focus();
+          await page.keyboard.press('ArrowRight');
+          await expect
+            .poll(() => box.evaluate((element) => element.scrollLeft), {
+              message: `${name} scrolls sideways from the keyboard`,
+            })
+            .toBeGreaterThan(0);
         }
       });
     }

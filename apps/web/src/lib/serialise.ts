@@ -16,8 +16,8 @@ import type {
   Paragraph,
   PageRecord,
   PageSection,
+  Table,
   TableCell,
-  TableRow,
 } from '@/data/pages/types';
 import { assertPathname, markdownTwinPath } from './pathname';
 import { siteOrigin } from './site-origin';
@@ -179,37 +179,56 @@ function numbered(items: readonly string[], what: string): string {
 /**
  * A cell as the page reads it (`cellText()`), so the twin and `components/scroll-table.tsx` word it
  * alike: a list as its entries joined with `, `, which no entry may hold, a lead as a sentence
- * before the text, an icon left out.
+ * before the text, an icon left out. A plain cell may be blank, as a table's can; a decorated one
+ * must have text, or its icon or lead would stand for a value the twin cannot write.
  */
 function cell(value: TableCell, what: string): string {
-  if (typeof value === 'string' || 'text' in value) return cellText(value);
+  if (typeof value === 'string') return value;
+  if ('text' in value) {
+    nonEmpty(inline(value.text), what);
+    return cellText(value);
+  }
   return commaList(value, what);
 }
 
-function table(title: string, columns: readonly string[], rows: readonly TableRow[]): string {
+/**
+ * A table: a `Table:` caption line (Pandoc's), unless the caption only repeats the heading above
+ * it, then the columns and rows. `where` names the table in an error. The caption, every column and
+ * every row header must have text: the page renders each as a name, a `<caption>` or a `<th>`, and
+ * an empty one is an unnamed header to a screen reader and a gap in the twin.
+ */
+function table(
+  heading: string,
+  { caption, columns, rows }: Table,
+  where = `the table under "${heading}"`,
+): string {
   if (columns.length === 0) {
-    throw new Error(`renderSections: the table under "${title}" has no columns`);
+    throw new Error(`renderSections: ${where} has no columns`);
   }
-  entries(rows, `the table under "${title}"`);
+  const name = nonEmpty(inline(caption), `the caption of ${where}`);
+  columns.forEach((column, index) => nonEmpty(inline(column), `column ${index + 1} of ${where}`));
+  entries(rows, where);
   rows.forEach((row, index) => {
     if (row.length !== columns.length) {
       throw new Error(
-        `renderSections: row ${index + 1} of the table under "${title}" has ${row.length} cells for ${columns.length} columns`,
+        `renderSections: row ${index + 1} of ${where} has ${row.length} cells for ${columns.length} columns`,
       );
     }
+    nonEmpty(inline(row[0]), `the header of row ${index + 1} of ${where}`);
   });
   const line = (cells: readonly string[]) => `| ${cells.map(inline).join(' | ')} |`;
-  return [
+  const markdown = [
     line(columns),
     line(columns.map(() => '---')),
     ...rows.map((row, index) =>
       line(
         row.map((value, column) =>
-          cell(value, `the ${columns[column]} of row ${index + 1} under "${title}"`),
+          cell(value, `the ${columns[column]} of row ${index + 1} of ${where}`),
         ),
       ),
     ),
   ].join('\n');
+  return name === inline(heading) ? markdown : `Table: ${name}\n\n${markdown}`;
 }
 
 function section(content: PageSection): string[] {
@@ -233,7 +252,7 @@ function section(content: PageSection): string[] {
           .join('\n'),
       ];
     case 'table':
-      return [heading(2, content.heading), table(content.heading, content.columns, content.rows)];
+      return [heading(2, content.heading), table(content.heading, content)];
     default: {
       // The types rule this out; a record cast from elsewhere must not lose a section silently.
       const unknown: never = content;
@@ -342,15 +361,9 @@ export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
       ? [heading(2, CASE_STUDY_HEADINGS.lessons), bullets(lessons, where('Lessons'))]
       : []),
     heading(2, CASE_STUDY_HEADINGS.techStack),
-    table(
-      CASE_STUDY_HEADINGS.techStack,
-      // The page's columns (#58), with each row checked here so an error names the study.
-      techStackTable(caseStudy).columns,
-      caseStudy.techStack.map(({ category, items }): TableRow => [
-        nonEmpty(category.trim(), where('a tech-stack category')),
-        commaList(items, where(`the ${category} items`)),
-      ]),
-    ),
+    // The page's table whole (#58): its caption, columns and rows, checked here so an error names
+    // the study, and so the page and the twin read one array.
+    table(CASE_STUDY_HEADINGS.techStack, techStackTable(caseStudy), where('the tech stack')),
   ]);
 }
 

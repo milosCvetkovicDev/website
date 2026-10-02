@@ -2,15 +2,16 @@ import type { Page } from '@playwright/test';
 import { caseStudies, techStackTable } from '../../src/data/case-studies';
 import { aboutRecord } from '../../src/data/pages/about';
 import { skillsRecord } from '../../src/data/pages/skills';
-import { cellText } from '../../src/data/pages/table';
+import { cellText, isWideTable } from '../../src/data/pages/table';
 import type { PageRecord, Table } from '../../src/data/pages/types';
 import { caseStudyRoute } from '../routes';
 
 /**
  * The data tables the site serves (#58), read from the records the page and its Markdown twin both
  * render: a route's tables, in page order, and each one as the served HTML reads once parsed.
- * Shared by `seo-surface.spec.ts`, which checks the markup, and `mobile/layout-overflow.spec.ts`,
- * which checks that each table scrolls inside its region rather than widening the page.
+ * Shared by `seo-surface.spec.ts`, which checks the markup, `accessibility.spec.ts`, which runs
+ * axe's table rules on these routes, and `mobile/layout-overflow.spec.ts`, which checks that a wide
+ * table scrolls inside its region and a narrow one fits, rather than either widening the page.
  */
 
 const tablesOf = (record: PageRecord): Table[] =>
@@ -25,7 +26,10 @@ export const TABLES: Readonly<Record<string, readonly Table[]>> = {
   ),
 };
 
-/** A table as a parser reads it, with the region it scrolls in. */
+/**
+ * A table as a parser reads it, with the box around it: for a wide table, the region it scrolls in,
+ * whose `label` is the text of the element its `aria-labelledby` names.
+ */
 export interface ServedTable {
   caption: string | null;
   region: { role: string | null; tabindex: string | null; label: string | null; scrolls: boolean };
@@ -51,12 +55,13 @@ export async function servedTables(page: Page, html: string): Promise<ServedTabl
     };
     return [...(main?.querySelectorAll('table') ?? [])].map((table) => {
       const region = table.parentElement;
+      const labelledBy = region?.getAttribute('aria-labelledby');
       return {
         caption: table.caption ? text(table.caption) : null,
         region: {
           role: region?.getAttribute('role') ?? null,
           tabindex: region?.getAttribute('tabindex') ?? null,
-          label: region?.getAttribute('aria-label') ?? null,
+          label: labelledBy ? text(table.ownerDocument.getElementById(labelledBy)) : null,
           scrolls: region?.classList.contains('overflow-x-auto') ?? false,
         },
         columns: [...table.querySelectorAll('thead th')].map((th) => ({
@@ -79,15 +84,29 @@ export async function servedTables(page: Page, html: string): Promise<ServedTabl
   }, html);
 }
 
-/** The table a record describes, in the shape `servedTables()` reads a served one. */
-export function expectedTable({ caption, columns, rows }: Table): ServedTable {
+/** Whitespace collapsed and trimmed, as `servedTables()` reads the served text. */
+const collapsed = (text: string) => text.replace(/\s+/g, ' ').trim();
+
+/**
+ * The table a record describes, in the shape `servedTables()` reads a served one. A wide table
+ * (`isWideTable()`) sits in a keyboard-reachable region named by its caption; a narrow one in a
+ * plain box that is neither.
+ */
+export function expectedTable(table: Table): ServedTable {
+  const { caption, columns, rows } = table;
+  const wide = isWideTable(table);
   return {
-    caption,
-    region: { role: 'region', tabindex: '0', label: caption, scrolls: true },
-    columns: columns.map((text) => ({ scope: 'col', text })),
+    caption: collapsed(caption),
+    region: {
+      role: wide ? 'region' : null,
+      tabindex: wide ? '0' : null,
+      label: wide ? collapsed(caption) : null,
+      scrolls: true,
+    },
+    columns: columns.map((text) => ({ scope: 'col', text: collapsed(text) })),
     rows: rows.map(([header, ...cells]) => ({
-      header: { tag: 'th', scope: 'row', text: header },
-      cells: cells.map(cellText),
+      header: { tag: 'th', scope: 'row', text: collapsed(header) },
+      cells: cells.map((cell) => collapsed(cellText(cell))),
     })),
   };
 }

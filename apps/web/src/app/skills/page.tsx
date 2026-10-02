@@ -130,7 +130,7 @@ export default function SkillsPage() {
           <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {skillsCopy.headings.toolkit}
           </h2>
-          <ScrollTable {...toolkitTable} wide />
+          <ScrollTable {...toolkitTable} />
         </section>
 
         {/* Learning philosophy */}

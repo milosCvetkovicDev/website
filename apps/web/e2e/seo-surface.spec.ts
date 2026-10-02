@@ -1069,3 +1069,24 @@ test('the table rows are counted from the data the records read (#58)', () => {
     expect(tables?.[0]?.rows).toHaveLength(study.techStack.length);
   }
 });
+
+// #58: the specs above, the axe table rules and the phone overflow check all run over `TABLES`, so
+// a table served on a route `TABLES` does not list would get none of them. Every page route, the
+// 404 included, serves exactly the tables `TABLES` lists for it, and a route it lists is a route.
+test('every route serves exactly the tables TABLES lists for it (#58)', async ({
+  page,
+  request,
+}) => {
+  expect(PAGE_ROUTES, 'TABLES lists a route that is not a page').toEqual(
+    expect.arrayContaining(Object.keys(TABLES)),
+  );
+  const counts: Record<string, number> = {};
+  for (const route of PAGE_ROUTES) {
+    const response = await request.get(route);
+    expect(response.status(), `GET ${route}`).toBe(expectedStatus(route));
+    counts[route] = (await servedTables(page, await response.text())).length;
+  }
+  expect(counts).toEqual(
+    Object.fromEntries(PAGE_ROUTES.map((route) => [route, TABLES[route]?.length ?? 0])),
+  );
+});

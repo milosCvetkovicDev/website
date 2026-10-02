@@ -37,12 +37,11 @@ export interface ListSection {
  * A cell that carries more than its text. `lead` is a line set apart above the text, and both
  * the page and the twin end it as a sentence (`cellText()` in `table.ts`). `icon` is an emoji drawn
  * before the text as decoration: the page hides it from screen readers and the twin leaves it out.
+ * A cell has one or the other, never both: an icon before a lead would sit alone on the line above
+ * it, since the lead is set on a line of its own.
  */
-export interface DecoratedCell {
-  text: string;
-  lead?: string;
-  icon?: string;
-}
+export type DecoratedCell =
+  { text: string; lead?: string; icon?: never } | { text: string; icon?: string; lead?: never };
 
 /**
  * A data cell: text, a list of short entries (drawn as chips, read as one comma-separated list,
