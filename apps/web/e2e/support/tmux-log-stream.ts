@@ -17,10 +17,10 @@ export const TMUX_LOG_STREAM = '[data-tmux-slots]';
  * exclude. It must match five elements, one in each `[data-tmux-pane]`, in a tree under
  * `aria-hidden="true"`. Each must be a `div` carrying only `data-tmux-slots`, `class` and `style`,
  * so it is itself no link, button, heading, landmark or focus stop. Each may hold only the slots
- * `createSlot` makes: a `div` with text, a pinned height and no attribute but `style`. A slot has no
- * child element, so nothing can sit deeper, and `StaticPane`'s reduced-motion lines, which pin no
- * height, fail. The negative control at the bottom of `accessibility.spec.ts` proves each part can
- * fail.
+ * `createSlot` makes, and the lines of `StaticPane` (reduced motion), which pin their height the
+ * same way: a `div` with text, a pinned height and no attribute but `style`. A slot has no child
+ * element, so nothing can sit deeper. The negative control at the bottom of `accessibility.spec.ts`
+ * proves each part can fail.
  */
 export async function tmuxLogStreamProblems(page: Page): Promise<string[]> {
   return page.evaluate((selector) => {

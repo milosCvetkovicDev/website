@@ -14,7 +14,15 @@ function createHeightStore(ref: RefObject<HTMLElement | null>) {
     read: () => height,
     subscribe: (onChange: () => void) => {
       const element = ref.current;
-      if (!element) return () => {};
+      if (!element) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            'useElementHeight: the ref was not attached when React subscribed, so the height stays 0. ' +
+              'Put it on an element rendered unconditionally.',
+          );
+        }
+        return () => {};
+      }
       const report = (next: number) => {
         if (next === height) return;
         height = next;
@@ -28,7 +36,13 @@ function createHeightStore(ref: RefObject<HTMLElement | null>) {
         observer.observe(element);
         return () => observer.disconnect();
       }
-      const onResize = () => report(element.clientHeight);
+      // The content box, as `contentRect` reports it: clientHeight less the vertical padding.
+      const onResize = () => {
+        const style = getComputedStyle(element);
+        const padding =
+          (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+        report(element.clientHeight - padding);
+      };
       onResize();
       window.addEventListener('resize', onResize);
       return () => window.removeEventListener('resize', onResize);
@@ -40,12 +54,17 @@ function createHeightStore(ref: RefObject<HTMLElement | null>) {
  * The height of the element `ref` points at, in CSS pixels: its content box, as a
  * `ResizeObserver` last reported it. Read through `useSyncExternalStore` (ADR 0006), so a resize
  * renders the caller again without an effect that sets state. 0 on the server, while hydrating and
- * until the first report, which the browser delivers after the element's first layout and before
- * its first paint; an element that is not displayed reports nothing and stays at 0. Without
- * `ResizeObserver` (jsdom) it reads `clientHeight` at once and again on every window resize.
+ * until the first report. React subscribes in a passive effect, which can run after the first
+ * paint, so a frame can be painted at 0 before the observer's first report, which then arrives
+ * before the next paint. An element that is not displayed reports nothing and stays at 0.
+ *
+ * Without `ResizeObserver` (jsdom; every browser the site supports has it) it reads the content box
+ * from `clientHeight` at once and again on every window resize only, so a size change from anything
+ * else goes unseen there.
  *
  * The ref is read once, when React subscribes after the first commit, so it must sit on an element
- * rendered unconditionally and never swapped for another node.
+ * rendered unconditionally and never swapped for another node; in development a ref that is not
+ * attached by then is reported with a console warning.
  */
 export function useElementHeight(ref: RefObject<HTMLElement | null>): number {
   const [store] = useState(() => createHeightStore(ref));

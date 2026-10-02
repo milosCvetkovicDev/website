@@ -34,13 +34,30 @@ const PANE_PADDING_Y_PX = 6;
 const PANE_PADDING_X_PX = 10;
 
 /**
+ * Room a pane's stack is given beyond its viewport, so that it still reaches the top when the
+ * browser lays a line out a little shorter than `LINE_HEIGHT_PX`: Chromium and WebKit round 23.1 px
+ * down to 23.09375 (1/64 px units), 1.25 px short over `MAX_SLOTS` lines.
+ */
+const SLOT_SLACK_PX = 2;
+
+/**
+ * The most lines a pane stacks: 4620 px of them, more than any window shows at 100% zoom (89 fill a
+ * 3840x2160 window). Every tick rewrites every slot, so this bounds that work in a browser zoomed far
+ * out, where the pane's viewport can be thousands of CSS pixels tall.
+ */
+const MAX_SLOTS = 200;
+
+/**
  * How many lines a pane's stack needs to reach the top of a log viewport `height` px tall, the first
  * one partly clipped above it. The stack is anchored to the viewport's bottom edge, so any fewer
- * leave an empty band under the pane's title bar, and there is no cap: a cap of 40, which reaches
- * 924 px, left one on every window from 1920x1080 up.
+ * leave an empty band under the pane's title bar: the old cap of 40, which reaches 924 px, left one
+ * on every window from 1920x1080 up. Up to `MAX_SLOTS`, and none for a height that is not a positive
+ * number.
  */
 function slotCount(height: number): number {
-  return Math.max(0, Math.ceil((height - PANE_PADDING_Y_PX) / LINE_HEIGHT_PX));
+  if (!(height > 0)) return 0;
+  const needed = Math.ceil((height - PANE_PADDING_Y_PX + SLOT_SLACK_PX) / LINE_HEIGHT_PX);
+  return Math.min(MAX_SLOTS, Math.max(0, needed));
 }
 
 const LOG_COLORS: Record<LogLevel, string> = {
@@ -442,7 +459,9 @@ const PaneTitle = memo(function PaneTitle({ title, host }: { title: string; host
         color: 'var(--tmux-bar-text)',
       }}
     >
-      <span style={{ color: 'var(--tmux-pane-title-text)', fontWeight: 500 }}>{title}</span>
+      <span data-tmux-title="" style={{ color: 'var(--tmux-pane-title-text)', fontWeight: 500 }}>
+        {title}
+      </span>
       <span>{host}</span>
     </div>
   );
@@ -545,12 +564,17 @@ function StaticPane({ config }: { config: PaneConfig }) {
   return (
     <div
       // Test hooks, here and on the slot container: the tree is aria-hidden, so no role reaches it.
+      // `data-tmux-static` tells this pane from the animated one that it replaces after hydration.
       data-tmux-pane=""
+      data-tmux-static=""
       className="flex min-w-0 flex-1 flex-col overflow-hidden border-r-2 last:border-r-0"
       style={{ borderColor: 'var(--tmux-border)' }}
     >
       <PaneTitle title={config.title} host={config.host} />
       <div ref={viewportRef} className="relative flex-1 overflow-hidden">
+        {/* `justify-end` is flex-end's default unsafe alignment: lines that do not fit overflow the
+            top, where the viewport clips them. `safe` alignment would overflow the bottom and clip
+            the newest lines instead. */}
         <div
           data-tmux-slots=""
           className="absolute inset-0 flex flex-col justify-end font-mono whitespace-nowrap"
@@ -561,7 +585,18 @@ function StaticPane({ config }: { config: PaneConfig }) {
           }}
         >
           {lines.map(({ at, entry }) => (
-            <div key={at} style={{ color: LOG_COLORS[entry.cls] }}>
+            // Pinned, as the animated slots are, so a taller fallback glyph cannot grow a line. Not
+            // shrinkable either: an `overflow: hidden` flex item may shrink below its height, and the
+            // lines would squeeze into the viewport instead of overflowing its top.
+            <div
+              key={at}
+              style={{
+                color: LOG_COLORS[entry.cls],
+                height: `${LINE_HEIGHT_PX}px`,
+                overflow: 'hidden',
+                flexShrink: 0,
+              }}
+            >
               {entry.text || '\u00A0'}
             </div>
           ))}

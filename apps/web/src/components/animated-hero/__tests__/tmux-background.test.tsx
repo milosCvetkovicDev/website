@@ -342,6 +342,27 @@ describe('AnimatedPane log slots', () => {
     expect(slots.children[0].textContent).toBe('[03:14:06] warn: Heap usage 487Mi/512Mi (95.1%)');
   });
 
+  it('keeps a spare slot where the stack would only just reach the top', () => {
+    render(<TmuxBackground />);
+    const slots = kubectlSlots();
+    // 40 slots of 23.1 px reach 924 px, a tenth of a pixel more than this pane's 923.9 of room, but
+    // the browser lays each slot out at 23.09375 px (1/64 px units), 923.75 px in all: without a
+    // spare slot a hairline of the band would show under the title bar.
+    resizeTo(slots, 929.9);
+    expect(slots.children).toHaveLength(41);
+  });
+
+  it('stops at 200 slots however tall the pane is', () => {
+    render(<TmuxBackground />);
+    const slots = kubectlSlots();
+    // 200 slots reach 4620 px, taller than any window at 100% zoom; a browser zoomed far out would
+    // otherwise repaint thousands of slots a pane on every tick.
+    resizeTo(slots, 100_000);
+    expect(slots.children).toHaveLength(200);
+    resizeTo(slots, Number.POSITIVE_INFINITY);
+    expect(slots.children).toHaveLength(200);
+  });
+
   it('skips ticks while the background is off screen and resumes when it is back', () => {
     render(<TmuxBackground />);
     const observerCallback = MockIntersectionObserver.lastCallback;
@@ -381,10 +402,10 @@ describe('AnimatedPane log slots', () => {
       expect(slots.children).toHaveLength(52);
       // The same 15 at the bottom, the log's 15th (a blank line) last ...
       expect(slots.children[37].textContent).toBe(FIRST_LINE);
-      expect(slots.lastElementChild?.textContent).toBe(' ');
+      expect(slots.lastElementChild?.textContent).toBe('\u00A0');
       // ... and the 37 above them read back from the end of the log, as if it had run once before:
       // its last 33 lines, and above those its last four again.
-      expect(slots.children[36].textContent).toBe(' ');
+      expect(slots.children[36].textContent).toBe('\u00A0');
       expect(slots.children[35].textContent).toBe('[OK] All pods recovered');
       expect(slots.children[0].textContent).toBe('api-server-x2k9p   1/1   Running   3   4d12h');
       expect(vi.getTimerCount()).toBe(0);
@@ -392,6 +413,25 @@ describe('AnimatedPane log slots', () => {
       resizeTo(slots, 150);
       expect(slots.children).toHaveLength(15);
       expect(slots.firstElementChild?.textContent).toBe(FIRST_LINE);
+    });
+
+    it('mark themselves static and pin every line to the line height, up to 200 lines', () => {
+      render(<TmuxBackground />);
+      const slots = kubectlSlots();
+      expect(slots.closest('[data-tmux-pane]')?.hasAttribute('data-tmux-static')).toBe(true);
+      // Pinned as the animated slots are, so a taller fallback glyph (or a line of only spaces)
+      // cannot change a line's height and the count of lines still reaches the top.
+      // And kept from shrinking, which a flex item with hidden overflow otherwise may: the lines
+      // would squeeze into the viewport rather than overflow its top (jsdom lays nothing out, so
+      // `hero.spec.ts` measures it).
+      for (const line of slots.children) {
+        expect((line as HTMLElement).style.height).toBe(`${LINE_HEIGHT_PX}px`);
+        expect((line as HTMLElement).style.flexShrink).toBe('0');
+      }
+      resizeTo(slots, 929.9);
+      expect(slots.children).toHaveLength(41);
+      resizeTo(slots, 100_000);
+      expect(slots.children).toHaveLength(200);
     });
   });
 

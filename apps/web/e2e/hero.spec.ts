@@ -496,30 +496,28 @@ test.describe('scroll indicator clears the hero card at rest', () => {
 });
 
 /**
- * The first line of the kubectl pane's log, which the reduced-motion snapshot draws 15th from the
- * bottom.
- */
-const KUBECTL_FIRST_LINE = '$ kubectl get pods -n production -w';
-
-/**
  * Each tmux pane's log stack, the lines in `[data-tmux-slots]`, measured against its log viewport,
  * the element they are anchored to the bottom of: `band` is how far the first line's top edge sits
  * below the viewport's (the whole viewport with no line), so the empty band left under the pane's
- * title bar when it is positive, and 0 or less once the stack reaches the top. Read from the first
- * line rather than the container, which fills the viewport in the static pane. Also the viewport's
- * height, the number of lines in the stack and the text of its 15th line from the bottom.
+ * title bar when it is positive, and 0 or less once the stack reaches the top. Unrounded, so a
+ * sub-pixel hairline counts too. Read from the first line rather than the container, which fills the
+ * viewport in the static pane. Also the pane's title (`data-tmux-title`), whether it is the static
+ * pane (`data-tmux-static`), the viewport's height and the number of lines in the stack.
  */
 async function tmuxStacks(page: Page) {
   return page.locator('[data-tmux-slots]').evaluateAll((stacks) =>
     stacks.map((stack) => {
-      const viewport = stack.parentElement!.getBoundingClientRect();
+      const pane = stack.closest('[data-tmux-pane]');
+      const viewportElement = stack.parentElement;
+      if (!pane || !viewportElement) throw new Error('a log stack outside a pane viewport');
+      const viewport = viewportElement.getBoundingClientRect();
       const top = stack.firstElementChild?.getBoundingClientRect().top ?? viewport.bottom;
       return {
-        pane: stack.closest('[data-tmux-pane]')?.querySelector('span')?.textContent ?? '?',
+        pane: pane.querySelector('[data-tmux-title]')?.textContent ?? 'a pane with no title',
+        isStatic: pane.hasAttribute('data-tmux-static'),
         viewport: Math.round(viewport.height),
         lines: stack.childElementCount,
-        band: Math.round(top - viewport.top),
-        fifteenthFromBottom: stack.children[stack.childElementCount - 15]?.textContent ?? null,
+        band: top - viewport.top,
       };
     }),
   );
@@ -535,7 +533,7 @@ async function tmuxEmptyBands(page: Page) {
     .filter(({ band }) => band > 0)
     .map(
       ({ pane, viewport, lines, band }) =>
-        `${pane}: ${lines} lines leave a ${band} px band at the top of its ${viewport} px viewport`,
+        `${pane}: ${lines} lines leave a ${band.toFixed(2)} px band at the top of its ${viewport} px viewport`,
     );
 }
 
@@ -563,7 +561,9 @@ test.describe('tmux panes fill to their top edge', () => {
     test.describe(`at ${width}x${height}`, () => {
       test.use({ viewport: { width, height } });
 
-      test('every animated pane stacks its slots up to the top', async ({ page }) => {
+      // The slot boxes only: a fresh pane fills them from the bottom, a line a tick, as it always
+      // has, so the top ones are blank at first. The 2560x1440 test below checks their text.
+      test('every animated pane stacks its slot boxes up to the top', async ({ page }) => {
         await gotoHydrated(page, '/');
         // Retried: a pane sizes its slots once its viewport has been laid out.
         await expect
@@ -571,23 +571,36 @@ test.describe('tmux panes fill to their top edge', () => {
           .toEqual([]);
       });
 
-      test('every static pane, with motion reduced, stacks its lines up to the top', async ({
+      test('every static pane, with motion reduced, stacks its lines up to the top without shifting', async ({
         page,
       }) => {
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await gotoHydrated(page, '/');
         // The static snapshot replaces the animated panes once the page has hydrated, and then
-        // takes the measure of its pane: the stack's 15th line from the bottom is the first line of
-        // the log, as the snapshot has always drawn it, only in the static pane.
+        // takes the measure of its pane.
         await expect
-          .poll(async () => {
-            const kubectl = (await tmuxStacks(page)).find(({ pane }) => pane === PANE_TITLES[0]);
-            return kubectl?.fifteenthFromBottom;
-          })
-          .toBe(KUBECTL_FIRST_LINE);
+          .poll(async () => (await tmuxStacks(page)).map(({ isStatic }) => isStatic))
+          .toEqual(PANE_TITLES.map(() => true));
         await expect
           .poll(() => tmuxEmptyBands(page), { message: `at ${width}x${height}, motion reduced` })
           .toEqual([]);
+        // The lines added once the height is known are insertions above the first 15, which move
+        // nothing on screen: every shift since the navigation, to the budget of the story scroll
+        // test above (`buffered` hands the observer the entries recorded before it was created).
+        const shiftScore = await page.evaluate(async () => {
+          let total = 0;
+          const observer = new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+              const shift = entry as PerformanceEntry & { value: number; hadRecentInput: boolean };
+              if (!shift.hadRecentInput) total += shift.value;
+            }
+          });
+          observer.observe({ type: 'layout-shift', buffered: true });
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          observer.disconnect();
+          return total;
+        });
+        expect(shiftScore).toBeLessThan(0.02);
       });
     });
   }
@@ -595,13 +608,17 @@ test.describe('tmux panes fill to their top edge', () => {
   test.describe('at 2560x1440, once every pane has had more lines than it has slots', () => {
     test.use({ viewport: { width: 2560, height: 1440 } });
 
+    // A pane fills from the bottom, a line a tick, so its top slot is the last to fill: here 58
+    // slots, which the slowest pane (prometheus, 850 ms a line give or take 15%) reaches within
+    // 58 x 977.5 ms, after its first tick waits up to 2 s past an idle callback. Plus 5 s of margin.
+    const FILL_MS = Math.ceil(58 * 850 * 1.15) + 2_000 + 5_000;
+
     test('the top slot of every pane holds a line', async ({ page }) => {
-      // A pane fills from the bottom, a line a tick, so its top slot is the last to fill: here 58
-      // slots, which the slowest pane, at 850 ms a line give or take 15%, needs up to 57 s to reach.
-      // The page clock runs 90 s of its timers at once and then flows on in real time.
+      // The page clock runs FILL_MS of its timers at once and then flows on in real time. Every pane
+      // is checked below, so one that a pause rule held back fails here rather than passing unseen.
       await page.clock.install();
       await gotoHydrated(page, '/');
-      await page.clock.runFor(90_000);
+      await page.clock.runFor(FILL_MS);
 
       await expect.poll(() => tmuxEmptyBands(page)).toEqual([]);
       for (const title of PANE_TITLES) {
