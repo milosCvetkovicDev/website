@@ -465,8 +465,9 @@ case study is added, add its item here.
       the body: `curl -s -o /dev/null -w '%{http_code}\n' https://miloscvetkovic.dev/work/does-not-exist`
       must print `404`, and the body must contain "Page not found"
 - [ ] `/no-such-page` renders that same page with the same `404`
-- [ ] JSON-LD is present: `view-source` on `/` contains two `application/ld+json` blocks (Person and
-      WebSite, from `apps/web/src/components/json-ld.tsx`) and their `url` fields are the apex
+- [ ] JSON-LD is present: `view-source` on `/` contains three `application/ld+json` blocks (Person,
+      WebSite and WebPage, built by `apps/web/src/lib/structured-data.ts`) and their `url` fields
+      are the apex
 - [ ] The theme toggle in the navigation switches light and dark, the choice survives a reload, and
       there is no light-to-dark flash on first paint
 - [ ] Browser console is clean on every page. `apps/web/e2e/console-clean.spec.ts` covers this in
@@ -757,12 +758,12 @@ Detail on the less obvious rows:
   `dig +short www.miloscvetkovic.dev` rather than a browser. Remove any leftover apex `A`, `www`
   `CNAME` or URL redirect record, turn the Namecheap parking page off on the Domain tab, wait out the
   TTL, then use **Refresh** on each domain in Vercel.
-- **Environment variable.** All four readers, `apps/web/src/app/layout.tsx`, `sitemap.ts`,
-  `robots.ts` and `components/json-ld.tsx`, fall back to the hard-coded `https://miloscvetkovic.dev`,
-  so a missing variable is invisible everywhere, Production and Preview alike. Setting it for Preview
-  to the same value changes nothing. The variable exists to make the origin explicit, not to change
-  behaviour, and because the value is inlined at build time, saving it in Vercel does nothing until
-  the next deploy.
+- **Environment variable.** Every reader, `apps/web/src/app/layout.tsx`, `sitemap.ts`, `robots.ts`,
+  `feed.xml/route.ts`, `lib/serialise.ts` and `lib/structured-data.ts`, falls back to the hard-coded
+  `https://miloscvetkovic.dev`, so a missing variable is invisible everywhere, Production and
+  Preview alike. Setting it for Preview to the same value changes nothing. The variable exists to
+  make the origin explicit, not to change behaviour, and because the value is inlined at build
+  time, saving it in Vercel does nothing until the next deploy.
 - **Ignored build scripts.** A warning naming a package that `pnpm why -r <name>` does not find is
   the same stale `.modules.yaml` record, for a package the lockfile no longer resolves. The first
   Vercel deploys after the vite 8 migration can report `esbuild@0.27.2` that way: esbuild left the

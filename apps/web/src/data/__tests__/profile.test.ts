@@ -80,7 +80,7 @@ describe('the day the printed figure took effect', () => {
     vi.setSystemTime(new Date('2026-10-01T12:00:00Z'));
     const today = (await import('../static-routes')).STATIC_ROUTE_UPDATED;
     expect(today['/']).toBe('2026-10-01');
-    expect(today['/about']).toBe('2026-10-01');
+    expect(today['/about']).toBe('2026-10-02');
 
     vi.resetModules();
     vi.setSystemTime(new Date('2031-06-15T12:00:00Z'));

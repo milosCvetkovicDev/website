@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { COLLECTED, privacyCopy, privacyRecord } from '@/data/pages/privacy';
 import type { Paragraph } from '@/data/pages/types';
 import { linkKind } from '@/lib/links';
+import { WebPageJsonLd } from '@/components/json-ld';
 import { buildMetadata } from '@/lib/metadata';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
@@ -35,6 +36,7 @@ function Sentence({ paragraph }: { paragraph: Paragraph }) {
 export default function PrivacyPage() {
   return (
     <div className="py-16 md:py-24">
+      <WebPageJsonLd path={privacyRecord.path} name={privacyRecord.title} />
       <div className="mx-auto max-w-3xl px-6">
         <h1 className="mb-6 text-4xl font-bold md:text-5xl">Privacy</h1>
         <p className="mb-12 text-xl text-[var(--muted)]">{privacyCopy.intro}</p>

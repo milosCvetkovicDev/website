@@ -1,8 +1,14 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { BreadcrumbListJsonLd, TechArticleJsonLd } from '@/components/json-ld';
-import { adjacentCaseStudies, caseStudies, formatMetric, getCaseStudy } from '@/data/case-studies';
+import { BreadcrumbListJsonLd, TechArticleJsonLd, WebPageJsonLd } from '@/components/json-ld';
+import {
+  adjacentCaseStudies,
+  caseStudies,
+  formatMetric,
+  getCaseStudy,
+  type CaseStudy,
+} from '@/data/case-studies';
 import { social } from '@/data/social';
 import { formatContentDates } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
@@ -27,6 +33,9 @@ export async function generateStaticParams() {
   }));
 }
 
+/** The page's title, `<title> — <tagline>`: its head and its WebPage node both name it so. */
+const pageTitle = (caseStudy: CaseStudy) => `${caseStudy.title} — ${caseStudy.tagline}`;
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const caseStudy = getCaseStudy(slug);
@@ -36,7 +45,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return buildMetadata({
-    title: `${caseStudy.title} — ${caseStudy.tagline}`,
+    title: pageTitle(caseStudy),
     description: caseStudy.description,
     path: `/work/${caseStudy.slug}`,
     type: 'article',
@@ -68,6 +77,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
   return (
     <div className="py-16 md:py-24">
+      <WebPageJsonLd path={`/work/${caseStudy.slug}`} name={pageTitle(caseStudy)} breadcrumb />
       <TechArticleJsonLd caseStudy={caseStudy} />
       <BreadcrumbListJsonLd caseStudy={caseStudy} />
       <div className="mx-auto max-w-3xl px-6">

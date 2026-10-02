@@ -65,6 +65,7 @@ const COPY_MODULES = [
   'app/not-found.tsx',
   'app/error.tsx',
   'components/json-ld.tsx',
+  'lib/structured-data.ts',
   'components/animated-hero/hero-content.tsx',
   ...PAGE_RECORDS,
 ];

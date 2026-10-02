@@ -8,7 +8,9 @@ import {
   timeline,
   type StoryParagraph,
 } from '@/data/pages/about';
+import { ProfilePageJsonLd } from '@/components/json-ld';
 import { buildMetadata } from '@/lib/metadata';
+import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
 export const metadata = buildMetadata({
   title: aboutRecord.title,
@@ -37,8 +39,12 @@ function StoryText({ paragraph }: { paragraph: StoryParagraph }) {
 }
 
 export default function AboutPage() {
+  // One date for the visible line and the ProfilePage's dateModified, which may not assert a date the
+  // page does not show; it is also the sitemap's lastmod for /about.
+  const updated = STATIC_ROUTE_UPDATED['/about'];
   return (
     <div className="py-16 md:py-24">
+      <ProfilePageJsonLd path={aboutRecord.path} dateModified={updated} />
       <div className="mx-auto max-w-3xl px-6">
         {/* Hook */}
         <div className="mb-16">
@@ -203,6 +209,11 @@ export default function AboutPage() {
             ))}
           </div>
         </section>
+
+        {/* The line stays in the page with its date, as on /privacy. */}
+        <p className="mt-12 text-sm text-[var(--muted)]">
+          Last updated <time dateTime={updated}>{updated}</time>.
+        </p>
       </div>
     </div>
   );

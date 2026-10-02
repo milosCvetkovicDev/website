@@ -9,6 +9,7 @@ import {
   type RichParagraph,
   type ToolkitCategory,
 } from '@/data/pages/skills';
+import { WebPageJsonLd } from '@/components/json-ld';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
@@ -107,6 +108,7 @@ function SkillCategory({ category }: { category: ToolkitCategory }) {
 export default function SkillsPage() {
   return (
     <div className="py-16 md:py-24">
+      <WebPageJsonLd path={skillsRecord.path} name={skillsRecord.title} />
       <div className="mx-auto max-w-4xl px-6">
         {/* Header */}
         <div className="mb-16">

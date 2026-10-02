@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import Link from 'next/link';
 import { contactCopy, contactRecord, socialLinks, type SocialLinkName } from '@/data/pages/contact';
+import { WebPageJsonLd } from '@/components/json-ld';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
@@ -32,6 +33,7 @@ const icons: Record<SocialLinkName, ReactElement> = {
 export default function ContactPage() {
   return (
     <div className="py-16 md:py-24">
+      <WebPageJsonLd path={contactRecord.path} name={contactRecord.title} />
       <div className="mx-auto max-w-3xl px-6">
         {/* Header */}
         <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
