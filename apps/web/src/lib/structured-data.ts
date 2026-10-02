@@ -68,7 +68,7 @@ function titleText(title: PageRecord['title']): string {
 /** A content date as stored, `YYYY-MM-DD`; anything else throws, so the prerender fails. */
 function contentDate(date: string, node: string): string {
   if (formatContentDate(date) === null) {
-    throw new Error(`${node}: ${JSON.stringify(date)} is not a YYYY-MM-DD day`);
+    throw new Error(`${node}: "${date}" is not a YYYY-MM-DD day`);
   }
   return date;
 }
