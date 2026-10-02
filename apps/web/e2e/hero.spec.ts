@@ -1,4 +1,4 @@
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { isOnlyEmoji, pictographsIn } from '../src/test/pictographs';
 import { expectHydrated, gotoHydrated } from './support/hydration';
 import { servedText } from './support/served-text';
@@ -298,24 +298,45 @@ test.describe('Hero Section', () => {
     // and a screen reader never names it ("high voltage", "brain", "trophy" ...), as on /about and
     // /skills (`pages.spec.ts`). What counts as an emoji is `src/test/pictographs.ts`, which that
     // spec and the page records' unit test share.
-    const main = page.locator('main');
-    expect(pictographsIn(await main.ariaSnapshot()), 'pictographs announced on /').toEqual([]);
+    const snapshot = await page.locator('body').ariaSnapshot();
+    expect(pictographsIn(snapshot), 'pictographs in the accessibility tree of /').toEqual([]);
 
-    // The check above would pass as well on a page that stopped drawing them. Each card of the
-    // Strategy phase's tech tree still draws one emoji, visible, in an aria-hidden element of its
-    // own, so the card is still read out by its words alone.
-    const cards = main
-      .getByRole('heading', { name: 'TECH TREE', level: 3 })
-      .locator('xpath=following-sibling::*');
-    expect(await cards.count(), 'tech cards under TECH TREE').toBeGreaterThan(0);
-    for (const card of await cards.all()) {
-      const hidden = card.locator('[aria-hidden="true"]');
-      const icons = (await hidden.allTextContents()).filter(isOnlyEmoji);
-      expect(icons, `one emoji in the tech card "${await card.innerText()}"`).toHaveLength(1);
-      await expect(hidden.filter({ hasText: icons[0] })).toBeVisible();
+    // The check above would pass as well on a page that stopped drawing them. So each emoji is
+    // still drawn, alone in an aria-hidden element: one in each of the Strategy phase's four tech
+    // cards (`.tech-reveal`, the wrappers its timeline reveals), then the Gauntlet's and the Loop's
+    // toasts. Each is laid out at its text size and is not transparent itself; the opacity GSAP
+    // gives an ancestor is the story's entrance, which `story-phases.test.tsx` covers.
+    const main = page.locator('main');
+    const cards = main.locator('.tech-reveal');
+    await expect(cards).toHaveCount(4);
+    for (const [index, card] of (await cards.all()).entries()) {
+      const icons = (await emojiDrawnIn(card)).map(({ text }) => text);
+      expect(icons, `the emoji in tech card ${index + 1}`).toHaveLength(1);
+    }
+    const drawn = await emojiDrawnIn(main);
+    expect(drawn.map(({ text }) => text)).toEqual(['⚡', '🔷', '🧠', '👁', '🏆', '🔄']);
+    for (const { text, width, opacity } of drawn) {
+      expect(width, `the laid-out width of ${text}`).toBeGreaterThanOrEqual(16);
+      expect(opacity, `the opacity of ${text}`).toBe('1');
     }
   });
 });
+
+/**
+ * The aria-hidden elements under `scope` whose whole text is one emoji, in document order, with
+ * their layout width (`offsetWidth`, which a GSAP scale or a scroll position does not change) and
+ * their own computed opacity.
+ */
+async function emojiDrawnIn(scope: Locator) {
+  const hidden = await scope.locator('[aria-hidden="true"]').evaluateAll((elements) =>
+    elements.map((element) => ({
+      text: element.textContent ?? '',
+      width: element instanceof HTMLElement ? element.offsetWidth : 0,
+      opacity: getComputedStyle(element).opacity,
+    })),
+  );
+  return hidden.filter(({ text }) => isOnlyEmoji(text));
+}
 
 type Rect = { x: number; y: number; width: number; height: number };
 

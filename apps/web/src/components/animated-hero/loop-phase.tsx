@@ -317,8 +317,8 @@ export function LoopPhase() {
         >
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
-              {/* Decoration: the protocol line beside it says it, so a screen reader skips the
-                  emoji. */}
+              {/* Decoration: the self-healing protocol line beside it carries the meaning, so a
+                  screen reader skips the emoji. */}
               <span aria-hidden="true" className="text-xl">
                 🔄
               </span>
