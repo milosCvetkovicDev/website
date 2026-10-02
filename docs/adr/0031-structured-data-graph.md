@@ -14,10 +14,10 @@ Until #57 the site's JSON-LD was four loosely related blocks at most. The root l
 `Person` and a `WebSite` on every route, and the `WebSite` carried its own copy of the Person, with
 its name and URL, as `author`. A case study added a `TechArticle`, with the same copy as its
 `author` and the WebSite named by `@id`, and a `BreadcrumbList`; neither of those two had an `@id`
-of its own, and no route said what the page itself was. Nothing joined a page to the person it is about, and the offline gate of
-#55 (`apps/web/src/components/__tests__/json-ld.test.tsx`) carried two expected failures naming
-#57: every node carries an `@id`, and a page node exists that the WebSite and the Person are joined
-to.
+of its own, and no route said what the page itself was. Nothing joined a page to the person it is
+about, and the offline gate of #55 (`apps/web/src/components/__tests__/json-ld.test.tsx`) carried
+two expected failures naming #57: every node carries an `@id`, and a page node exists that the
+WebSite and the Person are joined to.
 
 Structured data is worth shipping here for two reasons, and only these:
 
@@ -31,11 +31,17 @@ Structured data is worth shipping here for two reasons, and only these:
   ([profile-page](https://developers.google.com/search/docs/appearance/structured-data/profile-page)).
   No knowledge panel is promised: Google's gallery has no `Person` feature.
 
-It is not an AI-citation lever, and this record does not claim one. The evidence is in
-[ADR 0017](0017-ai-discoverability-policy.md): Google states that no special markup is needed to
-appear in its generative features, and the one matched study of pages that added JSON-LD measured
-AI Overviews −4.6%, AI Mode +2.2% and ChatGPT +2.2%, results straddling zero. Answer engines that
-read a page read its visible text.
+It is not an AI-citation lever, and this record does not claim one. Google says so itself:
+"Structured data isn't required for generative AI search, and there's no special schema.org markup
+you need to add"
+([ai-optimization-guide](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide),
+updated 2026-07-10). A matched difference-in-differences over 1,885 pages that added JSON-LD,
+against roughly 4,000 controls, measured AI Overviews −4.6%, AI Mode +2.2% and ChatGPT +2.2%
+([schema-ai-citations](https://ahrefs.com/blog/schema-ai-citations), 2026-05-11), results
+straddling zero. A direct-fetch test of five answer engines found none of them reading JSON-LD;
+what they did extract came from the visible HTML
+([searchVIU](https://www.searchviu.com/en/schema-markup-and-ai-in-2025-what-chatgpt-claude-perplexity-gemini-really-see/),
+2025-12-02). [ADR 0017](0017-ai-discoverability-policy.md) carries the rest of the evidence.
 
 Google's structured-data policies also forbid marking up content that readers of the page cannot
 see, and want the markup to be a true representation of the page
@@ -81,8 +87,9 @@ the markup.
    the markup is a date the page prints: a case study's `datePublished` and `dateModified` are its
    visible Published and Updated line (#56), and /about's `dateModified` is
    `STATIC_ROUTE_UPDATED['/about']`, which /about now prints as a "Last updated" line, as /privacy
-   does. No other WebPage carries a date, because no other page shows one. The Person's existing
-   predicates are brought under the rule by 57b, which also adds only facts /about displays.
+   does. A page node that carries no date asserts none: of the other pages only /privacy prints
+   one, and dating its WebPage is left for a later change. The Person's existing predicates are
+   brought under the rule by 57b, which also adds only facts /about displays.
 
 6. **Refused types stay refused.** `FAQPage`, `HowTo`, `speakable` and `SearchAction` (with its
    `potentialAction`) are refused by [ADR 0017](0017-ai-discoverability-policy.md), with the source
@@ -142,7 +149,7 @@ the markup.
 - **`AboutPage` on /about.** It is valid schema.org, but `ProfilePage` is the type Google documents
   for a page about one person, and the one whose `mainEntity` it reads.
 - **A trail on /work.** Home and Work alone add nothing a result's URL does not already say.
-- **A `dateModified` on every WebPage from `STATIC_ROUTE_UPDATED`.** Those pages print no date, so
-  the markup would assert one no reader can see.
+- **A `dateModified` on every WebPage from `STATIC_ROUTE_UPDATED`.** All but /privacy print no
+  date, so the markup would assert one no reader can see.
 - **Keeping the article's own `url`.** The page the article is the main entity of is its WebPage
   node, which carries the canonical; a second `url` is a second copy of one fact.
