@@ -220,13 +220,15 @@ describe('what the scan flags', () => {
       );`,
       ['group-hover:opacity-50'],
     ],
+    // The inner class is a declared animation that moves rather than dims, so the scan judges it
+    // from its keyframes (the texture's own animate-scroll-up went with it in #47's slice 47l).
     [
       "an opacity on an ancestor of the text, as the data-stream texture's wrapper had until #111",
       `export function Stream({ className = '' }: { className?: string }) {
         const lines = '0101';
         return (
           <div className={\`pointer-events-none absolute inset-0 opacity-10 \${className}\`}>
-            <div className="animate-scroll-up font-mono">{lines}</div>
+            <div className="animate-shimmer font-mono">{lines}</div>
           </div>
         );
       }`,
@@ -1406,11 +1408,12 @@ describe('how an animation is judged', () => {
   // A new dimming animation fails this: check where it is used, then add it here. The four hero and
   // caret classes (slice 47g of #47) carry the keyframes the story used to write inline, and each
   // runs on a text-free, aria-hidden element: the hero glow, the scroll dot, the status dot and the
-  // Execution caret.
+  // Execution caret. `shimmer` is the declared, non-dimming animation the ancestor-opacity fixture
+  // above relies on.
   it("finds which of Tailwind's animations and globals.css's dim", () => {
     const names = [...vocabulary.animations.keys()];
     expect(names).toEqual(
-      expect.arrayContaining(['spin', 'bounce', 'fade-in', 'blink', 'highlight-scan']),
+      expect.arrayContaining(['spin', 'bounce', 'fade-in', 'blink', 'highlight-scan', 'shimmer']),
     );
     const dimming = names.filter((name) =>
       (vocabulary.animations.get(name) ?? []).some((shorthand) =>
@@ -1501,8 +1504,8 @@ const KNOWN_DEFECTS: KnownDefect[] = [
  * Dimmed classes the text rule allows because nothing under them renders text: the sites this guard
  * was written to leave alone, less the hex badge's polygons, which went with the component (#47,
  * slice 47l). Pinned with their counts to show the scan reaching and judging them rather than
- * missing them. A <text> added under one turns it into a finding, and the change that deletes one of these
- * components deletes its row.
+ * missing them. A <text> added under one turns it into a finding, and the change that deletes one
+ * of these components deletes its row.
  */
 const DECORATIVE = [
   {

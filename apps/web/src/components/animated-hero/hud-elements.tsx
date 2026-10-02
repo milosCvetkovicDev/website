@@ -1,5 +1,3 @@
-'use client';
-
 import { forwardRef } from 'react';
 
 // Corner bracket decoration for HUD panels
@@ -184,12 +182,8 @@ export function TypingCursor({ color = 'accent' }: { color?: 'accent' | 'white' 
     green: 'bg-[var(--status-ok)]',
   };
 
-  return (
-    <span
-      className={`animate-blink ml-0.5 inline-block h-5 w-2 ${colors[color]}`}
-      style={{ animationTimingFunction: 'steps(1)' }}
-    />
-  );
+  // `.animate-blink` (globals.css) already steps the blink with `steps(1)`.
+  return <span className={`animate-blink ml-0.5 inline-block h-5 w-2 ${colors[color]}`} />;
 }
 
 /**
