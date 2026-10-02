@@ -78,6 +78,18 @@ describe("the story's endless animations and the rule that pauses them", () => {
     ).toEqual([]);
   });
 
+  // TypingCursor (hud-elements.tsx) once restated `steps(1)` as an inline timing function, which the
+  // pause rule cannot see past either; its blink now comes from the class alone, so the class keeps
+  // the hard on-off step rather than a fade.
+  it("keeps the caret's blink stepped in its class", () => {
+    expect(vocabulary.animations.get('blink')).toEqual([
+      expect.stringMatching(/^blink\s.*\bsteps\(1\)/),
+    ]);
+    expect(
+      sources.flatMap(({ name, text }) => (/animationTimingFunction/.test(text) ? [name] : [])),
+    ).toEqual([]);
+  });
+
   it('writes no animation the rule cannot match', () => {
     const unmatchable = [
       ...tokens

@@ -365,7 +365,11 @@ export function GauntletPhase() {
         >
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
-              <span className="text-xl">🏆</span>
+              {/* Decoration: "Achievement Unlocked" beside it says it, so a screen reader skips
+                  the emoji. */}
+              <span aria-hidden="true" className="text-xl">
+                🏆
+              </span>
               <div>
                 <div className="font-semibold">Achievement Unlocked</div>
                 <div className="text-sm">&quot;Zero Trust, Full Send&quot; — +500 XP</div>

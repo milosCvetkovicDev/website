@@ -187,7 +187,12 @@ export function StrategyPhase() {
                   {/* Selection indicator */}
                   <div className="absolute top-0 bottom-0 left-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
 
-                  <span className="text-2xl transition-transform duration-300 group-hover:scale-125">
+                  {/* Decoration: the category and choice beside it say what it stands for, so a
+                      screen reader does not name the emoji. */}
+                  <span
+                    aria-hidden="true"
+                    className="text-2xl transition-transform duration-300 group-hover:scale-125"
+                  >
                     {tech.icon}
                   </span>
                   <div className="min-w-0 flex-1">
