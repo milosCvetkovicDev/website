@@ -317,7 +317,11 @@ export function LoopPhase() {
         >
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
-              <span className="text-xl">🔄</span>
+              {/* Decoration: the protocol line beside it says it, so a screen reader skips the
+                  emoji. */}
+              <span aria-hidden="true" className="text-xl">
+                🔄
+              </span>
               <div>
                 <div className="font-semibold">SELF-HEALING PROTOCOL ACTIVE</div>
                 <div className="text-sm">System diagnosed and fixed the issue autonomously</div>

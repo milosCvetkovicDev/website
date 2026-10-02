@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { isOnlyEmoji, pictographsIn } from '../src/test/pictographs';
 import { expectHydrated, gotoHydrated } from './support/hydration';
 import { servedText } from './support/served-text';
 
@@ -289,6 +290,30 @@ test.describe('Hero Section', () => {
     // Skill tags use a list
     const skillList = page.locator('ul[aria-label="Technical skills"]');
     await expect(skillList).toBeAttached();
+  });
+
+  test('keeps every emoji out of what the story announces', async ({ page }) => {
+    // The story's emoji are decoration beside words that already say the same thing ("Runtime →
+    // Bun", "Achievement Unlocked"), so each one sits in an aria-hidden element: it still shows,
+    // and a screen reader never names it ("high voltage", "brain", "trophy" ...), as on /about and
+    // /skills (`pages.spec.ts`). What counts as an emoji is `src/test/pictographs.ts`, which that
+    // spec and the page records' unit test share.
+    const main = page.locator('main');
+    expect(pictographsIn(await main.ariaSnapshot()), 'pictographs announced on /').toEqual([]);
+
+    // The check above would pass as well on a page that stopped drawing them. Each card of the
+    // Strategy phase's tech tree still draws one emoji, visible, in an aria-hidden element of its
+    // own, so the card is still read out by its words alone.
+    const cards = main
+      .getByRole('heading', { name: 'TECH TREE', level: 3 })
+      .locator('xpath=following-sibling::*');
+    expect(await cards.count(), 'tech cards under TECH TREE').toBeGreaterThan(0);
+    for (const card of await cards.all()) {
+      const hidden = card.locator('[aria-hidden="true"]');
+      const icons = (await hidden.allTextContents()).filter(isOnlyEmoji);
+      expect(icons, `one emoji in the tech card "${await card.innerText()}"`).toHaveLength(1);
+      await expect(hidden.filter({ hasText: icons[0] })).toBeVisible();
+    }
   });
 });
 
