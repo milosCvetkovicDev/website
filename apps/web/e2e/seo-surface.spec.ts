@@ -6,7 +6,9 @@ import {
   CASE_STUDY_ROUTES,
   NOT_FOUND_ROUTE,
   PAGE_ROUTES,
+  POST_ROUTES,
   STATIC_ROUTES,
+  caseStudyRoute,
   expectedStatus,
   postRoute,
 } from './routes';
@@ -414,10 +416,12 @@ test('no route, nor the sitemap, robots.txt or the manifest, serves an owner pla
 async function servedGraph(request: APIRequestContext, page: Page, path: string) {
   const response = await request.get(path);
   expect(response.status(), `GET ${path}`).toBe(expectedStatus(path));
-  const { sources, canonicals, lastUpdated } = await page.evaluate(
+  const { sources, canonicals, lastUpdated, title, lang } = await page.evaluate(
     (markup) => {
       const doc = new DOMParser().parseFromString(markup, 'text/html');
       return {
+        title: doc.head.querySelector('title')?.textContent ?? null,
+        lang: doc.documentElement.getAttribute('lang'),
         sources: [...doc.querySelectorAll('script[type="application/ld+json"]')].map(
           (script) => script.textContent ?? '',
         ),
@@ -443,7 +447,23 @@ async function servedGraph(request: APIRequestContext, page: Page, path: string)
       );
     }
   });
-  return { nodes, canonicals, lastUpdated };
+  return { nodes, canonicals, lastUpdated, title, lang };
+}
+
+/** Every string under a key that holds a link, at any depth, with where it sits. */
+function linksIn(value: unknown, at = ''): { at: string; link: string }[] {
+  if (Array.isArray(value)) return value.flatMap((entry, i) => linksIn(entry, `${at}[${i}]`));
+  if (typeof value !== 'object' || value === null) return [];
+  return Object.entries(value).flatMap(([key, entry]) => {
+    const where = at === '' ? key : `${at}.${key}`;
+    if (['@id', 'url', 'item', 'image', 'sameAs'].includes(key)) {
+      const strings = (Array.isArray(entry) ? entry : [entry]).filter(
+        (link): link is string => typeof link === 'string',
+      );
+      if (strings.length > 0) return strings.map((link) => ({ at: where, link }));
+    }
+    return linksIn(entry, where);
+  });
 }
 
 /** Every object below a node's root that carries an `@id`: the node's references to other nodes. */
@@ -471,6 +491,9 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
   // nothing else, and a page node's `url` is the canonical link the same document serves.
   const typesOf = (path: string) => {
     if (path === NOT_FOUND_ROUTE) return ['Person', 'WebSite'];
+    // A post page has no page node of its own until #61 (61f) builds its nodes with these builders;
+    // pinned here so the first published post cannot ship without anyone deciding what it serves.
+    if (POST_ROUTES.includes(path)) return ['Person', 'WebSite'];
     if (path === '/about') return ['Person', 'WebSite', 'ProfilePage'];
     if ((CASE_STUDY_ROUTES as readonly string[]).includes(path)) {
       return ['Person', 'WebSite', 'WebPage', 'TechArticle', 'BreadcrumbList'];
@@ -480,8 +503,10 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
   const problems: string[] = [];
   const canonicalOf = new Map<string, string>();
   const served = new Map<string, Record<string, unknown>[]>();
-  for (const path of [...STATIC_ROUTES, ...CASE_STUDY_ROUTES, NOT_FOUND_ROUTE]) {
-    const { nodes, canonicals } = await servedGraph(request, page, path);
+  // Every page a visitor can land on: the static routes, the case studies, the published posts and
+  // the 404, so a route added to any of those lists is held to the same graph.
+  for (const path of PAGE_ROUTES) {
+    const { nodes, canonicals, title, lang } = await servedGraph(request, page, path);
     served.set(path, nodes);
     const types = JSON.stringify(nodes.map((node) => node['@type']));
     if (types !== JSON.stringify(typesOf(path))) {
@@ -497,14 +522,18 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
         problems.push(`${path}: a ${String(node['@type'])} with no @id`);
       } else if (ids.has(id)) problems.push(`${path}: two nodes with the @id ${id}`);
       else ids.add(id);
-      // A relative link would resolve against whatever page a crawler found it on.
-      for (const key of ['@id', 'url'] as const) {
-        const link = node[key];
-        if (link !== undefined && !/^https?:\/\/[^/]/.test(String(link))) {
-          problems.push(
-            `${path}: ${String(node['@type'])}.${key} is ${String(link)}, not absolute`,
-          );
+      // A relative link would resolve against whatever page a crawler found it on: every `@id`,
+      // `url`, breadcrumb `item`, `image` and `sameAs`, at any depth, is absolute.
+      for (const { at, link } of linksIn(node)) {
+        if (!/^https?:\/\/[^/]/.test(link)) {
+          problems.push(`${path}: ${String(node['@type'])}.${at} is ${link}, not absolute`);
         }
+      }
+      // The WebSite's language is the one the document declares.
+      if (node['@type'] === 'WebSite' && node.inLanguage !== lang) {
+        problems.push(
+          `${path}: the WebSite's inLanguage is ${String(node.inLanguage)}, <html lang> ${lang}`,
+        );
       }
     }
     for (const node of nodes) {
@@ -531,16 +560,44 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
         `${path}: the page node's url is ${String(pageNode.url)}, not ${canonicals[0]}`,
       );
     }
+    // A WebPage's name is the title the route hands `buildMetadata()`, which the served <title>
+    // carries alone (an absolute title) or through the root template. /about's ProfilePage is named
+    // after the person instead (#57), so it is not compared.
+    if (
+      pageNode?.['@type'] === 'WebPage' &&
+      title !== pageNode.name &&
+      title !== `${String(pageNode.name)} | Milos Cvetkovic`
+    ) {
+      problems.push(
+        `${path}: the WebPage's name is ${String(pageNode.name)}, the <title> ${title}`,
+      );
+    }
   }
 
   // A case study's article is its page's main entity, and its breadcrumb runs Home, Work, the study,
   // in that order, each step at the canonical its own document serves.
-  caseStudies.forEach((study, index) => {
-    const path = CASE_STUDY_ROUTES[index];
-    const nodes = served.get(path) ?? [];
+  for (const study of caseStudies) {
+    const path = caseStudyRoute(study.slug);
+    const nodes = served.get(path);
+    if (!nodes) {
+      problems.push(`${path}: not among the routes walked above (CASE_STUDY_ROUTES)`);
+      continue;
+    }
     const byType = (type: string) => nodes.find((node) => node['@type'] === type);
     const [webPage, article, crumbs] = ['WebPage', 'TechArticle', 'BreadcrumbList'].map(byType);
-    if (!webPage || !article || !crumbs) return;
+    if (!webPage || !article || !crumbs) {
+      problems.push(`${path}: no WebPage, TechArticle or BreadcrumbList, so nothing below checked`);
+      continue;
+    }
+    // The article's image is the study's card, fetched from this server by its path.
+    const image = new URL(String(article.image));
+    const response = await request.get(`${image.pathname}${image.search}`);
+    const type = response.headers()['content-type'] ?? '(none)';
+    if (response.status() !== 200 || !type.startsWith('image/')) {
+      problems.push(
+        `${path}: the TechArticle's image ${image.href} answers ${response.status()} ${type}`,
+      );
+    }
     if ((article.mainEntityOfPage as { '@id'?: unknown })?.['@id'] !== webPage['@id']) {
       problems.push(`${path}: the TechArticle's mainEntityOfPage is not its WebPage`);
     }
@@ -557,7 +614,7 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
     );
     if (trail !== expected)
       problems.push(`${path}: the breadcrumb is ${trail}, expected ${expected}`);
-  });
+  }
 
   expect(problems).toEqual([]);
 });

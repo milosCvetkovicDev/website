@@ -360,6 +360,14 @@ export const caseStudies: CaseStudy[] = [
   },
 ];
 
+/**
+ * A case study's page title, `<title> — <tagline>`: the route's head and its WebPage node both name
+ * it so, and the JSON-LD tests build the served name from here rather than restating the format.
+ */
+export function caseStudyPageTitle(caseStudy: CaseStudy): string {
+  return `${caseStudy.title} — ${caseStudy.tagline}`;
+}
+
 export function getCaseStudy(slug: string): CaseStudy | undefined {
   return caseStudies.find((cs) => cs.slug === slug);
 }

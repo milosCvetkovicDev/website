@@ -11,6 +11,7 @@ import {
 import { OWNER_TODO } from '@/data/owner-todo';
 import type { InlineLink, Paragraph, PageRecord, PageSection } from '@/data/pages/types';
 import { assertPathname, markdownTwinPath } from './pathname';
+import { siteOrigin } from './site-origin';
 
 /**
  * The one module that writes Markdown (#59) and the case studies as JSON (#60). Every Markdown twin
@@ -55,8 +56,8 @@ export function jsonResponse(value: unknown): Response {
 }
 
 /**
- * The absolute URL of a path on this site. The origin comes from the variable and the fallback
- * `app/sitemap.ts` and `app/robots.ts` read, so a preview build names production like the sitemap
+ * The absolute URL of a path on this site. The origin is `siteOrigin()`'s, from the variable and the
+ * fallback `app/sitemap.ts` and `app/robots.ts` read, so a preview build names production like the sitemap
  * does, and the root is the bare origin, as its served canonical is. `metadataBase` cannot help
  * here: it resolves URLs in the head, and a Markdown body is plain text.
  */
@@ -66,35 +67,6 @@ export function absoluteUrl(path: string): string {
   }
   const origin = siteOrigin();
   return path === '/' ? origin : `${origin}${path}`;
-}
-
-/**
- * `NEXT_PUBLIC_SITE_URL`, or production when it is unset or blank, as the bare origin. A trailing
- * slash is dropped, so `https://x.dev/` cannot write `https://x.dev//about`; anything that is not an
- * http(s) origin (no scheme, a path, a query) throws at build time rather than ship broken URLs.
- */
-function siteOrigin(): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim() || 'https://miloscvetkovic.dev';
-  let url: URL | undefined;
-  try {
-    url = new URL(configured);
-  } catch {
-    url = undefined;
-  }
-  if (
-    !url ||
-    (url.protocol !== 'https:' && url.protocol !== 'http:') ||
-    url.pathname !== '/' ||
-    url.search ||
-    url.hash ||
-    url.username ||
-    url.password
-  ) {
-    throw new Error(
-      `absoluteUrl: NEXT_PUBLIC_SITE_URL "${configured}" is not an origin such as https://miloscvetkovic.dev`,
-    );
-  }
-  return url.origin;
 }
 
 // Inline syntax anywhere in a line: code spans, emphasis, links, autolinks and raw HTML, GFM's table

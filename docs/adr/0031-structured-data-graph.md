@@ -57,9 +57,10 @@ the markup.
    `apps/web/src/components/json-ld.tsx` renders each node into its own
    `<script type="application/ld+json">` through `serializeJsonLd`, the one `JSON.stringify` there,
    so #48's escape stays the only path into a script element. Every URL is absolute on
-   `NEXT_PUBLIC_SITE_URL`, falling back to production, and a route's URL is its canonical, built
-   from the pathname that route passes to `buildMetadata()`: the origin alone for `/`, as Next
-   writes the canonical link.
+   `NEXT_PUBLIC_SITE_URL` read as a bare http(s) origin by `apps/web/src/lib/site-origin.ts`, which
+   fails the build on any other value, falling back to production; a route's URL is its
+   canonical, built from the pathname that route passes to `buildMetadata()`: the origin alone for
+   `/`, as Next writes the canonical link.
 
 2. **Separate blocks, joined by `@id`, not one `@graph`.** Each node keeps its own block and an
    `@id`: `<origin>/#person`, `<origin>/#website`, `<canonical>#webpage` (`<origin>/#webpage` for
@@ -113,8 +114,10 @@ the markup.
   names no node on the route or carries more than its `@id`, and a type set other than the one
   pinned for the route; the two #57 expected failures are ordinary rows now.
   `apps/web/e2e/seo-surface.spec.ts` checks the same in the served HTML, a page node's `url`
-  against the canonical link the document serves, the trail's order and steps against the
-  canonicals of the routes it names, and /about's printed date against its `dateModified`.
+  against the canonical link and a WebPage's `name` against the `<title>` the document serves,
+  every link in a node as absolute, the article's image as an image, the trail's order and steps
+  against the canonicals of the routes it names, and /about's printed date against its
+  `dateModified`.
 - A fact lives in one node. The WebSite no longer restates the Person, and a page node does not
   restate the WebSite.
 - Adding a route means adding one `WebPageJsonLd`, with the path and title its metadata already

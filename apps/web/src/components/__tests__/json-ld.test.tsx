@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { caseStudies } from '@/data/case-studies';
+import { caseStudies, caseStudyPageTitle } from '@/data/case-studies';
 import { pages } from '@/data/pages';
 import { yearsOfExperience } from '@/data/profile';
 import { socialProfiles } from '@/data/social';
@@ -332,29 +332,94 @@ describe('the JSON-LD blocks', () => {
     }
   });
 
-  it('R32 (#48): a site URL containing </script> does not close the script element early', async () => {
-    // The attack shape, minimal: anything that reaches the block and contains a closing tag ends the
-    // script where the JSON did not expect it. `JSON.stringify` leaves it untouched, so both blocks
-    // emit it literally.
-    const hostile = 'https://example.test/</script><script>window.x=1</script>';
-    const { PersonJsonLd, WebsiteJsonLd } = await importWithSiteUrl(hostile);
+  it('R32 (#48): a value containing </script> does not close the script element early', async () => {
+    // The attack shape, minimal: anything that reaches a block and contains a closing tag ends the
+    // script where the JSON did not expect it. `JSON.stringify` leaves it untouched. The row was
+    // written with the site URL as the carrier; since 57a that is refused before any block renders,
+    // because `siteOrigin()` accepts a bare http(s) origin only. So the content carries it instead:
+    // the Person's profile links, and every prop a page block takes.
+    const hostile = '</script><script>window.x=1</script>';
+    await expect(importWithSiteUrl(`https://example.test/${hostile}`)).rejects.toThrow(
+      /is not an origin/,
+    );
+
+    vi.doMock('@/data/social', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@/data/social')>();
+      return {
+        ...actual,
+        socialProfiles: actual.socialProfiles.map((profile) => ({
+          ...profile,
+          href: `${profile.href}/${hostile}`,
+        })),
+      };
+    });
+    try {
+      const {
+        PersonJsonLd,
+        WebsiteJsonLd,
+        WebPageJsonLd,
+        TechArticleJsonLd,
+        BreadcrumbListJsonLd,
+      } = await importWithSiteUrl('https://example.test');
+      const study = { ...caseStudies[0], title: hostile, description: hostile, tags: [hostile] };
+      const { container } = render(
+        <>
+          <PersonJsonLd />
+          <WebsiteJsonLd />
+          <WebPageJsonLd path="/skills" name={hostile} />
+          <TechArticleJsonLd caseStudy={study} />
+          <BreadcrumbListJsonLd caseStudy={study} />
+        </>,
+      );
+
+      const blocks = jsonLdBlocks(container);
+      expect(blocks).toHaveLength(5);
+      // The hostile text did reach the Person, the page, the article and the trail.
+      expect(blocks.filter((body) => body.includes('\\u003c/script>'))).toHaveLength(4);
+      const offenders = blocks
+        .map((body, index) => ({ index, body }))
+        .filter(({ body }) => body.toLowerCase().includes('</script'))
+        .map(({ index, body }) => `block ${index + 1}: ${body.slice(0, 120)}`);
+
+      expect(
+        offenders,
+        'a block bypasses serializeJsonLd: every ld+json script must write `<` as `\\u003c`, ' +
+          'which keeps the JSON valid and the script element closed where it should be.',
+      ).toEqual([]);
+    } finally {
+      vi.doUnmock('@/data/social');
+    }
+  });
+
+  it('writes every id and url on the bare origin, whatever NEXT_PUBLIC_SITE_URL ends with (57a)', async () => {
+    // Next resolves the canonical through `new URL(siteUrl)`, which drops a trailing slash; the
+    // graph has to read the value the same way, or `https://example.test/` writes `…test//about`
+    // and no page node's url matches its canonical. A value with a path cannot be an origin at all.
+    const { PersonJsonLd, WebPageJsonLd, BreadcrumbListJsonLd } =
+      await importWithSiteUrl(' https://example.test/ ');
     const { container } = render(
       <>
         <PersonJsonLd />
-        <WebsiteJsonLd />
+        <WebPageJsonLd path="/skills" name="Skills" />
+        <BreadcrumbListJsonLd caseStudy={caseStudies[0]} />
       </>,
     );
+    const [person, page, crumbs] = jsonLdBlocks(container).map(parseJsonLdBlock);
+    expect(person['@id']).toBe('https://example.test/#person');
+    expect(person.url).toBe('https://example.test');
+    expect(page).toMatchObject({
+      '@id': 'https://example.test/skills#webpage',
+      url: 'https://example.test/skills',
+    });
+    expect((crumbs.itemListElement as { item: string }[]).map(({ item }) => item)).toEqual([
+      'https://example.test',
+      'https://example.test/work',
+      `https://example.test/work/${caseStudies[0].slug}`,
+    ]);
 
-    const offenders = jsonLdBlocks(container)
-      .map((body, index) => ({ index, body }))
-      .filter(({ body }) => body.toLowerCase().includes('</script'))
-      .map(({ index, body }) => `block ${index + 1}: ${body.slice(0, 120)}`);
-
-    expect(
-      offenders,
-      'a block bypasses serializeJsonLd: every ld+json script must write `<` as `\\u003c`, ' +
-        'which keeps the JSON valid and the script element closed where it should be.',
-    ).toEqual([]);
+    for (const configured of ['https://example.test/base', 'example.test', 'ftp://example.test']) {
+      await expect(importWithSiteUrl(configured), configured).rejects.toThrow(/is not an origin/);
+    }
   });
 
   it('escapes < without changing what a JSON parser reads', async () => {
@@ -490,6 +555,59 @@ const WEB_PAGE_ROUTES = (Object.keys(pages) as (keyof typeof pages)[]).filter(
   (path) => path !== '/about',
 );
 
+describe('the builders refuse a node they cannot mark up truthfully (57a)', () => {
+  // Each throws at prerender, so a bad trail, date or name fails the build instead of shipping.
+  const builders = async () => {
+    process.env.NEXT_PUBLIC_SITE_URL = 'https://example.test';
+    vi.resetModules();
+    return import('@/lib/structured-data');
+  };
+
+  it('accepts a trail from / down to the route, and refuses any other', async () => {
+    const { breadcrumbList } = await builders();
+    const path = '/work/a-study';
+    const home = { name: 'Home', path: '/' };
+    const work = { name: 'Work', path: '/work' };
+    const study = { name: 'A study', path };
+    expect(breadcrumbList({ path, trail: [home, work, study] }).itemListElement).toHaveLength(3);
+
+    const refused: [string, { name: string; path: string }[]][] = [
+      ['one step', [study]],
+      ['a trail ending elsewhere', [home, work]],
+      ['a trail not starting at /', [work, study]],
+      ['a route repeated', [home, work, work, study]],
+      ['a blank name', [home, { ...work, name: ' ' }, study]],
+    ];
+    for (const [label, trail] of refused) {
+      expect(() => breadcrumbList({ path, trail }), label).toThrow(/breadcrumbList: the trail/);
+    }
+  });
+
+  it('refuses a date that is not a YYYY-MM-DD day, and a blank page name', async () => {
+    const { profilePage, techArticle, webPage } = await builders();
+    expect(profilePage({ path: '/about', dateModified: '2026-10-02' }).dateModified).toBe(
+      '2026-10-02',
+    );
+    for (const date of ['', '2026-10-2', '2026-02-30', '2026-10-02T00:00:00Z']) {
+      expect(() => profilePage({ path: '/about', dateModified: date }), date).toThrow(
+        /profilePage: .* is not a YYYY-MM-DD day/,
+      );
+      const article = { path: '/work/x', headline: 'X', description: 'X', keywords: [] };
+      expect(
+        () => techArticle({ ...article, datePublished: date, dateModified: '2026-10-02' }),
+        date,
+      ).toThrow(/techArticle: .* is not a YYYY-MM-DD day/);
+      expect(
+        () => techArticle({ ...article, datePublished: '2026-10-02', dateModified: date }),
+        date,
+      ).toThrow(/techArticle: .* is not a YYYY-MM-DD day/);
+    }
+    for (const name of ['', '  ', { absolute: '' }]) {
+      expect(() => webPage({ path: '/skills', name }), JSON.stringify(name)).toThrow(/blank/);
+    }
+  });
+});
+
 /**
  * Every block the site serves, each component rendered on its own: the layout's two, a WebPage for
  * each static route but /about, /about's ProfilePage, then each case study's three in data order.
@@ -524,7 +642,12 @@ async function renderEveryBlock(): Promise<{ source: string; blocks: string[] }[
     ...caseStudies.flatMap((study): [string, ReactElement][] => [
       [
         `WebPageJsonLd (${study.slug})`,
-        <WebPageJsonLd key="page" path={`/work/${study.slug}`} name={study.title} breadcrumb />,
+        <WebPageJsonLd
+          key="page"
+          path={`/work/${study.slug}`}
+          name={caseStudyPageTitle(study)}
+          breadcrumb
+        />,
       ],
       [`TechArticleJsonLd (${study.slug})`, <TechArticleJsonLd key="article" caseStudy={study} />],
       [
@@ -705,7 +828,9 @@ describe('the offline structured-data gate (#55)', () => {
  * after `importWithSiteUrl`, so the pages share its fresh module graph and its site URL.
  * `e2e/seo-surface.spec.ts` checks the same sets in the HTML the server sends.
  */
-async function renderEveryRoute(): Promise<{ route: string; nodes: JsonLdNode[]; html: string }[]> {
+async function renderEveryRoute(): Promise<
+  { route: string; nodes: JsonLdNode[]; html: string; title: unknown }[]
+> {
   const { PersonJsonLd, WebsiteJsonLd } = await importWithSiteUrl('https://example.test');
   const [home, about, work, skills, contact, blog, privacy, study, notFound] = await Promise.all([
     import('@/app/page'),
@@ -718,23 +843,38 @@ async function renderEveryRoute(): Promise<{ route: string; nodes: JsonLdNode[];
     import('@/app/work/[slug]/page'),
     import('@/app/not-found'),
   ]);
-  const routes: [string, () => ReactElement | Promise<ReactElement>][] = [
-    ['/', () => <home.default />],
-    ['/about', () => <about.default />],
-    ['/work', () => <work.default />],
-    ['/skills', () => <skills.default />],
-    ['/contact', () => <contact.default />],
-    ['/blog', () => <blog.default />],
-    ['/privacy', () => <privacy.default />],
-    ...caseStudies.map((caseStudy): [string, () => Promise<ReactElement>] => [
-      `/work/${caseStudy.slug}`,
-      () => study.default({ params: Promise.resolve({ slug: caseStudy.slug }) }),
-    ]),
-    ['404', () => <notFound.default />],
+  // Each route with the title its head is given: the page module's own metadata, the very value
+  // Next reads, so a page that hands `buildMetadata()` one title and its page node another fails.
+  type Route = [string, () => ReactElement | Promise<ReactElement>, () => unknown];
+  const routes: Route[] = [
+    ['/', () => <home.default />, () => home.metadata.title],
+    ['/about', () => <about.default />, () => about.metadata.title],
+    ['/work', () => <work.default />, () => work.metadata.title],
+    ['/skills', () => <skills.default />, () => skills.metadata.title],
+    ['/contact', () => <contact.default />, () => contact.metadata.title],
+    ['/blog', () => <blog.default />, () => blog.metadata.title],
+    ['/privacy', () => <privacy.default />, () => privacy.metadata.title],
+    ...caseStudies.map((caseStudy): Route => {
+      const params = () => ({ params: Promise.resolve({ slug: caseStudy.slug }) });
+      return [
+        `/work/${caseStudy.slug}`,
+        () => study.default(params()),
+        async () => (await study.generateMetadata(params())).title,
+      ];
+    }),
+    ['404', () => <notFound.default />, () => notFound.metadata.title],
   ];
   const rendered = [];
-  for (const [route, page] of routes) {
-    const element = await page();
+  for (const [route, page, headTitle] of routes) {
+    // A page that throws fails every row of the describe from its hook, so the error names it.
+    let element: ReactElement;
+    let title: unknown;
+    try {
+      element = await page();
+      title = await headTitle();
+    } catch (error) {
+      throw new Error(`${route} did not render: ${(error as Error).message}`);
+    }
     const { container, unmount } = render(
       <>
         <PersonJsonLd />
@@ -749,7 +889,7 @@ async function renderEveryRoute(): Promise<{ route: string; nodes: JsonLdNode[];
         throw new Error(`${route}, block ${index + 1}: ${(error as Error).message}`);
       }
     });
-    rendered.push({ route, nodes, html: container.innerHTML });
+    rendered.push({ route, nodes, html: container.innerHTML, title });
     unmount();
   }
   return rendered;
@@ -813,23 +953,20 @@ describe('the JSON-LD graph on every route (#57)', () => {
   });
 
   it('gives each page node the route’s canonical and the title its head carries', () => {
-    const titles: Record<string, string> = {
-      ...Object.fromEntries(
-        Object.entries(pages).map(([path, { title }]) => [
-          path,
-          typeof title === 'string' ? title : title.absolute,
-        ]),
-      ),
-      '/about': 'Milos Cvetkovic',
-      ...Object.fromEntries(
-        caseStudies.map((study) => [`/work/${study.slug}`, `${study.title} — ${study.tagline}`]),
-      ),
-    };
-    for (const { route, nodes } of routes) {
+    // The title is the one the page module hands Next (its `metadata` or `generateMetadata()`), not
+    // the data record it was built from. /about is the one exception: #57 names its ProfilePage
+    // after the person the page is about, so its name is the real name, not the head's title.
+    const textOf = (title: unknown) =>
+      typeof title === 'object' && title !== null && 'absolute' in title
+        ? (title as { absolute: string }).absolute
+        : title;
+    for (const { route, nodes, title } of routes) {
       if (route === '404') continue;
       const page = nodeOfType(route, nodes, route === '/about' ? 'ProfilePage' : 'WebPage');
       const canonical = route === '/' ? 'https://example.test' : `https://example.test${route}`;
-      expect(page, route).toMatchObject({ url: canonical, name: titles[route] });
+      const name = route === '/about' ? 'Milos Cvetkovic' : textOf(title);
+      expect(typeof name, `${route}: a head title`).toBe('string');
+      expect(page, route).toMatchObject({ url: canonical, name });
     }
   });
 

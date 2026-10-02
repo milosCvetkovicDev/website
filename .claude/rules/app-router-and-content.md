@@ -100,8 +100,9 @@ as a handler that exports any other method does even with it. The same check fai
 any `'use server'` action, and a build that lacks a route in its `REQUIRED_ROUTES` (the JSON
 handlers and the feed above) or prerendered no path for one, or other slugs for
 `/work/[slug]/index.json` than for the page. `sitemap.ts`, `robots.ts`, `layout.tsx`,
-`feed.xml/route.ts`, `lib/structured-data.ts` and `lib/serialise.ts` each read
-`NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
+`feed.xml/route.ts` and `lib/site-origin.ts` (for `lib/structured-data.ts` and `lib/serialise.ts`,
+which refuses a value that is not an http(s) origin) each read `NEXT_PUBLIC_SITE_URL`, falling back
+to `https://miloscvetkovic.dev`. There is no middleware.
 `src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
 page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own
 (#59). It writes the case-study JSON too, with `jsonResponse()` as the one place that sets its

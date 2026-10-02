@@ -759,8 +759,9 @@ Detail on the less obvious rows:
   `CNAME` or URL redirect record, turn the Namecheap parking page off on the Domain tab, wait out the
   TTL, then use **Refresh** on each domain in Vercel.
 - **Environment variable.** Every reader, `apps/web/src/app/layout.tsx`, `sitemap.ts`, `robots.ts`,
-  `feed.xml/route.ts`, `lib/serialise.ts` and `lib/structured-data.ts`, falls back to the hard-coded
-  `https://miloscvetkovic.dev`, so a missing variable is invisible everywhere, Production and
+  `feed.xml/route.ts` and `lib/site-origin.ts` (for `lib/serialise.ts` and
+  `lib/structured-data.ts`), falls back to the hard-coded `https://miloscvetkovic.dev`, so a
+  missing variable is invisible everywhere, Production and
   Preview alike. Setting it for Preview to the same value changes nothing. The variable exists to
   make the origin explicit, not to change behaviour, and because the value is inlined at build
   time, saving it in Vercel does nothing until the next deploy.

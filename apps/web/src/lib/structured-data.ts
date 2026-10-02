@@ -1,7 +1,9 @@
 import type { PageRecord } from '@/data/pages/types';
 import { yearsOfExperience } from '@/data/profile';
 import { socialProfiles } from '@/data/social';
+import { formatContentDate } from './content-date';
 import { assertPathname } from './pathname';
+import { siteOrigin } from './site-origin';
 
 /**
  * The site's JSON-LD nodes, as plain objects (#57, ADR 0031). `components/json-ld.tsx` renders each
@@ -15,12 +17,13 @@ import { assertPathname } from './pathname';
  * study adds its TechArticle and its BreadcrumbList. The blocks stay separate rather than one
  * `@graph`: the `@id` references are what join them.
  *
- * Every URL is absolute on `NEXT_PUBLIC_SITE_URL`, falling back to production, and a route's URL is
- * its canonical, built from the same pathname its `buildMetadata()` call receives, the way Next
- * resolves it: the origin alone for `/`.
+ * Every URL is absolute on `siteOrigin()`, `NEXT_PUBLIC_SITE_URL` as a bare origin, falling back to
+ * production, and a route's URL is its canonical, built from the same pathname its `buildMetadata()`
+ * call receives, the way Next resolves it: the origin alone for `/`. A value that is not an http(s)
+ * origin throws when this module loads, so the build fails rather than ship broken ids.
  */
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://miloscvetkovic.dev';
+const siteUrl = siteOrigin();
 
 const CONTEXT = 'https://schema.org';
 const NAME = 'Milos Cvetkovic';
@@ -56,7 +59,18 @@ export const webPageId = (path: string) => routeNodeId(path, 'webpage');
 
 /** The text of a route's title, as `buildMetadata()` gets it: a plain or an absolute title. */
 function titleText(title: PageRecord['title']): string {
-  return typeof title === 'string' ? title : title.absolute;
+  const text = typeof title === 'string' ? title : title.absolute;
+  if (text.trim() === '')
+    throw new Error('webPage: a page node needs a name, and this one is blank');
+  return text;
+}
+
+/** A content date as stored, `YYYY-MM-DD`; anything else throws, so the prerender fails. */
+function contentDate(date: string, node: string): string {
+  if (formatContentDate(date) === null) {
+    throw new Error(`${node}: ${JSON.stringify(date)} is not a YYYY-MM-DD day`);
+  }
+  return date;
 }
 
 export function person() {
@@ -134,8 +148,9 @@ export function webPage({
 
 /**
  * /about's page node. It is that route's WebPage, so /about renders this and no `webPage()`: a page
- * about one person, whose `mainEntity` is the Person. `dateModified` is the date the page shows in
- * its "Last updated" line, never a date it does not show.
+ * about one person, whose `mainEntity` is the Person. Its `name` is that person's name, as #57
+ * specifies for a ProfilePage, not the route's title: the one page node whose name is not its head's.
+ * `dateModified` is the date the page shows in its "Last updated" line, never a date it does not show.
  */
 export function profilePage({ path, dateModified }: { path: string; dateModified: string }) {
   return {
@@ -144,7 +159,7 @@ export function profilePage({ path, dateModified }: { path: string; dateModified
     '@id': webPageId(path),
     url: canonicalUrl(path),
     name: NAME,
-    dateModified,
+    dateModified: contentDate(dateModified, 'profilePage'),
     isPartOf: reference(WEBSITE_ID),
     mainEntity: reference(PERSON_ID),
   };
@@ -180,8 +195,8 @@ export function techArticle({
     author: reference(PERSON_ID),
     mainEntityOfPage: reference(webPageId(path)),
     isPartOf: reference(WEBSITE_ID),
-    datePublished,
-    dateModified,
+    datePublished: contentDate(datePublished, 'techArticle'),
+    dateModified: contentDate(dateModified, 'techArticle'),
     keywords,
   };
 }
@@ -192,11 +207,22 @@ export interface Crumb {
   path: string;
 }
 
-/** The trail from the home page down to the route at `path`, which is its last step. */
+/**
+ * The trail from the home page down to the route at `path`, which is its last step. A trail that is
+ * shorter than two steps, does not start at `/` or end at `path`, repeats a route or has a blank
+ * name throws, so the prerender fails rather than ship a trail a results page cannot show.
+ */
 export function breadcrumbList({ path, trail }: { path: string; trail: readonly Crumb[] }) {
-  if (trail.length < 2 || trail[trail.length - 1].path !== path) {
+  if (
+    trail.length < 2 ||
+    trail[0].path !== '/' ||
+    trail[trail.length - 1].path !== path ||
+    new Set(trail.map((crumb) => crumb.path)).size !== trail.length ||
+    trail.some((crumb) => crumb.name.trim() === '')
+  ) {
     throw new Error(
-      `breadcrumbList: the trail for ${path} must have two steps or more, ending there`,
+      `breadcrumbList: the trail for ${path} must run from / to it in two named steps or more, ` +
+        'each route once',
     );
   }
   return {

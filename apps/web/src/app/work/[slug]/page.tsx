@@ -5,9 +5,9 @@ import { BreadcrumbListJsonLd, TechArticleJsonLd, WebPageJsonLd } from '@/compon
 import {
   adjacentCaseStudies,
   caseStudies,
+  caseStudyPageTitle,
   formatMetric,
   getCaseStudy,
-  type CaseStudy,
 } from '@/data/case-studies';
 import { social } from '@/data/social';
 import { formatContentDates } from '@/lib/content-date';
@@ -33,9 +33,6 @@ export async function generateStaticParams() {
   }));
 }
 
-/** The page's title, `<title> — <tagline>`: its head and its WebPage node both name it so. */
-const pageTitle = (caseStudy: CaseStudy) => `${caseStudy.title} — ${caseStudy.tagline}`;
-
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const caseStudy = getCaseStudy(slug);
@@ -45,7 +42,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return buildMetadata({
-    title: pageTitle(caseStudy),
+    title: caseStudyPageTitle(caseStudy),
     description: caseStudy.description,
     path: `/work/${caseStudy.slug}`,
     type: 'article',
@@ -77,7 +74,11 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
   return (
     <div className="py-16 md:py-24">
-      <WebPageJsonLd path={`/work/${caseStudy.slug}`} name={pageTitle(caseStudy)} breadcrumb />
+      <WebPageJsonLd
+        path={`/work/${caseStudy.slug}`}
+        name={caseStudyPageTitle(caseStudy)}
+        breadcrumb
+      />
       <TechArticleJsonLd caseStudy={caseStudy} />
       <BreadcrumbListJsonLd caseStudy={caseStudy} />
       <div className="mx-auto max-w-3xl px-6">
