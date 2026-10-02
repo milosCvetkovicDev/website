@@ -14,7 +14,7 @@ import {
 } from '@/lib/structured-data';
 
 /**
- * JSON for a `<script type="application/ld+json">`, with every `<` written as `<`: a JSON
+ * JSON for a `<script type="application/ld+json">`, with every `<` written as `\u003c`: a JSON
  * parser reads the same string, and the HTML tokeniser never sees a `</script>` inside it.
  */
 export function serializeJsonLd(value: unknown): string {
