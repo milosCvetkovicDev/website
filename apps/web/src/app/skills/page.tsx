@@ -52,12 +52,18 @@ function SkillBar({ name, years, level, context }: CoreSkill) {
         </span>
       </div>
       <div className="mb-3">
+        {/* A fixed level within a known range, so a meter: a progressbar would announce a task
+            under way. The value text makes every screen reader say the value as "95%" rather than
+            a bare number. The name repeats the level on purpose: a reader without meter support
+            announces the name alone. A meter's children are presentational, so the fill inside
+            is decoration. */}
         <div
           className="h-2 overflow-hidden rounded-full bg-[var(--border)]"
-          role="progressbar"
+          role="meter"
           aria-valuenow={level}
           aria-valuemin={0}
           aria-valuemax={100}
+          aria-valuetext={`${level}%`}
           aria-label={`${name} self-assessed proficiency: ${level}%`}
         >
           <div
@@ -75,7 +81,10 @@ function SkillCategory({ category }: { category: ToolkitCategory }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 transition-all hover:border-[var(--accent)]/50">
       <div className="mb-3 flex items-center gap-3">
-        <span className="text-2xl">{category.icon}</span>
+        {/* Decoration: the name beside it says what it means, so it is not read out. */}
+        <span aria-hidden="true" className="text-2xl">
+          {category.icon}
+        </span>
         <div>
           <h3 className="font-semibold">{category.name}</h3>
           <p className="text-xs text-[var(--muted)]">{category.description}</p>

@@ -137,7 +137,10 @@ export default function AboutPage() {
                 className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 transition-colors hover:border-[var(--accent)]/50"
               >
                 <div className="flex items-start gap-4">
-                  <span className="text-2xl">{belief.icon}</span>
+                  {/* Decoration: the title beside it says what it means, so it is not read out. */}
+                  <span aria-hidden="true" className="text-2xl">
+                    {belief.icon}
+                  </span>
                   <div>
                     <h3 className="mb-2 font-semibold">{belief.title}</h3>
                     <p className="leading-relaxed text-[var(--muted)]">{belief.description}</p>
@@ -159,7 +162,10 @@ export default function AboutPage() {
                 key={credential.text}
                 className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-2"
               >
-                <span className="text-sm">{`${credential.icon} ${credential.text}`}</span>
+                {/* The icon in a span of its own, hidden from screen readers; the text still reads. */}
+                <span className="text-sm">
+                  <span aria-hidden="true">{credential.icon}</span> {credential.text}
+                </span>
               </div>
             ))}
           </div>
