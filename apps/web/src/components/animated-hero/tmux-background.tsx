@@ -1,5 +1,6 @@
 'use client';
 
+import { useElementHeight } from '@/hooks/use-element-height';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
 import { memo, useEffect, useRef, useState } from 'react';
 
@@ -25,7 +26,22 @@ type StatusColor = 's-ok' | 's-err' | 's-wrn';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const MAX_LINES = 40;
+/** A log line's font size and height, and the padding around a pane's stack of lines. */
+const LINE_FONT_PX = 14;
+const LINE_HEIGHT_RATIO = 1.65;
+const LINE_HEIGHT_PX = LINE_FONT_PX * LINE_HEIGHT_RATIO;
+const PANE_PADDING_Y_PX = 6;
+const PANE_PADDING_X_PX = 10;
+
+/**
+ * How many lines a pane's stack needs to reach the top of a log viewport `height` px tall, the first
+ * one partly clipped above it. The stack is anchored to the viewport's bottom edge, so any fewer
+ * leave an empty band under the pane's title bar, and there is no cap: a cap of 40, which reaches
+ * 924 px, left one on every window from 1920x1080 up.
+ */
+function slotCount(height: number): number {
+  return Math.max(0, Math.ceil((height - PANE_PADDING_Y_PX) / LINE_HEIGHT_PX));
+}
 
 const LOG_COLORS: Record<LogLevel, string> = {
   'l-err': 'var(--log-err)',
@@ -490,9 +506,42 @@ const StatusBar = memo(function StatusBar({ clock }: { clock: string }) {
 
 // ─── Static Snapshot (reduced motion) ────────────────────────────────────────
 
+/** The lines a static pane always draws at its bottom: the first 15 of its log. */
+const SNAPSHOT_LINES = 15;
+
+/**
+ * A static pane's lines for `slots` of room, top to bottom, each with its place in the log: the
+ * first 15 of the log at the bottom, as the snapshot has always drawn them, and above them, in a pane
+ * that needs more to reach its top, the log read back from its end, as if it had run through once
+ * before (a short log goes round again). Never fewer than the 15, so a short pane is drawn as it
+ * always was, its top lines clipped.
+ */
+function snapshotLines(seq: LogEntry[], slots: number): { at: number; entry: LogEntry }[] {
+  if (seq.length === 0) return [];
+  const shown = Math.min(SNAPSHOT_LINES, seq.length);
+  const count = Math.max(shown, slots);
+  return Array.from({ length: count }, (_, i) => {
+    const at = shown - count + i;
+    return { at, entry: seq[((at % seq.length) + seq.length) % seq.length] };
+  });
+}
+
+/**
+ * The reduced-motion pane: no timers and no animation, its lines rendered for the height of its log
+ * viewport. A resize renders them again, adding or removing lines at the front, each keyed by its
+ * place in the log, so the lines that remain stay where they are, as the animated slots do.
+ *
+ * Its line container fills the viewport and stacks the lines at its bottom (`justify-end`), where
+ * the animated pane's container sits on the bottom edge and grows upwards. The first render can be
+ * painted before the height is known, with the 15 lines, and a container that then grew to reach the
+ * top would move its own top edge, which the browser counts as a layout shift (0.18 at 1280x720 with
+ * motion reduced, against the 0.02 `e2e/hero.spec.ts` allows). This one never moves: the lines above
+ * the 15 are added, not moved, and the first line overflows the top, clipped, as before.
+ */
 function StaticPane({ config }: { config: PaneConfig }) {
-  // Show the first ~15 lines as a static snapshot
-  const lines = config.seq.slice(0, 15);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const height = useElementHeight(viewportRef);
+  const lines = snapshotLines(config.seq, slotCount(height));
   return (
     <div
       // Test hooks, here and on the slot container: the tree is aria-hidden, so no role reaches it.
@@ -501,14 +550,18 @@ function StaticPane({ config }: { config: PaneConfig }) {
       style={{ borderColor: 'var(--tmux-border)' }}
     >
       <PaneTitle title={config.title} host={config.host} />
-      <div className="relative flex-1 overflow-hidden">
+      <div ref={viewportRef} className="relative flex-1 overflow-hidden">
         <div
           data-tmux-slots=""
-          className="absolute right-0 bottom-0 left-0 font-mono whitespace-nowrap"
-          style={{ padding: '6px 10px', fontSize: '14px', lineHeight: '1.65' }}
+          className="absolute inset-0 flex flex-col justify-end font-mono whitespace-nowrap"
+          style={{
+            padding: `${PANE_PADDING_Y_PX}px ${PANE_PADDING_X_PX}px`,
+            fontSize: `${LINE_FONT_PX}px`,
+            lineHeight: LINE_HEIGHT_RATIO,
+          }}
         >
-          {lines.map((entry, i) => (
-            <div key={i} style={{ color: LOG_COLORS[entry.cls] }}>
+          {lines.map(({ at, entry }) => (
+            <div key={at} style={{ color: LOG_COLORS[entry.cls] }}>
               {entry.text || '\u00A0'}
             </div>
           ))}
@@ -521,11 +574,6 @@ function StaticPane({ config }: { config: PaneConfig }) {
 
 // ─── Animated Pane ───────────────────────────────────────────────────────────
 
-const LINE_FONT_PX = 14;
-const LINE_HEIGHT_RATIO = 1.65;
-const LINE_HEIGHT_PX = LINE_FONT_PX * LINE_HEIGHT_RATIO;
-const PANE_PADDING_Y_PX = 6;
-const PANE_PADDING_X_PX = 10;
 const LINE_APPEAR_MS = 250;
 
 /**
@@ -553,8 +601,10 @@ function AnimatedPane({
     const slots = slotsRef.current;
     if (!viewport || !slots || config.seq.length === 0) return;
 
-    let nextIndex = 0;
-    const history: LogEntry[] = [];
+    // How many lines the pane has received. The log cycles through `config.seq`, so this count alone
+    // says which line every slot holds: the history reaches back over every line received, as many
+    // as any number of slots needs, without being stored.
+    let received = 0;
     const shownLevel = new WeakMap<Element, LogLevel>();
 
     // Write the newest lines into the slots, touching only what changed.
@@ -562,7 +612,8 @@ function AnimatedPane({
       const count = slots.children.length;
       for (let i = 0; i < count; i++) {
         const slot = slots.children[i] as HTMLElement;
-        const entry = history[history.length - count + i];
+        const line = received - count + i;
+        const entry = line >= 0 ? config.seq[line % config.seq.length] : undefined;
         const text = entry?.text || '\u00A0';
         if (slot.textContent !== text) slot.textContent = text;
         if (shownLevel.get(slot) !== entry?.cls) {
@@ -580,13 +631,10 @@ function AnimatedPane({
       return slot;
     };
 
-    // Enough slots to reach the top of the pane, the first one partly clipped, capped at the
-    // history size. Adding or removing at the front never moves the slots that remain.
+    // Enough slots to reach the top of the pane, the first one partly clipped, however tall it is.
+    // Adding or removing at the front never moves the slots that remain.
     const fit = (height: number) => {
-      const count = Math.min(
-        MAX_LINES,
-        Math.max(0, Math.ceil((height - PANE_PADDING_Y_PX) / LINE_HEIGHT_PX)),
-      );
+      const count = slotCount(height);
       while (slots.children.length < count) slots.insertBefore(createSlot(), slots.firstChild);
       while (slots.children.length > count && slots.firstChild) {
         slots.removeChild(slots.firstChild);
@@ -595,9 +643,7 @@ function AnimatedPane({
     };
 
     const addLine = () => {
-      history.push(config.seq[nextIndex % config.seq.length]);
-      nextIndex++;
-      if (history.length > MAX_LINES) history.shift();
+      received++;
       paint();
       const newest = slots.lastElementChild;
       if (newest instanceof HTMLElement && typeof newest.animate === 'function') {
@@ -611,7 +657,7 @@ function AnimatedPane({
       }
     };
 
-    // The history survives a stop, so a pane shown again after a rotation carries on where it was.
+    // The count survives a stop, so a pane shown again after a rotation carries on where it was.
     return whileDisplayed(() => {
       let resizeObserver: ResizeObserver | undefined;
       let onWindowResize: (() => void) | undefined;

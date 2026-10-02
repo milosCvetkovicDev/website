@@ -313,11 +313,33 @@ describe('AnimatedPane log slots', () => {
     expect(slots.lastElementChild).toBe(newest);
     expect(slots.children[5].textContent).toBe(FIRST_LINE);
 
-    resizeTo(slots, 1200); // capped at MAX_LINES
-    expect(slots.children).toHaveLength(40);
+    // (1200 - 6) / 23.1 -> 52 slots. No cap: a cap of 40 reached 924 px and left an empty band above
+    // the stack in any taller pane, from a 1920x1080 window up.
+    resizeTo(slots, 1200);
+    expect(slots.children).toHaveLength(52);
     expect(slots.lastElementChild).toBe(newest);
-    expect(slots.children[38].textContent).toBe(FIRST_LINE);
+    expect(slots.children[50].textContent).toBe(FIRST_LINE);
     expect(slots.children[0].textContent).toBe('\u00A0');
+  });
+
+  it('keeps every line it has received, so the slots a growing pane adds show lines too', () => {
+    render(<TmuxBackground />);
+    const slots = kubectlSlots();
+    firstTick();
+    // 59 more, 60 lines in all: more than the 52 slots of a 1200 px pane, and past the end of the
+    // kubectl log's 33, so it has come round once.
+    act(() => vi.advanceTimersByTime(650 * 59));
+    expect(slots.children).toHaveLength(13);
+
+    resizeTo(slots, 1200);
+    expect(slots.children).toHaveLength(52);
+    // A slot that holds a line is coloured by its level, a blank line of the log included; one that
+    // has had none yet is not.
+    const empty = [...slots.children].filter((slot) => (slot as HTMLElement).style.color === '');
+    expect(empty).toHaveLength(0);
+    // The 60th line, the log's 27th, is last; the top slot holds the 9th.
+    expect(slots.lastElementChild?.textContent).toBe('[AGENT] Fix: LRU eviction, cap 10k entries');
+    expect(slots.children[0].textContent).toBe('[03:14:06] warn: Heap usage 487Mi/512Mi (95.1%)');
   });
 
   it('skips ticks while the background is off screen and resumes when it is back', () => {
@@ -341,6 +363,36 @@ describe('AnimatedPane log slots', () => {
     setVisible(true);
     nextTick();
     expect(slots.lastElementChild?.textContent).toBe(FIRST_LINE);
+  });
+
+  describe('the static panes, under reduced motion', () => {
+    beforeEach(() => {
+      media.state.reducedMotion = true;
+    });
+
+    it('fill a tall pane to its top, the first 15 lines of the log at the bottom, with no timers', () => {
+      render(<TmuxBackground />);
+      const slots = kubectlSlots();
+      // 13 lines would reach the top of the 300 px pane; the snapshot never shows fewer than 15.
+      expect(slots.children).toHaveLength(15);
+      expect(slots.firstElementChild?.textContent).toBe(FIRST_LINE);
+
+      resizeTo(slots, 1200); // (1200 - 6) / 23.1 -> 52 lines
+      expect(slots.children).toHaveLength(52);
+      // The same 15 at the bottom, the log's 15th (a blank line) last ...
+      expect(slots.children[37].textContent).toBe(FIRST_LINE);
+      expect(slots.lastElementChild?.textContent).toBe(' ');
+      // ... and the 37 above them read back from the end of the log, as if it had run once before:
+      // its last 33 lines, and above those its last four again.
+      expect(slots.children[36].textContent).toBe(' ');
+      expect(slots.children[35].textContent).toBe('[OK] All pods recovered');
+      expect(slots.children[0].textContent).toBe('api-server-x2k9p   1/1   Running   3   4d12h');
+      expect(vi.getTimerCount()).toBe(0);
+
+      resizeTo(slots, 150);
+      expect(slots.children).toHaveLength(15);
+      expect(slots.firstElementChild?.textContent).toBe(FIRST_LINE);
+    });
   });
 
   describe('below md, where the background is not displayed', () => {
