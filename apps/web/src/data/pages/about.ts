@@ -1,10 +1,11 @@
 /**
  * The copy `/about` renders, and the page record its Markdown twin reads (#59). The page keeps the
- * layout, the classes and its `h1`, and maps over what is here, so a page and its twin cannot
- * disagree. Every string is text the page shows, with two exceptions: the `Quick facts` heading,
- * which the page gives screen readers only (#58), and the timeline's column names, which only the
- * twin reads. Every record section needs a heading and a table needs columns, and the page shows
- * those parts without either.
+ * layout, the classes, its `h1` and its "Last updated" line, which reads `STATIC_ROUTE_UPDATED`
+ * (#57) as /privacy's does, and maps over what is here, so a page and its twin cannot disagree.
+ * Every string is text the page shows, with two exceptions: the `Quick facts` heading, which the
+ * page gives screen readers only (#58), and the timeline's column names, which only the twin reads.
+ * Every record section needs a heading and a table needs columns, and the page shows those parts
+ * without either.
  */
 import { formatMetric, getCaseStudy } from '@/data/case-studies';
 import { experienceFact, yearsOfExperience } from '@/data/profile';

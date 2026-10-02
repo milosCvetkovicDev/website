@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { CARD_LINK } from '@/components/card-link';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
 import { workCopy, workRecord } from '@/data/pages/work';
+import { WebPageJsonLd } from '@/components/json-ld';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
@@ -243,6 +244,7 @@ function ProjectCard({ project, index }: { project: CaseStudy; index: number }) 
 export default function WorkPage() {
   return (
     <div className="relative overflow-hidden py-16 md:py-24">
+      <WebPageJsonLd path={workRecord.path} name={workRecord.title} />
       {/* Subtle grid background */}
       <div
         className="absolute inset-0 opacity-[0.02]"

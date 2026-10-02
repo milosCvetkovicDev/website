@@ -1,8 +1,14 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { BreadcrumbListJsonLd, TechArticleJsonLd } from '@/components/json-ld';
-import { adjacentCaseStudies, caseStudies, formatMetric, getCaseStudy } from '@/data/case-studies';
+import { BreadcrumbListJsonLd, TechArticleJsonLd, WebPageJsonLd } from '@/components/json-ld';
+import {
+  adjacentCaseStudies,
+  caseStudies,
+  caseStudyPageTitle,
+  formatMetric,
+  getCaseStudy,
+} from '@/data/case-studies';
 import { social } from '@/data/social';
 import { formatContentDates } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
@@ -36,7 +42,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return buildMetadata({
-    title: `${caseStudy.title} — ${caseStudy.tagline}`,
+    title: caseStudyPageTitle(caseStudy),
     description: caseStudy.description,
     path: `/work/${caseStudy.slug}`,
     type: 'article',
@@ -68,6 +74,11 @@ export default async function CaseStudyPage({ params }: PageProps) {
 
   return (
     <div className="py-16 md:py-24">
+      <WebPageJsonLd
+        path={`/work/${caseStudy.slug}`}
+        name={caseStudyPageTitle(caseStudy)}
+        breadcrumb
+      />
       <TechArticleJsonLd caseStudy={caseStudy} />
       <BreadcrumbListJsonLd caseStudy={caseStudy} />
       <div className="mx-auto max-w-3xl px-6">

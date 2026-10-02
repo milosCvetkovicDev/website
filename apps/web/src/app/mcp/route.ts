@@ -41,7 +41,7 @@ const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
  * (`VERCEL=1`) a request reaches this deployment only through one of the project's own domains;
  * anywhere else, a `next start` on a developer's machine or in the e2e job, only a loopback host
  * name is trusted. Whole serialised origins are compared (scheme, host and port), not host names;
- * `absoluteUrl('/')` is already one, normalised by `siteOrigin()` in `lib/serialise.ts`.
+ * `absoluteUrl('/')` is already one, normalised by `siteOrigin()` in `lib/site-origin.ts`.
  */
 function trusted(origin: string, request: Request): boolean {
   if (origin === absoluteUrl('/')) return true;

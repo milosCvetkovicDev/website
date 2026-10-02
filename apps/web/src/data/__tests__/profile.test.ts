@@ -77,10 +77,12 @@ describe('the day the printed figure took effect', () => {
     // past the recorded dates pinned here.
     vi.resetModules();
     vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-10-01T12:00:00Z'));
+    // The clock sits on /about's recorded day, never before it: a recorded date ahead of the clock
+    // would be a lastmod and a visible "Last updated" day in the future.
+    vi.setSystemTime(new Date('2026-10-02T12:00:00Z'));
     const today = (await import('../static-routes')).STATIC_ROUTE_UPDATED;
     expect(today['/']).toBe('2026-10-01');
-    expect(today['/about']).toBe('2026-10-01');
+    expect(today['/about']).toBe('2026-10-02');
 
     vi.resetModules();
     vi.setSystemTime(new Date('2031-06-15T12:00:00Z'));

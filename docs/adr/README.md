@@ -56,6 +56,7 @@ perform an operation.
 | 0028 | [Blog posts are typed data, and the owner writes every one](0028-blog-posts-as-typed-data.md)                                            | Accepted                                      | 2026-09-29 |
 | 0029 | [A read-only, unauthenticated MCP server at /mcp is the site's one server function](0029-read-only-mcp-server.md)                        | Proposed                                      | 2026-09-30 |
 | 0030 | [Generated endpoints are static route handlers; pages negotiate twins by rewrite](0030-generated-endpoints-as-static-route-handlers.md)  | Accepted                                      | 2026-10-01 |
+| 0031 | [Structured data is one graph joined by @id, in separate blocks, asserting only what a page shows](0031-structured-data-graph.md)        | Accepted                                      | 2026-10-02 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see

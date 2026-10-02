@@ -12,14 +12,16 @@ import { experienceFigureSince } from './profile';
  * needs no bump here. Changing a published post's title or summary, unpublishing a post or removing
  * one changes the list without a new `publishedAt`: bump /blog's date in that commit.
  *
- * From git, the last commit to change what each route visibly says: `/`, /about, /work and /skills
- * 2026-10-01 (#49: the self-healing agent's figure relabelled "errors resolved autonomously" on the
- * home and /work cards and in the About timeline, whose 2021 entry lost its unsourced 40%; #58: the
- * three questions answered after the /about story, the stats bar's production figure counted from
- * the studies' statuses and "Left Unfinished" dropped, and the line saying the proficiency bars are
- * self-assessed), /contact 2026-09-23 (d1da60f, #116, which changed the hero subtitle and the
- * eyebrows) and /blog 2026-01-27 (696c2ef). The later commits to /blog changed only formatting,
- * colour tokens, metadata or Open Graph images. /privacy was added on 2026-09-27.
+ * From git, the last commit to change what each route visibly says: /about 2026-10-02 (#57: the
+ * "Last updated" line at the foot of the page, which prints this date; before it, #49 and #58
+ * below), `/`, /work and /skills 2026-10-01 (#49: the self-healing agent's figure relabelled
+ * "errors resolved autonomously" on the home and /work cards and in the About timeline, whose 2021
+ * entry lost its unsourced 40%; #58: the three questions answered after the /about story, the stats
+ * bar's production figure counted from the studies' statuses and "Left Unfinished" dropped, and the
+ * line saying the proficiency bars are self-assessed), /contact 2026-09-23 (d1da60f, #116, which
+ * changed the hero subtitle and the eyebrows) and /blog 2026-01-27 (696c2ef). The later commits to
+ * /blog changed only formatting, colour tokens, metadata or Open Graph images. /privacy was added
+ * on 2026-09-27.
  *
  * One change needs no commit: `/` (the hero's XP row) and /about (its description and first quick
  * fact) print the years of experience, which `data/profile.ts` derives from the build's clock, so
@@ -31,7 +33,7 @@ const laterOf = (recorded: string, derived: string) => (recorded > derived ? rec
 
 export const STATIC_ROUTE_UPDATED = {
   '/': laterOf('2026-10-01', figureSince),
-  '/about': laterOf('2026-10-01', figureSince),
+  '/about': laterOf('2026-10-02', figureSince),
   '/work': '2026-10-01',
   '/skills': '2026-10-01',
   '/blog': '2026-01-27',
