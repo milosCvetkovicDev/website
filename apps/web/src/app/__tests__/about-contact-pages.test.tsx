@@ -12,6 +12,7 @@ import {
   type StoryParagraph,
 } from '@/data/pages/about';
 import { contactCopy, socialLinks } from '@/data/pages/contact';
+import { asSentence } from '@/data/pages/table';
 
 /**
  * `/about` and `/contact` map over their page records (#59), so a page and its Markdown twin read
@@ -53,7 +54,8 @@ describe('/about', () => {
         year,
         role,
         company,
-        `"${highlight}"`,
+        // The timeline's last cell leads with the highlight, ended as a sentence (#58).
+        asSentence(highlight),
         description,
       ]),
       ...beliefs.flatMap(({ title, description, icon }) => [title, description, icon]),

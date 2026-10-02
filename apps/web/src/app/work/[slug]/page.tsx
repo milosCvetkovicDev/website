@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { BreadcrumbListJsonLd, TechArticleJsonLd, WebPageJsonLd } from '@/components/json-ld';
+import { ScrollTable } from '@/components/scroll-table';
 import {
   adjacentCaseStudies,
   caseStudies,
   caseStudyPageTitle,
   formatMetric,
   getCaseStudy,
+  techStackTable,
 } from '@/data/case-studies';
 import { social } from '@/data/social';
 import { formatContentDates } from '@/lib/content-date';
@@ -261,33 +263,12 @@ export default async function CaseStudyPage({ params }: PageProps) {
           </section>
         ) : null}
 
-        {/* Tech Stack */}
+        {/* Tech Stack, as a table (#58) */}
         <section className="mb-12">
           <h2 className="mb-6 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
             Tech Stack
           </h2>
-          <div className="grid gap-4">
-            {caseStudy.techStack.map((category) => (
-              <div
-                key={category.category}
-                className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4"
-              >
-                <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">
-                  {category.category}
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {category.items.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1 text-sm"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <ScrollTable {...techStackTable(caseStudy)} />
           <p className="mt-6 text-sm">
             <Link href="/skills" className="text-[var(--accent-text)] hover:underline">
               All my skills, and the experience behind each one

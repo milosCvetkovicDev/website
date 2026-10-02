@@ -3,13 +3,22 @@ import {
   formatMetric,
   formatMetricScope,
   oneLine,
+  techStackTable,
   type CaseStudy,
   type CaseStudyHighlight,
   type CaseStudyMetric,
   type MetricDefinition,
 } from '@/data/case-studies';
 import { OWNER_TODO } from '@/data/owner-todo';
-import type { InlineLink, Paragraph, PageRecord, PageSection } from '@/data/pages/types';
+import { cellText } from '@/data/pages/table';
+import type {
+  InlineLink,
+  Paragraph,
+  PageRecord,
+  PageSection,
+  TableCell,
+  TableRow,
+} from '@/data/pages/types';
 import { assertPathname, markdownTwinPath } from './pathname';
 import { siteOrigin } from './site-origin';
 
@@ -167,11 +176,17 @@ function numbered(items: readonly string[], what: string): string {
     .join('\n');
 }
 
-function table(
-  title: string,
-  columns: readonly string[],
-  rows: readonly (readonly string[])[],
-): string {
+/**
+ * A cell as the page reads it (`cellText()`), so the twin and `components/scroll-table.tsx` word it
+ * alike: a list as its entries joined with `, `, which no entry may hold, a lead as a sentence
+ * before the text, an icon left out.
+ */
+function cell(value: TableCell, what: string): string {
+  if (typeof value === 'string' || 'text' in value) return cellText(value);
+  return commaList(value, what);
+}
+
+function table(title: string, columns: readonly string[], rows: readonly TableRow[]): string {
   if (columns.length === 0) {
     throw new Error(`renderSections: the table under "${title}" has no columns`);
   }
@@ -184,7 +199,17 @@ function table(
     }
   });
   const line = (cells: readonly string[]) => `| ${cells.map(inline).join(' | ')} |`;
-  return [line(columns), line(columns.map(() => '---')), ...rows.map(line)].join('\n');
+  return [
+    line(columns),
+    line(columns.map(() => '---')),
+    ...rows.map((row, index) =>
+      line(
+        row.map((value, column) =>
+          cell(value, `the ${columns[column]} of row ${index + 1} under "${title}"`),
+        ),
+      ),
+    ),
+  ].join('\n');
 }
 
 function section(content: PageSection): string[] {
@@ -319,8 +344,9 @@ export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
     heading(2, CASE_STUDY_HEADINGS.techStack),
     table(
       CASE_STUDY_HEADINGS.techStack,
-      ['Category', 'Items'],
-      caseStudy.techStack.map(({ category, items }) => [
+      // The page's columns (#58), with each row checked here so an error names the study.
+      techStackTable(caseStudy).columns,
+      caseStudy.techStack.map(({ category, items }): TableRow => [
         nonEmpty(category.trim(), where('a tech-stack category')),
         commaList(items, where(`the ${category} items`)),
       ]),

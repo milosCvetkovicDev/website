@@ -291,6 +291,7 @@ const FIXTURE: PageRecord = {
     {
       kind: 'table',
       heading: 'Quick facts',
+      caption: 'Quick facts',
       columns: ['Fact', 'Value'],
       rows: [
         ['Production systems rescued', '12'],
@@ -368,11 +369,54 @@ describe('pageToMarkdown() and renderSections()', () => {
     const ragged: PageSection = {
       kind: 'table',
       heading: 'Quick facts',
+      caption: 'Quick facts',
       columns: ['Fact', 'Value'],
       rows: [['Teams led', '4', 'extra']],
     };
     expect(() => renderSections([ragged])).toThrow(
       'renderSections: row 1 of the table under "Quick facts" has 3 cells for 2 columns',
+    );
+  });
+
+  it('writes a cell as the page reads it: a list joined, a lead as a sentence, no icon (#58)', () => {
+    const markdown = renderSections([
+      {
+        kind: 'table',
+        heading: 'The longer version',
+        caption: 'Career timeline',
+        columns: ['Year', 'Kit', 'What changed', 'Area'],
+        rows: [
+          [
+            '2025',
+            ['Bun', 'Hono'],
+            { lead: 'Shipped the agent', text: 'It fixed bugs.' },
+            { icon: '🤖', text: 'Agents' },
+          ],
+        ],
+      },
+    ]);
+    expect(markdown).toBe(
+      [
+        '## The longer version',
+        '',
+        '| Year | Kit | What changed | Area |',
+        '| --- | --- | --- | --- |',
+        '| 2025 | Bun, Hono | Shipped the agent. It fixed bugs. | Agents |',
+      ].join('\n'),
+    );
+  });
+
+  it('refuses a list cell whose entry holds a comma, or that has no entries', () => {
+    const withList = (list: readonly string[]): PageSection => ({
+      kind: 'table',
+      heading: 'Toolkit',
+      caption: 'Skills by category',
+      columns: ['Category', 'Skills'],
+      rows: [['Frontend', list]],
+    });
+    expect(() => renderSections([withList(['React, Next.js'])])).toThrow(/holds a comma/);
+    expect(() => renderSections([withList([])])).toThrow(
+      /the Skills of row 1 under "Toolkit" is empty/,
     );
   });
 
@@ -399,6 +443,7 @@ describe('pageToMarkdown() and renderSections()', () => {
       {
         kind: 'table',
         heading: 'Pipes',
+        caption: 'Pipes',
         columns: ['A|B', 'C'],
         rows: [['x | y', '']],
       },
@@ -496,12 +541,12 @@ describe('pageToMarkdown() and renderSections()', () => {
     ],
     [
       'a table with no columns',
-      { kind: 'table', heading: 'T', columns: [], rows: [] },
+      { kind: 'table', heading: 'T', caption: 'T', columns: [], rows: [] },
       /table under "T" has no columns/,
     ],
     [
       'a table with no rows',
-      { kind: 'table', heading: 'T', columns: ['A'], rows: [] },
+      { kind: 'table', heading: 'T', caption: 'T', columns: ['A'], rows: [] },
       /table under "T" is empty/,
     ],
     [
@@ -607,7 +652,7 @@ describe('caseStudyToMarkdown()', () => {
         '',
         '## Tech Stack',
         '',
-        '| Category | Items |',
+        '| Layer | Technologies |',
         '| --- | --- |',
         '| Runtime | Bun |',
         '| Storage | Azure Blob Storage, LRU Cache |',
@@ -727,12 +772,14 @@ describe('caseStudyToMarkdown()', () => {
       expect(visible(twin).split(metric.basis)).toHaveLength(2);
     });
 
-    it('lists the tech stack as a Category | Items table, one row per category', () => {
+    it('lists the tech stack as a Layer | Technologies table, one row per layer', () => {
+      // The page's table has these columns (#58): the twin's first header cell is the unit the
+      // markdown-twins parity test looks for.
       const rows = study.techStack.map(
         ({ category, items }) => `| ${category} | ${items.join(', ')} |`,
       );
       expect(visible(twin)).toContain(
-        ['| Category | Items |', '| --- | --- |', ...rows].join('\n'),
+        ['| Layer | Technologies |', '| --- | --- |', ...rows].join('\n'),
       );
     });
 

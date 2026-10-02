@@ -3,12 +3,13 @@ import {
   aboutRecord,
   beliefs,
   credentials,
-  facts,
+  factsTable,
   questions,
-  timeline,
+  timelineTable,
   type StoryParagraph,
 } from '@/data/pages/about';
 import { ProfilePageJsonLd } from '@/components/json-ld';
+import { ScrollTable } from '@/components/scroll-table';
 import { buildMetadata } from '@/lib/metadata';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
@@ -81,54 +82,19 @@ export default function AboutPage() {
           ))}
         </section>
 
-        {/* Quick facts. The heading is for screen readers: without it the grid would sit under the
+        {/* Quick facts. The heading is for screen readers: without it the table would sit under the
             last question in the heading outline (#58). */}
         <section className="mb-20">
           <h2 className="sr-only">{aboutCopy.factsHeading}</h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {facts.map((fact) => (
-              <div
-                key={fact.label}
-                className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 text-center"
-              >
-                <div className="mb-1 text-2xl font-bold text-[var(--accent-text)]">
-                  {fact.value}
-                </div>
-                <div className="text-xs tracking-wider text-[var(--muted)] uppercase">
-                  {fact.label}
-                </div>
-              </div>
-            ))}
-          </div>
+          <ScrollTable {...factsTable} />
         </section>
 
-        {/* Timeline with story */}
+        {/* Timeline with story, as a table (#58): it scrolls inside its region on a phone. */}
         <section className="mb-20">
           <h2 className="mb-8 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {aboutCopy.timelineHeading}
           </h2>
-          <div className="space-y-12">
-            {timeline.map((item) => (
-              <div key={item.year} className="relative">
-                {/* Year badge */}
-                <div className="mb-3 flex items-center gap-4">
-                  <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 font-mono text-sm font-bold text-[var(--accent-text)]">
-                    {item.year}
-                  </span>
-                  <span className="text-sm text-[var(--muted)]">{item.company}</span>
-                </div>
-
-                {/* Content */}
-                <div className="border-l-0 border-[var(--border)] pl-0 md:border-l-2 md:pl-4">
-                  <h3 className="mb-2 text-xl font-semibold">{item.role}</h3>
-                  <p className="mb-3 text-sm font-medium text-[var(--accent-text)] italic">
-                    &quot;{item.highlight}&quot;
-                  </p>
-                  <p className="leading-relaxed text-[var(--muted)]">{item.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <ScrollTable {...timelineTable} wide />
         </section>
 
         {/* Beliefs */}

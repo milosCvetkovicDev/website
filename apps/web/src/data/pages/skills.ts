@@ -1,5 +1,5 @@
 import { social } from '@/data/social';
-import type { InlineLink, PageRecord } from './types';
+import type { InlineLink, PageRecord, Table } from './types';
 
 /**
  * /skills: the copy `app/skills/page.tsx` renders, and the record its Markdown twin reads (#59).
@@ -201,6 +201,20 @@ export const skillsCopy = {
   };
 };
 
+/**
+ * The full toolkit as a table (#58): each category heads its row, then what it covers, led by its
+ * icon, then its skills. The icon is decoration, so the twin leaves it out.
+ */
+export const toolkitTable: Table = {
+  caption: 'Skills by category',
+  columns: ['Category', 'What it covers', 'Skills'],
+  rows: skillCategories.map(({ name, icon, description, skills }) => [
+    name,
+    { icon, text: description },
+    skills,
+  ]),
+};
+
 export const skillsRecord: PageRecord = {
   path: '/skills',
   title: 'Skills — TypeScript, React, NestJS, Azure',
@@ -223,15 +237,7 @@ export const skillsRecord: PageRecord = {
       heading: skillsCopy.headings.differentiators,
       items: differentiators.map(({ title, description }) => ({ term: title, description })),
     },
-    {
-      kind: 'list',
-      heading: skillsCopy.headings.toolkit,
-      // The icon is decoration, so the twin leaves it out.
-      items: skillCategories.map(({ name, description, skills }) => ({
-        term: name,
-        description: `${description}: ${skills.join(', ')}`,
-      })),
-    },
+    { kind: 'table', heading: skillsCopy.headings.toolkit, ...toolkitTable },
     {
       kind: 'prose',
       heading: skillsCopy.staySharp.heading,

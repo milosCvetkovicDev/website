@@ -24,21 +24,23 @@ function agentMetric(study: CaseStudy | undefined = getCaseStudy(AGENT)) {
 }
 
 /**
- * The 2025 timeline entry's description. An entry is its role's heading, then the quoted highlight,
- * then the description, as siblings: each step is checked, so a markup change fails here by name
- * instead of reading some other paragraph.
+ * The 2025 timeline entry's "What changed" cell (#58): its row is headed by the year, and the cell,
+ * the row's last, leads with the highlight on a line of its own, then the description. Each step
+ * is checked, so a markup change fails here by name instead of reading some other cell. The whole
+ * cell is returned: the lead states no figure either, so the checks below hold for both.
  */
 function agentEntryText(): string {
-  const role = screen.getByRole('heading', { level: 3, name: 'AI-Native Engineer' });
-  const highlight = role.nextElementSibling;
-  if (highlight?.tagName !== 'P' || !highlight.textContent?.startsWith('"')) {
-    throw new Error('the 2025 entry must have its quoted highlight right after its role');
+  const year = screen.getByRole('rowheader', { name: '2025' });
+  const row = year.parentElement;
+  if (row?.localName !== 'tr') throw new Error('the 2025 entry must be a row headed by its year');
+  if (row.children[1]?.textContent !== 'AI-Native Engineer') {
+    throw new Error('the 2025 row must name its role, AI-Native Engineer, in its second cell');
   }
-  const description = highlight.nextElementSibling;
-  if (description?.tagName !== 'P' || description.nextElementSibling !== null) {
-    throw new Error('the 2025 entry must end with its description, right after the highlight');
+  const cell = row.lastElementChild;
+  if (cell?.localName !== 'td' || row.children.length !== 4) {
+    throw new Error('the 2025 entry must end with its "What changed" cell, the fourth');
   }
-  return description.textContent ?? '';
+  return cell.textContent ?? '';
 }
 
 describe('/about, the figures it quotes', () => {

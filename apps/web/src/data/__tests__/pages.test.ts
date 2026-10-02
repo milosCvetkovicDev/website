@@ -24,6 +24,7 @@ import { caseStudies } from '@/data/case-studies';
 import { pages } from '@/data/pages';
 import { publishedPosts } from '@/data/posts';
 import { beliefs, credentials, facts, timeline } from '@/data/pages/about';
+import { asSentence } from '@/data/pages/table';
 import { socialLinks } from '@/data/pages/contact';
 import { coreSkills, differentiators, skillCategories } from '@/data/pages/skills';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
@@ -86,13 +87,19 @@ describe('the entries moved out of the page modules', () => {
   it('keeps every timeline entry, belief and quick fact in the /about twin', () => {
     for (const list of [timeline, beliefs, facts]) expect(list.length).toBeGreaterThan(0);
     const about = twin('/about');
+    // The timeline and the quick facts are tables on the page (#58), with the same columns here;
+    // the timeline's last cell leads with the highlight, ended as a sentence, as the page sets it.
+    expect(about).toContain('| Year | Role | Company | What changed |');
     for (const { year, role, company, highlight, description } of timeline) {
-      expect(about).toContain(`| ${year} | ${role} | ${company} | ${highlight} | ${description} |`);
+      expect(about).toContain(
+        `| ${year} | ${role} | ${company} | ${asSentence(highlight)} ${description} |`,
+      );
     }
     for (const { title, description } of beliefs) {
       expect(about).toContain(`- **${title}**: ${description}`);
     }
-    for (const { label, value } of facts) expect(about).toContain(`- **${label}**: ${value}`);
+    expect(about).toContain('| Fact | Figure |');
+    for (const { label, value } of facts) expect(about).toContain(`| ${label} | ${value} |`);
   });
 
   it('keeps every core skill, differentiator and toolkit category in the /skills twin', () => {
@@ -108,8 +115,10 @@ describe('the entries moved out of the page modules', () => {
     for (const { title, description } of differentiators) {
       expect(skills).toContain(`- **${title}**: ${description}`);
     }
+    // The toolkit is a table on the page (#58), with the same columns here, its icon left out.
+    expect(skills).toContain('| Category | What it covers | Skills |');
     for (const { name, description, skills: list } of skillCategories) {
-      expect(skills).toContain(`- **${name}**: ${description}: ${list.join(', ')}`);
+      expect(skills).toContain(`| ${name} | ${description} | ${list.join(', ')} |`);
     }
   });
 

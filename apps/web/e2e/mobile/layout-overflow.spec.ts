@@ -9,6 +9,7 @@ import {
   measureOverflow,
   type OverflowWindow,
 } from '../support/overflow';
+import { TABLES } from '../support/tables';
 
 /**
  * No page route may scroll sideways on a phone.
@@ -168,6 +169,51 @@ for (const motion of MOTIONS) {
     }
   });
 }
+
+// #58: the routes that serve a data table, at every phone width rather than 320px alone. A table
+// cannot wrap the way a grid of cards does, so a wide one has to scroll inside its own region: the
+// page must not scroll sideways at any of the three widths, and each table's region must sit inside
+// the viewport, reachable by the keyboard, however wide the table inside it is.
+test(`the routes with a table do not scroll sideways at ${PHONE_WIDTHS.join(', ')}px`, async ({
+  page,
+}) => {
+  const routes = Object.keys(TABLES);
+  expect(routes, 'the routes that serve a table').toEqual(
+    expect.arrayContaining(['/about', '/skills', ...CASE_STUDY_ROUTES]),
+  );
+  // As above: a navigation, a hydration wait, two walks and three reads per route, per width.
+  test.setTimeout(30_000 + routes.length * PHONE_WIDTHS.length * 5_000);
+
+  for (const width of PHONE_WIDTHS) {
+    await narrowTo(page, width);
+    for (const route of routes) {
+      await test.step(`${route} at ${width}px`, async () => {
+        const response = await gotoHydrated(page, route);
+        expect.soft(response?.status(), `${route} did not answer 200`).toBe(200);
+        if (response?.status() !== 200) return;
+        expectNoOverflow(await measureOverflow(page, READ_AND_WALK), `${route} at ${width}px`);
+
+        const regions = page.locator('main [role="region"]:has(> table)');
+        await expect
+          .soft(regions, `${route}: one scrolling region per table`)
+          .toHaveCount(TABLES[route]?.length ?? 0);
+        for (const region of await regions.all()) {
+          const name = (await region.getAttribute('aria-label')) ?? 'a table region';
+          await expect
+            .soft(region, `${name} is reachable by the keyboard`)
+            .toHaveAttribute('tabindex', '0');
+          const box = await region.boundingBox();
+          expect.soft(box, `${name} is rendered`).not.toBeNull();
+          if (!box) continue;
+          expect.soft(box.x, `${name} starts off the left edge`).toBeGreaterThanOrEqual(0);
+          expect
+            .soft(box.x + box.width, `${name} ends past the ${width}px viewport`)
+            .toBeLessThanOrEqual(width);
+        }
+      });
+    }
+  }
+});
 
 test("/ fits the story's narrowest parts into 320px", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });

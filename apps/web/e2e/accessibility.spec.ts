@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import { caseStudies } from '../src/data/case-studies';
 import { publishedPosts, type PostBlock } from '../src/data/posts';
-import { PAGE_ROUTES, POST_ROUTES, expectedStatus, postRoute } from './routes';
+import { PAGE_ROUTES, POST_ROUTES, caseStudyRoute, expectedStatus, postRoute } from './routes';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
 import { TMUX_LOG_STREAM, tmuxLogStreamProblems } from './support/tmux-log-stream';
@@ -289,6 +290,27 @@ async function auditExcludingTmuxLogStream(page: Page) {
 const colorSchemes = ['light', 'dark'] as const;
 
 /**
+ * The routes that serve a data table (#58), with the axe table rules each must pass on at least one
+ * node. Every table rule must also have run there, which is what proves it was selected:
+ * `td-has-header` and `table-fake-caption` are switched on in the shared options, and
+ * `th-has-data-cells` comes in with the `wcag2a` tag. `td-has-header` applies only to a table of at
+ * least three rows by three columns (axe's `data-table-large-matches`), so it can pass only where the
+ * career timeline and the toolkit are; a case study's tech stack, two columns wide, leaves it
+ * inapplicable.
+ */
+const TABLE_RULES = ['td-has-header', 'th-has-data-cells', 'table-fake-caption'] as const;
+const TABLE_RULES_PASSING: Record<string, readonly (typeof TABLE_RULES)[number][]> = {
+  '/about': TABLE_RULES,
+  '/skills': TABLE_RULES,
+  ...Object.fromEntries(
+    caseStudies.map(({ slug }) => [
+      caseStudyRoute(slug),
+      ['th-has-data-cells', 'table-fake-caption'],
+    ]),
+  ),
+};
+
+/**
  * Walks the page to the bottom so every phase has been through the viewport. Two animation frames
  * per step let React commit before the next one moves.
  *
@@ -442,6 +464,16 @@ test.describe('Accessibility', () => {
         expect(ruleIdsThatRan(results)).toEqual(
           expect.arrayContaining(['document-title', 'label-content-name-mismatch']),
         );
+        const tableRules = TABLE_RULES_PASSING[path];
+        if (tableRules) {
+          expect(ruleIdsThatRan(results)).toEqual(expect.arrayContaining([...TABLE_RULES]));
+          for (const rule of tableRules) {
+            expect(
+              passingNodes(results, rule),
+              `${path} serves a data table, so ${rule} must pass on it rather than find nothing`,
+            ).toBeGreaterThan(0);
+          }
+        }
       });
     }
   }
