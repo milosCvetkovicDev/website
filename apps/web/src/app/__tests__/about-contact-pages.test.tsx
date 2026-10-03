@@ -181,4 +181,14 @@ describe('/contact', () => {
 
     expect(errors, 'rendering /contact must not log an error').not.toHaveBeenCalled();
   });
+
+  it('names the person and exactly the profiles the page links in its h1 (#58)', () => {
+    render(<ContactPage />);
+    const heading = screen.getByRole('heading', { level: 1 }).textContent ?? '';
+    expect(heading).toContain('Milos Cvetkovic');
+    // The h1 lists the channels as "on A, B or C", by the name before any " / " (`X / Twitter` is
+    // X), so a profile added to or dropped from `socialLinks` fails here until the line follows.
+    const [, channels = ''] = heading.split(' on ');
+    expect(channels.split(/, | or /)).toEqual(socialLinks.map(({ name }) => name.split(' / ')[0]));
+  });
 });

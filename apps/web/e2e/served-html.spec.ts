@@ -77,14 +77,18 @@ test('the whole story is in the served markup with JavaScript off', async ({ pag
   }
 });
 
-test('the hero headline and its paragraph are on top in the served page', async ({ page }) => {
-  // The hero H1 is the largest contentful paint of `/`, so it has to be paintable from the served
-  // HTML alone: an overlay the client removes after hydration would hold every visitor's LCP back to
-  // hydration time (ADR 0022). With JavaScript off the page is exactly the served HTML, so whatever
-  // is topmost at the centre of each is what the first paint shows there.
+test('the hero headline and its paragraphs are on top in the served page', async ({ page }) => {
+  // The hero's largest line is the largest contentful paint of `/`: the hook, which was the H1 and
+  // since #58 is the paragraph right under the H1 that names who the site is about. Each has to be
+  // paintable from the served HTML alone: an overlay the client removes after hydration would hold
+  // every visitor's LCP back to hydration time (ADR 0022). With JavaScript off the page is exactly
+  // the served HTML, so whatever is topmost at the centre of each is what the first paint shows
+  // there.
   await page.goto('/');
+  const h1 = page.getByRole('heading', { level: 1 });
   const targets = [
-    page.getByRole('heading', { level: 1 }),
+    h1,
+    h1.locator('xpath=following-sibling::p[1]'),
     page.getByText('I build systems that inherit chaos'),
   ];
   for (const target of targets) {

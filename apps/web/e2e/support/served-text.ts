@@ -53,8 +53,9 @@ import type { Page } from '@playwright/test';
  * *accessible name* on the same markup was a different defect, which #47's slice 47d fixed with an
  * `aria-hidden` split and a visually hidden copy of the whole text; do not "fix" the spans
  * to suit an extractor. The flip side is that zero-join cannot invent a word boundary the markup does
- * not have: `<br />` is an element, not a space, so text either side of one runs together (see the
- * hero headline in `no-js-text.spec.ts`).
+ * not have: `<br />` is an element, not a space, so text either side of one runs together unless
+ * the markup puts a space beside it, as the hero's hook and subtitle do since #58 (see
+ * `HOME_PHRASES` in `no-js-text.spec.ts`).
  *
  * `root` picks what is read. `'document'`, the default, reads the whole document, `<head>` included,
  * so the `<title>` counts: that is what `served-html.spec.ts` measures. `'body'` reads the page's

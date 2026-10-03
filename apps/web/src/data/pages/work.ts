@@ -6,7 +6,7 @@ import type { InlineLink, PageRecord, ProseSection } from './types';
 /**
  * /work: the copy `app/work/page.tsx` renders around its cards, and the record its Markdown twin
  * reads (#59). The cards themselves read `caseStudies`, and so does the record, so neither restates
- * a study's title, description or metric. The `h1` stays in the page.
+ * a study's title, description or metric. The `h1` and the hook under it stay in the page (#58).
  */
 
 /**
@@ -18,7 +18,7 @@ export interface WorkStat {
   label: string;
 }
 
-/** The copy the page renders around its `h1` and its cards, in page order. */
+/** The copy the page renders around its `h1`, the hook under it and its cards, in page order. */
 export const workCopy = {
   eyebrow: 'Case studies · Milos Cvetkovic, Senior Full-Stack Engineer',
   intro:

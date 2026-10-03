@@ -3,7 +3,7 @@ import type { InlineLink, PageRecord, Table } from './types';
 
 /**
  * /skills: the copy `app/skills/page.tsx` renders, and the record its Markdown twin reads (#59).
- * The `h1` stays in the page.
+ * The `h1` and the hook under it stay in the page (#58).
  */
 
 /** A primary skill with its depth: the badge's years, the bar's level, and a line of context. */
@@ -147,7 +147,9 @@ export const differentiators: readonly Differentiator[] = [
   },
 ];
 
-/** The copy the page renders around its `h1` and its three lists, in page order. */
+/**
+ * The copy the page renders around its `h1`, the hook under it and its three lists, in page order.
+ */
 export const skillsCopy = {
   eyebrow: 'Technical toolkit · Milos Cvetkovic, Senior Full-Stack Engineer',
   intro: [

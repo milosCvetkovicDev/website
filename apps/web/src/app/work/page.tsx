@@ -259,8 +259,11 @@ export default function WorkPage() {
       />
 
       <div className="relative mx-auto max-w-5xl px-6">
-        {/* Header */}
-        <div className="mb-12">
+        {/* Header, on the page's own background rather than over the grid: axe cannot decide the
+            contrast of text over a background image, and the grid, at 1% accent, is invisible
+            behind text anyway. So the h1 and the hook under it (#58) are measured, and so are the
+            eyebrow and the intro, which used to be counted in /work's incomplete budget. */}
+        <div className="mb-12 bg-[var(--background)]">
           <div className="mb-4 flex items-center gap-4">
             {/* The eyebrow wraps on a phone: the dot keeps its size and sits on the first line, and
                 the rule, which would be squeezed to nothing, shows only where there is room. */}
@@ -272,9 +275,13 @@ export default function WorkPage() {
             </div>
             <div className="hidden h-px flex-1 bg-gradient-to-r from-[var(--accent)]/50 to-transparent sm:block" />
           </div>
-          <h1 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
-            Problems solved. Systems shipped.
+          {/* The h1 names the subject; the hook under it stays the largest line (#58). */}
+          <h1 className="mb-3 text-lg leading-snug font-semibold text-balance md:text-xl">
+            Case studies: AI agents, legacy modernization, and build infrastructure
           </h1>
+          <p className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
+            Problems solved. Systems shipped.
+          </p>
           <p className="max-w-2xl text-xl text-[var(--muted)]">{workCopy.intro}</p>
         </div>
 

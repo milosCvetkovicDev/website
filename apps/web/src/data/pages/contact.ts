@@ -1,8 +1,8 @@
 /**
  * The copy `/contact` renders, and the page record its Markdown twin reads (#59). The page keeps
- * the layout, the classes, its `h1` and each profile's icon, which it keys by the link's `name`,
- * and maps over what is here, so a page and its twin cannot disagree. Every string is text the
- * page already showed.
+ * the layout, the classes, its `h1` and the hook under it (#58), and each profile's icon, which it
+ * keys by the link's `name`, and maps over what is here, so a page and its twin cannot disagree.
+ * Every string is text the page already showed.
  */
 import { social } from '@/data/social';
 import type { PageRecord, PageSection } from './types';
@@ -47,7 +47,10 @@ export const socialLinks = [
 /** The names the page keys its icons by, so a profile added here without an icon fails typecheck. */
 export type SocialLinkName = (typeof socialLinks)[number]['name'];
 
-/** The rest of what `/contact` renders in its main element, in page order, less the `h1` (#58's). */
+/**
+ * The rest of what `/contact` renders in its main element, in page order, less the `h1` and the
+ * hook under it (#58's).
+ */
 export const contactCopy = {
   socialTitle: 'Contact Milos Cvetkovic',
   eyebrow: 'Contact · Milos Cvetkovic, Senior Full-Stack Engineer',

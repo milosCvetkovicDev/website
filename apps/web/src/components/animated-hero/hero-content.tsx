@@ -132,29 +132,37 @@ export function HeroContent() {
       {/* Player card */}
       <PlayerCard />
 
-      {/* Headline */}
+      {/* Headline: the h1 says who the site is about, and the hook under it stays the largest line
+          (#58). Who this is, and the specialisation, are visible rather than screen-reader-only:
+          text that only crawlers see is what Google's hidden-text policy describes. Both are drawn
+          in `--foreground`, which resolves per scheme, rather than a hex with a `dark:` override
+          (ADR 0010). */}
       <div className="max-w-[540px] text-center">
         <h1
-          className="mb-3.5 font-extrabold text-balance text-[#1e1e2e] dark:text-white"
+          className="mb-2 font-semibold text-balance text-[var(--foreground)]"
+          style={{ fontSize: 'clamp(15px, 1.6vw, 17px)', lineHeight: 1.35 }}
+        >
+          Milos Cvetkovic — senior full-stack engineer and architect building AI-native systems
+        </h1>
+        <p
+          className="mb-3.5 font-extrabold text-balance text-[var(--foreground)]"
           style={{
             fontSize: 'clamp(30px, 5.5vw, 50px)',
             lineHeight: 1.12,
             letterSpacing: '-0.025em',
           }}
         >
-          {/* One line from `sm`; below it the line may wrap, or it runs out of the island at 320 px. */}
-          <span className="sm:whitespace-nowrap">This happened at 3am.</span>
-          <br />
+          {/* One line from `sm`; below it the line may wrap, or it runs out of the island at
+              320 px. The space before the break keeps the sentences apart in text read from the
+              markup. */}
+          <span className="sm:whitespace-nowrap">This happened at 3am.</span> <br />
           Nobody woke up.
-        </h1>
-        {/* Who this is, visible rather than screen-reader-only: text that only crawlers see is what
-            Google's hidden-text policy describes, and the headline alone does not say it. */}
+        </p>
         <p
           className="mb-3 font-medium text-[var(--muted)]"
           style={{ fontSize: '15px', lineHeight: 1.5 }}
         >
-          Milos Cvetkovic, Senior Full Stack Engineer specializing in AI-native development,
-          TypeScript, React, and cloud architecture.
+          Specializing in AI-native development, TypeScript, React, and cloud architecture.
         </p>
 
         {/* Subtitle */}
@@ -162,8 +170,7 @@ export function HeroContent() {
           className="text-[15px] text-[#6b7280] sm:text-base dark:text-[#b0b4c4]"
           style={{ lineHeight: 1.6 }}
         >
-          I build systems that inherit chaos and ship clarity.
-          <br />
+          I build systems that inherit chaos and ship clarity. <br />
           <span className="font-bold text-[var(--accent-text)]">Scroll to see how.</span>
         </p>
       </div>

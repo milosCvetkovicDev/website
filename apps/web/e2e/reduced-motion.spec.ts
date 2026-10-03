@@ -117,10 +117,11 @@ async function parkOn(page: Page, region: Locator) {
   }).toPass({ timeout: 10_000 });
 }
 
-// The Scroll indicator is displayed from `lg` and 960 px tall only (#134), and an element that is not
-// displayed runs no CSS animation at all, so at the desktop project's 1280x720 its dot would be
-// missing from both tests below rather than measured. This spec sits outside `e2e/mobile/`, so it
-// runs on the desktop project only (playwright.config.ts, MOBILE_SPECS), as it did at 1280x720.
+// The Scroll indicator is displayed from `lg` and 1024 px tall only (#134, #58), and an element
+// that is not displayed runs no CSS animation at all, so at the desktop project's 1280x720 its dot
+// would be missing from both tests below rather than measured. This spec sits outside
+// `e2e/mobile/`, so it runs on the desktop project only (playwright.config.ts, MOBILE_SPECS), as it
+// did at 1280x720.
 test.describe('at 1280x1024, where the scroll indicator is displayed', () => {
   test.use({ viewport: { width: 1280, height: 1024 } });
 
