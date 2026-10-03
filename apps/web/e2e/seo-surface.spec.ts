@@ -1102,22 +1102,45 @@ test('every page serves one non-empty h1 of its own, and five name their subject
   page,
   request,
 }) => {
-  const served: Record<string, { h1s: string[]; next: { tag: string; text: string } | null }> = {};
+  type Served = {
+    h1s: string[];
+    next: { tag: string; text: string } | null;
+    // The innermost elements whose whole text is the route's hook, and whether a heading holds any.
+    hooks: { tag: string; inHeading: boolean }[];
+  };
+  const served: Record<string, Served> = {};
+  const hookOf = (route: string): string | null =>
+    route in PAGE_HEADINGS ? PAGE_HEADINGS[route as keyof typeof PAGE_HEADINGS].hook : null;
   for (const route of PAGE_ROUTES.filter((path) => path !== NOT_FOUND_ROUTE)) {
     const response = await request.get(route);
     expect(response.status(), `GET ${route}`).toBe(200);
     served[route] = await page.evaluate(
-      (markup) => {
+      ({ markup, hook }) => {
         const doc = new DOMParser().parseFromString(markup, 'text/html');
+        for (const inert of doc.body.querySelectorAll('script, style, template')) inert.remove();
         const text = (element: Element) => (element.textContent ?? '').replace(/\s+/g, ' ').trim();
         const h1s = [...doc.body.querySelectorAll('h1')];
         const next = h1s[0]?.nextElementSibling;
+        const hooks =
+          hook === null
+            ? []
+            : [...doc.body.querySelectorAll('*')]
+                .filter(
+                  (element) =>
+                    text(element) === hook &&
+                    ![...element.children].some((child) => text(child) === hook),
+                )
+                .map((element) => ({
+                  tag: element.localName,
+                  inHeading: element.closest('h1, h2, h3, h4, h5, h6, [role="heading"]') !== null,
+                }));
         return {
           h1s: h1s.map(text),
           next: next ? { tag: next.localName, text: text(next) } : null,
+          hooks,
         };
       },
-      await response.text(),
+      { markup: await response.text(), hook: hookOf(route) },
     );
   }
 
@@ -1131,14 +1154,27 @@ test('every page serves one non-empty h1 of its own, and five name their subject
     'two routes serve the same h1',
   ).toEqual([]);
 
+  // Every static route is either one of the five or named here with the reason it is not, so a
+  // route added later cannot ship a hook-only h1 without being classified. `/blog` says "Writing"
+  // (#61's line) and /privacy "Privacy"; both name their subject already.
+  const NAMED_ALREADY = ['/blog', '/privacy'];
+  expect(
+    STATIC_ROUTES.filter((route) => !(route in PAGE_HEADINGS) && !NAMED_ALREADY.includes(route)),
+    'a static route that is neither in PAGE_HEADINGS nor named as already naming its subject',
+  ).toEqual([]);
+
   for (const [route, { heading, hook }] of Object.entries(PAGE_HEADINGS)) {
     const onRoute = served[route];
     expect(onRoute, `${route} is a page route`).toBeDefined();
     expect(onRoute?.h1s[0], `${route}'s h1 is the owner's line`).toBe(heading);
-    expect(onRoute?.h1s[0], `${route}'s hook is not inside its h1`).not.toContain(hook);
     expect(onRoute?.next, `${route}'s hook is the paragraph right after its h1`).toEqual({
       tag: 'p',
       text: hook,
     });
+    // The hook is served once, as that paragraph, and no heading holds it (AC 2).
+    expect(
+      onRoute?.hooks,
+      `${route} serves its hook once, as a paragraph outside any heading`,
+    ).toEqual([{ tag: 'p', inHeading: false }]);
   }
 });

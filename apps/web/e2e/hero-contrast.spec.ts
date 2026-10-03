@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
+import { PAGE_HEADINGS } from './support/page-headings';
 import { TMUX_LOG_STREAM, tmuxLogStreamProblems } from './support/tmux-log-stream';
 
 /**
@@ -298,15 +299,19 @@ for (const colorScheme of colorSchemes) {
     ).toEqual([]);
   });
 
-  test(`the lines under the headline reach AA in the ${colorScheme} theme`, async ({ page }) => {
-    // Green. On the island axe cannot decide either line: each is one of the `incomplete` nodes in
-    // the `/` budget of accessibility.spec.ts, so without this nothing would measure their colour.
-    // Since #58 the h1 names who the site is about, and right under it come the hook, which was the
-    // h1, and then the line saying the specialisation, which was sr-only until #48 made it visible
-    // and is drawn in `--muted`.
+  test(`the headline and the lines under it reach AA in the ${colorScheme} theme`, async ({
+    page,
+  }) => {
+    // Green. On the island axe cannot decide any of these lines: each is one of the `incomplete`
+    // nodes in the `/` budget of accessibility.spec.ts, so without this nothing would measure their
+    // colour. Since #58 the h1 names who the site is about, drawn at 15-17 px semibold, so normal
+    // text that needs 4.5:1, and right under it come the hook, which was the h1, and then the line
+    // saying the specialisation, which was sr-only until #48 made it visible and is drawn in
+    // `--muted`.
     await openHero(page, colorScheme);
     const h1 = page.getByRole('heading', { level: 1 });
     const lines = [
+      { line: h1, what: 'the h1 naming who the site is about' },
       { line: h1.locator('xpath=following-sibling::p[1]'), what: 'the hook under the h1' },
       {
         line: h1.locator('xpath=following-sibling::p[2]'),
@@ -314,8 +319,9 @@ for (const colorScheme of colorSchemes) {
       },
     ];
     // Which paragraphs these are, before their colour is read.
-    await expect(lines[0].line).toHaveText(/^This happened at 3am\./);
-    await expect(lines[1].line).toHaveText(/^Specializing in /);
+    await expect(lines[0].line).toHaveText(PAGE_HEADINGS['/'].heading);
+    await expect(lines[1].line).toHaveText(PAGE_HEADINGS['/'].hook);
+    await expect(lines[2].line).toHaveText(/^Specializing in /);
     for (const { line, what } of lines) {
       const sample = await sampleColor(line, what);
       expect(sample.alpha, what).toBe(1);

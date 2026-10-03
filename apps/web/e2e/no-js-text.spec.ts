@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { caseStudies, formatMetric } from '../src/data/case-studies';
 import { CASE_STUDY_ROUTES, STATIC_ROUTES } from './routes';
 import { gotoHydrated } from './support/hydration';
+import { PAGE_HEADINGS } from './support/page-headings';
 import { servedText } from './support/served-text';
 
 /**
@@ -112,10 +113,12 @@ const HOME_PHRASES = [
   // sentences (#58 AC 4). A `<br />` yields no whitespace under any tag-strip, so until #58 put a
   // space before each one the served text read `…at 3am.Nobody woke up.` and `…ship
   // clarity.Scroll to see how.`, and neither sentence pair was in any crawler's copy of the page.
-  'This happened at 3am. Nobody woke up.',
+  // The hook is AC 4's exact string, `This happened at 3am. Nobody woke up.`, read from the specs'
+  // copy of the five headings and hooks (`support/page-headings.ts`).
+  PAGE_HEADINGS['/'].hook,
   'I build systems that inherit chaos and ship clarity. Scroll to see how.',
   // The h1 that names who the site is about, which the hook used to be (#58 AC 1).
-  'Milos Cvetkovic — senior full-stack engineer and architect building AI-native systems',
+  PAGE_HEADINGS['/'].heading,
 ];
 
 /**

@@ -11,16 +11,28 @@ import { PAGE_HEADINGS } from './support/page-headings';
  * pull request; this keeps the order and the size relation from drifting afterwards.
  *
  * This file sits outside `e2e/mobile/`, so only the desktop `chromium` project runs it; the phone
- * width is a viewport here, not a device.
+ * widths are viewports here, not devices. 320 px is the narrowest phone the site is laid out for
+ * (`e2e/mobile/layout-overflow.spec.ts`), where the long lines wrap the most, so each line's text is
+ * also held inside the viewport there.
  */
 
 const VIEWPORTS = [
   { width: 1280, height: 720 },
   { width: 375, height: 812 },
+  { width: 320, height: 568 },
 ];
 
 const fontSize = (locator: Locator) =>
   locator.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+
+/** The box of an element's text, read through a range over its contents. */
+const textBox = (locator: Locator) =>
+  locator.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const { left, right } = range.getBoundingClientRect();
+    return { left, right };
+  });
 
 for (const viewport of VIEWPORTS) {
   test.describe(`at ${viewport.width}x${viewport.height}`, () => {
@@ -38,6 +50,10 @@ for (const viewport of VIEWPORTS) {
 
         const [headingSize, hookSize] = [await fontSize(h1), await fontSize(hookLine)];
         expect(
+          [headingSize, hookSize].every(Number.isFinite),
+          `the font sizes are numbers: the h1 ${headingSize}, the hook ${hookSize}`,
+        ).toBe(true);
+        expect(
           hookSize,
           `the hook is drawn at ${hookSize}px and the h1 at ${headingSize}px: the hook stays the larger line`,
         ).toBeGreaterThan(headingSize);
@@ -50,6 +66,16 @@ for (const viewport of VIEWPORTS) {
           hookBox.y,
           'the hook starts below the bottom of the h1, on lines of its own',
         ).toBeGreaterThanOrEqual(headingBox.y + headingBox.height - 0.5);
+
+        // Each line's text, not its block, which is as wide as its column whatever the text does.
+        for (const [what, line] of [
+          ['the h1', h1],
+          ['the hook', hookLine],
+        ] as const) {
+          const text = await textBox(line);
+          expect(text.left, `${what} starts off the left edge`).toBeGreaterThanOrEqual(0);
+          expect(text.right, `${what} ends past the viewport`).toBeLessThanOrEqual(viewport.width);
+        }
       });
     }
   });

@@ -134,16 +134,18 @@ export function HeroContent() {
 
       {/* Headline: the h1 says who the site is about, and the hook under it stays the largest line
           (#58). Who this is, and the specialisation, are visible rather than screen-reader-only:
-          text that only crawlers see is what Google's hidden-text policy describes. */}
+          text that only crawlers see is what Google's hidden-text policy describes. Both are drawn
+          in `--foreground`, which resolves per scheme, rather than a hex with a `dark:` override
+          (ADR 0010). */}
       <div className="max-w-[540px] text-center">
         <h1
-          className="mb-2 font-semibold text-balance text-[#1e1e2e] dark:text-white"
+          className="mb-2 font-semibold text-balance text-[var(--foreground)]"
           style={{ fontSize: 'clamp(15px, 1.6vw, 17px)', lineHeight: 1.35 }}
         >
           Milos Cvetkovic — senior full-stack engineer and architect building AI-native systems
         </h1>
         <p
-          className="mb-3.5 font-extrabold text-balance text-[#1e1e2e] dark:text-white"
+          className="mb-3.5 font-extrabold text-balance text-[var(--foreground)]"
           style={{
             fontSize: 'clamp(30px, 5.5vw, 50px)',
             lineHeight: 1.12,

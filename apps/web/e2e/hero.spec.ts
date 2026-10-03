@@ -447,7 +447,21 @@ test.describe('scroll indicator clears the hero card at rest', () => {
           await expect(skills.getByRole('listitem')).not.toHaveCount(0);
           // The card is the list's parent; holding the headline proves it is not a wrapper of the list.
           const card = skills.locator('..');
-          await expect(card.getByRole('heading', { level: 1 })).toHaveCount(1);
+          const h1 = card.getByRole('heading', { level: 1 });
+          await expect(h1).toHaveCount(1);
+          // The clearance below assumes the h1 (#58) takes two lines on every `lg` size: a third
+          // adds about 23 px to the card, most of the margin over MIN_CLEARANCE_PX. A longer line, a
+          // narrower column or a wider face would take it there, so the count is checked and
+          // reported rather than left to show up as a few pixels of gap.
+          const h1Lines = await h1.evaluate((element) => {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            return new Set(
+              [...range.getClientRects()]
+                .filter((rect) => rect.width > 0)
+                .map((rect) => Math.round(rect.top)),
+            ).size;
+          });
 
           // Measured before the display is asserted, so a failure also says whether it overlaps.
           const display = await indicator.evaluate((el) => getComputedStyle(el).display);
@@ -482,9 +496,13 @@ test.describe('scroll indicator clears the hero card at rest', () => {
               .map(({ what, box }) => `${what} (${describeRect(box)})`);
             measured =
               `the Scroll indicator (${describeRect(indicatorBox)}) is ${gap.toFixed(1)} px below ` +
-              `the hero card (${describeRect(cardBox)})` +
+              `the hero card (${describeRect(cardBox)}, its h1 on ${h1Lines} lines)` +
               (covered.length ? `, covering ${covered.join(', ')}` : '');
             if (displayed) {
+              expect(
+                h1Lines,
+                `at ${size} the h1 takes ${h1Lines} lines; ${measured}`,
+              ).toBeLessThanOrEqual(2);
               expect(gap, `at ${size} ${measured}`).toBeGreaterThanOrEqual(MIN_CLEARANCE_PX);
             }
           }
