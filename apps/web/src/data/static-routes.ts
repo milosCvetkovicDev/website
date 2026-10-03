@@ -12,18 +12,20 @@ import { experienceFigureSince } from './profile';
  * needs no bump here. Changing a published post's title or summary, unpublishing a post or removing
  * one changes the list without a new `publishedAt`: bump /blog's date in that commit.
  *
- * From git, the last commit to change what each route visibly says: /about and /skills 2026-10-03
- * (#58: the /about quick facts and timeline and the /skills toolkit became captioned tables, whose
- * wide ones stack into rows on a phone, dated the day they are expected to merge; before it, on
- * 2026-10-02, #57's "Last updated" line at the foot of /about, which prints this date),
- * `/` and /work 2026-10-01 (#49: the self-healing agent's figure relabelled "errors resolved
- * autonomously" on the home and /work cards and in the About timeline, whose 2021 entry lost its
- * unsourced 40%; #58: the three questions answered after the /about story, the stats bar's
- * production figure counted from the studies' statuses and "Left Unfinished" dropped, and the line
- * on /skills saying the proficiency bars are self-assessed), /contact 2026-09-23 (d1da60f, #116, which
- * changed the hero subtitle and the eyebrows) and /blog 2026-01-27 (696c2ef). The later commits to
- * /blog changed only formatting, colour tokens, metadata or Open Graph images. /privacy was added
- * on 2026-09-27.
+ * From git, the last commit to change what each route visibly says: `/`, /about, /work, /skills and
+ * /contact 2026-10-03 (#58: each one's h1 names the person or the page's subject, with the hook it
+ * used to be as the largest line under it, and the line under the hero's hook says only the
+ * specialisation; earlier the same day, #58's tables: the /about quick facts and timeline and the
+ * /skills toolkit became captioned tables, whose wide ones stack into rows on a phone; each dated
+ * the day it is expected to merge). Before those, /about 2026-10-02 (#57's "Last updated" line at
+ * the foot of /about, which prints this date), `/` and /work 2026-10-01 (#49: the self-healing
+ * agent's figure relabelled "errors resolved autonomously" on the home and /work cards and in the
+ * About timeline, whose 2021 entry lost its unsourced 40%; #58: the three questions answered after
+ * the /about story, the stats bar's production figure counted from the studies' statuses and "Left
+ * Unfinished" dropped, and the line on /skills saying the proficiency bars are self-assessed) and
+ * /contact 2026-09-23 (d1da60f, #116, which changed the hero subtitle and the eyebrows); /blog
+ * 2026-01-27 (696c2ef). The later commits to /blog changed only formatting, colour tokens, metadata
+ * or Open Graph images. /privacy was added on 2026-09-27.
  *
  * One change needs no commit: `/` (the hero's XP row) and /about (its description and first quick
  * fact) print the years of experience, which `data/profile.ts` derives from the build's clock, so
@@ -34,12 +36,12 @@ const figureSince = experienceFigureSince();
 const laterOf = (recorded: string, derived: string) => (recorded > derived ? recorded : derived);
 
 export const STATIC_ROUTE_UPDATED = {
-  '/': laterOf('2026-10-01', figureSince),
+  '/': laterOf('2026-10-03', figureSince),
   '/about': laterOf('2026-10-03', figureSince),
-  '/work': '2026-10-01',
+  '/work': '2026-10-03',
   '/skills': '2026-10-03',
   '/blog': '2026-01-27',
-  '/contact': '2026-09-23',
+  '/contact': '2026-10-03',
   '/privacy': '2026-09-27',
 } as const satisfies Record<string, string>;
 

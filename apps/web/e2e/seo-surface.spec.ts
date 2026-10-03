@@ -22,6 +22,7 @@ import { restatedMetrics, wordCount } from '../src/test/answer-copy';
 import { formatContentDate } from '../src/lib/content-date';
 import { fetchHead, first } from './support/served-head';
 import { TABLES, expectedTable, servedTables } from './support/tables';
+import { PAGE_HEADINGS } from './support/page-headings';
 // #58's tables, counted from the data their records read (the last tests in this file).
 import { facts, timeline } from '../src/data/pages/about';
 import { skillCategories } from '../src/data/pages/skills';
@@ -1090,4 +1091,54 @@ test('every route serves exactly the tables TABLES lists for it (#58)', async ({
   expect(counts).toEqual(
     Object.fromEntries(PAGE_ROUTES.map((route) => [route, TABLES[route]?.length ?? 0])),
   );
+});
+
+// #58 AC 1 and 2 (58a): five routes opened on a hook that named neither the person nor the
+// subject, so neither the outline nor a machine reading it said who or what a page was about. Each
+// of them now serves the owner's line as its `h1`, and the hook as the `<p>` right after it,
+// outside the heading. Read from the served HTML, which no crawler runs; `DOMParser` parses it, so
+// the RSC flight payload's copy of every heading, inside a script, is never an element.
+test('every page serves one non-empty h1 of its own, and five name their subject over their hook (#58)', async ({
+  page,
+  request,
+}) => {
+  const served: Record<string, { h1s: string[]; next: { tag: string; text: string } | null }> = {};
+  for (const route of PAGE_ROUTES.filter((path) => path !== NOT_FOUND_ROUTE)) {
+    const response = await request.get(route);
+    expect(response.status(), `GET ${route}`).toBe(200);
+    served[route] = await page.evaluate(
+      (markup) => {
+        const doc = new DOMParser().parseFromString(markup, 'text/html');
+        const text = (element: Element) => (element.textContent ?? '').replace(/\s+/g, ' ').trim();
+        const h1s = [...doc.body.querySelectorAll('h1')];
+        const next = h1s[0]?.nextElementSibling;
+        return {
+          h1s: h1s.map(text),
+          next: next ? { tag: next.localName, text: text(next) } : null,
+        };
+      },
+      await response.text(),
+    );
+  }
+
+  for (const [route, { h1s }] of Object.entries(served)) {
+    expect(h1s, `${route} serves exactly one h1`).toHaveLength(1);
+    expect(h1s[0], `${route} serves an empty h1`).not.toBe('');
+  }
+  const headings = Object.values(served).map(({ h1s }) => h1s[0]);
+  expect(
+    headings.filter((heading, index) => headings.indexOf(heading) !== index),
+    'two routes serve the same h1',
+  ).toEqual([]);
+
+  for (const [route, { heading, hook }] of Object.entries(PAGE_HEADINGS)) {
+    const onRoute = served[route];
+    expect(onRoute, `${route} is a page route`).toBeDefined();
+    expect(onRoute?.h1s[0], `${route}'s h1 is the owner's line`).toBe(heading);
+    expect(onRoute?.h1s[0], `${route}'s hook is not inside its h1`).not.toContain(hook);
+    expect(onRoute?.next, `${route}'s hook is the paragraph right after its h1`).toEqual({
+      tag: 'p',
+      text: hook,
+    });
+  }
 });
