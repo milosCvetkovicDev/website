@@ -21,6 +21,10 @@ import { RUNS_IN_PRODUCTION } from '../src/data/work-stats';
 import { restatedMetrics, wordCount } from '../src/test/answer-copy';
 import { formatContentDate } from '../src/lib/content-date';
 import { fetchHead, first } from './support/served-head';
+import { TABLES, expectedTable, servedTables } from './support/tables';
+// #58's tables, counted from the data their records read (the last tests in this file).
+import { facts, timeline } from '../src/data/pages/about';
+import { skillCategories } from '../src/data/pages/skills';
 
 /**
  * The head every crawler and link-preview bot reads.
@@ -1028,4 +1032,62 @@ test('/skills says above its proficiency bars that they are self-assessed (#58)'
   for (const name of served.barNames) {
     expect(name, 'each bar names its level as self-assessed').toMatch(/self-assessed/i);
   }
+});
+
+// #58 AC 5 and 6: the tech stacks, the /about quick facts and timeline, and the /skills toolkit are
+// data tables, which an extractor can read as rows and columns and a grid of cards cannot be. The
+// served HTML, which no crawler runs, carries each one whole: named by its caption, a `th` heading
+// every column and every row, every cell as the record's `cellText()` reads it (the text the twin
+// writes), in a plain box that does not scroll, and every element with its table role spelled out,
+// which keeps a stacked table a table where the phone layout changes its display.
+for (const [route, tables] of Object.entries(TABLES)) {
+  test(`${route} serves its record's tables, captioned and headed both ways (#58)`, async ({
+    page,
+    request,
+  }) => {
+    const response = await request.get(route);
+    expect(response.status(), `GET ${route}`).toBe(200);
+    const served = await servedTables(page, await response.text());
+    expect(served, `${route} serves its tables in page order`).toEqual(tables.map(expectedTable));
+  });
+}
+
+test('the table rows are counted from the data the records read (#58)', () => {
+  // The expectations above come from the records; this pins the records to their data, so a record
+  // that dropped a row would not set its own, shorter, expectation.
+  expect(TABLES['/about']?.map(({ caption, rows }) => [caption, rows.length])).toEqual([
+    ['Quick facts', facts.length],
+    ['Career timeline', timeline.length],
+  ]);
+  expect(TABLES['/skills']?.map(({ caption, rows }) => [caption, rows.length])).toEqual([
+    ['Skills by category', skillCategories.length],
+  ]);
+  for (const study of caseStudies) {
+    const tables = TABLES[caseStudyRoute(study.slug)];
+    expect(tables, `${study.slug} serves one table`).toHaveLength(1);
+    expect(tables?.[0]?.caption).toBe(`Tech stack for ${study.title}`);
+    expect(tables?.[0]?.columns, 'two column headers').toHaveLength(2);
+    expect(tables?.[0]?.rows).toHaveLength(study.techStack.length);
+  }
+});
+
+// #58: the specs above, the axe table rules and the phone overflow check all run over `TABLES`, so
+// a table served on a route `TABLES` does not list would get none of them. Every page route, the
+// 404 included, serves exactly the tables `TABLES` lists for it, and a route it lists is a route.
+test('every route serves exactly the tables TABLES lists for it (#58)', async ({
+  page,
+  request,
+}) => {
+  expect(PAGE_ROUTES, 'TABLES lists a route that is not a page').toEqual(
+    expect.arrayContaining(Object.keys(TABLES)),
+  );
+  const counts: Record<string, number> = {};
+  for (const route of PAGE_ROUTES) {
+    const response = await request.get(route);
+    expect(response.status(), `GET ${route}`).toBe(expectedStatus(route));
+    counts[route] = (await servedTables(page, await response.text())).length;
+  }
+  expect(counts).toEqual(
+    Object.fromEntries(PAGE_ROUTES.map((route) => [route, TABLES[route]?.length ?? 0])),
+  );
 });

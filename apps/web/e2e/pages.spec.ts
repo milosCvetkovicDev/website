@@ -54,9 +54,12 @@ const routes: readonly { path: string; cards: readonly IconCard[] }[] = [
   },
   {
     path: '/skills',
-    cards: skillCategories.map(({ icon, name }) => ({
+    // The toolkit is a table (#58): each icon sits in its row's "What it covers" cell, inline
+    // before the description, so the cell announces the description alone and draws both.
+    cards: skillCategories.map(({ icon, description }) => ({
       icon,
-      announced: `- heading ${quoted(name)} [level=3]`,
+      announced: `- cell ${quoted(description)}`,
+      drawn: `${icon} ${description}`,
     })),
   },
 ];

@@ -2,14 +2,14 @@ import Link from 'next/link';
 import {
   coreSkills,
   differentiators,
-  skillCategories,
   skillsCopy,
   skillsRecord,
+  toolkitTable,
   type CoreSkill,
   type RichParagraph,
-  type ToolkitCategory,
 } from '@/data/pages/skills';
 import { WebPageJsonLd } from '@/components/json-ld';
+import { DataTable } from '@/components/data-table';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
@@ -78,33 +78,6 @@ function SkillBar({ name, years, level, context }: CoreSkill) {
   );
 }
 
-function SkillCategory({ category }: { category: ToolkitCategory }) {
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 transition-all hover:border-[var(--accent)]/50">
-      <div className="mb-3 flex items-center gap-3">
-        {/* Decoration: the name beside it says what it means, so it is not read out. */}
-        <span aria-hidden="true" className="text-2xl">
-          {category.icon}
-        </span>
-        <div>
-          <h3 className="font-semibold">{category.name}</h3>
-          <p className="text-xs text-[var(--muted)]">{category.description}</p>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {category.skills.map((skill) => (
-          <span
-            key={skill}
-            className="rounded bg-[var(--accent)]/10 px-2 py-1 font-mono text-xs text-[var(--accent-text)]"
-          >
-            {skill}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function SkillsPage() {
   return (
     <div className="py-16 md:py-24">
@@ -152,16 +125,12 @@ export default function SkillsPage() {
           </div>
         </section>
 
-        {/* Full skill grid */}
+        {/* The full toolkit, as a table (#58): on a phone each category stacks into a block. */}
         <section className="mb-20">
           <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {skillsCopy.headings.toolkit}
           </h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {skillCategories.map((category) => (
-              <SkillCategory key={category.name} category={category} />
-            ))}
-          </div>
+          <DataTable {...toolkitTable} />
         </section>
 
         {/* Learning philosophy */}

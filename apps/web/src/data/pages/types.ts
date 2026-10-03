@@ -33,12 +33,41 @@ export interface ListSection {
   items: readonly { term: string; description: string }[];
 }
 
+/**
+ * A cell that carries more than its text. `lead` is a line set apart above the text, and both
+ * the page and the twin end it as a sentence (`cellText()` in `table.ts`). `icon` is an emoji drawn
+ * before the text as decoration: the page hides it from screen readers and the twin leaves it out.
+ * A cell has one or the other, never both: an icon before a lead would sit alone on the line above
+ * it, since the lead is set on a line of its own.
+ */
+export type DecoratedCell =
+  { text: string; lead?: string; icon?: never } | { text: string; icon?: string; lead?: never };
+
+/**
+ * A data cell: text, a list of short entries (drawn as chips, read as one comma-separated list,
+ * so no entry may hold a comma), or text with a lead or an icon.
+ */
+export type TableCell = string | readonly string[] | DecoratedCell;
+
+/** A row: its header, the first column's text, then one cell for each column after it. */
+export type TableRow = readonly [header: string, ...cells: TableCell[]];
+
+/**
+ * A data table (#58): the page renders it through `components/data-table.tsx`, with its caption,
+ * a header cell for every column and one for every row, and the twin writes the columns and rows
+ * as a Markdown table.
+ */
+export interface Table {
+  /** The table's name: the page's `<caption>`, which `aria-labelledby` points the table at too. */
+  caption: string;
+  columns: readonly string[];
+  rows: readonly TableRow[];
+}
+
 /** A heading with a table: one cell per column in every row. */
-export interface TableSection {
+export interface TableSection extends Table {
   kind: 'table';
   heading: string;
-  columns: readonly string[];
-  rows: readonly (readonly string[])[];
 }
 
 /** Every page's content fits these three shapes; a fourth needs a renderer in `serialise.ts`. */

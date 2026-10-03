@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
 import { OWNER_TODO } from '@/data/owner-todo';
-import type { PageRecord, PageSection, Paragraph } from '@/data/pages/types';
+import type { PageRecord, PageSection, Paragraph, TableSection } from '@/data/pages/types';
 import { visible } from '@/test/markdown';
 import { buildMetadata } from '../metadata';
 import { markdownTwinPath } from '../pathname';
@@ -291,6 +291,7 @@ const FIXTURE: PageRecord = {
     {
       kind: 'table',
       heading: 'Quick facts',
+      caption: 'Quick facts',
       columns: ['Fact', 'Value'],
       rows: [
         ['Production systems rescued', '12'],
@@ -368,6 +369,7 @@ describe('pageToMarkdown() and renderSections()', () => {
     const ragged: PageSection = {
       kind: 'table',
       heading: 'Quick facts',
+      caption: 'Quick facts',
       columns: ['Fact', 'Value'],
       rows: [['Teams led', '4', 'extra']],
     };
@@ -375,6 +377,131 @@ describe('pageToMarkdown() and renderSections()', () => {
       'renderSections: row 1 of the table under "Quick facts" has 3 cells for 2 columns',
     );
   });
+
+  it('writes a cell as the page reads it: a list joined, a lead as a sentence, no icon (#58)', () => {
+    const markdown = renderSections([
+      {
+        kind: 'table',
+        heading: 'The longer version',
+        caption: 'Career timeline',
+        // The icon cell first: a wide table's first cell runs on after the row header on a phone,
+        // so it may not be a list or carry a lead (refused below).
+        columns: ['Year', 'Area', 'Kit', 'What changed'],
+        rows: [
+          [
+            '2025',
+            { icon: '🤖', text: 'Agents' },
+            ['Bun', 'Hono'],
+            { lead: 'Shipped the agent', text: 'It fixed bugs.' },
+          ],
+        ],
+      },
+    ]);
+    expect(markdown).toBe(
+      [
+        '## The longer version',
+        '',
+        'Table: Career timeline',
+        '',
+        '| Year | Area | Kit | What changed |',
+        '| --- | --- | --- | --- |',
+        '| 2025 | Agents | Bun, Hono | Shipped the agent. It fixed bugs. |',
+      ].join('\n'),
+    );
+  });
+
+  it('names a table by its caption, as the page does, unless the heading already does (#58)', () => {
+    const withCaption = (caption: string): PageSection => ({
+      kind: 'table',
+      heading: 'Quick facts',
+      caption,
+      columns: ['Fact', 'Figure'],
+      rows: [['Teams led', '4']],
+    });
+    expect(renderSections([withCaption('Facts at a glance')])).toBe(
+      [
+        '## Quick facts',
+        '',
+        'Table: Facts at a glance',
+        '',
+        '| Fact | Figure |',
+        '| --- | --- |',
+        '| Teams led | 4 |',
+      ].join('\n'),
+    );
+    expect(renderSections([withCaption('Quick facts')])).not.toContain('Table:');
+  });
+
+  it.each<[string, Partial<TableSection>, RegExp]>([
+    ['a blank caption', { caption: ' ' }, /the caption of the table under "T" is empty/],
+    ['a blank column', { columns: ['A', ''] }, /column 2 of the table under "T" is empty/],
+    ['a blank row header', { rows: [[' ', 'x']] }, /the header of row 1 of the table under "T"/],
+    [
+      'a decorated cell without text',
+      { rows: [['Row', { icon: '🤖', text: ' ' }]] },
+      /the B of row 1 of the table under "T" is empty/,
+    ],
+  ])(
+    'refuses a table with %s: the page would render an unnamed header or a bare icon',
+    (_, change, error) => {
+      const base: TableSection = {
+        kind: 'table',
+        heading: 'T',
+        caption: 'C',
+        columns: ['A', 'B'],
+        rows: [['Row', 'x']],
+      };
+      expect(() => renderSections([{ ...base, ...change }])).toThrow(error);
+    },
+  );
+
+  it('refuses a list cell whose entry holds a comma, or that has no entries', () => {
+    const withList = (list: readonly string[]): PageSection => ({
+      kind: 'table',
+      heading: 'Toolkit',
+      caption: 'Skills by category',
+      columns: ['Category', 'Skills'],
+      rows: [['Frontend', list]],
+    });
+    expect(() => renderSections([withList(['React, Next.js'])])).toThrow(/holds a comma/);
+    expect(() => renderSections([withList([])])).toThrow(
+      /the Skills of row 1 of the table under "Toolkit" is empty/,
+    );
+    // A blank entry would be an empty chip on the page and "A, , B" in the twin.
+    expect(() => renderSections([withList(['React', ' ', 'Vue'])])).toThrow(
+      /an entry in the Skills of row 1 of the table under "Toolkit" is empty/,
+    );
+  });
+
+  it.each<[string, TableSection['rows'], RegExp]>([
+    [
+      'a list as its first cell',
+      [['2025', ['Bun', 'Hono'], 'x']],
+      /the B of row 1 of the table under "T" is a list/,
+    ],
+    [
+      'a lead in its first cell',
+      [['2025', { lead: 'Shipped', text: 'x' }, 'x']],
+      /the B of row 1 of the table under "T" has a lead/,
+    ],
+    ['a blank first cell', [['2025', ' ', 'x']], /the B of row 1 of the table under "T" is blank/],
+    ['a blank later cell', [['2025', 'x', '']], /the C of row 1 of the table under "T" is blank/],
+  ])(
+    'refuses a wide table with %s, which its stacked row on a phone could not draw',
+    (_, rows, error) => {
+      const wide: TableSection = {
+        kind: 'table',
+        heading: 'T',
+        caption: 'C',
+        columns: ['A', 'B', 'C'],
+        rows,
+      };
+      expect(() => renderSections([wide])).toThrow(error);
+      // Two columns never stack, so the same cells are fine there.
+      const narrow = rows.map(([header, first]) => [header, first] as const);
+      expect(() => renderSections([{ ...wide, columns: ['A', 'B'], rows: narrow }])).not.toThrow();
+    },
+  );
 
   it('writes plain text so that it displays as written, never as Markdown syntax', () => {
     const markdown = renderSections([
@@ -399,6 +526,7 @@ describe('pageToMarkdown() and renderSections()', () => {
       {
         kind: 'table',
         heading: 'Pipes',
+        caption: 'Pipes',
         columns: ['A|B', 'C'],
         rows: [['x | y', '']],
       },
@@ -496,13 +624,18 @@ describe('pageToMarkdown() and renderSections()', () => {
     ],
     [
       'a table with no columns',
-      { kind: 'table', heading: 'T', columns: [], rows: [] },
+      { kind: 'table', heading: 'T', caption: 'T', columns: [], rows: [] },
       /table under "T" has no columns/,
     ],
     [
       'a table with no rows',
-      { kind: 'table', heading: 'T', columns: ['A'], rows: [] },
+      { kind: 'table', heading: 'T', caption: 'T', columns: ['A', 'B'], rows: [] },
       /table under "T" is empty/,
+    ],
+    [
+      'a table of one column, row headers with no cell to head',
+      { kind: 'table', heading: 'T', caption: 'T', columns: ['A'], rows: [['x']] },
+      /table under "T" has one column/,
     ],
     [
       'an unknown section kind',
@@ -607,7 +740,9 @@ describe('caseStudyToMarkdown()', () => {
         '',
         '## Tech Stack',
         '',
-        '| Category | Items |',
+        'Table: Tech stack for Nx Remote Cache Server',
+        '',
+        '| Layer | Technologies |',
         '| --- | --- |',
         '| Runtime | Bun |',
         '| Storage | Azure Blob Storage, LRU Cache |',
@@ -675,11 +810,16 @@ describe('caseStudyToMarkdown()', () => {
     ['no tags', { tags: [] }, /the tags of nx-remote-cache is empty/],
     ['a blank tagline', { tagline: ' ' }, /the Tagline of nx-remote-cache is empty/],
     ['an empty challenge', { challenge: '' }, /the challenge of nx-remote-cache is empty/],
-    ['no tech stack', { techStack: [] }, /table under "Tech Stack" is empty/],
+    ['no tech stack', { techStack: [] }, /the tech stack of nx-remote-cache is empty/],
     [
       'a tech-stack category with no items',
       { techStack: [{ category: 'Runtime', items: [] }] },
-      /the Runtime items of nx-remote-cache is empty/,
+      /the Technologies of row 1 of the tech stack of nx-remote-cache is empty/,
+    ],
+    [
+      'a blank tech-stack category',
+      { techStack: [{ category: ' ', items: ['Bun'] }] },
+      /the header of row 1 of the tech stack of nx-remote-cache is empty/,
     ],
     [
       'a tag holding a comma',
@@ -727,12 +867,14 @@ describe('caseStudyToMarkdown()', () => {
       expect(visible(twin).split(metric.basis)).toHaveLength(2);
     });
 
-    it('lists the tech stack as a Category | Items table, one row per category', () => {
+    it('lists the tech stack as a Layer | Technologies table, one row per layer', () => {
+      // The page's table has these columns (#58): the twin's first header cell is the unit the
+      // markdown-twins parity test looks for.
       const rows = study.techStack.map(
         ({ category, items }) => `| ${category} | ${items.join(', ')} |`,
       );
       expect(visible(twin)).toContain(
-        ['| Category | Items |', '| --- | --- |', ...rows].join('\n'),
+        ['| Layer | Technologies |', '| --- | --- |', ...rows].join('\n'),
       );
     });
 

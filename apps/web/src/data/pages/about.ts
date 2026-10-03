@@ -2,15 +2,15 @@
  * The copy `/about` renders, and the page record its Markdown twin reads (#59). The page keeps the
  * layout, the classes, its `h1` and its "Last updated" line, which reads `STATIC_ROUTE_UPDATED`
  * (#57) as /privacy's does, and maps over what is here, so a page and its twin cannot disagree.
- * Every string is text the page shows, with two exceptions: the `Quick facts` heading, which the
- * page gives screen readers only (#58), and the timeline's column names, which only the twin reads.
- * Every record section needs a heading and a table needs columns, and the page shows those parts
- * without either.
+ * Every string is text the page shows, with one exception: the `Quick facts` heading, which the
+ * page gives screen readers only (#58), since every record section needs a heading. The quick facts
+ * and the timeline are tables (#58), which the page renders through `components/data-table.tsx`
+ * with their captions and column headers, and the twin writes with the same columns.
  */
 import { formatMetric, getCaseStudy } from '@/data/case-studies';
 import { experienceFact, yearsOfExperience } from '@/data/profile';
 import { social } from '@/data/social';
-import type { PageRecord, PageSection, Paragraph } from './types';
+import type { PageRecord, PageSection, Paragraph, Table } from './types';
 
 // The timeline quotes the agent's metric, so it reads it from the study rather than restating it.
 const agentStudy = getCaseStudy('self-healing-agent');
@@ -220,6 +220,28 @@ export const aboutCopy = {
   },
 } as const;
 
+/** The quick facts as a table (#58): each fact's label heads its row. */
+export const factsTable: Table = {
+  caption: 'Quick facts',
+  columns: ['Fact', 'Figure'],
+  rows: facts.map(({ label, value }) => [label, value]),
+};
+
+/**
+ * The timeline as a table (#58), newest first: each year heads its row, and the last cell leads
+ * with the entry's highlight, then says what changed.
+ */
+export const timelineTable: Table = {
+  caption: 'Career timeline',
+  columns: ['Year', 'Role', 'Company', 'What changed'],
+  rows: timeline.map(({ year, role, company, highlight, description }) => [
+    year,
+    role,
+    company,
+    { lead: highlight, text: description },
+  ]),
+};
+
 /** A story paragraph as the text it reads as: the twin has no emphasis to carry. */
 function plainText(paragraph: StoryParagraph): string {
   if (typeof paragraph === 'string') return paragraph;
@@ -237,23 +259,8 @@ const sections: readonly PageSection[] = [
     heading: question,
     paragraphs: [answer],
   })),
-  {
-    kind: 'list',
-    heading: aboutCopy.factsHeading,
-    items: facts.map(({ label, value }) => ({ term: label, description: value })),
-  },
-  {
-    kind: 'table',
-    heading: aboutCopy.timelineHeading,
-    columns: ['Year', 'Role', 'Company', 'Highlight', 'Description'],
-    rows: timeline.map(({ year, role, company, highlight, description }) => [
-      year,
-      role,
-      company,
-      highlight,
-      description,
-    ]),
-  },
+  { kind: 'table', heading: aboutCopy.factsHeading, ...factsTable },
+  { kind: 'table', heading: aboutCopy.timelineHeading, ...timelineTable },
   {
     kind: 'list',
     heading: aboutCopy.beliefsHeading,

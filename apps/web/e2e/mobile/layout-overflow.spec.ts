@@ -9,6 +9,7 @@ import {
   measureOverflow,
   type OverflowWindow,
 } from '../support/overflow';
+import { TABLES } from '../support/tables';
 
 /**
  * No page route may scroll sideways on a phone.
@@ -168,6 +169,63 @@ for (const motion of MOTIONS) {
     }
   });
 }
+
+// #58: the routes that serve a data table, at every phone width rather than 320px alone. No table
+// scrolls sideways any more (the owner's decision on #226, 2026-10-03): a wide one (`isWideTable()`)
+// stacks each row into a block below 640px, and a narrow one wraps. So the page must not scroll
+// sideways at any of the three widths, each table's box must sit inside the viewport, and no table
+// may overflow its box, which is a plain card: not a region, not a tab stop, not a scroller.
+// `tables.spec.ts` beside this file checks the stacked rows themselves.
+test(`the routes with a table do not scroll sideways at ${PHONE_WIDTHS.join(', ')}px`, async ({
+  page,
+}) => {
+  const routes = Object.keys(TABLES);
+  expect([...routes].sort(), 'the routes that serve a table').toEqual(
+    ['/about', '/skills', ...CASE_STUDY_ROUTES].sort(),
+  );
+  // As above: a navigation, a hydration wait, two walks and three reads per route, per width.
+  test.setTimeout(30_000 + routes.length * PHONE_WIDTHS.length * 5_000);
+
+  for (const width of PHONE_WIDTHS) {
+    await narrowTo(page, width);
+    for (const route of routes) {
+      await test.step(`${route} at ${width}px`, async () => {
+        const response = await gotoHydrated(page, route);
+        expect.soft(response?.status(), `${route} did not answer 200`).toBe(200);
+        if (response?.status() !== 200) return;
+        expectNoOverflow(await measureOverflow(page, READ_AND_WALK), `${route} at ${width}px`);
+
+        const tables = TABLES[route] ?? [];
+        const boxes = page.locator('main div:has(> table)');
+        await expect.soft(boxes, `${route}: one box per table`).toHaveCount(tables.length);
+        for (const [index, table] of tables.entries()) {
+          const box = boxes.nth(index);
+          const name = table.caption;
+          const measured = await box.evaluate((element) => ({
+            overflowX: getComputedStyle(element).overflowX,
+            scrollWidth: element.scrollWidth,
+            clientWidth: element.clientWidth,
+          }));
+          // The computed style, not a class name: nothing is left to scroll, so nothing scrolls.
+          expect.soft(measured.overflowX, `${name}'s box is not a scroller`).toBe('visible');
+          expect
+            .soft(measured.scrollWidth, `${name} overflows its box at ${width}px`)
+            .toBeLessThanOrEqual(measured.clientWidth);
+          await expect.soft(box, `${name}'s box is not a region`).not.toHaveAttribute('role');
+          await expect.soft(box, `${name}'s box is not a tab stop`).not.toHaveAttribute('tabindex');
+          const bounds = await box.boundingBox();
+          expect.soft(bounds, `${name} is rendered`).not.toBeNull();
+          if (bounds) {
+            expect.soft(bounds.x, `${name} starts off the left edge`).toBeGreaterThanOrEqual(0);
+            expect
+              .soft(bounds.x + bounds.width, `${name} ends past the ${width}px viewport`)
+              .toBeLessThanOrEqual(width);
+          }
+        }
+      });
+    }
+  }
+});
 
 test("/ fits the story's narrowest parts into 320px", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });

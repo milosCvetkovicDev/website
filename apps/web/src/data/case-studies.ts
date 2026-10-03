@@ -4,6 +4,7 @@
 // loads the config through that loader to catch it).
 import { formatContentDate } from '../lib/content-date';
 import { OWNER_TODO } from './owner-todo';
+import type { Table } from './pages/types';
 
 /**
  * A figure as a card prints it: the number, how it is written, and what it counts. `formatMetric`
@@ -174,11 +175,13 @@ export interface CaseStudy {
 
 // Every study went public with the site's first production deployment, on 2026-09-09
 // (docs/runbooks/deploy.md:14-18); acacce0 had written them on 2026-01-27. UPDATED_AT is the day
-// every study page gained its metric panel, the headline figure with its label and basis (#49),
-// which also relabelled the self-healing agent's figure. The change before it, on 2026-09-25, moved
-// that study to the past tense and aligned the enterprise study's claims with the public record.
+// every study page's tech stack became a captioned table, its layers and technologies under column
+// headers (#58), dated the day it is expected to merge. The change before it, on 2026-10-01, gave
+// every study page its metric panel, the headline figure with its label and basis (#49), which also
+// relabelled the self-healing agent's figure; on 2026-09-25 that study moved to the past tense and
+// the enterprise study's claims were aligned with the public record.
 const PUBLISHED_AT = '2026-09-09';
-const UPDATED_AT = '2026-10-01';
+const UPDATED_AT = '2026-10-03';
 
 export const caseStudies: CaseStudy[] = [
   {
@@ -366,6 +369,18 @@ export const caseStudies: CaseStudy[] = [
  */
 export function caseStudyPageTitle(caseStudy: CaseStudy): string {
   return `${caseStudy.title} — ${caseStudy.tagline}`;
+}
+
+/**
+ * A case study's tech stack as the table its page renders and its twin writes (#58): one row per
+ * layer, its technologies listed in the row.
+ */
+export function techStackTable(caseStudy: CaseStudy): Table {
+  return {
+    caption: `Tech stack for ${caseStudy.title}`,
+    columns: ['Layer', 'Technologies'],
+    rows: caseStudy.techStack.map(({ category, items }) => [category, items]),
+  };
 }
 
 export function getCaseStudy(slug: string): CaseStudy | undefined {

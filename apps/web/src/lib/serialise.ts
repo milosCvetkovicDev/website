@@ -3,13 +3,23 @@ import {
   formatMetric,
   formatMetricScope,
   oneLine,
+  techStackTable,
   type CaseStudy,
   type CaseStudyHighlight,
   type CaseStudyMetric,
   type MetricDefinition,
 } from '@/data/case-studies';
 import { OWNER_TODO } from '@/data/owner-todo';
-import type { InlineLink, Paragraph, PageRecord, PageSection } from '@/data/pages/types';
+import { cellText, isWideTable, leadOf } from '@/data/pages/table';
+import type {
+  InlineLink,
+  Paragraph,
+  PageRecord,
+  PageSection,
+  Table,
+  TableCell,
+  TableRow,
+} from '@/data/pages/types';
 import { assertPathname, markdownTwinPath } from './pathname';
 import { siteOrigin } from './site-origin';
 
@@ -167,24 +177,71 @@ function numbered(items: readonly string[], what: string): string {
     .join('\n');
 }
 
+/**
+ * A cell as the page reads it (`cellText()`), so the twin and `components/data-table.tsx` word it
+ * alike: a list as its entries joined with `, `, which no entry may hold, a lead as a sentence
+ * before the text, an icon left out. A plain cell may be blank, as a table's can; a decorated one
+ * must have text, or its icon or lead would stand for a value the twin cannot write.
+ */
+function cell(value: TableCell, what: string): string {
+  if (typeof value === 'string') return value;
+  if ('text' in value) {
+    nonEmpty(inline(value.text), what);
+    return cellText(value);
+  }
+  return commaList(value, what);
+}
+
+/**
+ * A table: a `Table:` caption line (Pandoc's), unless the caption only repeats the heading above
+ * it, then the columns and rows. `where` names the table in an error. The caption, every column and
+ * every row header must have text: the page renders each as a name, a `<caption>` or a `<th>`, and
+ * an empty one is an unnamed header to a screen reader and a gap in the twin. A table needs a data
+ * column as well as its header column, or its column header would head no cell.
+ *
+ * A wide table (`isWideTable()`) also has to fit the layout `components/data-table.tsx` stacks it
+ * into on a phone, where its row header and first cell run on as one line after a drawn " · ": that
+ * first cell must be text, not a list (drawn as a block of chips) nor a cell with a lead (set on a
+ * line of its own), either of which would break the line after the dot; and no cell may be blank,
+ * which would leave the dot pointing at nothing or an empty line in the row. Every table the site
+ * renders is a page section that comes through here, so the build refuses such a row.
+ */
 function table(
-  title: string,
-  columns: readonly string[],
-  rows: readonly (readonly string[])[],
+  heading: string,
+  { caption, columns, rows }: Table,
+  where = `the table under "${heading}"`,
 ): string {
   if (columns.length === 0) {
-    throw new Error(`renderSections: the table under "${title}" has no columns`);
+    throw new Error(`renderSections: ${where} has no columns`);
   }
-  entries(rows, `the table under "${title}"`);
+  if (columns.length === 1) {
+    throw new Error(`renderSections: ${where} has one column, row headers with no cell to head`);
+  }
+  const name = nonEmpty(inline(caption), `the caption of ${where}`);
+  columns.forEach((column, index) => nonEmpty(inline(column), `column ${index + 1} of ${where}`));
+  entries(rows, where);
   rows.forEach((row, index) => {
     if (row.length !== columns.length) {
       throw new Error(
-        `renderSections: row ${index + 1} of the table under "${title}" has ${row.length} cells for ${columns.length} columns`,
+        `renderSections: row ${index + 1} of ${where} has ${row.length} cells for ${columns.length} columns`,
       );
     }
+    nonEmpty(inline(row[0]), `the header of row ${index + 1} of ${where}`);
+    if (isWideTable({ columns })) stackable(row, columns, `row ${index + 1} of ${where}`);
   });
   const line = (cells: readonly string[]) => `| ${cells.map(inline).join(' | ')} |`;
-  return [line(columns), line(columns.map(() => '---')), ...rows.map(line)].join('\n');
+  const markdown = [
+    line(columns),
+    line(columns.map(() => '---')),
+    ...rows.map((row, index) =>
+      line(
+        row.map((value, column) =>
+          cell(value, `the ${columns[column]} of row ${index + 1} of ${where}`),
+        ),
+      ),
+    ),
+  ].join('\n');
+  return name === inline(heading) ? markdown : `Table: ${name}\n\n${markdown}`;
 }
 
 function section(content: PageSection): string[] {
@@ -208,7 +265,7 @@ function section(content: PageSection): string[] {
           .join('\n'),
       ];
     case 'table':
-      return [heading(2, content.heading), table(content.heading, content.columns, content.rows)];
+      return [heading(2, content.heading), table(content.heading, content)];
     default: {
       // The types rule this out; a record cast from elsewhere must not lose a section silently.
       const unknown: never = content;
@@ -317,23 +374,36 @@ export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
       ? [heading(2, CASE_STUDY_HEADINGS.lessons), bullets(lessons, where('Lessons'))]
       : []),
     heading(2, CASE_STUDY_HEADINGS.techStack),
-    table(
-      CASE_STUDY_HEADINGS.techStack,
-      ['Category', 'Items'],
-      caseStudy.techStack.map(({ category, items }) => [
-        nonEmpty(category.trim(), where('a tech-stack category')),
-        commaList(items, where(`the ${category} items`)),
-      ]),
-    ),
+    // The page's table whole (#58): its caption, columns and rows, checked here so an error names
+    // the study, and so the page and the twin read one array.
+    table(CASE_STUDY_HEADINGS.techStack, techStackTable(caseStudy), where('the tech stack')),
   ]);
+}
+
+/** Refuses a wide table's row that its stacked layout on a phone could not draw (see `table()`). */
+function stackable([, first, ...rest]: TableRow, columns: readonly string[], where: string): void {
+  const what = (column: number) => `renderSections: the ${columns[column]} of ${where}`;
+  if (Array.isArray(first)) {
+    throw new Error(`${what(1)} is a list, which cannot run on after the row header on a phone`);
+  }
+  if (typeof first === 'object' && 'text' in first && leadOf(first)) {
+    throw new Error(`${what(1)} has a lead, which cannot run on after the row header on a phone`);
+  }
+  [first, ...rest].forEach((value, index) => {
+    if (typeof value === 'string' && !value.trim()) {
+      throw new Error(`${what(index + 1)} is blank, which a stacked row on a phone cannot draw`);
+    }
+  });
 }
 
 /**
  * Entries joined with `, `, as the page's chips would read aloud. An entry holding a comma would
- * read as two, and no entries at all as a blank, so both throw.
+ * read as two, and a blank entry or no entries at all as a gap, so each throws.
  */
 function commaList(list: readonly string[], what: string): string {
   entries(list, what).forEach((entry) => {
+    // A blank entry would be an empty chip on the page and a gap between two commas in the twin.
+    if (!entry.trim()) throw new Error(`serialise: an entry in ${what} is empty`);
     if (entry.includes(',')) {
       throw new Error(`serialise: "${entry}" in ${what} holds a comma and would read as two`);
     }

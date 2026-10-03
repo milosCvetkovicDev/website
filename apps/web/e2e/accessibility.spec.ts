@@ -3,6 +3,8 @@ import { publishedPosts, type PostBlock } from '../src/data/posts';
 import { PAGE_ROUTES, POST_ROUTES, expectedStatus, postRoute } from './routes';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
+// The table rules each table route must pass (#58), shared with the phone pass.
+import { TABLE_RULES, TABLE_RULES_PASSING } from './support/tables';
 import { TMUX_LOG_STREAM, tmuxLogStreamProblems } from './support/tmux-log-stream';
 // The rule map and the result readers are shared with e2e/mobile/accessibility.spec.ts: only
 // e2e/mobile/ is selected by the two phone projects, and importing one spec file from another would
@@ -442,6 +444,16 @@ test.describe('Accessibility', () => {
         expect(ruleIdsThatRan(results)).toEqual(
           expect.arrayContaining(['document-title', 'label-content-name-mismatch']),
         );
+        const tableRules = TABLE_RULES_PASSING[path];
+        if (tableRules) {
+          expect(ruleIdsThatRan(results)).toEqual(expect.arrayContaining([...TABLE_RULES]));
+          for (const rule of tableRules) {
+            expect(
+              passingNodes(results, rule),
+              `${path} serves a data table, so ${rule} must pass on it rather than find nothing`,
+            ).toBeGreaterThan(0);
+          }
+        }
       });
     }
   }
