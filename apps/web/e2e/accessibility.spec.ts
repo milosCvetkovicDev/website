@@ -694,7 +694,7 @@ test.describe('Accessibility', () => {
       'loose text in a container': () => {
         document.querySelector('[data-tmux-slots]')!.append('loose text');
       },
-      'a line with no pinned height, as StaticPane renders': () => {
+      'a line with no pinned height': () => {
         document.querySelector<HTMLElement>('[data-tmux-slots] > div')!.style.height = '';
       },
       'a container that became a section': () => {
