@@ -287,8 +287,16 @@ test('the stacked tables are still tables to assistive technology at 375px', asy
         try {
           await cdp.send('DOM.enable');
           await cdp.send('Accessibility.enable');
-          const { result } = await cdp.send('Runtime.evaluate', {
-            expression: `[...document.querySelectorAll('main table')].find((table) => table.caption?.textContent === ${JSON.stringify(table.caption)})`,
+          // The caption goes in as an argument, never spliced into the code that runs in the page.
+          const { result: documentRef } = await cdp.send('Runtime.evaluate', {
+            expression: 'document',
+          });
+          if (!documentRef.objectId) throw new Error('no document to search');
+          const { result } = await cdp.send('Runtime.callFunctionOn', {
+            objectId: documentRef.objectId,
+            functionDeclaration:
+              "function (caption) { return [...this.querySelectorAll('main table')].find((table) => table.caption?.textContent === caption); }",
+            arguments: [{ value: table.caption }],
           });
           if (!result.objectId) throw new Error(`no table captioned ${table.caption}`);
           const named = async (role: string) =>
