@@ -34,6 +34,13 @@ export const TABLES: Readonly<Record<string, readonly Table[]>> = {
  * `components/data-table.tsx`. From here up it is a grid, which fits its box at every width because
  * it has no minimum width of its own: its narrowest, 440px for the timeline, fits the 590px box
  * `/about` and `/skills` give it at 640px.
+ *
+ * 640 is 40rem at the browser's default 16px, which every test runs at. A media query's rem is the
+ * browser's initial font size, not the page's, so a visitor whose browser defaults to 20px gets the
+ * grid from 800px up, with text a quarter larger: the same layout at the same proportions. Tailwind
+ * writes the query in range syntax (`width < 40rem`), and the production build lowers it to
+ * `not all and (min-width: 40rem)` (checked in the built CSS on 2026-10-03), which every browser
+ * reads, Safari before 16.4 included.
  */
 export const STACKED_BELOW = 640;
 

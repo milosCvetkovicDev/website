@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { audit, describeViolations, passingNodes, ruleIdsThatRan } from '../axe';
 import { expectGsapLoaded } from '../support/gsap';
 import { expectHydrated } from '../support/hydration';
-import { TABLE_RULES, TABLE_RULES_PASSING } from '../support/tables';
+import { isWideTable } from '../../src/data/pages/table';
+import { TABLE_RULES, TABLE_RULES_PASSING, TABLES } from '../support/tables';
 
 /**
  * The accessibility gate at a phone viewport.
@@ -107,12 +108,13 @@ for (const path of pages) {
 }
 
 /**
- * The routes whose wide tables stack into rows on a phone (#58, the owner's decision on #226): the
- * stacked layout changes the display of every table element, so the phone is where a table could
- * stop being one, which the table rules would then report. Both colour schemes, as on desktop,
- * because the stacked rows put their text on the card in a layout no desktop pass sees. The other
- * table routes, the case studies, keep a two-column table that never stacks, and one of them is
- * audited above.
+ * The routes whose wide tables stack into rows on a phone (#58, the owner's decision on #226),
+ * derived from `TABLES`, so a route that gains a wide table gains this pass, and fails until it has
+ * a floor: the stacked layout changes the display of every table element, so the phone is where a
+ * table could stop being one, which the table rules would then report. Both colour schemes, as on
+ * desktop, because the stacked rows put their text on the card in a layout no desktop pass sees.
+ * The other table routes, the case studies, keep a two-column table that never stacks, and one of
+ * them is audited above.
  *
  * Fewest colour-contrast nodes each must measure: on 2026-10-03 at 412x839 (Pixel 7), /about
  * measured 70 and /skills 87, identical in both schemes, and each floor is about three quarters of
@@ -123,7 +125,15 @@ const TABLE_ROUTE_CONTRAST_FLOOR: Record<string, number> = {
   '/skills': 65,
 };
 
-for (const path of Object.keys(TABLE_ROUTE_CONTRAST_FLOOR)) {
+const STACKED_ROUTES = Object.entries(TABLES)
+  .filter(([, tables]) => tables.some(isWideTable))
+  .map(([route]) => route);
+
+test('every route with a stacked table has a phone colour-contrast floor, and no other does', () => {
+  expect(Object.keys(TABLE_ROUTE_CONTRAST_FLOOR).sort()).toEqual([...STACKED_ROUTES].sort());
+});
+
+for (const path of STACKED_ROUTES) {
   for (const colorScheme of ['light', 'dark'] as const) {
     test(`${path} has no axe violations at rest on a phone in the ${colorScheme} theme`, async ({
       page,
@@ -133,12 +143,23 @@ for (const path of Object.keys(TABLE_ROUTE_CONTRAST_FLOOR)) {
       await page.emulateMedia({ colorScheme });
       await openPage(page, path);
       await expect(page.locator('html')).toContainClass(colorScheme);
-      // Stacked, so this is the layout the pass is for: a wide table's column header row is drawn
-      // nowhere below 640px.
-      const head = await page
-        .locator('main table thead')
-        .evaluateAll((heads) => heads.map((head) => head.getBoundingClientRect().height));
-      expect(Math.min(...head), `${path}: no table is stacked`).toBeLessThanOrEqual(1);
+      // Stacked, so this is the layout the pass is for: every wide table's column header row is
+      // drawn nowhere below 640px, and every narrow table's is drawn, as a grid's.
+      const served = await page.locator('main table').evaluateAll((tables) =>
+        tables.map((table) => ({
+          caption: (table as HTMLTableElement).caption?.textContent ?? '',
+          head: (table as HTMLTableElement).tHead!.getBoundingClientRect().height,
+        })),
+      );
+      const expected = TABLES[path]!;
+      expect(served.map(({ caption }) => caption)).toEqual(expected.map(({ caption }) => caption));
+      for (const [index, { caption, head }] of served.entries()) {
+        if (isWideTable(expected[index]!)) {
+          expect(head, `${path}: ${caption} is not stacked`).toBeLessThanOrEqual(1);
+        } else {
+          expect(head, `${path}: ${caption} lost its drawn column headers`).toBeGreaterThan(1);
+        }
+      }
 
       const results = await audit(page);
       expect(ruleIdsThatRan(results), 'axe did not measure this document').toContain(
@@ -157,7 +178,9 @@ for (const path of Object.keys(TABLE_ROUTE_CONTRAST_FLOOR)) {
         `${path} on a phone in the ${colorScheme} theme must have no axe violations`,
       ).toEqual([]);
       expect(ruleIdsThatRan(results)).toEqual(expect.arrayContaining([...TABLE_RULES]));
-      for (const rule of TABLE_RULES_PASSING[path] ?? []) {
+      const passing = TABLE_RULES_PASSING[path];
+      expect(passing, `${path} has no table rules to pass`).toBeDefined();
+      for (const rule of passing!) {
         expect(
           passingNodes(results, rule),
           `${path} serves a stacked data table, so ${rule} must pass on it rather than find nothing`,

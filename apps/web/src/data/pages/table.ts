@@ -17,9 +17,12 @@ export function asSentence(text: string): string {
   return `${trimmed.replace(/[,:;]+$/, '')}.`;
 }
 
-/** A cell's lead, or nothing when it is absent or only whitespace, which would read as a lone `.`. */
+/**
+ * A cell's lead, or nothing when it is absent or holds no words: only whitespace, or only the
+ * comma, colon or semicolon that `asSentence()` replaces, which would read as a lone `.`.
+ */
 export function leadOf(cell: { lead?: string }): string | undefined {
-  const lead = cell.lead?.trim();
+  const lead = cell.lead?.trim().replace(/[,:;\s]+$/, '');
   return lead ? asSentence(lead) : undefined;
 }
 

@@ -176,10 +176,10 @@ describe('DataTable', () => {
     // Generated content with empty alternative text: drawn, but not in the document, the
     // accessible name or a selection. A browser without that syntax drops the declaration and
     // draws no dot, and the space below still keeps the two apart.
-    for (const header of container.querySelectorAll('tbody th')) {
+    for (const [index, header] of container.querySelectorAll('tbody th').entries()) {
       expect(header.className.split(/\s+/)).toContain("max-sm:after:content-['·_'/'']");
-      // A real space after the header's text, so the line copies as "First plain text".
-      expect(header.textContent).toBe(`${header.textContent?.trim()} `);
+      // The row's header and a real space after it, so the line copies as "First plain text".
+      expect(header.textContent).toBe(`${FIXTURE.rows[index]![0]} `);
     }
     expect(container.textContent).not.toContain('·');
     // A narrow table never stacks, so its headers carry neither.
@@ -216,16 +216,33 @@ describe('DataTable', () => {
     expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
   });
 
-  it('draws no lead for one that is only whitespace, where it would read as a lone stop', () => {
+  it.each([
+    ['only whitespace', '  '],
+    ['only a colon', ' : '],
+    ['only the punctuation a stop replaces', ',; '],
+  ])('draws no lead that is %s, where it would read as a lone stop', (_, lead) => {
     const { container } = render(
       <DataTable
         caption="Blank lead"
         columns={['Row', 'Cell']}
-        rows={[['R', { lead: '  ', text: 'Text' }]]}
+        rows={[['R', { lead, text: 'Text' }]]}
       />,
     );
     expect(container.querySelector('td')?.textContent).toBe('Text');
-    expect(cellText({ lead: '  ', text: 'Text' })).toBe('Text');
+    expect(cellText({ lead, text: 'Text' })).toBe('Text');
+  });
+
+  it('draws no icon that is only whitespace, which would leave a stray space before the text', () => {
+    const { container } = render(
+      <DataTable
+        caption="Blank icon"
+        columns={['Row', 'Cell']}
+        rows={[['R', { icon: ' ', text: 'Text' }]]}
+      />,
+    );
+    const cell = container.querySelector('td')!;
+    expect(cell.querySelector('[aria-hidden="true"]')).toBeNull();
+    expect(cell.textContent).toBe('Text');
   });
 });
 

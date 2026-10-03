@@ -19,12 +19,19 @@ import type { DecoratedCell, Table, TableCell } from '@/data/pages/types';
  * assistive technology. The grid has no minimum width, so it fits its box at every width it is
  * drawn at: its narrowest is about 440px, and `/about` and `/skills` give it 590px at 640px
  * (`e2e/table-layout.spec.ts`). A two-column table wraps inside the page at every width and never
- * stacks.
+ * stacks. Stacked, a word too long for its line breaks anywhere rather than push the page sideways;
+ * the grids keep the browser's own breaking, since letting a word break there would change how
+ * their columns share the width. A wide table's first cell must be text that can run on after the
+ * header, and none of its cells may be blank, which `serialise.ts` checks of every table the site
+ * renders.
  *
  * Changing the `display` of table elements drops their table semantics in WebKit, so every element
  * carries its role explicitly (`table`, `rowgroup`, `row`, `columnheader`, `rowheader`, `cell`), and
  * the table is named by `aria-labelledby` as well as by its caption. Every table has them, so the
- * markup has one shape; `e2e/mobile/tables.spec.ts` checks that a stacked table is still one.
+ * markup has one shape. `e2e/mobile/tables.spec.ts` checks that the roles are there in every engine
+ * and, on Chromium, that the platform accessibility tree still holds a table; what VoiceOver makes
+ * of the stacked table in Safari is untested. The card is `relative`, so the boxes hidden from
+ * sight (the stacked column header row, the chips' commas) are anchored inside it.
  */
 export function DataTable({ caption, columns, rows }: Table) {
   const captionId = useId();
@@ -32,13 +39,13 @@ export function DataTable({ caption, columns, rows }: Table) {
   // Each element's classes are whole strings, one for each layout, so the `max-sm:` variants
   // that stack a wide table are absent from a narrow one, and the class sorter can sort each.
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--card)]">
+    <div className="relative rounded-xl border border-[var(--border)] bg-[var(--card)]">
       <table
         role="table"
         aria-labelledby={captionId}
         className={
           wide
-            ? 'w-full border-collapse text-left text-sm max-sm:block'
+            ? 'w-full border-collapse text-left text-sm max-sm:block max-sm:wrap-anywhere'
             : 'w-full border-collapse text-left text-sm'
         }
       >
@@ -141,7 +148,9 @@ function Cell({ cell }: { cell: TableCell }) {
 }
 
 function Decorated({ cell }: { cell: DecoratedCell }) {
-  const { icon, text } = cell;
+  const { text } = cell;
+  // An icon of only whitespace would draw nothing and leave a stray space before the text.
+  const icon = cell.icon?.trim();
   const lead = leadOf(cell);
   return (
     <>

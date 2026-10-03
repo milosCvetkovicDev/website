@@ -384,13 +384,15 @@ describe('pageToMarkdown() and renderSections()', () => {
         kind: 'table',
         heading: 'The longer version',
         caption: 'Career timeline',
-        columns: ['Year', 'Kit', 'What changed', 'Area'],
+        // The icon cell first: a wide table's first cell runs on after the row header on a phone,
+        // so it may not be a list or carry a lead (refused below).
+        columns: ['Year', 'Area', 'Kit', 'What changed'],
         rows: [
           [
             '2025',
+            { icon: '🤖', text: 'Agents' },
             ['Bun', 'Hono'],
             { lead: 'Shipped the agent', text: 'It fixed bugs.' },
-            { icon: '🤖', text: 'Agents' },
           ],
         ],
       },
@@ -401,9 +403,9 @@ describe('pageToMarkdown() and renderSections()', () => {
         '',
         'Table: Career timeline',
         '',
-        '| Year | Kit | What changed | Area |',
+        '| Year | Area | Kit | What changed |',
         '| --- | --- | --- | --- |',
-        '| 2025 | Bun, Hono | Shipped the agent. It fixed bugs. | Agents |',
+        '| 2025 | Agents | Bun, Hono | Shipped the agent. It fixed bugs. |',
       ].join('\n'),
     );
   });
@@ -465,7 +467,41 @@ describe('pageToMarkdown() and renderSections()', () => {
     expect(() => renderSections([withList([])])).toThrow(
       /the Skills of row 1 of the table under "Toolkit" is empty/,
     );
+    // A blank entry would be an empty chip on the page and "A, , B" in the twin.
+    expect(() => renderSections([withList(['React', ' ', 'Vue'])])).toThrow(
+      /an entry in the Skills of row 1 of the table under "Toolkit" is empty/,
+    );
   });
+
+  it.each<[string, TableSection['rows'], RegExp]>([
+    [
+      'a list as its first cell',
+      [['2025', ['Bun', 'Hono'], 'x']],
+      /the B of row 1 of the table under "T" is a list/,
+    ],
+    [
+      'a lead in its first cell',
+      [['2025', { lead: 'Shipped', text: 'x' }, 'x']],
+      /the B of row 1 of the table under "T" has a lead/,
+    ],
+    ['a blank first cell', [['2025', ' ', 'x']], /the B of row 1 of the table under "T" is blank/],
+    ['a blank later cell', [['2025', 'x', '']], /the C of row 1 of the table under "T" is blank/],
+  ])(
+    'refuses a wide table with %s, which its stacked row on a phone could not draw',
+    (_, rows, error) => {
+      const wide: TableSection = {
+        kind: 'table',
+        heading: 'T',
+        caption: 'C',
+        columns: ['A', 'B', 'C'],
+        rows,
+      };
+      expect(() => renderSections([wide])).toThrow(error);
+      // Two columns never stack, so the same cells are fine there.
+      const narrow = rows.map(([header, first]) => [header, first] as const);
+      expect(() => renderSections([{ ...wide, columns: ['A', 'B'], rows: narrow }])).not.toThrow();
+    },
+  );
 
   it('writes plain text so that it displays as written, never as Markdown syntax', () => {
     const markdown = renderSections([
@@ -593,8 +629,13 @@ describe('pageToMarkdown() and renderSections()', () => {
     ],
     [
       'a table with no rows',
-      { kind: 'table', heading: 'T', caption: 'T', columns: ['A'], rows: [] },
+      { kind: 'table', heading: 'T', caption: 'T', columns: ['A', 'B'], rows: [] },
       /table under "T" is empty/,
+    ],
+    [
+      'a table of one column, row headers with no cell to head',
+      { kind: 'table', heading: 'T', caption: 'T', columns: ['A'], rows: [['x']] },
+      /table under "T" has one column/,
     ],
     [
       'an unknown section kind',
