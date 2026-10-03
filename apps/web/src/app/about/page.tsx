@@ -9,7 +9,7 @@ import {
   type StoryParagraph,
 } from '@/data/pages/about';
 import { ProfilePageJsonLd } from '@/components/json-ld';
-import { ScrollTable } from '@/components/scroll-table';
+import { DataTable } from '@/components/data-table';
 import { buildMetadata } from '@/lib/metadata';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
@@ -86,15 +86,15 @@ export default function AboutPage() {
             last question in the heading outline (#58). */}
         <section className="mb-20">
           <h2 className="sr-only">{aboutCopy.factsHeading}</h2>
-          <ScrollTable {...factsTable} />
+          <DataTable {...factsTable} />
         </section>
 
-        {/* Timeline with story, as a table (#58): it scrolls inside its region on a phone. */}
+        {/* Timeline with story, as a table (#58): on a phone each entry stacks into a block. */}
         <section className="mb-20">
           <h2 className="mb-8 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {aboutCopy.timelineHeading}
           </h2>
-          <ScrollTable {...timelineTable} />
+          <DataTable {...timelineTable} />
         </section>
 
         {/* Beliefs */}

@@ -176,12 +176,12 @@ export interface CaseStudy {
 // Every study went public with the site's first production deployment, on 2026-09-09
 // (docs/runbooks/deploy.md:14-18); acacce0 had written them on 2026-01-27. UPDATED_AT is the day
 // every study page's tech stack became a captioned table, its layers and technologies under column
-// headers (#58). The change before it, on 2026-10-01, gave every study page its metric panel, the
-// headline figure with its label and basis (#49), which also relabelled the self-healing agent's
-// figure; on 2026-09-25 that study moved to the past tense and the enterprise study's claims were
-// aligned with the public record.
+// headers (#58), dated the day it is expected to merge. The change before it, on 2026-10-01, gave
+// every study page its metric panel, the headline figure with its label and basis (#49), which also
+// relabelled the self-healing agent's figure; on 2026-09-25 that study moved to the past tense and
+// the enterprise study's claims were aligned with the public record.
 const PUBLISHED_AT = '2026-09-09';
-const UPDATED_AT = '2026-10-02';
+const UPDATED_AT = '2026-10-03';
 
 export const caseStudies: CaseStudy[] = [
   {

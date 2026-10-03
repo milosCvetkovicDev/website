@@ -3,7 +3,8 @@ import { publishedPosts, type PostBlock } from '../src/data/posts';
 import { PAGE_ROUTES, POST_ROUTES, expectedStatus, postRoute } from './routes';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
-import { TABLES } from './support/tables';
+// The table rules each table route must pass (#58), shared with the phone pass.
+import { TABLE_RULES, TABLE_RULES_PASSING } from './support/tables';
 import { TMUX_LOG_STREAM, tmuxLogStreamProblems } from './support/tmux-log-stream';
 // The rule map and the result readers are shared with e2e/mobile/accessibility.spec.ts: only
 // e2e/mobile/ is selected by the two phone projects, and importing one spec file from another would
@@ -288,27 +289,6 @@ async function auditExcludingTmuxLogStream(page: Page) {
 }
 
 const colorSchemes = ['light', 'dark'] as const;
-
-/**
- * The routes that serve a data table (#58), with the axe table rules each must pass on at least one
- * node, derived from `TABLES`, so a route that gains a table gains these checks with it (and
- * `seo-surface.spec.ts` fails a route that serves a table `TABLES` does not list). Every table rule
- * must also have run there, which is what proves it was selected: `td-has-header` and
- * `table-fake-caption` are switched on in the shared options, and `th-has-data-cells` comes in with
- * the `wcag2a` tag. `td-has-header` applies only to a table of at least three rows by three columns
- * (axe's `data-table-large-matches`), so it can pass only where the career timeline and the toolkit
- * are; a case study's tech stack, two columns wide, leaves it inapplicable.
- */
-const TABLE_RULES = ['td-has-header', 'th-has-data-cells', 'table-fake-caption'] as const;
-const TABLE_RULES_PASSING: Record<string, readonly (typeof TABLE_RULES)[number][]> =
-  Object.fromEntries(
-    Object.entries(TABLES).map(([route, tables]) => [
-      route,
-      tables.some(({ columns, rows }) => columns.length >= 3 && rows.length >= 3)
-        ? TABLE_RULES
-        : TABLE_RULES.filter((rule) => rule !== 'td-has-header'),
-    ]),
-  );
 
 /**
  * Walks the page to the bottom so every phase has been through the viewport. Two animation frames

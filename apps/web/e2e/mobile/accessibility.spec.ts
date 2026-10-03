@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { audit, describeViolations, passingNodes, ruleIdsThatRan } from '../axe';
 import { expectGsapLoaded } from '../support/gsap';
 import { expectHydrated } from '../support/hydration';
+import { TABLE_RULES, TABLE_RULES_PASSING } from '../support/tables';
 
 /**
  * The accessibility gate at a phone viewport.
@@ -103,4 +104,70 @@ for (const path of pages) {
         'being rendered or became transparent. Find what left the page before adjusting this floor.',
     ).toBeGreaterThan(CONTRAST_FLOOR[path]);
   });
+}
+
+/**
+ * The routes whose wide tables stack into rows on a phone (#58, the owner's decision on #226): the
+ * stacked layout changes the display of every table element, so the phone is where a table could
+ * stop being one, which the table rules would then report. Both colour schemes, as on desktop,
+ * because the stacked rows put their text on the card in a layout no desktop pass sees. The other
+ * table routes, the case studies, keep a two-column table that never stacks, and one of them is
+ * audited above.
+ *
+ * Fewest colour-contrast nodes each must measure: on 2026-10-03 at 412x839 (Pixel 7), /about
+ * measured 70 and /skills 87, identical in both schemes, and each floor is about three quarters of
+ * that, the headroom the desktop floors have (/about 61 → 45, /skills 88 → 65).
+ */
+const TABLE_ROUTE_CONTRAST_FLOOR: Record<string, number> = {
+  '/about': 52,
+  '/skills': 65,
+};
+
+for (const path of Object.keys(TABLE_ROUTE_CONTRAST_FLOOR)) {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`${path} has no axe violations at rest on a phone in the ${colorScheme} theme`, async ({
+      page,
+    }) => {
+      expect(page.viewportSize()?.width, 'this spec must run at a phone width').toBeLessThan(500);
+      // Before the navigation: the theme init script reads prefers-color-scheme for the first paint.
+      await page.emulateMedia({ colorScheme });
+      await openPage(page, path);
+      await expect(page.locator('html')).toContainClass(colorScheme);
+      // Stacked, so this is the layout the pass is for: a wide table's column header row is drawn
+      // nowhere below 640px.
+      const head = await page
+        .locator('main table thead')
+        .evaluateAll((heads) => heads.map((head) => head.getBoundingClientRect().height));
+      expect(Math.min(...head), `${path}: no table is stacked`).toBeLessThanOrEqual(1);
+
+      const results = await audit(page);
+      expect(ruleIdsThatRan(results), 'axe did not measure this document').toContain(
+        'document-title',
+      );
+      await test.info().attach('axe-results', {
+        body: JSON.stringify(
+          { violations: results.violations, incomplete: results.incomplete },
+          null,
+          2,
+        ),
+        contentType: 'application/json',
+      });
+      expect(
+        describeViolations(results.violations),
+        `${path} on a phone in the ${colorScheme} theme must have no axe violations`,
+      ).toEqual([]);
+      expect(ruleIdsThatRan(results)).toEqual(expect.arrayContaining([...TABLE_RULES]));
+      for (const rule of TABLE_RULES_PASSING[path] ?? []) {
+        expect(
+          passingNodes(results, rule),
+          `${path} serves a stacked data table, so ${rule} must pass on it rather than find nothing`,
+        ).toBeGreaterThan(0);
+      }
+      expect(
+        passingNodes(results, 'color-contrast'),
+        `${path} measured far fewer colour-contrast nodes on a phone than it should: content stopped ` +
+          'being rendered or became transparent. Find what left the page before adjusting this floor.',
+      ).toBeGreaterThan(TABLE_ROUTE_CONTRAST_FLOOR[path]!);
+    });
+  }
 }

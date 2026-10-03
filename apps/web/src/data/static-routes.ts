@@ -12,9 +12,10 @@ import { experienceFigureSince } from './profile';
  * needs no bump here. Changing a published post's title or summary, unpublishing a post or removing
  * one changes the list without a new `publishedAt`: bump /blog's date in that commit.
  *
- * From git, the last commit to change what each route visibly says: /about and /skills 2026-10-02
- * (#58: the /about quick facts and timeline and the /skills toolkit became captioned tables; on
- * /about the same day, #57's "Last updated" line at the foot of the page, which prints this date),
+ * From git, the last commit to change what each route visibly says: /about and /skills 2026-10-03
+ * (#58: the /about quick facts and timeline and the /skills toolkit became captioned tables, whose
+ * wide ones stack into rows on a phone, dated the day they are expected to merge; before it, on
+ * 2026-10-02, #57's "Last updated" line at the foot of /about, which prints this date),
  * `/` and /work 2026-10-01 (#49: the self-healing agent's figure relabelled "errors resolved
  * autonomously" on the home and /work cards and in the About timeline, whose 2021 entry lost its
  * unsourced 40%; #58: the three questions answered after the /about story, the stats bar's
@@ -34,9 +35,9 @@ const laterOf = (recorded: string, derived: string) => (recorded > derived ? rec
 
 export const STATIC_ROUTE_UPDATED = {
   '/': laterOf('2026-10-01', figureSince),
-  '/about': laterOf('2026-10-02', figureSince),
+  '/about': laterOf('2026-10-03', figureSince),
   '/work': '2026-10-01',
-  '/skills': '2026-10-02',
+  '/skills': '2026-10-03',
   '/blog': '2026-01-27',
   '/contact': '2026-09-23',
   '/privacy': '2026-09-27',

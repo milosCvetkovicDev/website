@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { BreadcrumbListJsonLd, TechArticleJsonLd, WebPageJsonLd } from '@/components/json-ld';
-import { ScrollTable } from '@/components/scroll-table';
+import { DataTable } from '@/components/data-table';
 import {
   adjacentCaseStudies,
   caseStudies,
@@ -268,7 +268,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
           <h2 className="mb-6 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
             Tech Stack
           </h2>
-          <ScrollTable {...techStackTable(caseStudy)} />
+          <DataTable {...techStackTable(caseStudy)} />
           <p className="mt-6 text-sm">
             <Link href="/skills" className="text-[var(--accent-text)] hover:underline">
               All my skills, and the experience behind each one

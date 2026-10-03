@@ -53,12 +53,12 @@ export type TableCell = string | readonly string[] | DecoratedCell;
 export type TableRow = readonly [header: string, ...cells: TableCell[]];
 
 /**
- * A data table (#58): the page renders it through `components/scroll-table.tsx`, with its caption,
+ * A data table (#58): the page renders it through `components/data-table.tsx`, with its caption,
  * a header cell for every column and one for every row, and the twin writes the columns and rows
  * as a Markdown table.
  */
 export interface Table {
-  /** The table's name: the page's `<caption>`, and the label of the region it scrolls in. */
+  /** The table's name: the page's `<caption>`, which `aria-labelledby` points the table at too. */
   caption: string;
   columns: readonly string[];
   rows: readonly TableRow[];

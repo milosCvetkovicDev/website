@@ -4,7 +4,7 @@
  * (#57) as /privacy's does, and maps over what is here, so a page and its twin cannot disagree.
  * Every string is text the page shows, with one exception: the `Quick facts` heading, which the
  * page gives screen readers only (#58), since every record section needs a heading. The quick facts
- * and the timeline are tables (#58), which the page renders through `components/scroll-table.tsx`
+ * and the timeline are tables (#58), which the page renders through `components/data-table.tsx`
  * with their captions and column headers, and the twin writes with the same columns.
  */
 import { formatMetric, getCaseStudy } from '@/data/case-studies';

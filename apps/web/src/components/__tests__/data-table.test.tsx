@@ -1,20 +1,21 @@
-import { render, within } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, techStackTable } from '@/data/case-studies';
 import { factsTable, timelineTable } from '@/data/pages/about';
 import { toolkitTable } from '@/data/pages/skills';
 import { asSentence, cellText, isWideTable } from '@/data/pages/table';
 import type { DecoratedCell, Table } from '@/data/pages/types';
-import { ScrollTable } from '../scroll-table';
+import { DataTable } from '../data-table';
 
 /**
  * The data tables of #58: the case-study tech stacks, the /about quick facts and timeline, and the
- * /skills toolkit, all rendered by `ScrollTable`. A table is named by its caption and has a header
- * cell for every column and one for every row; a wide one scrolls sideways inside a region the
- * keyboard can reach rather than widening the page. A cell reads as `cellText()` says, less its decoration,
- * which is what the Markdown twin writes, so the page and the twin say the same thing.
- * `e2e/seo-surface.spec.ts` checks the same of the served HTML, and the e2e accessibility gate runs
- * axe's table rules over it.
+ * /skills toolkit, all rendered by `DataTable`. A table is named by its caption and has a header
+ * cell for every column and one for every row; below 640px a wide one stacks each row into a block
+ * rather than scrolling sideways (the owner's decision on #226), keeping its table roles. A cell
+ * reads as `cellText()` says, less its decoration, which is what the Markdown twin writes, so the
+ * page and the twin say the same thing. `e2e/seo-surface.spec.ts` checks the same of the served
+ * HTML, the e2e accessibility gates run axe's table rules over it on a desktop and on a phone, and
+ * `e2e/mobile/tables.spec.ts` and `e2e/table-layout.spec.ts` measure the two layouts.
  */
 
 /** Every table the site renders, by where it appears. */
@@ -50,24 +51,28 @@ const FIXTURE: Table = {
   ],
 };
 
-/** Two columns: wraps inside the page, so it is neither a region nor a tab stop. */
+/** Two columns: wraps inside the page at every width, so it never stacks. */
 const NARROW: Table = {
   caption: 'A narrow table',
   columns: ['Fact', 'Figure'],
   rows: [['Teams led', '4']],
 };
 
-describe('ScrollTable', () => {
+describe('DataTable', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   it('names the table by its caption and heads every column and every row', () => {
-    const { container } = render(<ScrollTable {...FIXTURE} />);
+    const { container, getByRole } = render(<DataTable {...FIXTURE} />);
     const table = container.querySelector('table');
-    if (!table) throw new Error('ScrollTable must render a table');
+    if (!table) throw new Error('DataTable must render a table');
 
     expect(table.caption?.textContent).toBe(FIXTURE.caption);
+    // Named through `aria-labelledby` as well as natively, so the name holds where the stacked
+    // layout's `display` drops the caption's own role.
+    expect(table.getAttribute('aria-labelledby')).toBe(table.caption?.getAttribute('id'));
+    expect(getByRole('table', { name: FIXTURE.caption })).toBe(table);
     const columns = [...table.querySelectorAll('thead th')];
     expect(columns.map((th) => [th.getAttribute('scope'), th.textContent])).toEqual(
       FIXTURE.columns.map((column) => ['col', column]),
@@ -78,35 +83,30 @@ describe('ScrollTable', () => {
       const [first, ...rest] = [...row.children];
       expect(first.localName).toBe('th');
       expect(first.getAttribute('scope')).toBe('row');
-      expect(first.textContent).toBe(FIXTURE.rows[index][0]);
+      expect(first.textContent?.trim()).toBe(FIXTURE.rows[index][0]);
       expect(rest.map((cell) => cell.localName)).toEqual(FIXTURE.columns.slice(1).map(() => 'td'));
     });
   });
 
-  it('scrolls a wide table inside a region the keyboard reaches, named by the caption', () => {
-    const { container, getByRole } = render(<ScrollTable {...FIXTURE} />);
-    const region = getByRole('region', { name: FIXTURE.caption });
-    expect(region).toHaveAttribute('tabindex', '0');
-    // The name has one source, the caption, rather than a second copy in an aria-label.
-    expect(region).not.toHaveAttribute('aria-label');
-    expect(region.getAttribute('aria-labelledby')).toBe(
-      container.querySelector('caption')?.getAttribute('id'),
-    );
-    expect(region.className).toMatch(/\boverflow-x-auto\b/);
-    // The containing block of the chips' `sr-only` separators, which are absolutely positioned:
-    // without it they escape the scroller and widen the page by the table's overflow on a phone.
-    expect(region.className).toMatch(/(^|\s)relative(\s|$)/);
-    expect(region.className).toMatch(/\bfocus-ring\b/);
-    expect(region.firstElementChild?.localName, 'the table sits straight inside its region').toBe(
-      'table',
-    );
-    expect(within(region).getByRole('table', { name: FIXTURE.caption })).toBe(
-      container.querySelector('table'),
+  it.each([
+    ['a wide table', FIXTURE],
+    ['a narrow table', NARROW],
+  ])('draws %s in a plain box: not a region, not a tab stop, not a scroller', (_, table) => {
+    const { container, queryByRole } = render(<DataTable {...table} />);
+    expect(queryByRole('region')).toBeNull();
+    expect(container.querySelector('[tabindex]')).toBeNull();
+    const box = container.querySelector('table')?.parentElement;
+    expect(box?.localName).toBe('div');
+    expect(box?.attributes.length, 'the box carries a class and nothing else').toBe(1);
+    // Nothing scrolls, so nothing needs a scroller, a focus ring, a minimum width or a pinned
+    // header: #226's region went with the owner's decision to stack the rows on a phone.
+    expect(container.innerHTML).not.toMatch(
+      /\boverflow-(x-)?(auto|scroll)\b|\bfocus-ring\b|\bmin-w-|\bsticky\b/,
     );
   });
 
   it('reads each cell as cellText() writes it for the twin, with its icon hidden', () => {
-    const { container } = render(<ScrollTable {...FIXTURE} />);
+    const { container } = render(<DataTable {...FIXTURE} />);
     const rows = [...container.querySelectorAll('tbody tr')];
     rows.forEach((row, index) => {
       const [, ...cells] = FIXTURE.rows[index];
@@ -126,34 +126,66 @@ describe('ScrollTable', () => {
     expect(iconCell.textContent).toBe('🧪 Beside an icon');
   });
 
-  it('leaves a two-column table out of the tab order: it wraps, so there is nothing to scroll', () => {
-    const { container, queryByRole, getByRole } = render(<ScrollTable {...NARROW} />);
-    expect(queryByRole('region')).toBeNull();
-    expect(container.querySelector('[tabindex]')).toBeNull();
-    expect(getByRole('table', { name: NARROW.caption })).toBeInTheDocument();
-    // Still a scroller, and still the separators' containing block, should a cell ever overflow.
-    const box = container.querySelector('table')?.parentElement;
-    expect(box?.className).toMatch(/(^|\s)relative(\s|$)/);
-    expect(box?.className).toMatch(/\boverflow-x-auto\b/);
-    expect(box?.className).not.toMatch(/\bfocus-ring\b/);
+  it('gives every element of a table its ARIA role, which outlasts a change of display', () => {
+    for (const table of [FIXTURE, NARROW]) {
+      const { container, unmount } = render(<DataTable {...table} />);
+      const element = container.querySelector('table')!;
+      const roles = (selector: string) =>
+        [...element.querySelectorAll(selector)].map((node) => node.getAttribute('role'));
+      expect(element.getAttribute('role')).toBe('table');
+      expect(roles(':scope > thead, :scope > tbody')).toEqual(['rowgroup', 'rowgroup']);
+      expect(roles('tr')).toEqual(table.rows.map(() => 'row').concat('row'));
+      expect(roles('thead th')).toEqual(table.columns.map(() => 'columnheader'));
+      expect(roles('tbody th')).toEqual(table.rows.map(() => 'rowheader'));
+      expect(roles('td')).toEqual(table.rows.flatMap(([, ...cells]) => cells.map(() => 'cell')));
+      // The scopes stay, for whatever reads the markup rather than the roles.
+      expect(
+        new Set([...element.querySelectorAll('thead th')].map((th) => th.getAttribute('scope'))),
+      ).toEqual(new Set(['col']));
+      unmount();
+    }
   });
 
-  it('lays a table of more than two columns out at its minimum width, and scrolls it', () => {
+  it('stacks each row of a wide table into a block below 640px, and leaves a narrow one alone', () => {
     expect(isWideTable(FIXTURE)).toBe(true);
     expect(isWideTable(NARROW)).toBe(false);
-    const { container, rerender } = render(<ScrollTable {...NARROW} />);
-    expect(container.querySelector('table')?.className).not.toMatch(/\bmin-w-/);
-    rerender(<ScrollTable {...FIXTURE} />);
-    expect(container.querySelector('table')?.className).toMatch(/\bmin-w-160\b/);
+    const classes = (element: Element | null | undefined) => element?.className.split(/\s+/) ?? [];
+
+    const { container, rerender } = render(<DataTable {...FIXTURE} />);
+    const table = container.querySelector('table')!;
+    expect(classes(table)).toContain('max-sm:block');
+    expect(classes(table.caption)).toContain('max-sm:block');
+    // The column header row is hidden from sight there, and only from sight.
+    expect(classes(table.tHead)).toEqual(['max-sm:sr-only']);
+    expect(classes(table.tBodies[0])).toContain('max-sm:block');
+    for (const row of table.tBodies[0]!.rows) {
+      expect(classes(row)).toContain('max-sm:block');
+      const [header, first, ...rest] = [...row.cells];
+      // The header and the first cell run on as one line, the rest each take a line of their own.
+      expect(classes(header)).toContain('max-sm:inline');
+      expect(classes(first)).toContain('max-sm:inline');
+      for (const cell of rest) expect(classes(cell)).toContain('max-sm:block');
+    }
+
+    rerender(<DataTable {...NARROW} />);
+    expect(container.innerHTML).not.toContain('max-sm:');
   });
 
-  it('pins each row header on a solid surface, so a scrolled cell keeps its row name', () => {
-    const { container } = render(<ScrollTable {...FIXTURE} />);
-    for (const th of container.querySelectorAll('tbody th')) {
-      expect(th.className).toMatch(/(^|\s)sticky(\s|$)/);
-      expect(th.className).toMatch(/\bleft-0\b/);
-      expect(th.className).toContain('bg-[var(--card)]');
+  it("joins a stacked row's header to its first cell with a dot no one reads, copies or parses", () => {
+    const { container } = render(<DataTable {...FIXTURE} />);
+    // Generated content with empty alternative text: drawn, but not in the document, the
+    // accessible name or a selection. A browser without that syntax drops the declaration and
+    // draws no dot, and the space below still keeps the two apart.
+    for (const header of container.querySelectorAll('tbody th')) {
+      expect(header.className.split(/\s+/)).toContain("max-sm:after:content-['·_'/'']");
+      // A real space after the header's text, so the line copies as "First plain text".
+      expect(header.textContent).toBe(`${header.textContent?.trim()} `);
     }
+    expect(container.textContent).not.toContain('·');
+    // A narrow table never stacks, so its headers carry neither.
+    const narrow = render(<DataTable {...NARROW} />).container.querySelector('tbody th');
+    expect(narrow?.textContent).toBe(NARROW.rows[0][0]);
+    expect(narrow?.className).not.toContain('content-');
   });
 
   it('types a cell with an icon or a lead, never both, which would leave the icon on its own line', () => {
@@ -164,14 +196,14 @@ describe('ScrollTable', () => {
 
   it('renders without a React warning', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<ScrollTable {...FIXTURE} />);
+    render(<DataTable {...FIXTURE} />);
     expect(errors).not.toHaveBeenCalled();
   });
 
   it('renders rows that share a header, and a list that repeats an entry, without a key warning', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
     const { container } = render(
-      <ScrollTable
+      <DataTable
         caption="Repeats"
         columns={['Year', 'Kit', 'Note']}
         rows={[
@@ -186,7 +218,7 @@ describe('ScrollTable', () => {
 
   it('draws no lead for one that is only whitespace, where it would read as a lone stop', () => {
     const { container } = render(
-      <ScrollTable
+      <DataTable
         caption="Blank lead"
         columns={['Row', 'Cell']}
         rows={[['R', { lead: '  ', text: 'Text' }]]}
@@ -216,7 +248,7 @@ describe('the tables the site renders', () => {
   });
 
   it.each(TABLES)('%s renders every cell as its twin reads it', (_, table) => {
-    const { container } = render(<ScrollTable {...table} />);
+    const { container } = render(<DataTable {...table} />);
     const served = [...container.querySelectorAll('tbody tr')].map((row) =>
       [...row.children].map(readText),
     );
@@ -240,11 +272,11 @@ describe('the tables the site renders', () => {
 
   // Literal rows, not built from cellText(): a regression in how a cell reads (a join, a dropped
   // lead) would change the page, the twin and an expectation built from the same code together.
-  it.each<[string, Table, number, string[]]>([
+  it.each<[string, number, Table, string[]]>([
     [
       '/about timeline',
-      timelineTable,
       2,
+      timelineTable,
       [
         '2016',
         'Full-Stack Developer → Tech Lead',
@@ -254,8 +286,8 @@ describe('the tables the site renders', () => {
     ],
     [
       '/skills toolkit',
-      toolkitTable,
       0,
+      toolkitTable,
       [
         'AI & Agents',
         'Building AI that actually works in production',
@@ -264,12 +296,12 @@ describe('the tables the site renders', () => {
     ],
     [
       'self-healing-agent tech stack',
-      techStackTable(caseStudies.find(({ slug }) => slug === 'self-healing-agent')!),
       2,
+      techStackTable(caseStudies.find(({ slug }) => slug === 'self-healing-agent')!),
       ['AI', 'Claude Agent SDK, Anthropic API'],
     ],
-  ])('%s row %i reads, word for word, as written', (_, table, index, expected) => {
-    const { container } = render(<ScrollTable {...table} />);
+  ])('%s row %i reads, word for word, as written', (_, index, table, expected) => {
+    const { container } = render(<DataTable {...table} />);
     const row = container.querySelectorAll('tbody tr')[index];
     expect([...row.children].map(readText)).toEqual(expected);
   });

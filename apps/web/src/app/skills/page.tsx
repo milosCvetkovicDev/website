@@ -9,7 +9,7 @@ import {
   type RichParagraph,
 } from '@/data/pages/skills';
 import { WebPageJsonLd } from '@/components/json-ld';
-import { ScrollTable } from '@/components/scroll-table';
+import { DataTable } from '@/components/data-table';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
@@ -125,12 +125,12 @@ export default function SkillsPage() {
           </div>
         </section>
 
-        {/* The full toolkit, as a table (#58): it scrolls inside its region on a phone. */}
+        {/* The full toolkit, as a table (#58): on a phone each category stacks into a block. */}
         <section className="mb-20">
           <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {skillsCopy.headings.toolkit}
           </h2>
-          <ScrollTable {...toolkitTable} />
+          <DataTable {...toolkitTable} />
         </section>
 
         {/* Learning philosophy */}

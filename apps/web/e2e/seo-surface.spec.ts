@@ -1038,7 +1038,8 @@ test('/skills says above its proficiency bars that they are self-assessed (#58)'
 // data tables, which an extractor can read as rows and columns and a grid of cards cannot be. The
 // served HTML, which no crawler runs, carries each one whole: named by its caption, a `th` heading
 // every column and every row, every cell as the record's `cellText()` reads it (the text the twin
-// writes), inside a region the keyboard can reach that scrolls it sideways.
+// writes), in a plain box that does not scroll, and every element with its table role spelled out,
+// which keeps a stacked table a table where the phone layout changes its display.
 for (const [route, tables] of Object.entries(TABLES)) {
   test(`${route} serves its record's tables, captioned and headed both ways (#58)`, async ({
     page,

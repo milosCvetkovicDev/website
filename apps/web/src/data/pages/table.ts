@@ -1,7 +1,7 @@
 import type { Table, TableCell } from './types';
 
 /**
- * How a table cell reads as text (#58): what `components/scroll-table.tsx` puts in front of a
+ * How a table cell reads as text (#58): what `components/data-table.tsx` puts in front of a
  * reader, less its decoration, and what the Markdown twin writes in the cell. Both read it from
  * here, so the page and the twin cannot word a cell differently.
  */
@@ -37,10 +37,10 @@ export function cellText(cell: TableCell): string {
 }
 
 /**
- * Whether a table is laid out at least 40rem wide and scrolls sideways inside a region the keyboard
- * can reach: one of more than two columns, which on a phone would otherwise squeeze each column to a
- * word a line. A two-column table wraps inside the page's width instead, so it is not a scroller
- * and not a tab stop.
+ * Whether a table stacks each row into a block on a phone, below Tailwind's `sm` (640px): one of more
+ * than two columns, which there would otherwise squeeze each column to a word a line or, laid out
+ * wider, hide its last columns off-screen. A two-column table wraps inside the page's width at
+ * every width instead, so it is a grid everywhere.
  */
 export function isWideTable({ columns }: Pick<Table, 'columns'>): boolean {
   return columns.length > 2;

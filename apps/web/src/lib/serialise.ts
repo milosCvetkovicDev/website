@@ -177,7 +177,7 @@ function numbered(items: readonly string[], what: string): string {
 }
 
 /**
- * A cell as the page reads it (`cellText()`), so the twin and `components/scroll-table.tsx` word it
+ * A cell as the page reads it (`cellText()`), so the twin and `components/data-table.tsx` word it
  * alike: a list as its entries joined with `, `, which no entry may hold, a lead as a sentence
  * before the text, an icon left out. A plain cell may be blank, as a table's can; a decorated one
  * must have text, or its icon or lead would stand for a value the twin cannot write.
