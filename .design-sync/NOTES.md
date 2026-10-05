@@ -29,12 +29,26 @@ expects, and what each workaround depends on.
   `json-ld.tsx` reads `NEXT_PUBLIC_SITE_URL` at module scope and the bundle would otherwise throw
   while loading.
 - `tsconfig.paths.json` (the converter's `tsconfig`) maps `next/link` and `next/navigation` to the
-  stand-ins in `next/`. The real modules pull in Next's router internals, which read `process` and
-  `__dirname` at load time and cannot navigate without a router anyway. The stand-in Link renders a
-  plain `<a>`; `usePathname` returns null, as Next's does with no router mounted. It also mirrors
-  apps/web's `@/*` alias, which the converter reads from this file only.
-- A component that starts importing another `next/*` module needs a stand-in and a `paths` entry
-  here, or the bundle drags Next's internals back in (the bundle size jumps from ~600 KB).
+  stand-ins in `next/`, and `@vercel/analytics/next` to the one in `vercel/`. The real modules pull
+  in Next's router internals, which read `process` and `__dirname` at load time and cannot navigate
+  without a router anyway. The stand-in Link renders a plain `<a>`. `usePathname` returns `''`, a
+  path no header link matches: Next types the App Router's hook as `string`, and since #178
+  `isCurrentLink` calls `pathname.startsWith`, so the `null` it returned until 2026-10-05 threw and
+  left the `Navigation` card empty (the render check's `root empty`). `Analytics` renders nothing: a
+  design is no Vercel deployment and must never send beacons. The file also mirrors apps/web's `@/*`
+  alias, which the converter reads from this file only.
+- A `paths` key without a `*` matches only the exact specifier. The converter's resolve plugin
+  (`tsconfigPathsPlugin` in `.ds-sync/lib/bundle.mjs`) runs for every import, inside `node_modules`
+  too, but compares the whole path: `@vercel/analytics/next` imports `next/navigation.js`, with
+  its extension, which the `next/navigation` key never matches, and through `WebAnalytics` (#135)
+  the bundle came out at 813 KB, against 560 KB with the stand-in. Mapping the package's own entry
+  keeps its beacon code out as well. `componentSrcMap: null` does not help: it drops the card, but
+  the synthesized entry still exports every file in `src/components`.
+- A component that starts importing another `next/*` module, or a package that does, needs a
+  stand-in and a `paths` entry here under the exact specifier it imports, or the bundle drags
+  Next's internals back in. The bundle is
+  560 KB (2026-10-05); after a build, `grep -c 'node_modules/next/' ds-bundle/_ds_bundle.js` must
+  print 0.
 
 ## Components and props
 
@@ -43,10 +57,15 @@ expects, and what each workaround depends on.
   `node .design-sync/props-from-source.mjs` from the TypeScript source; run it with `--check` on
   every re-sync and paste its output back into `dtsPropsFor` when it reports drift.
 - `componentSrcMap` excludes `ThemeProvider` (it is the preview `provider`, still on the global),
-  `HydrationMarker` and the four JSON-LD components (they render nothing visible). #116 added
+  `HydrationMarker` and the JSON-LD components, six since 2026-10-05 (they render nothing
+  visible). #116 added
   `TechArticleJsonLd` and `BreadcrumbListJsonLd` to `json-ld.tsx`; the 2026-09-23 re-sync found them
   through `props-from-source.mjs --check` and excluded them. A new export in `json-ld.tsx` needs the
-  same null entry.
+  same null entry: the 2026-10-05 re-sync added `ProfilePageJsonLd` and `WebPageJsonLd`, and
+  `WebAnalytics`, which renders nothing outside a Vercel production or preview build.
+- `props-from-source.mjs` prints tuple types with their labels and rest element since 2026-10-05:
+  `DataTable`'s row is `readonly [header: string, ...cells: Array<…>]`. Without that branch a tuple
+  fell through to the object printer and listed every method of `Array` as a member.
 - The converter's `isComponentName` treats an all-caps name as a constant and drops it after
   discovery: the export stays on `window.Portfolio` but gets no card, and nothing warns. `CTA` was
   the one such component (left bundle-only on 2026-09-22, deleted since as unrendered). Give a new
@@ -71,8 +90,14 @@ expects, and what each workaround depends on.
   and `ProgressBar`, `StatDisplay`, `CodeLine`, `DataStream` and `HexBadge` from `hud-elements.tsx`.
   Their previews, `docs/` stubs and config entries went with them, and the `HudPanel` preview's
   stat rows, which were `StatDisplay`s, are plain markup in the style of the story's BUILD STATS
-  panel. Claude Design keeps the six cards until the next `/design-sync` removes them, and that run
-  regrades the `HudPanel` cells.
+  panel. The 2026-10-05 re-sync deleted the six cards from Claude Design, with `Highlights` (#149),
+  and regraded the `HudPanel` cells.
+- The 2026-10-05 re-sync added `DataTable` and `PostBody` (#226 and #215), in a `content`
+  picker group that their `docs/` stubs name. #149 to #228 had changed most components, so it
+  re-captured all 28 with `--spot-check-components` and graded the 74 cells: 69 `good` at once, and
+  five fixed in the previews or frame sizes (the `PostBody` quote and the `SectionProgress` readout
+  were cut off at the frame's bottom, `FeaturedWork`'s dark cell showed one project and its backdrop
+  ran into the CTA, and `HeroContent` sat flush left).
 - **Animated components are previewed in their settled state.** A card is a still frame, and the
   phases, the hero pieces, `ArchitectureBackground` and `MetricCounter` animate on scroll or on a
   timer. Their preview files stub `window.matchMedia` for `(prefers-reduced-motion: reduce)` at
@@ -89,14 +114,34 @@ expects, and what each workaround depends on.
   size of the card viewport. The three components whose layers still escape a grid cell
   (`AnimatedHero`, `HeroSection`, `SectionProgress`) are `cardMode: single` with a
   `primaryStory`; the wide ones are `cardMode: column`, with `viewport` set where the site's layout
-  needs more width than the 900x700 default (`TechStack` at 1200 for its four columns, the phases at
-  1200x1000, `FeaturedWork` at 1200x1300).
-- `FeaturedWork`'s stories inline the three real case-study projects rather than importing
-  `@/data/featured-projects`, because the examples in `.prompt.md` are what the design agent copies
-  and it has no access to the repository's data modules.
+  needs more room than the 900x700 default (`TechStack` at 1200 for its four columns, the phases at
+  1200x1000, `FeaturedWork` at 1200x1300, `PostBody` 900x900, taller for the whole article).
+  `SectionProgress` is 1200x760 for a 700px story: its `fixed inset-0` overlay resolves to the
+  card's transformed element, which is the story plus the card's padding, so a 700px frame cut off
+  the bottom brackets and the `[01/07]` readout.
+- **Every story carries its data inline.** The stories become the usage examples in `.prompt.md`,
+  which is what the design agent copies, and it has no access to the repository's data modules or
+  to a preview file's own module scope: a story that spreads a module constant
+  (`<DataTable {...quickFacts} />`) ships an example naming something that does not exist there.
+  `FeaturedWork` inlines the three real case-study projects in both stories, and `DataTable` its
+  tables, rather than importing `@/data`. Check the `## Examples` in the built `.prompt.md` of any
+  story you author.
+- **Stories are plain JSX.** The examples are fenced as `jsx`, and a design is JSX: TypeScript
+  syntax in a story (`as const`, a type argument, an annotation) ships an example that does not
+  parse there. Until 2026-10-05 `FeaturedWork` and `AnimatedText` carried `as const`, and
+  `SectionProgress` (from #108) `useRef<HTMLDivElement>(null)` on a `useRef` imported at module
+  scope; its stories now call `React.useRef(null)`, React being a global in a design. After the
+  driver, this must print nothing (it matches the old `useRef<HTMLDivElement>(`, and nothing in the
+  `## Props` listings):
+  `grep -nE 'as const|satisfies|[A-Za-z]<[A-Z][A-Za-z]*>\(' ds-bundle/components/*/*/*.prompt.md`.
+  It cannot see an annotation or an `as` cast, so read the examples of every story that changed as
+  well. esbuild strips the syntax, so removing it changes no render: re-capturing `FeaturedWork` and
+  `AnimatedText` showed no pixel difference beyond the 132 that `FeaturedWork`'s `AsOnTheSite` cell
+  also shows between two captures of unchanged code (an animation caught at one of two frames).
 - `.design-sync/styles.css` ends with `@source inline(...)` lines that pre-generate layout and colour
   utilities the site itself does not use, so a design's own layout code resolves against the same
-  Tailwind vocabulary. They take the stylesheet from 79 KB to 104 KB. `conventions.md` documents the
+  Tailwind vocabulary. They took the stylesheet from 79 KB to 104 KB when they were added; it is
+  118 KB on 2026-10-05. `conventions.md` documents the
   families; keep the two in step, and keep the accent and alpha rules (no `text-[var(--accent)]`, no
   alpha on a text colour). The focus families are load-bearing: without them a design agent's focus
   class is never emitted and every interactive element it builds loses its visible focus ring.
@@ -105,19 +150,46 @@ expects, and what each workaround depends on.
 
 - **`dtsPropsFor` drifts silently.** It is a copy of the components' props. Run
   `node .design-sync/props-from-source.mjs --check` first; it exits 1 and names every component whose
-  source no longer matches.
+  source no longer matches. A failure can be a reorder only: the printer follows TypeScript's own
+  order for a union's members, which moves when other files change, and on 2026-10-05 two unions
+  (`ActivityEntry`'s and `NotificationToast`'s status) came out reordered with no source change.
+  Compare the members before treating it as drift, then regenerate.
+- **`delete_files` reports fewer deletions than `upload.deletePaths` lists, without an error.** The
+  diff names a `_preview/<Name>.css` for every removed component, the project holds none (no preview
+  here has its own CSS), and the tool skips a missing path silently: on 2026-10-05 it reported 35
+  of 42. Before re-arming the sentinel and writing `_ds_sync.json`, `list_files` must show none of
+  the removed components' paths.
 - **`FeaturedWork`'s stories are hand copies of `apps/web/src/data/case-studies.ts`.** The component
   imports only types from `@/data` and takes the projects as a prop, so nothing in the sync compares
   the inlined description, tags, status and metric with the data file: a copy-only change reaches
   the site and leaves the design project stale. Diff the three inlined projects against
   `case-studies.ts` on every re-sync. On 2026-09-25 (#127 retired the agent) the drift surfaced only
   because the status type and the badge changed too, and `props-from-source.mjs --check` caught the
-  type.
+  type. `DataTable`'s stories are hand copies in the same way, of the rows that `factsTable`,
+  `timelineTable` and `toolkitTable` compute from `facts` and `timeline` in
+  `apps/web/src/data/pages/about.ts` and `skillCategories` in `skills.ts`: diff them too. The first
+  copy (2026-10-05) dropped the 2016 timeline row and curled two apostrophes, and the review caught
+  it. The years figure comes from `experienceFact()` in `profile.ts` and the build year, so the
+  preview's `13` is wrong from 2027-01-01.
+- **`conventions.md` can name classes that no longer exist.** Tailwind emits only the classes it
+  finds, so a recipe class whose last user is deleted drops out of `_ds_bundle.css` and a design
+  that follows the recipe silently gets nothing: the section recipe's `py-20` stopped existing when
+  #149 deleted `CTA`, its last user, and stayed in the recipe until 2026-10-05. After the driver,
+  run `node .design-sync/check-conventions.mjs`; it exits 1 and names every class the build lacks,
+  every `--token` it does not define, and every component that has neither a card nor the
+  provider's role. It reads the important forms (`!flex`, `flex!`) and skips what it cannot read as
+  one class: a pattern such as `opacity-*`, and a class that starts with `[` or `@` or holds `=` or
+  a quote (`[&>svg]:…`, `@md:…`, `data-[state=open]:…`), as well as the anti-examples listed in
+  `ANTI_EXAMPLES`.
 - **`tsconfig.paths.json` mirrors apps/web's `@/*` alias.** If the app's alias changes, the converter
   resolves the old one.
-- **The `next/` stand-ins cover only `next/link` and `next/navigation`.** A component that starts
-  importing another `next/*` module silently pulls Next's internals back into the bundle (watch the
-  bundle size, ~600 KB today) or fails on `process`/`__dirname`.
+- **The stand-ins cover only `next/link`, `next/navigation` and `@vercel/analytics/next`.** A
+  component that starts importing another `next/*` module, or a package that imports one itself,
+  silently pulls Next's internals back into the bundle (560 KB today; check
+  `grep -c 'node_modules/next/' ds-bundle/_ds_bundle.js` is 0) or fails on `process`/`__dirname`.
+  A stand-in must also keep the types the site is checked against: the App Router types
+  `usePathname` as `string`, so a stand-in returning `null` (which Next itself does outside the App
+  Router) breaks a component the site's typecheck says is safe.
 - **GSAP is loaded with a dynamic `import()` since #116** (`animated-hero/load-gsap.ts`). esbuild
   folds it into the IIFE, so `_ds_bundle.js` holds GSAP and no runtime `import(` (checked
   2026-09-23: `grep -c 'import(' ds-bundle/_ds_bundle.js` is 0). A bundle that keeps one would try to
@@ -153,7 +225,8 @@ expects, and what each workaround depends on.
 - **The build assumed:** Node 22.22.0 via nvm, pnpm 10.34.5, Tailwind 4.3.3 through the repo's own
   `@tailwindcss/postcss`, chromium 1243 via `playwright@1.63.0` in `.ds-sync/`, and the skill files
   from Claude Code 2.1.275 (the 2026-09-23 re-sync ran 2.1.280 with no config change beyond the two
-  exclusions above). Nothing is fetched from the network at build time; the fonts are the
+  exclusions above, and the 2026-10-05 one 2.1.289 with the changes this file records under that
+  date). Nothing is fetched from the network at build time; the fonts are the
   repository's own woff2 files, cut to weights 400 to 900 since #131 (`conventions.md` tells the
   design agent a lighter weight renders at 400).
 

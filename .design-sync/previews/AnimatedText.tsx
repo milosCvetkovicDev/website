@@ -19,24 +19,22 @@ export const PhaseLabel = () => (
 
 export const EveryAnimation = () => (
   <div className="grid gap-3 md:grid-cols-2">
-    {(
-      [
-        'scramble',
-        'wave',
-        'magnetic',
-        'scatter',
-        'glitch',
-        'typewriter',
-        'elastic',
-        'stagger-up',
-        'rainbow',
-        'perspective',
-        'gravity',
-        'blur-reveal',
-        'highlight',
-        'morse',
-      ] as const
-    ).map((animation) => (
+    {[
+      'scramble',
+      'wave',
+      'magnetic',
+      'scatter',
+      'glitch',
+      'typewriter',
+      'elastic',
+      'stagger-up',
+      'rainbow',
+      'perspective',
+      'gravity',
+      'blur-reveal',
+      'highlight',
+      'morse',
+    ].map((animation) => (
       <div
         key={animation}
         className="flex items-baseline justify-between gap-4 rounded-lg border border-[var(--border)] px-4 py-3"

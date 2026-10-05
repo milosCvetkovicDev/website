@@ -37,7 +37,7 @@ CSS variables, light values in `:root` and dark ones in `.dark`:
 - `font-sans` is Geist, the body font; `font-mono` is Geist Mono. HUD labels are
   `font-mono text-xs uppercase tracking-wider text-[var(--muted)]`.
 - Both fonts carry weights 400 to 900 only: a lighter font weight renders at 400.
-- Section: `<section className="border-t border-[var(--border)] py-20">` around
+- Section: `<section className="border-t border-[var(--border)] py-16">` around
   `<div className="mx-auto max-w-5xl px-6">`; heading `text-3xl font-bold md:text-4xl`; lead
   `text-lg text-[var(--muted)]`.
 - Primary button:
@@ -56,8 +56,9 @@ CSS variables, light values in `:root` and dark ones in `.dark`:
 - `_ds_bundle.css` holds the tokens (search for `:root {` and `.dark {`) and every utility.
 - Each component's `.prompt.md` and `.d.ts` hold its props and working examples.
 - Groups: `hud` (panels, terminal, stats and status rows: the site's signature look and the parts to
-  build new UI from), `sections` (whole page sections), `featured-work`, and `animated-hero` (the
-  home page's scroll story: decorative set pieces, not building blocks).
+  build new UI from), `content` (`DataTable` for captioned tables of facts, timelines and chip
+  lists; `PostBody` for article prose), `sections` (whole page sections), `featured-work`, and
+  `animated-hero` (the home page's scroll story: decorative set pieces, not building blocks).
 - `TmuxBackground`, and the `HeroSection` and `AnimatedHero` that render it, show the tmux panes
   only from Tailwind's `md` breakpoint (768px) up, as the site does: in a narrower frame that
   background renders nothing.
@@ -81,7 +82,7 @@ CSS variables, light values in `:root` and dark ones in `.dark`:
 
 ```jsx
 <ThemeProvider>
-  <section className="dark bg-[var(--background)] px-6 py-20 text-[var(--foreground)]">
+  <section className="dark bg-[var(--background)] px-6 py-16 text-[var(--foreground)]">
     <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
       <HudPanel title="CI/CD PIPELINE" glow>
         <div className="space-y-3">
