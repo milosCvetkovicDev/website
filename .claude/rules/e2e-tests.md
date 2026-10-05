@@ -106,6 +106,19 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   where a spec goes when it needs a phone viewport or `isMobile`. `src/test/playwright-config.test.ts`
   pins the split. A run that fails every test in milliseconds is a missing browser, usually webkit
   after a Playwright bump: rerun the install command with `chromium webkit`.
+- Every Chromium this repository's Playwright starts launches with `--js-flags=--single-threaded-gc`
+  (`CHROMIUM_LAUNCH_ARGS` in `e2e/support/chromium-launch-args.ts`, passed by both Chromium projects
+  here, which `playwright.flake-hunt.config.ts` inherits, by the live check's project in
+  `playwright.live.config.ts` and by the Lighthouse spec's own launch): without it Chromium 153 on
+  the Linux runner now and then stops for good in the reduced-motion walk on `/`, the renderer idle
+  and answering nothing, and the test times out (#223, ADR 0032). No spec sets `launchOptions`,
+  which would replace the projects' flags and, from `e2e/mobile/`, reach WebKit. Playwright merges a
+  project's launch options into a spec's own `chromium.launch*` call shallowly, so a call with
+  `args` of its own spreads `CHROMIUM_LAUNCH_ARGS` into them. Every V8 flag goes into that one
+  `--js-flags` entry, because Chromium keeps only the last of a repeated switch.
+  `src/test/playwright-config.test.ts` checks all three, reading each spec as a syntax tree so that
+  comments and strings never count, and pins the Chromium build, 153.0.8010.12: when a Playwright
+  upgrade changes it, ADR 0032 says how to tell whether the flag is still needed.
 - Verified defects that an open task will fix are recorded as expected failures, `test.fail()` in
   Playwright and `it.fails` in Vitest, each naming its manifest row and fixing issue (see
   `.claude/epics/audit-remediation-2026-09/43.md`). An expected failure that passes fails the run, so

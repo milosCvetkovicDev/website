@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { chromium, expect, test, type BrowserContext } from '@playwright/test';
 import { CASE_STUDY_ROUTES } from './routes';
+import { CHROMIUM_LAUNCH_ARGS } from './support/chromium-launch-args';
 import {
   LIGHTHOUSE_VERSION,
   auditFailure,
@@ -231,7 +232,9 @@ async function audit(path: string): Promise<AuditRun> {
   try {
     context = await chromium.launchPersistentContext(profile, {
       executablePath: chromium.executablePath(),
-      args: ['--remote-debugging-port=0'],
+      // Playwright merges the project's launch options in shallowly, so these args replace the
+      // project's: the launch flags are spread back in (ADR 0032).
+      args: [...CHROMIUM_LAUNCH_ARGS, '--remote-debugging-port=0'],
     });
     const port = await devToolsPort(profile);
     if (runner === 'cli') {

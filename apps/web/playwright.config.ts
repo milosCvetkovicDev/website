@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { servesProductionBuild } from './e2e/support/build-mode';
+import { CHROMIUM_LAUNCH_ARGS } from './e2e/support/chromium-launch-args';
 
 // GitHub Actions sets CI=true; anything else (including "false") is treated as local. This chooses
 // the command and the runner hardening below, not the port: docs/runbooks/deploy.md sets CI=true by
@@ -87,13 +88,17 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], launchOptions: { args: [...CHROMIUM_LAUNCH_ARGS] } },
       // Without this the desktop project would run the phone specs at 1280x720, where the mobile
       // header is `md:hidden` and every menu locator resolves to nothing: nine tests failing for a
       // reason that has nothing to do with the defect they exist to record.
       testIgnore: MOBILE_SPECS,
     },
-    { name: 'mobile-chrome', use: { ...devices['Pixel 7'] }, testMatch: MOBILE_SPECS },
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 7'], launchOptions: { args: [...CHROMIUM_LAUNCH_ARGS] } },
+      testMatch: MOBILE_SPECS,
+    },
     { name: 'mobile-safari', use: { ...devices['iPhone 13'] }, testMatch: MOBILE_SPECS },
   ],
   webServer: {
