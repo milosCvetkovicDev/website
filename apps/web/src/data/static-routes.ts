@@ -15,9 +15,9 @@ import { experienceFigureSince } from './profile';
  * From git, the last commit to change what each route visibly says: `/`, /about, /work, /skills and
  * /contact 2026-10-05 (#228, for #58: each one's h1 names the person or the page's subject, with
  * the hook it used to be as the largest line under it, and the line under the hero's hook says only
- * the specialisation; built on 2026-10-03 and dated that day, it merged on 2026-10-05, and a
- * follow-up moved the dates to the day the copy went live). Before that, /about and /skills
- * 2026-10-03 (#226, for #58: the /about quick facts and timeline and the /skills toolkit became
+ * the specialisation; written and dated on 2026-10-03, it merged on 2026-10-05, and a follow-up
+ * moved the five dates to the merge day). Before #228, /about and /skills 2026-10-03 (#226, for
+ * #58, merged that day: the /about quick facts and timeline and the /skills toolkit became
  * captioned tables, whose wide ones stack into rows on a phone). Before those, /about 2026-10-02
  * (#57's "Last updated" line at the foot of /about, which prints this date), `/` and /work
  * 2026-10-01 (#49: the self-healing agent's figure relabelled "errors resolved autonomously" on the
