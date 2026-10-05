@@ -4,11 +4,17 @@
  *
  * @vitest-environment node
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PlaywrightTestConfig } from '@playwright/test';
+import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CHROMIUM_LAUNCH_ARGS } from '../../e2e/support/chromium-launch-args';
 import config, { MOBILE_SPECS, resolvePort } from '../../playwright.config';
+import flakeHuntConfig from '../../playwright.flake-hunt.config';
+import liveConfig from '../../playwright.live.config';
 
 const FALLBACK = 3210;
 const resolve = (raw: string | undefined) => resolvePort(raw, FALLBACK);
@@ -114,6 +120,90 @@ describe('the Playwright projects', () => {
     ['e2e/is-mobile.spec.ts', false],
   ])('%s is a phone spec: %s', (path, isMobileSpec) => {
     expect(MOBILE_SPECS.test(path)).toBe(isMobileSpec);
+  });
+
+  // Every Playwright config in the repository: the e2e suite's, the nightly hunt's and the live
+  // check's.
+  const CONFIGS = [
+    ['playwright.config.ts', config],
+    ['playwright.flake-hunt.config.ts', flakeHuntConfig],
+    ['playwright.live.config.ts', liveConfig],
+  ] as const;
+  // Playwright's own rule for a project's browser: `browserName`, else the device's, else Chromium.
+  const engineOf = (project: (typeof projects)[number]) =>
+    project.use?.browserName ?? project.use?.defaultBrowserType ?? 'chromium';
+
+  it.each(CONFIGS)(
+    "keeps V8's garbage collector on the main thread in %s's Chromium (#223)",
+    (_, loaded) => {
+      // Without it Chromium 153 hangs for good, now and then, in the reduced-motion walk on `/`.
+      const all = loaded.projects ?? [];
+      const chromium = all.filter((project) => engineOf(project) === 'chromium');
+      expect(chromium.length).toBeGreaterThan(0);
+      for (const project of chromium) {
+        expect(project.use?.launchOptions?.args, project.name).toEqual([...CHROMIUM_LAUNCH_ARGS]);
+      }
+      // The flag is V8's: WebKit is launched without it.
+      for (const project of all.filter((project) => engineOf(project) !== 'chromium')) {
+        expect(project.use?.launchOptions?.args ?? [], project.name).not.toContainEqual(
+          expect.stringMatching(/^--js-flags=/),
+        );
+      }
+      // A run-wide setting would reach WebKit too, and a project's own would replace it anyway.
+      expect(loaded.use?.launchOptions).toBeUndefined();
+    },
+  );
+
+  it('puts every V8 flag into the one --js-flags entry (#223)', () => {
+    // Chromium keeps only the last of a repeated switch, so a second entry would drop the first.
+    const jsFlags = CHROMIUM_LAUNCH_ARGS.filter((arg) => arg.startsWith('--js-flags='));
+    expect(jsFlags).toHaveLength(1);
+    const [entry = ''] = jsFlags;
+    expect(entry.slice('--js-flags='.length).split(/\s+/)).toContain('--single-threaded-gc');
+  });
+
+  it('lets no spec drop the launch flags (#223)', () => {
+    const appDir = fileURLToPath(new URL('../../', import.meta.url));
+    const dirs = new Set(CONFIGS.map(([, loaded]) => join(appDir, loaded.testDir ?? '.')));
+    // The module that defines the flags is the one file allowed to spell them out.
+    const definition = fileURLToPath(
+      new URL('../../e2e/support/chromium-launch-args.ts', import.meta.url),
+    );
+    const scans = [...dirs].flatMap((dir) =>
+      readdirSync(dir, { recursive: true, encoding: 'utf8' })
+        .map((file) => join(dir, file))
+        .filter((path) => /\.[cm]?[jt]sx?$/.test(path) && path !== definition)
+        .map((path) => ({ file: relative(appDir, path), ...scanSpec(path) })),
+    );
+    for (const { file, launchOptions, jsFlags, launches } of scans) {
+      // `test.use({ launchOptions })` would replace the projects' flags, and in `e2e/mobile/` it
+      // would reach WebKit as well.
+      expect(launchOptions, `${file} names launchOptions on these lines`).toEqual([]);
+      expect(jsFlags, `${file} sets --js-flags of its own on these lines`).toEqual([]);
+      // In a test, Playwright merges the project's launch options into a launch call shallowly, so
+      // a call with `args` of its own, as the Lighthouse spec needs for a debugging port, replaces
+      // the flags unless it spreads them back in.
+      expect(
+        launches.filter(({ keepsFlags }) => !keepsFlags).map(({ line }) => line),
+        `${file} launches a browser without the flags on these lines`,
+      ).toEqual([]);
+    }
+    // The Lighthouse spec launches Chromium itself, so the scan has a launch call to find.
+    expect(scans.flatMap(({ launches }) => launches).length).toBeGreaterThan(0);
+  });
+
+  it('runs the Chromium build the launch flags were measured on (ADR 0032)', () => {
+    // The flags work around one build, 153.0.8010.12 (Playwright 1.63.0). An upgrade that changes
+    // it fails here until someone has decided whether they are still needed: ADR 0032 says how to
+    // check, then either remove them or keep them and move this pin. A release that keeps the build
+    // passes.
+    expect(
+      chromiumBuilds(),
+      'Chromium changed: is CHROMIUM_LAUNCH_ARGS still needed? ADR 0032',
+    ).toEqual({
+      chromium: '153.0.8010.12',
+      'chromium-headless-shell': '153.0.8010.12',
+    });
   });
 
   it('keeps one server for every project', () => {
@@ -231,3 +321,112 @@ describe('playwright.config.ts webServer (ADR 0014)', () => {
     expect(workflow).not.toContain('NEXT_DIST_DIR');
   });
 });
+
+/**
+ * The Chromium builds the installed Playwright runs, from playwright-core's `browsers.json`. The
+ * package does not export that file, so it is read from beside the package's manifest, reached
+ * through the packages that depend on it as pnpm lays them out.
+ */
+function chromiumBuilds(): Record<string, string> {
+  let manifest = fileURLToPath(import.meta.url);
+  for (const pkg of ['@playwright/test', 'playwright', 'playwright-core']) {
+    manifest = createRequire(manifest).resolve(`${pkg}/package.json`);
+  }
+  const { browsers } = JSON.parse(
+    readFileSync(join(dirname(manifest), 'browsers.json'), 'utf8'),
+  ) as {
+    browsers: { name: string; browserVersion?: string }[];
+  };
+  return Object.fromEntries(
+    browsers
+      .filter(({ name }) => name === 'chromium' || name === 'chromium-headless-shell')
+      .map(({ name, browserVersion }) => [name, browserVersion ?? '']),
+  );
+}
+
+const LAUNCH_METHODS = new Set(['launch', 'launchPersistentContext', 'launchServer']);
+
+/**
+ * What a spec does with browser launch options, read from its syntax tree, so that a comment or a
+ * string (a note about `launchOptions`, a route glob that a regular expression would read as a
+ * comment) is never mistaken for code. A launch call keeps the flags when it passes no `args`,
+ * since the project's then reach it, or when its `args` is an array, inline or a `const` in the
+ * same file, that spreads `CHROMIUM_LAUNCH_ARGS`. Options it cannot read, such as a variable, count
+ * as dropping them. Calls on `webkit` or `firefox` are left alone: the flag is V8's.
+ */
+function scanSpec(file: string) {
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(file, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const lineOf = (node: ts.Node) => source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+  const consts = new Map<string, ts.Expression>();
+  const collect = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      consts.set(node.name.text, node.initializer);
+    }
+    ts.forEachChild(node, collect);
+  };
+  collect(source);
+  const spreadsFlags = (value: ts.Expression): boolean => {
+    const array = ts.isIdentifier(value) ? consts.get(value.text) : value;
+    return (
+      array !== undefined &&
+      ts.isArrayLiteralExpression(array) &&
+      array.elements.some(
+        (element) =>
+          ts.isSpreadElement(element) &&
+          ts.isIdentifier(element.expression) &&
+          element.expression.text === 'CHROMIUM_LAUNCH_ARGS',
+      )
+    );
+  };
+  const keepsFlags = (call: ts.CallExpression, method: string): boolean => {
+    const options = call.arguments[method === 'launchPersistentContext' ? 1 : 0];
+    if (options === undefined) return true;
+    if (!ts.isObjectLiteralExpression(options)) return false;
+    const args = options.properties.find(
+      ({ name }) =>
+        name !== undefined &&
+        (ts.isIdentifier(name) || ts.isStringLiteral(name)) &&
+        name.text === 'args',
+    );
+    if (args === undefined) return true;
+    if (ts.isPropertyAssignment(args)) return spreadsFlags(args.initializer);
+    return ts.isShorthandPropertyAssignment(args) && spreadsFlags(args.name);
+  };
+  const found = {
+    launchOptions: [] as number[],
+    jsFlags: [] as number[],
+    launches: [] as { line: number; keepsFlags: boolean }[],
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && node.text === 'launchOptions')
+      found.launchOptions.push(lineOf(node));
+    if (
+      (ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node)) &&
+      node.text.includes('--js-flags')
+    ) {
+      found.jsFlags.push(lineOf(node));
+    }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      LAUNCH_METHODS.has(node.expression.name.text) &&
+      !(
+        ts.isIdentifier(node.expression.expression) &&
+        ['webkit', 'firefox'].includes(node.expression.expression.text)
+      )
+    ) {
+      found.launches.push({
+        line: lineOf(node),
+        keepsFlags: keepsFlags(node, node.expression.name.text),
+      });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
+}
