@@ -4,7 +4,8 @@
     "paths": {
       "@/*": ["apps/web/src/*"],
       "next/link": [".design-sync/next/link.tsx"],
-      "next/navigation": [".design-sync/next/navigation.ts"]
+      "next/navigation": [".design-sync/next/navigation.ts"],
+      "@vercel/analytics/next": [".design-sync/vercel/analytics-next.tsx"]
     }
   }
 }

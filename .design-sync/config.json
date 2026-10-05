@@ -20,13 +20,17 @@
     "WebsiteJsonLd": null,
     "TechArticleJsonLd": null,
     "BreadcrumbListJsonLd": null,
-    "ThemeProvider": null
+    "ThemeProvider": null,
+    "ProfilePageJsonLd": null,
+    "WebPageJsonLd": null,
+    "WebAnalytics": null
   },
   "dtsPropsFor": {
-    "ActivityEntry": "  status: 'success' | 'error' | 'pending';\n  children: React.ReactNode;\n  timestamp?: string;",
+    "ActivityEntry": "  status: 'pending' | 'success' | 'error';\n  children: React.ReactNode;\n  timestamp?: string;",
     "AnimatedHero": "  children?: React.ReactNode;",
     "AnimatedText": "  children: string;\n  animation: 'scramble' | 'wave' | 'magnetic' | 'scatter' | 'glitch' | 'typewriter' | 'elastic' | 'stagger-up' | 'rainbow' | 'perspective' | 'gravity' | 'blur-reveal' | 'highlight' | 'morse';\n  className?: string;",
     "ArchitectureBackground": "  activeNodes?: ReadonlyArray<'client' | 'gateway' | 'auth' | 'backend' | 'worker' | 'db' | 'cache' | 'ai' | 'storage'>;",
+    "DataTable": "  caption: string;\n  columns: ReadonlyArray<string>;\n  rows: ReadonlyArray<readonly [header: string, ...cells: Array<string | ReadonlyArray<string> | { text: string; lead?: string; icon?: undefined } | { text: string; icon?: string; lead?: undefined }>]>;",
     "DiscoveryPhase": "  // Takes no props.",
     "ExecutionPhase": "  // Takes no props.",
     "FeaturedWork": "  projects: ReadonlyArray<{ slug: string; title: string; description: string; tags: Array<string>; metric: { value: number; label: string; prefix?: string; suffix?: string; decimals?: number }; activeNodes: Array<'client' | 'gateway' | 'auth' | 'backend' | 'worker' | 'db' | 'cache' | 'ai' | 'storage'>; category: string; status: 'LIVE' | 'PRODUCTION' | 'RETIRED' }>;",
@@ -40,8 +44,9 @@
     "LoopPhase": "  // Takes no props.",
     "MetricCounter": "  active: boolean;\n  value: number;\n  label: string;\n  prefix?: string;\n  suffix?: string;\n  decimals?: number;",
     "Navigation": "  // Takes no props.",
-    "NotificationToast": "  children: React.ReactNode;\n  type?: 'success' | 'warning' | 'error' | 'info';",
+    "NotificationToast": "  children: React.ReactNode;\n  type?: 'success' | 'error' | 'warning' | 'info';",
     "PipelineStage": "  name: string;\n  status: 'pending' | 'running' | 'passed' | 'failed';\n  progress?: number;\n  fillRef?: React.RefObject<HTMLDivElement | null>;",
+    "PostBody": "  blocks: ReadonlyArray<{ kind: 'heading'; level: 2 | 3; text: string } | { kind: 'paragraph'; content: ReadonlyArray<string | { code: string; text?: undefined; href?: undefined } | { text: string; href: string; code?: undefined }> } | { kind: 'list'; ordered?: boolean; items: ReadonlyArray<ReadonlyArray<string | { code: string; text?: undefined; href?: undefined } | { text: string; href: string; code?: undefined }>> } | { kind: 'code'; language?: string; code: string } | { kind: 'quote'; content: ReadonlyArray<string | { code: string; text?: undefined; href?: undefined } | { text: string; href: string; code?: undefined }> }>;",
     "QuestItem": "  completed: boolean;\n  children: React.ReactNode;",
     "SectionProgress": "  storyRef: React.RefObject<HTMLElement | null>;",
     "StrategyPhase": "  // Takes no props.",
@@ -122,10 +127,17 @@
     "SectionProgress": {
       "cardMode": "single",
       "primaryStory": "AtTheStart",
-      "viewport": "1200x700"
+      "viewport": "1200x760"
     },
     "Logo": {
       "cardMode": "column"
+    },
+    "DataTable": {
+      "cardMode": "column"
+    },
+    "PostBody": {
+      "cardMode": "column",
+      "viewport": "900x900"
     }
   },
   "readmeHeader": ".design-sync/conventions.md"
