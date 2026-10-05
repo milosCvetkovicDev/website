@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { caseStudies } from '../src/data/case-studies';
 import { warmRoutes } from './support/warm-routes';
 import { expectHydrated } from './support/hydration';
+import { PAGE_HEADINGS } from './support/page-headings';
 
 /**
  * A real client-side navigation, by clicking links.
@@ -139,14 +140,16 @@ test.describe('client-side navigation', () => {
     await expect(page).toHaveURL(/\/work$/);
     // The URL changes on `popstate`, before React renders `/work`, so a bare visible `h1` could
     // still be the case study's. This heading is only on `/work`.
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Problems solved');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      PAGE_HEADINGS['/work'].heading,
+    );
     await expectSameDocument(page, 'going back');
 
     // 4. Back to /, by the header's home link.
     await header.getByRole('link', { name: 'MC, home', exact: true }).click();
     await expect(page).toHaveURL(/\/$/, { timeout: SOFT_NAVIGATION_TIMEOUT_MS });
 
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('This happened at 3am');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(PAGE_HEADINGS['/'].heading);
     await expectSameDocument(page, 'the MC home link');
 
     // The story still runs after arriving softly: its ScrollTriggers were created against this DOM.

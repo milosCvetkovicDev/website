@@ -12,7 +12,7 @@ import { gotoHydrated } from '../support/hydration';
  * not run either: its effects start them only while `(min-width: 48rem)` matches. The desktop
  * project keeps the full chrome, which `e2e/hero.spec.ts` covers (five panes, the log lines, the
  * indicator fading on scroll at a viewport tall enough to display it: from `lg` the indicator also
- * needs 960 px and 60rem of height, or it would cover the hero card).
+ * needs 1024 px and 64rem of height, or it would cover the hero card).
  *
  * Both motion settings are checked, because the reduced-motion snapshot renders its own panes.
  */

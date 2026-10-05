@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectGsapLoaded } from './support/gsap';
 import { expectHydrated } from './support/hydration';
+import { PAGE_HEADINGS } from './support/page-headings';
 import { TMUX_LOG_STREAM, tmuxLogStreamProblems } from './support/tmux-log-stream';
 
 /**
@@ -197,7 +198,7 @@ interface SweptSample extends Sample {
  * at-rest pass. `tmuxLogStreamProblems` runs before and after, so the exclusion can cover nothing
  * but the stream, and everything else in the tmux background, its bars and pane titles, is swept.
  * Elements that are not displayed are swept too: their computed `color` is the one they would
- * paint, so the Scroll label, `display: none` below 960 px tall, is still read.
+ * paint, so the Scroll label, `display: none` below 1024 px tall, is still read.
  */
 async function sampleHeroText(page: Page): Promise<SweptSample[]> {
   const why =
@@ -298,26 +299,44 @@ for (const colorScheme of colorSchemes) {
     ).toEqual([]);
   });
 
-  test(`the line under the headline reaches AA in the ${colorScheme} theme`, async ({ page }) => {
-    // Green. The line naming who the site is about was sr-only until #48 made it visible, and on the
-    // island axe cannot decide it: it is one of the `incomplete` nodes in the `/` budget of
-    // accessibility.spec.ts, so without this nothing would measure its colour.
+  test(`the headline and the lines under it reach AA in the ${colorScheme} theme`, async ({
+    page,
+  }) => {
+    // Green. On the island axe cannot decide any of these lines: each is one of the `incomplete`
+    // nodes in the `/` budget of accessibility.spec.ts, so without this nothing would measure their
+    // colour. Since #58 the h1 names who the site is about, drawn at 15-17 px semibold, so normal
+    // text that needs 4.5:1, and right under it come the hook, which was the h1, and then the line
+    // saying the specialisation, which was sr-only until #48 made it visible and is drawn in
+    // `--muted`.
     await openHero(page, colorScheme);
-    const line = await sampleColor(
-      page.getByRole('heading', { level: 1 }).locator('xpath=following-sibling::p[1]'),
-      'the line under the h1',
-    );
-    expect(line.alpha).toBe(1);
-    expect(passesAA(line), describeSample(line)).toBe(true);
+    const h1 = page.getByRole('heading', { level: 1 });
+    const lines = [
+      { line: h1, what: 'the h1 naming who the site is about' },
+      { line: h1.locator('xpath=following-sibling::p[1]'), what: 'the hook under the h1' },
+      {
+        line: h1.locator('xpath=following-sibling::p[2]'),
+        what: 'the specialisation line under the hook',
+      },
+    ];
+    // Which paragraphs these are, before their colour is read.
+    await expect(lines[0].line).toHaveText(PAGE_HEADINGS['/'].heading);
+    await expect(lines[1].line).toHaveText(PAGE_HEADINGS['/'].hook);
+    await expect(lines[2].line).toHaveText(/^Specializing in /);
+    for (const { line, what } of lines) {
+      const sample = await sampleColor(line, what);
+      expect(sample.alpha, what).toBe(1);
+      expect(passesAA(sample), describeSample(sample)).toBe(true);
+    }
   });
 
   test(`the Scroll label, "Scroll to see how." and every skill tag reach AA at rest and hovered in the ${colorScheme} theme`, async ({
     page,
   }) => {
-    // Tall enough for the Scroll label. Since #134 it is displayed from `lg` and 960 px (60rem) tall
-    // only, so at the desktop project's 1280x720 it is `display: none` and this would measure an
-    // element nobody sees. Set before the navigation, so the page never lays out at 720. This file
-    // sits outside e2e/mobile/, so only the desktop project runs it (playwright-config.test.ts).
+    // Tall enough for the Scroll label. Since #58 it is displayed from `lg` and 1024 px (64rem)
+    // tall only, so at the desktop project's 1280x720 it is `display: none` and this would measure
+    // an element nobody sees. Set before the navigation, so the page never lays out at 720. This
+    // file sits outside e2e/mobile/, so only the desktop project runs it
+    // (playwright-config.test.ts).
     await page.setViewportSize({ width: 1280, height: 1024 });
     await openHero(page, colorScheme);
     await expect(

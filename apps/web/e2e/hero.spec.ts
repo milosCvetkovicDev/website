@@ -2,6 +2,7 @@ import { test, expect, type APIRequestContext, type Locator, type Page } from '@
 import { isOnlyEmoji, pictographsIn } from '../src/test/pictographs';
 import { expectHydrated, gotoHydrated } from './support/hydration';
 import { servedText } from './support/served-text';
+import { PAGE_HEADINGS } from './support/page-headings';
 
 /** The tmux background's pane titles, left to right. */
 const PANE_TITLES = [
@@ -48,13 +49,15 @@ test.describe('Hero Section', () => {
   });
 
   test('renders the headline', async ({ page }) => {
+    // The h1 names who the site is about, and the hook it used to be is the paragraph under it
+    // (#58).
     const h1 = page.getByRole('heading', { level: 1 });
-    await expect(h1).toContainText('This happened at 3am');
-    await expect(h1).toContainText('Nobody woke up');
+    await expect(h1).toHaveText(PAGE_HEADINGS['/'].heading);
+    await expect(h1.locator('xpath=following-sibling::p[1]')).toHaveText(PAGE_HEADINGS['/'].hook);
   });
 
   test('renders player card with CV data', async ({ page }) => {
-    // exact: true — the subtitle under the headline and the footer also contain the name.
+    // exact: true — the h1 and the footer also contain the name.
     await expect(page.getByText('Milos Cvetkovic', { exact: true })).toBeVisible();
     await expect(page.getByText('Full Stack Engineer & Architect', { exact: true })).toBeVisible();
     await expect(page.getByText('AI-Native Development', { exact: true })).toBeVisible();
@@ -229,7 +232,7 @@ test.describe('Hero Section', () => {
     expect(shiftScore).toBeLessThan(0.02);
   });
 
-  // The indicator is displayed from `lg` and 960 px tall only, so not at the desktop project's
+  // The indicator is displayed from `lg` and 1024 px tall only, so not at the desktop project's
   // 1280x720, where it would cover the hero card (#134; the scan below). An element that is not
   // displayed still computes opacity 1, and then 0, so without a tall enough viewport and the
   // display check this test would pass while showing nothing. The `beforeEach` above loads the
@@ -349,18 +352,20 @@ const describeRect = (r: Rect) =>
 
 /**
  * The gate in `hero-section.tsx`, restated so each size knows what it must see: `lg` is 64rem wide,
- * and the height has to reach both 960 px and 60rem. Media-query rems follow the browser's default
- * font size, which is 16 px here unless a case sets another.
+ * and the height has to reach both 1024 px and 64rem (960 px and 60rem until #58 grew the card).
+ * Media-query rems follow the browser's default font size, which is 16 px here unless a case sets
+ * another.
  */
-const INDICATOR_GATE = { minWidthRem: 64, minHeightPx: 960, minHeightRem: 60 };
+const INDICATOR_GATE = { minWidthRem: 64, minHeightPx: 1024, minHeightRem: 64 };
 const indicatorDisplayed = (width: number, height: number, fontSize: number) =>
   width >= INDICATOR_GATE.minWidthRem * fontSize &&
   height >= Math.max(INDICATOR_GATE.minHeightPx, INDICATOR_GATE.minHeightRem * fontSize);
 
 /**
  * How far above the indicator the card's bottom edge must end wherever the indicator is displayed.
- * The gap was 19.9 px at 1280x960 when #134 was fixed, so the card may grow by about 8 px before
- * this fails, rather than by 20 px, when it would touch the indicator.
+ * The gap was 19.9 px at 1280x960 when #134 was fixed. #58 grew the card by 54 px, which took it to
+ * -7.0 px there, and moved the gate to 1024 px, where it is about 25 px, so the card may grow by
+ * about 26 px before this fails, rather than by 50 px, when it would touch the indicator.
  */
 const MIN_CLEARANCE_PX = 12;
 
@@ -369,19 +374,20 @@ const MIN_CLEARANCE_PX = 12;
  * centred in a section one small-viewport tall that starts under the sticky header. Losing height
  * lifts the indicator by the full amount and the card's bottom edge by only half of it, so on short
  * viewports the indicator sat on the card and on its last row of skill tags (#134: the Kubernetes
- * tag at 1280x800). `hero-section.tsx` displays it from `lg` and 960 px and 60rem tall only. This is
- * the guard on that gate, which drifts when the card's height or the header's offset changes:
+ * tag at 1280x800). `hero-section.tsx` displays it from `lg` and 1024 px and 64rem tall only. This
+ * is the guard on that gate, which drifts when the card's height or the header's offset changes:
  *
  * - below the gate the indicator must not be displayed, and the card's own "Scroll to see how." is
  *   in the viewport in its place;
  * - at and above it the indicator is displayed at rest, and its box (the union of its own and its
  *   children's, the bouncing dot included) ends at least `MIN_CLEARANCE_PX` below the card.
  *
- * The sizes: the six #134 measured, 1280x940 just under the gate, the gate itself at the narrowest
- * `lg` width, between it and 1280 and at 1280, a tall `lg` portrait, three tall desktops, and a
- * browser default font of 12 px and of 20 px, where a rem-only or a px-only gate would show the
- * indicator over the card. Chromium only: the desktop project is the only one that runs this spec,
- * and `Page.setFontSizes`, the browser setting a visitor changes, is a Chromium DevTools call.
+ * The sizes: the six #134 measured, 1280x940 and the three 960 px rows, the gate until #58 and now
+ * under it, 1280x1000 just under the gate, the gate itself at the narrowest `lg` width, between it
+ * and 1280 and at 1280, a tall `lg` portrait, three tall desktops, and a browser default font of
+ * 12 px and of 20 px, where a rem-only or a px-only gate would show the indicator over the card.
+ * Chromium only: the desktop project is the only one that runs this spec, and `Page.setFontSizes`,
+ * the browser setting a visitor changes, is a Chromium DevTools call.
  *
  * One test per size, each in a context of its own, so every page is laid out at its size from the
  * start rather than resized. Outside 'Hero Section', whose `beforeEach` loads the page at the
@@ -399,6 +405,9 @@ test.describe('scroll indicator clears the hero card at rest', () => {
     { width: 1024, height: 960 },
     { width: 1152, height: 960 },
     { width: 1280, height: 960 },
+    { width: 1280, height: 1000 },
+    { width: 1024, height: 1024 },
+    { width: 1152, height: 1024 },
     { width: 1024, height: 1366 },
     { width: 1280, height: 1024 },
     { width: 1680, height: 1050 },
@@ -407,6 +416,7 @@ test.describe('scroll indicator clears the hero card at rest', () => {
     { width: 1280, height: 960, fontSize: 12 },
     { width: 1280, height: 1024, fontSize: 20 },
     { width: 1280, height: 1200, fontSize: 20 },
+    { width: 1280, height: 1280, fontSize: 20 },
   ];
 
   for (const { width, height, fontSize = 16 } of CASES) {
@@ -437,7 +447,21 @@ test.describe('scroll indicator clears the hero card at rest', () => {
           await expect(skills.getByRole('listitem')).not.toHaveCount(0);
           // The card is the list's parent; holding the headline proves it is not a wrapper of the list.
           const card = skills.locator('..');
-          await expect(card.getByRole('heading', { level: 1 })).toHaveCount(1);
+          const h1 = card.getByRole('heading', { level: 1 });
+          await expect(h1).toHaveCount(1);
+          // The clearance below assumes the h1 (#58) takes two lines on every `lg` size: a third
+          // adds about 23 px to the card, most of the margin over MIN_CLEARANCE_PX. A longer line, a
+          // narrower column or a wider face would take it there, so the count is checked and
+          // reported rather than left to show up as a few pixels of gap.
+          const h1Lines = await h1.evaluate((element) => {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            return new Set(
+              [...range.getClientRects()]
+                .filter((rect) => rect.width > 0)
+                .map((rect) => Math.round(rect.top)),
+            ).size;
+          });
 
           // Measured before the display is asserted, so a failure also says whether it overlaps.
           const display = await indicator.evaluate((el) => getComputedStyle(el).display);
@@ -472,9 +496,13 @@ test.describe('scroll indicator clears the hero card at rest', () => {
               .map(({ what, box }) => `${what} (${describeRect(box)})`);
             measured =
               `the Scroll indicator (${describeRect(indicatorBox)}) is ${gap.toFixed(1)} px below ` +
-              `the hero card (${describeRect(cardBox)})` +
+              `the hero card (${describeRect(cardBox)}, its h1 on ${h1Lines} lines)` +
               (covered.length ? `, covering ${covered.join(', ')}` : '');
             if (displayed) {
+              expect(
+                h1Lines,
+                `at ${size} the h1 takes ${h1Lines} lines; ${measured}`,
+              ).toBeLessThanOrEqual(2);
               expect(gap, `at ${size} ${measured}`).toBeGreaterThanOrEqual(MIN_CLEARANCE_PX);
             }
           }
@@ -682,13 +710,14 @@ test.describe('Hero Section: served HTML', () => {
   test('hero content is SSR-rendered (SEO)', async ({ page, request }) => {
     const body = await servedBody(page, request);
     expect(body).toContain('This happened at 3am');
+    expect(body).toContain(PAGE_HEADINGS['/'].heading);
     expect(body).toContain('Milos Cvetkovic');
     expect(body).toContain('Full Stack Engineer');
     expect(body).toContain('TypeScript');
-    // The subtitle under the headline, not the head's description, which says it too.
-    expect(body).toContain('specializing in AI-native development');
+    // The line under the hook, which no longer repeats the name and role the h1 carries (#58).
+    expect(body).toContain('Specializing in AI-native development');
     // And it survives hydration.
     await gotoHydrated(page, '/');
-    await expect(page.getByText(/specializing in AI-native development/)).toBeVisible();
+    await expect(page.getByText(/Specializing in AI-native development/)).toBeVisible();
   });
 });

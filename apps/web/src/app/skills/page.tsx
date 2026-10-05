@@ -88,7 +88,11 @@ export default function SkillsPage() {
           <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {skillsCopy.eyebrow}
           </p>
-          <h1 className="mb-6 text-3xl font-bold md:text-4xl lg:text-5xl">Tools are just tools.</h1>
+          {/* The h1 names the subject; the hook under it stays the largest line (#58). */}
+          <h1 className="mb-3 text-lg leading-snug font-semibold text-balance md:text-xl">
+            Skills: full-stack TypeScript, Azure infrastructure, and production AI agents
+          </h1>
+          <p className="mb-6 text-3xl font-bold md:text-4xl lg:text-5xl">Tools are just tools.</p>
           <p className="max-w-2xl text-xl text-[var(--muted)]">
             <Rich paragraph={skillsCopy.intro} />
           </p>

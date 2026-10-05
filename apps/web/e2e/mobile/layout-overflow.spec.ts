@@ -288,30 +288,46 @@ test("/ fits the story's narrowest parts into 320px", async ({ page }) => {
   expect(measured.techItems.filter((item) => item.overflow > 0)).toEqual([]);
   expect(measured.loopCells.filter((cell) => cell.overflow > 0)).toEqual([]);
 
-  // The headline's text lies inside the hero island. The hero section is `overflow-hidden`, which
-  // hides a headline wider than the island from `scrollWidth`, so the text box is measured instead.
+  // The headline's text lies inside the hero island: the h1 and, since #58, the hook under it, the
+  // largest line and the one that runs out of the island at 320 px if its nowrap breakpoint or its
+  // size drifts. The hero section is `overflow-hidden`, which hides a line wider than the island
+  // from `scrollWidth`, so each text box is measured instead.
   const headline = await page.evaluate(() => {
     const h1 = document.querySelector('h1');
+    const hook = h1?.nextElementSibling;
     const skills = document.querySelector('ul[aria-label="Technical skills"]');
     if (!h1 || !skills) throw new Error('the hero has no h1 or no skill list');
+    if (!hook) throw new Error('no hook under the h1');
     let island = h1.parentElement;
     while (island && !island.contains(skills)) island = island.parentElement;
     if (!island) throw new Error('no element holds both the headline and the skill tags');
-    const range = document.createRange();
-    range.selectNodeContents(h1);
-    const text = range.getBoundingClientRect();
+    const textBox = (element: Element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const { left, right, top, bottom } = range.getBoundingClientRect();
+      return { left, right, top, bottom };
+    };
     const box = island.getBoundingClientRect();
     return {
-      text: { left: text.left, right: text.right, top: text.top, bottom: text.bottom },
+      lines: [
+        { what: 'the h1', text: textBox(h1) },
+        { what: 'the hook under the h1', text: textBox(hook) },
+      ],
       island: { left: box.left, right: box.right, top: box.top, bottom: box.bottom },
     };
   });
-  expect(headline.text.left, 'the headline starts outside the hero island').toBeGreaterThanOrEqual(
-    headline.island.left,
-  );
-  expect(headline.text.right, 'the headline ends outside the hero island').toBeLessThanOrEqual(
-    headline.island.right,
-  );
-  expect(headline.text.top).toBeGreaterThanOrEqual(headline.island.top);
-  expect(headline.text.bottom).toBeLessThanOrEqual(headline.island.bottom);
+  for (const { what, text } of headline.lines) {
+    expect(text.left, `${what} starts outside the hero island`).toBeGreaterThanOrEqual(
+      headline.island.left,
+    );
+    expect(text.right, `${what} ends outside the hero island`).toBeLessThanOrEqual(
+      headline.island.right,
+    );
+    expect(text.top, `${what} starts above the hero island`).toBeGreaterThanOrEqual(
+      headline.island.top,
+    );
+    expect(text.bottom, `${what} ends below the hero island`).toBeLessThanOrEqual(
+      headline.island.bottom,
+    );
+  }
 });
