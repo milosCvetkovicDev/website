@@ -5,9 +5,10 @@
  *
  * Between them they hold every block kind and every inline kind, both heading levels, both list
  * styles, a code block with a language and one without, links of both allowed forms, a title with
- * `&`, `<` and `"` in it, a draft, and two published posts with different dates, listed oldest
- * first so that a newest-first sort has something to do. `src/data/__tests__/posts.test.ts` fails
- * when a kind is missing here, and when any of these stops passing the post checker.
+ * `&`, `<` and `"` in it, a draft, and two published posts with different dates, one of each kind,
+ * listed oldest first so that a newest-first sort has something to do.
+ * `src/data/__tests__/posts.test.ts` fails when a kind is missing here, and when any of these stops
+ * passing the post checker.
  *
  * The copy describes the fixtures themselves. None of it is a post, and none of it is the owner's.
  */
@@ -17,6 +18,7 @@ import type { DraftPost, Post, PublishedPost } from '@/data/posts';
 export const everyBlockPost: PublishedPost = {
   slug: 'fixture-every-block',
   draft: false,
+  kind: 'own',
   title: 'Fixture: every block and inline kind',
   summary:
     'A test fixture that uses each block kind and each inline kind once or more, so a renderer that drops one is caught.',
@@ -71,6 +73,7 @@ export const everyBlockPost: PublishedPost = {
 export const hostileTitlePost: PublishedPost = {
   slug: 'fixture-hostile-title',
   draft: false,
+  kind: 'jev',
   title: 'Fixture: & <tags> and "quotes"',
   summary:
     'A test fixture whose title holds &, < and " and whose text holds *stars*, _underscores_ and <b>tags</b>, all of it plain text.',
@@ -89,6 +92,7 @@ export const hostileTitlePost: PublishedPost = {
 export const draftPost: DraftPost = {
   slug: 'fixture-draft',
   draft: true,
+  kind: 'own',
   title: 'Fixture: a draft',
   summary: 'A test fixture that is still a draft, so no page, feed, sitemap or twin may show it.',
   tags: [],
