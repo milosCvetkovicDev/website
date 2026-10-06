@@ -1950,7 +1950,7 @@ git commit -m "feat(web): serve each post's Markdown twin and list the posts in 
 
   The command is `node scripts/post-draft-check.mjs --kind own|jev <draft.md> <twin.md>`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `scripts/post-draft-check.test.mjs`:
 
@@ -1970,7 +1970,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { FOOTER_LINES, check, differences } from './post-draft-check.mjs';
+import { FOOTER_LINES, check, differences, lineDiff } from './post-draft-check.mjs';
 
 const ORIGIN = 'https://miloscvetkovic.dev';
 const TITLE = 'Where the tokens go: one week';
@@ -2206,6 +2206,23 @@ describe('the publish check', () => {
         /^- A paragraph .* 1,234 tokens\.$/m,
       ],
       [
+        'a no-break space in the body, pointed at under its line',
+        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234\u00A0tokens'))),
+        twin(),
+        'own',
+        /^- A paragraph .* 1,234\u00A0tokens\.\n\? +\^ U\+00A0\n\+ A paragraph .* 1,234 tokens\.$/m,
+      ],
+      [
+        'a no-break space in the summary, pointed at under its line',
+        draft(
+          BODY,
+          replace(FRONT, 3, `description: ${SUMMARY.replace('a summary', 'a\u00A0summary')}`),
+        ),
+        twin(),
+        'own',
+        /^the summary differs \(- draft, \+ twin\):\n- .* a\u00A0summary, .*\n\? +\^ U\+00A0\n\+ /m,
+      ],
+      [
         'kept bold, which the comparison alone would pass',
         draft(replace(BODY, 0, 'Some **bold** text.')),
         twin({ body: replace(SERVED, 0, 'Some \\*\\*bold\\*\\* text.') }),
@@ -2411,6 +2428,27 @@ describe('the publish check', () => {
       assert.deepEqual(differences(approved, served, 'own'), []);
     });
 
+    for (const [marker, indent] of [
+      ['-', '  '],
+      ['1.', '   '],
+    ]) {
+      it(`reads a later line of a ${marker} item as CommonMark does: only an item from 1 interrupts`, () => {
+        // Indented to the item's text, the line is inside the item, where `1995.` cannot interrupt
+        // its paragraph, so the line continues it.
+        const lines = [`${marker} It was cold in`, `${indent}1995. It was a good year.`];
+        const served = twin({
+          body: [...SERVED, '', `${marker} It was cold in 1995. It was a good year.`],
+        });
+        assert.deepEqual(differences(draft([...BODY, '', ...lines]), served, 'own'), []);
+      });
+    }
+
+    it("starts the next item at a marker left of the item's text, whatever its number", () => {
+      const approved = draft([...BODY, '', '1. It was cold in', '1995. It was a good year.']);
+      const served = twin({ body: [...SERVED, '', '1. It was cold in', '2. It was a good year.'] });
+      assert.deepEqual(differences(approved, served, 'own'), []);
+    });
+
     it('reports a whole-line --- rule once, as a rule, not as a list item holding one', () => {
       const problems = differences(draft([...BODY, '', '- ---']), twin(), 'own');
       assert.deepEqual(
@@ -2430,6 +2468,12 @@ describe('the publish check', () => {
       ['a bare URL', 'See https://example.com for more.', /a bare URL/],
       ['a bare www. address', 'See www.example.com for more.', /^line 29: a bare URL/],
       [
+        'a bare www. address in brackets',
+        'See [www.example.com] for more.',
+        /^line 29: a bare URL/,
+      ],
+      ['a bare email address', 'Write to name@example.com today.', /^line 29: an email address/],
+      [
         "a link inside a link's text",
         'See [the [work](/work) page](/work).',
         /^line 29: a link inside a link's text$/,
@@ -2442,15 +2486,38 @@ describe('the publish check', () => {
       ['an entity reference', 'Fish &amp; chips, &#169; and &#x2014;.', /an entity reference/],
       ['a footnote', 'A claim.[^1]', /a footnote/],
       ['a reference-style link', 'See [the docs][docs].', /a reference-style link/],
+      [
+        'a link reference definition in a quote',
+        '> [docs]: /work',
+        /^line 29: a reference-style link definition/,
+      ],
+      [
+        'a link reference definition in a list item',
+        '- [docs]: /work',
+        /^line 29: a reference-style link definition/,
+      ],
+      [
+        'a link reference definition in a quote in an ordered item',
+        '1. > [docs]: /work',
+        /^line 29: a reference-style link definition/,
+      ],
       ['a level-1 heading', '# A second title', /a level-1 heading/],
       ['a level-4 heading', '#### Too deep', /a heading below level 3/],
       ['a setext heading', ['A heading', '---'], /a setext heading underline/],
       ['a --- rule', ['---'], /a --- rule/],
       ['a nested list', ['- An item', '  - A nested item'], /a nested list/],
+      ['a nested ordered list', ['1. An item', '   1. A nested item'], /^line 30: a nested list$/],
       ['an ordered list that starts at 3', ['3. Third', '4. Fourth'], /starts at 3/],
       ['a quote of two paragraphs', ['> One.', '>', '> Two.'], /an empty quote line/],
       ['a hard line break', ['A line that breaks  ', 'here.'], /a hard line break/],
       ['a line indented with a tab', '\tIndented text.', /a line indented with a tab/],
+      ['a tab inside a line', 'Tokens:\t1,234 a day.', /^line 29: a tab; /],
+      [
+        'a tab after a list marker, which CommonMark reads as a list',
+        '-\tAn item',
+        /^line 29: a tab; /,
+      ],
+      ['a tab in a code span', 'Run `make\tall` now.', /^line 29: a tab; /],
       ['italics with underscores', 'Some _italic_ text.', /an emphasis marker _/],
       ['strikethrough', 'Some ~~struck~~ text.', /strikethrough/],
       [
@@ -2515,6 +2582,60 @@ describe('the publish check', () => {
       });
       assert.deepEqual(differences(approved, served, 'own'), []);
     });
+
+    it("accepts brackets and an escape in a link's text that make no link of their own", () => {
+      const approved = draft([...BODY, '', 'See [a [b]\\!(c) d](/work).']);
+      const served = twin({ body: [...SERVED, '', `See [a \\[b\\]!(c) d](${ORIGIN}/work).`] });
+      assert.deepEqual(differences(approved, served, 'own'), []);
+    });
+
+    it('reports an email autolink once, whatever its address starts with', () => {
+      for (const address of ['name@example.com', '2026@example.com']) {
+        const problems = differences(draft([...BODY, '', `Write to <${address}>.`]), twin(), 'own');
+        assert.deepEqual(
+          problems.filter((problem) => problem.startsWith('line 29:')),
+          ['line 29: raw HTML, an HTML comment or an autolink'],
+          address,
+        );
+      }
+    });
+
+    it('accepts an email address as a link or as code', () => {
+      const line = 'Write to [name@example.com](mailto:name@example.com) or `name@example.com`.';
+      const served = twin({ body: [...SERVED, '', line] });
+      assert.deepEqual(differences(draft([...BODY, '', line]), served, 'own'), []);
+    });
+
+    it('reports a tab in the front matter by its line', () => {
+      const front = replace(FRONT, 1, `title: "Where the tokens go:\tone week"`);
+      const problems = differences(draft(BODY, front), twin(), 'own');
+      assert.ok(
+        problems.some((problem) => /^line 2: a tab in the front matter; /.test(problem)),
+        problems.join('\n'),
+      );
+    });
+
+    it('accepts a tab inside a code fence, where it is code', () => {
+      const code = ['```make', 'all:', '\tnode build.mjs', '```'];
+      const served = twin({ body: [...SERVED, '', ...code] });
+      assert.deepEqual(differences(draft([...BODY, '', ...code]), served, 'own'), []);
+    });
+  });
+});
+
+describe('lineDiff()', () => {
+  it('points at a no-break space, which prints like a space, and names it', () => {
+    assert.equal(
+      lineDiff(['1,234\u00A0tokens'], ['1,234 tokens']),
+      ['- 1,234\u00A0tokens', `? ${' '.repeat(5)}^ U+00A0`, '+ 1,234 tokens'].join('\n'),
+    );
+  });
+
+  it('keeps a tab in its guide line, so the mark stays under its character', () => {
+    assert.equal(
+      lineDiff(['\tx\u2009y\u00A0z'], ['\tx y z']),
+      ['- \tx\u2009y\u00A0z', '? \t ^ ^ U+2009, U+00A0', '+ \tx y z'].join('\n'),
+    );
   });
 });
 
@@ -2607,7 +2728,7 @@ describe('the command', () => {
 });
 `````
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 ```bash
 node --test scripts/post-draft-check.test.mjs
@@ -2615,7 +2736,7 @@ node --test scripts/post-draft-check.test.mjs
 
 Expected: FAIL, with `Cannot find module` for `./post-draft-check.mjs`.
 
-- [ ] **Step 3: Write the check**
+- [x] **Step 3: Write the check**
 
 Create `scripts/post-draft-check.mjs`:
 
@@ -2965,17 +3086,49 @@ function canonicalTable(lines, caption, origin) {
 }
 
 /**
- * A list with `-` for every bullet, ordered items numbered from 1, and each item's lines joined.
+ * The column where a list item's text starts: after its marker and the spaces that follow it, or
+ * one space after the marker when five or more follow, which make the text indented code.
+ * @param {string} line a list item's first line
+ */
+function itemIndent(line) {
+  const match = /^( {0,3})([-*+]|\d{1,9}[.)])( +)/.exec(line);
+  if (!match) return 0;
+  const spaces = match[3].length;
+  return match[1].length + match[2].length + (spaces > 4 ? 1 : spaces);
+}
+
+/**
+ * Whether a later line of a list starts an item, as CommonMark reads it. A line indented to the
+ * current item's text is inside that item, where it continues the paragraph unless it can interrupt
+ * one: a bullet with text, or an ordered item from 1 with text, either of which nests a list. So
+ * `  1995. It was` there continues the item. A line indented less leaves the item, and starts the
+ * next one at any list marker, whatever its number; without a marker it is a lazy continuation.
+ * @param {string} line
+ * @param {number} indent the column where the current item's text starts
+ */
+function startsItem(line, indent) {
+  if (line.length - line.replace(/^ +/, '').length < indent) return LIST_ITEM.test(line);
+  return /^ {0,3}(?:[-*+]|1[.)]) +\S/.test(line.slice(indent));
+}
+
+/**
+ * A list with `-` for every bullet, ordered items numbered from 1, and each item's lines joined. A
+ * later line starts an item only where `startsItem()` says CommonMark starts one.
  * @param {string[]} lines
  * @param {string} origin
  */
 function canonicalList(lines, origin) {
   /** @type {{ ordered: boolean, text: string[] }[]} */
   const items = [];
+  let indent = 0;
   for (const line of lines) {
-    const item = LIST_ITEM.exec(line);
-    if (item) items.push({ ordered: /\d/.test(item[1]), text: [item[2]] });
-    else items[items.length - 1]?.text.push(line);
+    const item = items.length === 0 || startsItem(line, indent) ? LIST_ITEM.exec(line) : null;
+    if (item) {
+      items.push({ ordered: /\d/.test(item[1]), text: [item[2]] });
+      indent = itemIndent(line);
+    } else {
+      items[items.length - 1]?.text.push(line);
+    }
   }
   let number = 0;
   const shown = items.map(({ ordered, text }) => {
@@ -3116,16 +3269,26 @@ export function parseTwin(source) {
 const REFUSED_LINES = [
   [/^ {0,3}#(?: |$)/, 'a level-1 heading: the title, in the front matter, is the only one'],
   [/^ {0,3}#{4,6}(?: |$)/, 'a heading below level 3'],
-  [/^ {0,3}\[[^\]]+\]:/, 'a reference-style link definition or a footnote'],
-  [/^ {2,}(?:[-*+]|\d{1,9}[.)]) /, 'a nested list'],
+  // After any `>` and list markers too: a definition in a quote or a list item still defines the
+  // label, and turns a `[label]` anywhere in the post into a link.
+  [
+    /^ {0,3}(?:(?:>|[-*+] |\d{1,9}[.)] ) *)*\[[^\]]+\]:/,
+    'a reference-style link definition or a footnote',
+  ],
+  // Only a line that can interrupt the item's paragraph nests a list: see `startsItem()`.
+  [/^ {2,}(?:[-*+]|1[.)]) +\S/, 'a nested list'],
   [/^ {0,3}> *$/, 'an empty quote line, which makes a quote of more than one paragraph'],
   [/^ *\t/, 'a line indented with a tab; indent with spaces'],
+  // A tab anywhere else: CommonMark reads `-\tItem` as a list item and keeps a tab in a code span,
+  // where the comparison, which collapses it to a space, cannot see it. A fence keeps its tabs.
+  [/^ *[^ \t].*\t/, 'a tab; write a space, or put the text in a code fence'],
 ];
 
 /** @type {[RegExp, string][]} */
 const REFUSED_INLINE = [
   [/!\[/, 'an image'],
-  [/<[A-Za-z!?/]/, 'raw HTML, an HTML comment or an autolink'],
+  // An email autolink's address may start with a digit or a mark: `<2026@example.com>`.
+  [/<(?:[A-Za-z!?/]|[\w.!#$%&'*+/=?^`{|}~-]+@)/, 'raw HTML, an HTML comment or an autolink'],
   [/\[\^/, 'a footnote'],
   [/\]\[/, 'a reference-style link'],
   [/\*/, 'an emphasis marker *; write \\* for the character'],
@@ -3221,6 +3384,13 @@ function prose(tokens, labels) {
 }
 
 /**
+ * A link's label as written, its escapes kept and each code span a space, for reading it again for
+ * a link inside it. `prose()` drops each escape whole, which would read `[b]\!(c)` as a link.
+ * @param {Token[]} label
+ */
+const labelSource = (label) => label.map((token) => ('text' in token ? token.text : ' ')).join('');
+
+/**
  * The refused inline syntax in one run of text: a heading, a table row or caption, or the lines of a
  * paragraph, list item or quote joined, so a code span or link wrapped onto the next line is read
  * whole. Code spans, escapes and link destinations are left alone.
@@ -3243,16 +3413,20 @@ function refusedInline(source, at, block) {
   if (labels.some((label) => label.some((token) => 'code' in token))) {
     problems.push(`${at}: link text is plain text: no code`);
   }
-  if (labels.some((label) => inlineTokens(prose(label, false)).some((token) => 'label' in token))) {
+  if (labels.some((label) => inlineTokens(labelSource(label)).some((token) => 'label' in token))) {
     problems.push(`${at}: a link inside a link's text`);
   }
   const text = prose(tokens, true);
   for (const [pattern, what] of REFUSED_INLINE) {
     if (pattern.test(text)) problems.push(`${at}: ${what}`);
   }
-  // GFM links a bare `www.` address too, after a space, `(` or an emphasis mark.
-  if (/https?:\/\/|(?:^|[\s*_~(])www\.[\p{L}\p{N}_-]/iu.test(prose(tokens, false))) {
+  // GFM links a bare `www.` address too, after a space, `(`, a bracket or an emphasis mark.
+  if (/https?:\/\/|(?:^|[\s*_~([\]])www\.[\p{L}\p{N}_-]/iu.test(prose(tokens, false))) {
     problems.push(`${at}: a bare URL, which GFM makes a link; write it as a link or as code`);
+  }
+  // And a bare email address; one inside `<…>` is an autolink, reported above.
+  if (/(?<![<\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+/.test(prose(tokens, false))) {
+    problems.push(`${at}: an email address, which GFM makes a link; write it as a link or as code`);
   }
   return problems;
 }
@@ -3276,6 +3450,8 @@ export function refusedSyntax(body, firstLine = 1) {
   let run = null;
   /** whether the list item or quote the line belongs to already has a block refused inside it */
   let nested = false;
+  /** the column where the current list item's text starts, for `startsItem()` */
+  let indent = 0;
   const endRun = () => {
     if (run) {
       const [from, to] = [firstLine + run.from, firstLine + run.to];
@@ -3337,7 +3513,9 @@ export function refusedSyntax(body, firstLine = 1) {
       );
     }
     if (/(?: {2,}|\\)$/.test(line) && next.trim()) problems.push(`${at}: a hard line break`);
-    const item = block === 'list' ? LIST_ITEM.exec(line) : null;
+    const item =
+      block === 'list' && (opening || startsItem(line, indent)) ? LIST_ITEM.exec(line) : null;
+    if (item) indent = itemIndent(line);
     if (item || (block === 'quote' && /^ {0,3}>/.test(line))) {
       if (item || opening) nested = false;
       // A whole line of `- ---` is a rule, reported above, rather than a list item holding one.
@@ -3366,9 +3544,35 @@ export function refusedSyntax(body, firstLine = 1) {
   return problems;
 }
 
+/** A character that prints as a space and is not one, such as a no-break space or a thin space. */
+const SPACE_LIKE = /(?! )\p{Zs}/u;
+
+/**
+ * The `?` line that goes under a changed line holding a character that prints as a space and is
+ * not one, as Python's difflib marks a line: a `^` under each such character, a tab kept as a tab
+ * so the marks stay in their columns, then the characters' code points. Null for a line without
+ * one. Without it, a no-break space against a space shows as two identical lines.
+ * @param {string} line
+ * @returns {string | null}
+ */
+function spaceGuide(line) {
+  const chars = Array.from(line);
+  const marked = [...new Set(chars.filter((char) => SPACE_LIKE.test(char)))];
+  if (marked.length === 0) return null;
+  const guide = chars.map((char) => {
+    if (char === '\t') return '\t';
+    return SPACE_LIKE.test(char) ? '^' : ' ';
+  });
+  const names = marked.map(
+    (char) => `U+${(char.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`,
+  );
+  return `? ${guide.join('').trimEnd()} ${names.join(', ')}`;
+}
+
 /**
  * A line diff of `a` against `b`, as `-` and `+` lines with two lines of context, or '' when they
- * are equal.
+ * are equal. A changed line holding a character that prints as a space and is not one is followed
+ * by its `spaceGuide()`.
  * @param {string[]} a
  * @param {string[]} b
  */
@@ -3403,7 +3607,10 @@ export function lineDiff(a, b) {
   if (!changed.includes(true)) return '';
   return steps
     .filter((_, index) => changed.slice(Math.max(0, index - 2), index + 3).includes(true))
-    .map(([mark, line]) => `${mark} ${line}`)
+    .flatMap(([mark, line]) => {
+      const guide = mark === ' ' ? null : spaceGuide(line);
+      return guide === null ? [`${mark} ${line}`] : [`${mark} ${line}`, guide];
+    })
     .join('\n');
 }
 
@@ -3425,7 +3632,13 @@ export function differences(draftSource, twinSource, kind) {
   if (!title || !slug || !description) {
     throw new CannotRun('the front matter needs a title, a slug and a description');
   }
-  const problems = refusedSyntax(draft.body, draft.firstBodyLine);
+  const problems = normalise(draftSource)
+    .split('\n')
+    .slice(0, draft.firstBodyLine - 1)
+    .flatMap((line, index) =>
+      line.includes('\t') ? [`line ${index + 1}: a tab in the front matter; write a space`] : [],
+    );
+  problems.push(...refusedSyntax(draft.body, draft.firstBodyLine));
   /** @param {string} value */
   const plain = (value) => canonicalText(value).trim();
   /** @type {[string, string, string][]} */
@@ -3435,7 +3648,9 @@ export function differences(draftSource, twinSource, kind) {
     ['summary', plain(description), canonicalInline(twin.summary, twin.origin)],
   ];
   for (const [what, want, got] of fields) {
-    if (want !== got) problems.push(`the ${what} differs (- draft, + twin):\n- ${want}\n+ ${got}`);
+    if (want !== got) {
+      problems.push(`the ${what} differs (- draft, + twin):\n${lineDiff([want], [got])}`);
+    }
   }
   const body = lineDiff(
     canonicalise(splitBlocks(draft.body), twin.origin).join('\n\n').split('\n'),
@@ -3499,7 +3714,7 @@ if (startedAsCommand()) main();
 
 The guard's code is the one `scripts/check-webserver-log.mjs` uses, so the scripts share one guard.
 
-- [ ] **Step 4: Run the tests until they pass, then typecheck**
+- [x] **Step 4: Run the tests until they pass, then typecheck**
 
 ```bash
 node --test scripts/post-draft-check.test.mjs
@@ -3511,7 +3726,7 @@ Expected: every test passes. `typecheck` exits 0, because `turbo typecheck` cove
 with `checkJs` strict. When a case fails, change the check, not the case: each case is a behaviour
 the design names.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/post-draft-check.mjs scripts/post-draft-check.test.mjs docs/plans/2026-10-06-blog-publishing-plan.md
