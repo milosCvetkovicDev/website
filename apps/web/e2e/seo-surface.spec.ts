@@ -1221,7 +1221,6 @@ test.describe('the Person states only what the pages show (#57)', () => {
     'address.addressLocality',
     'address.addressCountry',
     'hasOccupation.name',
-    'hasOccupation.occupationLocation.name',
   ];
 
   /** Every string in a node, at any depth, with its path and the key it sits under. */
@@ -1251,6 +1250,8 @@ test.describe('the Person states only what the pages show (#57)', () => {
    * whole in either reading is shown.
    */
   function shows(body: string, phrase: string): boolean {
+    // A blank fact is not a fact a page shows: without this it would match any text.
+    if (phrase.trim() === '') return false;
     const pattern = phrase
       .toLowerCase()
       .trim()
@@ -1282,6 +1283,8 @@ test.describe('the Person states only what the pages show (#57)', () => {
     expect(shows('ai-native  development', 'AI-Native Development')).toBe(true);
     expect(shows('works on node.js', 'Node.js')).toBe(true);
     expect(shows('works on nodexjs', 'Node.js')).toBe(false);
+    expect(shows('any text at all', '')).toBe(false);
+    expect(shows('any text at all', ' \t ')).toBe(false);
     expect(
       descriptionClauses(
         'Senior Full-Stack Engineer with 13 years of experience in software engineering, now building AI-native systems.',

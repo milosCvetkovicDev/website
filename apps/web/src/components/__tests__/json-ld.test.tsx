@@ -337,11 +337,7 @@ describe('the JSON-LD blocks', () => {
         name: 'Angular Certified Architect',
         credentialCategory: 'certification',
       },
-      hasOccupation: {
-        '@type': 'Occupation',
-        name: 'Senior Full-Stack Engineer',
-        occupationLocation: { '@type': 'City', name: 'Belgrade' },
-      },
+      hasOccupation: { '@type': 'Occupation', name: 'Senior Full-Stack Engineer' },
       knowsAbout: [
         'TypeScript',
         'React',

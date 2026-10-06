@@ -56,8 +56,8 @@ export const CERTIFICATION = 'Angular Certified Architect';
 
 /**
  * Where the person is based, as `/about` shows it ("Belgrade, Serbia" under Credentials, and the
- * description's "Based in Belgrade."): the Person JSON-LD's `address` and the place of its
- * occupation read the same two names (#57).
+ * description's "Based in Belgrade."): the Person JSON-LD's `address` reads the same two names
+ * (#57). Its occupation names no place, because /about also lists the work as remote-first.
  */
 export const LOCATION = { locality: 'Belgrade', country: 'Serbia' } as const;
 

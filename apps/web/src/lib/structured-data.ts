@@ -119,11 +119,9 @@ export function person() {
       name: CERTIFICATION,
       credentialCategory: 'certification',
     },
-    hasOccupation: {
-      '@type': 'Occupation',
-      name: OCCUPATION,
-      occupationLocation: { '@type': 'City', name: LOCATION.locality },
-    },
+    // No `occupationLocation`: /about lists the work as remote-first since 2020, so the place is
+    // the person's address, not the occupation's (the owner's decision on #57).
+    hasOccupation: { '@type': 'Occupation', name: OCCUPATION },
     knowsAbout: [
       'TypeScript',
       'React',
