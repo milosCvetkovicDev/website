@@ -1779,6 +1779,7 @@ describe('the post twin', () => {
       new Request('http://localhost/'),
       paramsOf(hostileTitlePost.slug),
     );
+    expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/markdown; charset=utf-8');
     expect(await response.text()).toBe(postToMarkdown(hostileTitlePost));
   });
@@ -1786,7 +1787,7 @@ describe('the post twin', () => {
   it('refuses a draft, as dynamicParams would before it', async () => {
     await expect(
       twin.GET(new Request('http://localhost/'), paramsOf(draftPost.slug)),
-    ).rejects.toThrow(/unknown post "fixture-draft"/);
+    ).rejects.toThrow(`unknown post ${JSON.stringify(draftPost.slug)}`);
   });
 });
 ```

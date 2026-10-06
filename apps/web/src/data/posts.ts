@@ -1,3 +1,8 @@
+// No imports, or relative ones only, never `@/...`: `next.config.ts` imports this module to derive
+// the routes that negotiate a Markdown twin, and Next's config loader turns an `@/` import into
+// `./src/...`, a path that is right only beside the config (`src/test/next-config.test.ts` loads
+// the config through that loader to catch it).
+
 /**
  * The blog's posts: the one source every page, twin, feed and sitemap entry for a post is to read,
  * in the shape `case-studies.ts` gives the case studies (#61, ADR 0028). A post's body is typed

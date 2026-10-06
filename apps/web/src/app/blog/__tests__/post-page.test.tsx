@@ -3,13 +3,15 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { pages } from '@/data/pages';
 import { FOOTER_LINES, publishedPosts } from '@/data/posts';
 import { formatContentDate } from '@/lib/content-date';
-import { postToMarkdown } from '@/lib/serialise';
+import { blogToMarkdown, pageToMarkdown, postToMarkdown } from '@/lib/serialise';
 import { draftPost, everyBlockPost, hostileTitlePost } from '@/test/fixtures/posts';
 import PostPage, { dynamicParams, generateMetadata, generateStaticParams } from '../[slug]/page';
 import * as card from '../[slug]/og-image.png/route';
 import * as twin from '../[slug]/index.md/route';
+import * as blogTwin from '../index.md/route';
 
 /**
  * `/blog/[slug]`, the post page, and its card (#61, 61b).
@@ -279,6 +281,7 @@ describe('the post twin', () => {
       new Request('http://localhost/'),
       paramsOf(hostileTitlePost.slug),
     );
+    expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/markdown; charset=utf-8');
     expect(await response.text()).toBe(postToMarkdown(hostileTitlePost));
   });
@@ -286,7 +289,20 @@ describe('the post twin', () => {
   it('refuses a draft, as dynamicParams would before it', async () => {
     await expect(
       twin.GET(new Request('http://localhost/'), paramsOf(draftPost.slug)),
-    ).rejects.toThrow(/unknown post "fixture-draft"/);
+    ).rejects.toThrow(`unknown post ${JSON.stringify(draftPost.slug)}`);
+  });
+});
+
+// Here rather than beside the other twin handlers in `pages.test.ts`, which reads the real list:
+// while it is empty, `blogToMarkdown` falls back to `pageToMarkdown`, and a handler that ignored
+// the posts would pass there.
+describe("/blog's twin", () => {
+  it('lists the published posts, which the page record alone does not', async () => {
+    // The control: with no post published, the two expectations below would describe one body.
+    expect(publishedPosts.length).toBeGreaterThan(0);
+    const body = await blogTwin.GET().text();
+    expect(body).toBe(blogToMarkdown(pages['/blog'], publishedPosts));
+    expect(body).not.toBe(pageToMarkdown(pages['/blog']));
   });
 });
 

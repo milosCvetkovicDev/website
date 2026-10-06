@@ -34,11 +34,11 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   through `buildMetadata()`'s `image`.
 - `blog/[slug]/og-image.png/route.ts` draws the post card the same way, under the `Writing`
   eyebrow, with its own `generateStaticParams` over `publishedPosts` and `dynamicParams = false`,
-  so a draft has no card as it has no page (#61). Both post routes take their list from
-  `postStaticParams()` in `src/lib/post-static-params.ts`, which adds one placeholder slug under
-  `next dev` while no post is published: the dev server enforces `dynamicParams = false` only for
-  a non-empty list, and without it every `/blog/<slug>` page served Next's recovery shell
-  (ADR 0015) and every card answered 500.
+  so a draft has no card as it has no page (#61). The post page, its card and its twin
+  (`blog/[slug]/index.md/route.ts`, 61e) take their list from `postStaticParams()` in
+  `src/lib/post-static-params.ts`, which adds one placeholder slug under `next dev` while no post is
+  published: the dev server enforces `dynamicParams = false` only for a non-empty list, and without
+  it every `/blog/<slug>` page served Next's recovery shell (ADR 0015) and every card answered 500.
 - The Markdown twins (#59): an `index.md/route.ts` in each static route's folder
   (`app/index.md/route.ts` for `/`), and `work/[slug]/index.md/route.ts` for the case studies, with
   its own `generateStaticParams` and `dynamicParams = false`. Each is three lines that hand a record
@@ -83,9 +83,9 @@ its twin when the request's `Accept` lists `text/markdown` (not at `q=0`), throu
 per route in `next.config.ts` (the rules and their limits are in `deploy-and-next-config.md`), so
 a route added here needs its twin for the rewrite as well: `src/test/next-config.test.ts` fails
 when the negotiated routes and the twin handlers differ. `src/data/static-routes.ts`,
-`src/data/case-studies.ts`, `src/lib/pathname.ts` and every module they import are loaded by
-`next.config.ts` and must import by relative path, never `@/`, or `next build` fails. The
-pattern, `force-static` included, is recorded in
+`src/data/case-studies.ts`, `src/data/posts.ts`, `src/lib/pathname.ts` and every module they import
+are loaded by `next.config.ts` and must import by relative path, never `@/`, or `next build` fails.
+The pattern, `force-static` included, is recorded in
 `docs/adr/0030-generated-endpoints-as-static-route-handlers.md`. Once `hasPublishedPosts` is true,
 `buildMetadata()` also advertises the feed on every route, as
 `alternates.types['application/atom+xml']` at `FEED_PATH` from `src/lib/pathname.ts`, titled
