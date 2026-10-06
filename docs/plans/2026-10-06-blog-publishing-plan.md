@@ -3914,7 +3914,7 @@ git commit -m "feat(scripts): compare an approved blog draft with its served twi
 
 - Consumes: `postToMarkdown` (Task 6); `differences` and `FOOTER_LINES` from the check (Task 8).
 
-- [ ] **Step 1: Keep Prettier away from the fixture draft**
+- [x] **Step 1: Keep Prettier away from the fixture draft**
 
 The fixture deliberately uses the variant syntax that the check canonicalises: `*` markers, `1.` for
 every item, a `~~~` fence, a wrapped paragraph, a padded table and alignment colons. Prettier would
@@ -3925,7 +3925,7 @@ rewrite all of it. Before creating the file, add this to `.prettierignore` under
 apps/web/src/test/fixtures/post-draft.md
 ```
 
-- [ ] **Step 2: Write the fixture draft**
+- [x] **Step 2: Write the fixture draft**
 
 Create `apps/web/src/test/fixtures/post-draft.md`. It is the approved draft that the every-block
 fixture would have come from. Copy it byte for byte: this plan marks the block `text` only so that
@@ -3980,7 +3980,7 @@ grep -c '^\* \|^~~~\|^1\. ' apps/web/src/test/fixtures/post-draft.md
 Expected: `7` (three `*` bullets, two `~~~` lines and two `1.` items). A lower count means Prettier
 rewrote the file: check the `.prettierignore` entry from Step 1, then write the file again.
 
-- [ ] **Step 3: Write the round-trip test**
+- [x] **Step 3: Write the round-trip test**
 
 Create `apps/web/src/lib/__tests__/post-draft.test.ts`:
 
@@ -4028,7 +4028,7 @@ describe('the publish check, against the serialiser', () => {
 });
 ```
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 ```bash
 pnpm --filter web exec vitest run src/lib/__tests__/post-draft.test.ts
@@ -4039,7 +4039,7 @@ Expected: PASS, and typecheck exits 0 (`apps/web` sets `allowJs`). If the first 
 difference, the diff names the line. Fix whichever side breaks the design's format, and never edit
 the fixture to match a serialiser bug.
 
-- [ ] **Step 5: Point the rules at the format and the check**
+- [x] **Step 5: Point the rules at the format and the check**
 
 In `.claude/rules/app-router-and-content.md`, in the bullet on the Markdown twins (#59), change
 ``and `work/[slug]/index.md/route.ts` for the case studies`` to
@@ -4062,7 +4062,7 @@ In `.claude/rules/ci-and-scripts.md`, in the list of `scripts/` sources, add aft
 Add a row to its command table, in the shape of its neighbours:
 `` `node scripts/post-draft-check.mjs --kind own\|jev <draft.md> <twin.md>` `` | `Compares an approved draft with the post's served twin: 0 equal, 1 differences, 2 could not run`.
 
-- [ ] **Step 6: Tick the boxes and update the index**
+- [x] **Step 6: Tick the boxes and update the index**
 
 - In `docs/plans/2026-09-28-blog-engine-plan.md`, tick Task 5's steps (61e). Its Step 3 is met by
   `e2e/markdown-twins.spec.ts`, through the new `MARKDOWN_TWINS` entries, so add a note saying so.
