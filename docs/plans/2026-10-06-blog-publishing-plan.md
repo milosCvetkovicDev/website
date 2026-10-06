@@ -99,7 +99,7 @@ week"`. It must parse to the title the twin serves. Pinned in Task 8.
 | P2    |                                                                                                                                                                                                                    | `apps/web/src/data/posts.ts`, `apps/web/src/test/fixtures/posts.ts`, `apps/web/src/data/__tests__/posts.test.ts`, `apps/web/src/app/blog/[slug]/page.tsx`, `apps/web/src/app/blog/__tests__/post-page.test.tsx`                                                                                                                                                                                                                                                                                      |
 | P3    |                                                                                                                                                                                                                    | `apps/web/src/data/posts.ts`, `apps/web/src/test/fixtures/posts.ts`, `apps/web/src/data/__tests__/posts.test.ts`, `apps/web/src/components/post-body.tsx`, `apps/web/src/components/__tests__/post-body.test.tsx`, `apps/web/src/app/blog/__tests__/post-page.test.tsx`                                                                                                                                                                                                                              |
 | P4    | `apps/web/src/app/blog/[slug]/index.md/route.ts`, `scripts/post-draft-check.mjs`, `scripts/post-draft-check.test.mjs`, `apps/web/src/test/fixtures/post-draft.md`, `apps/web/src/lib/__tests__/post-draft.test.ts` | `apps/web/src/lib/serialise.ts`, `apps/web/src/lib/__tests__/serialise.test.ts`, `apps/web/src/app/blog/index.md/route.ts`, `apps/web/src/app/blog/__tests__/post-page.test.tsx`, `apps/web/src/data/__tests__/pages.test.ts`, `apps/web/next.config.ts`, `apps/web/src/test/next-config.test.ts`, `apps/web/e2e/endpoints.ts`, `.prettierignore`, `.claude/rules/app-router-and-content.md`, `.claude/rules/ci-and-scripts.md`, `docs/plans/2026-09-28-blog-engine-plan.md`, `docs/plans/README.md` |
-| P5    |                                                                                                                                                                                                                    | `apps/web/src/data/posts.ts`, `apps/web/src/data/static-routes.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| P5    |                                                                                                                                                                                                                    | `apps/web/src/data/posts.ts`, `apps/web/src/data/static-routes.ts`, `docs/plans/README.md`, `docs/plans/2026-10-06-blog-publishing-plan.md`                                                                                                                                                                                                                                                                                                                                                          |
 
 ---
 
@@ -1710,9 +1710,9 @@ Create `scripts/post-draft-check.test.mjs`:
 //
 // The cases that matter are the ones where a naive comparison passes a changed post: a number or a
 // word changed, a block dropped, kept bold that the twin escapes and the canonical form unescapes
-// again, a link, code span or heading that the entry flattened into plain text, an escape slipped
-// into inline code, a `---` inside a code block taken for the footer rule, and a missing disclosure
-// line.
+// again, a link, code span or heading that the entry flattened into plain text, block syntax inside
+// a list item or quote that flattens to the same text on both sides, an escape slipped into inline
+// code, a `---` inside a code block taken for the footer rule, and a missing disclosure line.
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -2053,6 +2053,124 @@ describe('the publish check', () => {
     }
   });
 
+  describe('exits 1 on block syntax in a list item or quote, which flattens to equal text', () => {
+    // The entry holds the syntax as text and the twin escapes its first mark, so the bodies agree
+    // and only the refusal catches it.
+    /** @type {[string, string[], string[], RegExp][]} */
+    const cases = [
+      [
+        'a heading inside a quote',
+        ['> ## Results'],
+        ['> \\## Results'],
+        /^line 29: a heading inside a quote$/m,
+      ],
+      [
+        'a list inside a quote',
+        ['> - An item'],
+        ['> \\- An item'],
+        /^line 29: a list inside a quote$/m,
+      ],
+      [
+        'an ordered list inside a quote',
+        ['> 1. A step'],
+        ['> 1\\. A step'],
+        /^line 29: a list inside a quote$/m,
+      ],
+      [
+        'a quote inside a quote',
+        ['> > Nested.'],
+        ['> \\> Nested.'],
+        /^line 29: a quote inside a quote$/m,
+      ],
+      [
+        'a code fence inside a quote',
+        ['> ```', '> code', '> ```'],
+        ['> `code`'],
+        /^line 29: a code fence inside a quote$/m,
+      ],
+      [
+        'indented code inside a quote',
+        ['>     code'],
+        ['> code'],
+        /^line 29: indented code inside a quote$/m,
+      ],
+      [
+        'a --- rule inside a quote',
+        ['> ---'],
+        ['> \\---'],
+        /^line 29: a --- rule inside a quote$/m,
+      ],
+      [
+        'a setext underline inside a quote',
+        ['> Results', '> ---'],
+        ['> Results ---'],
+        /^line 30: a setext heading underline inside a quote$/m,
+      ],
+      [
+        'a table inside a quote',
+        ['> | Day | Tokens |', '> | --- | --- |'],
+        ['> \\| Day \\| Tokens \\| \\| --- \\| --- \\|'],
+        /^line 30: a table inside a quote$/m,
+      ],
+      [
+        'a heading inside a list item',
+        ['- ## Results'],
+        ['- \\## Results'],
+        /^line 29: a heading inside a list item$/m,
+      ],
+      [
+        'a quote inside a list item',
+        ['- > Quoted.'],
+        ['- \\> Quoted.'],
+        /^line 29: a quote inside a list item$/m,
+      ],
+      [
+        'a list inside a list item',
+        ['- - Inner'],
+        ['- \\- Inner'],
+        /^line 29: a list inside a list item$/m,
+      ],
+      [
+        'indented code inside a list item',
+        ['-     code'],
+        ['- code'],
+        /^line 29: indented code inside a list item$/m,
+      ],
+      [
+        'a --- rule inside an ordered item',
+        ['1. ---'],
+        ['1. \\---'],
+        /^line 29: a --- rule inside a list item$/m,
+      ],
+    ];
+    for (const [name, approved, served, pattern] of cases) {
+      it(name, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', ...approved]),
+          'twin.md': twin({ body: [...SERVED, '', ...served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, pattern);
+        assert.doesNotMatch(output, /^the body differs/m);
+      });
+    }
+
+    it('reads a later quote line as CommonMark does: only an item from 1 opens a list', () => {
+      const approved = draft([...BODY, '', '> It was cold in', '> 1995. Then it was not.']);
+      const served = twin({ body: [...SERVED, '', '> It was cold in 1995. Then it was not.'] });
+      assert.deepEqual(differences(approved, served, 'own'), []);
+    });
+
+    it('reports a whole-line --- rule once, as a rule, not as a list item holding one', () => {
+      const problems = differences(draft([...BODY, '', '- ---']), twin(), 'own');
+      assert.deepEqual(
+        problems.filter((problem) => problem.startsWith('line 29:')),
+        ["line 29: a --- rule; the site adds the footer's rule itself"],
+      );
+    });
+  });
+
   describe('reports syntax the post format refuses, in the draft as written', () => {
     /** @type {[string, string | string[], RegExp][]} */
     const cases = [
@@ -2061,6 +2179,17 @@ describe('the publish check', () => {
       ['an HTML comment', '<!-- a note -->', /an HTML comment/],
       ['an autolink', 'See <https://example.com>.', /an autolink/],
       ['a bare URL', 'See https://example.com for more.', /a bare URL/],
+      ['a bare www. address', 'See www.example.com for more.', /^line 29: a bare URL/],
+      [
+        "a link inside a link's text",
+        'See [the [work](/work) page](/work).',
+        /^line 29: a link inside a link's text$/,
+      ],
+      [
+        "code in a link's text",
+        'See [the `--kind` flag](/work).',
+        /^line 29: link text is plain text: no code$/,
+      ],
       ['an entity reference', 'Fish &amp; chips, &#169; and &#x2014;.', /an entity reference/],
       ['a footnote', 'A claim.[^1]', /a footnote/],
       ['a reference-style link', 'See [the docs][docs].', /a reference-style link/],
@@ -2251,11 +2380,12 @@ Create `scripts/post-draft-check.mjs`:
 //
 // First it reports any syntax the post format refuses, in the draft as written. The comparison
 // cannot see it: a literal `**bold**` kept in the entry is escaped by the twin and unescaped again
-// here. Then it compares the slug, the title, the summary, the body and the footer, after undoing on
-// both sides only what the serialiser does on purpose. The canonical form keeps every block's kind,
-// and keeps text apart from code spans and links, so syntax the entry flattened into plain text is
-// a difference. Exit 0 when they agree, quietly; 1 with each difference; 2 when the check could not
-// run, whatever stopped it. Plain Node, no dependencies.
+// here, and so is the `##` of a `> ## Results` quote whose entry holds the text `## Results`.
+// Then it compares the slug, the title, the summary, the body and the footer, after undoing on both
+// sides only what the serialiser does on purpose. The canonical form keeps every block's kind, and
+// keeps text apart from code spans and links, so a block kind changed or a link or code span the
+// entry flattened into plain text is a difference. Exit 0 when they agree, quietly; 1 with each
+// difference; 2 when the check could not run, whatever stopped it. Plain Node, no dependencies.
 
 import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -2285,6 +2415,9 @@ const HEADING = /^ {0,3}(#{1,6})(?: +(.*?))?(?: +#+)? *$/;
 
 /** A list item's first line: its marker, then its text. */
 const LIST_ITEM = /^ {0,3}([-*+]|\d{1,9}[.)]) +(.*)$/;
+
+/** A thematic break: three or more `-`, `*` or `_`, with spaces between them or not. */
+const RULE = /^ {0,3}([-*_])(?: *\1){2,} *$/;
 
 /** A pipe table's delimiter row, with or without alignment colons and outer pipes. */
 const DELIMITER_ROW = /^ {0,3}\|? *:?-+:? *(?:\| *:?-+:? *)*\|? *$/;
@@ -2737,7 +2870,6 @@ const REFUSED_LINES = [
   [/^ {0,3}\[[^\]]+\]:/, 'a reference-style link definition or a footnote'],
   [/^ {2,}(?:[-*+]|\d{1,9}[.)]) /, 'a nested list'],
   [/^ {0,3}> *$/, 'an empty quote line, which makes a quote of more than one paragraph'],
-  [/^ {0,3}> *>/, 'a quote inside a quote'],
   [/^ *\t/, 'a line indented with a tab; indent with spaces'],
 ];
 
@@ -2793,6 +2925,36 @@ function continues(block, line) {
 }
 
 /**
+ * The block that `content` opens inside a list item or quote, or null. `content` is a list item's
+ * text after its marker and one space, or a quote line's after its `>` and one space. The entry
+ * holds such syntax as text and the twin escapes its first mark, so the two bodies agree and only
+ * this refusal catches it. A quote's later lines continue its paragraph, as CommonMark has it: a
+ * `---` or `===` line makes the paragraph a setext heading, a delimiter row makes its last line a
+ * table's header (GFM), and only a bullet or a `1.` item with text starts a list, so
+ * `> 1995. It was` stays text there.
+ * @param {string} content
+ * @param {boolean} first whether `content` starts the item or quote
+ * @returns {string | null}
+ */
+function nestedBlock(content, first) {
+  if (HEADING.test(content)) return 'a heading';
+  if (/^ {0,3}>/.test(content)) return 'a quote';
+  if (opensFence(content)) return 'a code fence';
+  if (!first && /^ {0,3}(?:=+|-+) *$/.test(content)) return 'a setext heading underline';
+  if (!first && content.includes('|') && DELIMITER_ROW.test(content)) return 'a table';
+  if (RULE.test(content)) return 'a --- rule';
+  if (
+    first
+      ? /^ {0,3}(?:[-*+]|\d{1,9}[.)])(?: |$)/.test(content)
+      : /^ {0,3}(?:[-*+]|1[.)]) +\S/.test(content)
+  ) {
+    return 'a list';
+  }
+  if (first && /^ {4,}\S/.test(content)) return 'indented code';
+  return null;
+}
+
+/**
  * Running text as the refusals read it: escapes dropped, a code span as a space, and a link as its
  * label in brackets, or as a space when `labels` is false.
  * @param {Token[]} tokens
@@ -2828,11 +2990,19 @@ function refusedInline(source, at, block) {
       problems.push(`${at}: a table's caption and cells are plain text: no code or links`);
     }
   }
+  const labels = tokens.flatMap((token) => ('label' in token ? [token.label] : []));
+  if (labels.some((label) => label.some((token) => 'code' in token))) {
+    problems.push(`${at}: link text is plain text: no code`);
+  }
+  if (labels.some((label) => inlineTokens(prose(label, false)).some((token) => 'label' in token))) {
+    problems.push(`${at}: a link inside a link's text`);
+  }
   const text = prose(tokens, true);
   for (const [pattern, what] of REFUSED_INLINE) {
     if (pattern.test(text)) problems.push(`${at}: ${what}`);
   }
-  if (/https?:\/\//i.test(prose(tokens, false))) {
+  // GFM links a bare `www.` address too, after a space, `(` or an emphasis mark.
+  if (/https?:\/\/|(?:^|[\s*_~(])www\.[\p{L}\p{N}_-]/iu.test(prose(tokens, false))) {
     problems.push(`${at}: a bare URL, which GFM makes a link; write it as a link or as code`);
   }
   return problems;
@@ -2855,6 +3025,8 @@ export function refusedSyntax(body, firstLine = 1) {
   let block = null;
   /** @type {{ kind: BlockKind, from: number, to: number, text: string[] } | null} */
   let run = null;
+  /** whether the list item or quote the line belongs to already has a block refused inside it */
+  let nested = false;
   const endRun = () => {
     if (run) {
       const [from, to] = [firstLine + run.from, firstLine + run.to];
@@ -2889,6 +3061,7 @@ export function refusedSyntax(body, firstLine = 1) {
       fence = opened.run;
       return;
     }
+    const opening = block === null;
     if (block === null) {
       endRun();
       block = blockKind(line, next);
@@ -2906,7 +3079,7 @@ export function refusedSyntax(body, firstLine = 1) {
       problems.push(
         `${at}: a setext heading underline; write ## or ### before the heading instead`,
       );
-    } else if (/^ {0,3}([-*_])(?: *\1){2,} *$/.test(line)) {
+    } else if (RULE.test(line)) {
       problems.push(`${at}: a --- rule; the site adds the footer's rule itself`);
     }
     if (/^ {2,}\S/.test(line) && !previous.trim()) {
@@ -2916,6 +3089,19 @@ export function refusedSyntax(body, firstLine = 1) {
     }
     if (/(?: {2,}|\\)$/.test(line) && next.trim()) problems.push(`${at}: a hard line break`);
     const item = block === 'list' ? LIST_ITEM.exec(line) : null;
+    if (item || (block === 'quote' && /^ {0,3}>/.test(line))) {
+      if (item || opening) nested = false;
+      // A whole line of `- ---` is a rule, reported above, rather than a list item holding one.
+      const content = item
+        ? line.replace(/^ {0,3}(?:[-*+]|\d{1,9}[.)]) /, '')
+        : line.replace(/^ {0,3}> ?/, '');
+      const what =
+        nested || RULE.test(line) ? null : nestedBlock(content, Boolean(item) || opening);
+      if (what) {
+        problems.push(`${at}: ${what} inside a ${item ? 'list item' : 'quote'}`);
+        nested = true;
+      }
+    }
     if (block === 'heading' || block === 'caption' || block === 'table' || item) endRun();
     const text = item ? item[2] : block === 'quote' ? line.replace(/^ {0,3}> ?/, '') : line;
     if (run) {
@@ -3358,15 +3544,16 @@ writing room, approved by the owner.
 Fill in the first three lines, save the block as a script outside the repository, and run it with
 `bash` (it ends with `exit`, so do not paste it into an interactive shell). It builds, starts
 `next start` on the first free port from 3217, waits until the server answers (or stops waiting
-when it exits), and fetches the twin, failing on an empty or failed fetch. It runs the check and, when the check passes, takes the
-screenshots. Its `trap` stops the server and removes the twin and the server log however it exits,
-so a rerun after any fix rebuilds and starts a fresh server.
+when it exits), and fetches the twin. A failed build or an empty or failed fetch exits 2, as the
+check could not run. It runs the check and, when the check passes, takes the screenshots. Its `trap`
+stops the server and removes the twin and the server log however it exits, so a rerun after any fix
+rebuilds and starts a fresh server.
 
 ```bash
 SLUG='<slug>'
 KIND='<kind>'
 DRAFT='<path to the approved draft.md>'
-pnpm --filter web build || exit 1
+pnpm --filter web build || exit 2
 PORT=3217
 while lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; do PORT=$((PORT + 1)); done
 TWIN="$(mktemp)"
@@ -3401,7 +3588,8 @@ exit "$STATUS"
 
 Expected: the check prints nothing, then `publish check: exit 0` and the screenshots' directory. On
 exit 1, each difference is a place where the entry is not the approved text: fix the entry and run
-the block again. Exit 2 means the check could not run, and it says why.
+the block again. Exit 2 means the check could not run: the build or the fetch failed, with its
+output above, or the check says why.
 
 - [ ] **Step 5: Read the screenshots and run the full gates**
 

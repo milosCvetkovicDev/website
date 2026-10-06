@@ -112,11 +112,13 @@ this site names a page that exists. The first column of a table is its row heade
 
 Not allowed, and caught by the check when present: bold or italics, images, raw HTML or HTML
 comments, entity references such as `&amp;`, footnotes, `#` or `####` and deeper headings, setext
-headings, code or links in a heading, a table caption or a table cell, nested lists, an ordered
-list that does not start at 1, a list item or quote of more than one paragraph, hard line breaks,
-reference-style links, autolinks and bare `http://` or `https://` URLs, a line indented with a tab,
-a block that does not start after a blank line, and a `---` rule inside the body. The disclosure
-line is not written in `draft.md`: the site adds it (D3).
+headings, code or links in a heading, a table caption or a table cell, code or a link in a link's
+text, nested lists, a heading, list, quote, table, code block or rule inside a list item or quote
+(such as `> ## Results`), an ordered list that does not start at 1, a list item or quote of more
+than one paragraph, hard line breaks, reference-style links, autolinks and bare `http://`,
+`https://` or `www.` addresses, a line indented with a tab, a block that does not start after a
+blank line, and a `---` rule inside the body. The disclosure line is not written in `draft.md`:
+the site adds it (D3).
 
 ## The publish check
 
@@ -124,7 +126,9 @@ line is not written in `draft.md`: the site adds it (D3).
 use of the syntax the format above refuses, in the draft as written: unescaped emphasis markers,
 `![`, a tag or comment, a footnote, a heading outside levels 2 and 3, and the rest of that list.
 This comes first because the comparison cannot see it: a literal `**bold**` kept in the entry is
-serialised as `\*\*bold\*\*`, which canonicalises to the draft's own `**bold**`. It then compares:
+serialised as `\*\*bold\*\*`, which canonicalises to the draft's own `**bold**`, and a quote whose
+entry holds the text `## Results` is served as `> \## Results`, which canonicalises to the draft's
+`> ## Results`, a heading inside a quote. It then compares:
 
 1. the draft's `slug` with the last path segment of the twin's `Source:` URL, its `title` with the
    twin's `#` line, and its `description` with the twin's summary;
@@ -145,10 +149,11 @@ The canonical form keeps kinds apart. Each block is written under a line naming 
 split into text, code spans and links, honouring escapes: an escaped backtick or bracket is text.
 Escapes are removed from text alone, and text is written back with every backslash, backtick and
 bracket escaped, which no code span or link produces. So a changed block kind, such as a heading,
-quote or list item that the entry wrote as a paragraph, is a difference, and so is syntax flattened
-into plain text, such as a link or code span that the entry holds as a string. Anything else that
-differs is reported too: a changed word or number, a dropped or added block, a moved link, a slug
-that is not the page's.
+quote or list item that the entry wrote as a paragraph, is a difference, and so is inline syntax
+flattened into plain text, such as a link or code span that the entry holds as a string. Block
+syntax inside a list item or quote flattens to the same text on both sides, as `> ## Results` does
+above, which is why the check refuses it in the draft. Anything else that differs is reported too:
+a changed word or number, a dropped or added block, a moved link, a slug that is not the page's.
 
 Exit codes follow the repository's checks: 0 when the two agree, quietly; 1 with a line diff of
 each difference, and for nothing else; 2 when the check could not run, whatever stopped it: a
