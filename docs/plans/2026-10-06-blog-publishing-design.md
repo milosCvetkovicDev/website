@@ -5,6 +5,7 @@
 **Branch:** one per slice, listed under Slices; this design ships with the first,
 `docs/blog-publishing-design`
 **Related:** #61, [ADR 0028](../adr/0028-blog-posts-as-typed-data.md),
+[ADR 0033](../adr/0033-blog-posts-drafted-with-claude.md),
 [the blog engine design](2026-09-28-blog-engine-design.md), ADR 0012 (how a decision is superseded)
 
 ## Context

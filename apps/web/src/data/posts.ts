@@ -4,7 +4,8 @@
  * blocks rather than Markdown or MDX, so the same object can render as HTML and serialise to
  * Markdown without a parser, and no sentence is written twice.
  *
- * For the owner, who writes every post; no agent drafts one (ADR 0028):
+ * For whoever adds a post. A post is drafted with Claude outside this repository, approved line by
+ * line by the owner, and added here by a pull request that only the owner merges (ADR 0033):
  *
  * - Add a post to `posts` as `draft: true` while it is being written. A draft renders nowhere and
  *   needs no dates. Everything that shows posts reads `publishedPosts` or `getPost`, never `posts`.
