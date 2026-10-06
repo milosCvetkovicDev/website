@@ -1760,17 +1760,18 @@ git commit -m "feat(web): write a post and the /blog list as Markdown twins (61e
 - Produces: a static twin at `/blog/<slug>/index.md` for each published post, negotiated from
   `/blog/<slug>` by `Accept: text/markdown`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `post-page.test.tsx`, add `import * as twin from '../[slug]/index.md/route';` beside the card
 import, and `import { postToMarkdown } from '@/lib/serialise';`. Then add:
 
 ```tsx
 describe('the post twin', () => {
-  it('prerenders one twin per published post, and no other', () => {
+  it('prerenders one twin per published post, and no other', async () => {
     expect(twin.dynamic).toBe('force-static');
     expect(twin.dynamicParams).toBe(false);
-    expect(twin.generateStaticParams()).toEqual(generateStaticParams());
+    // The page's list is async; the twin's, like the card's, is not.
+    expect(twin.generateStaticParams()).toEqual(await generateStaticParams());
   });
 
   it("serves the post's Markdown, as postToMarkdown writes it", async () => {
@@ -1827,7 +1828,7 @@ In `apps/web/src/test/next-config.test.ts`:
   `negotiates exactly the routes that have a twin: the static routes, every case study and every published post`,
   and append `...publishedPosts.map(({ slug }) => `/blog/${slug}`),` to the expected list.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 ```bash
 pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx src/data/__tests__/pages.test.ts src/test/next-config.test.ts
@@ -1836,7 +1837,7 @@ pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx src/
 Expected: FAIL. The twin route module does not exist, so the post-page file fails to import. The
 next-config list lacks the posts.
 
-- [ ] **Step 3: Add the post twin route**
+- [x] **Step 3: Add the post twin route**
 
 Create `apps/web/src/app/blog/[slug]/index.md/route.ts`:
 
@@ -1867,7 +1868,7 @@ export async function GET(_request: Request, { params }: RouteContext<'/blog/[sl
 }
 ```
 
-- [ ] **Step 4: Make `/blog`'s twin list the posts**
+- [x] **Step 4: Make `/blog`'s twin list the posts**
 
 In `apps/web/src/app/blog/index.md/route.ts`, keep the comment and replace the code with:
 
@@ -1883,7 +1884,7 @@ export function GET() {
 }
 ```
 
-- [ ] **Step 5: Negotiate the post twins**
+- [x] **Step 5: Negotiate the post twins**
 
 In `apps/web/next.config.ts`, add `import { publishedPosts } from './src/data/posts';` after the
 `case-studies` import. `posts.ts` imports nothing, so the rule that modules loaded by the config
@@ -1910,7 +1911,7 @@ append to `MARKDOWN_TWINS`:
 `e2e/markdown-twins.spec.ts` then checks each post twin's status, its type, the page's alternate link
 and heading parity as soon as a post is published. While none is, it checks nothing more.
 
-- [ ] **Step 6: Run the tests until they pass, then check the build**
+- [x] **Step 6: Run the tests until they pass, then check the build**
 
 ```bash
 pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx src/data/__tests__/pages.test.ts src/test/next-config.test.ts
@@ -1921,7 +1922,7 @@ pnpm --filter web build && pnpm check:build-output
 Expected: PASS. Typecheck exits 0. `check:build-output` exits 0: the new handler prerenders, here
 with no paths, as the card route does while nothing is published.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add 'apps/web/src/app/blog/[slug]/index.md/route.ts' apps/web/src/app/blog/index.md/route.ts apps/web/src/app/blog/__tests__/post-page.test.tsx apps/web/src/data/__tests__/pages.test.ts apps/web/next.config.ts apps/web/src/test/next-config.test.ts apps/web/e2e/endpoints.ts docs/plans/2026-10-06-blog-publishing-plan.md

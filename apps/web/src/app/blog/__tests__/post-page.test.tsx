@@ -5,9 +5,11 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { FOOTER_LINES, publishedPosts } from '@/data/posts';
 import { formatContentDate } from '@/lib/content-date';
+import { postToMarkdown } from '@/lib/serialise';
 import { draftPost, everyBlockPost, hostileTitlePost } from '@/test/fixtures/posts';
 import PostPage, { dynamicParams, generateMetadata, generateStaticParams } from '../[slug]/page';
 import * as card from '../[slug]/og-image.png/route';
+import * as twin from '../[slug]/index.md/route';
 
 /**
  * `/blog/[slug]`, the post page, and its card (#61, 61b).
@@ -261,6 +263,30 @@ describe('its card', () => {
     await expect(
       card.GET(new Request('http://localhost/'), paramsOf(draftPost.slug)),
     ).rejects.toThrow(JSON.stringify(draftPost.slug));
+  });
+});
+
+describe('the post twin', () => {
+  it('prerenders one twin per published post, and no other', async () => {
+    expect(twin.dynamic).toBe('force-static');
+    expect(twin.dynamicParams).toBe(false);
+    // The page's list is async; the twin's, like the card's, is not.
+    expect(twin.generateStaticParams()).toEqual(await generateStaticParams());
+  });
+
+  it("serves the post's Markdown, as postToMarkdown writes it", async () => {
+    const response = await twin.GET(
+      new Request('http://localhost/'),
+      paramsOf(hostileTitlePost.slug),
+    );
+    expect(response.headers.get('content-type')).toBe('text/markdown; charset=utf-8');
+    expect(await response.text()).toBe(postToMarkdown(hostileTitlePost));
+  });
+
+  it('refuses a draft, as dynamicParams would before it', async () => {
+    await expect(
+      twin.GET(new Request('http://localhost/'), paramsOf(draftPost.slug)),
+    ).rejects.toThrow(/unknown post "fixture-draft"/);
   });
 });
 
