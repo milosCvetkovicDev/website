@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { PostBody } from '@/components/post-body';
-import { getPost, publishedPosts } from '@/data/posts';
+import { FOOTER_LINES, getPost, publishedPosts } from '@/data/posts';
 import { formatContentDates } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
 import { cardAlt } from '@/lib/og-image';
@@ -117,6 +117,15 @@ export default async function PostPage({ params }: PageProps) {
           </header>
 
           <PostBody blocks={post.body} />
+          {/* The kind's closing lines, inside the article so that an extractor reading the article
+              keeps them (ADR 0034); `--muted` rather than an opacity step (ADR 0011). */}
+          {FOOTER_LINES[post.kind].length > 0 ? (
+            <footer className="mt-12 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
+              {FOOTER_LINES[post.kind].map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </footer>
+          ) : null}
         </article>
       </div>
     </div>

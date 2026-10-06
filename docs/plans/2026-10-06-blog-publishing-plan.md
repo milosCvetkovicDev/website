@@ -668,7 +668,7 @@ git commit -m "feat(blog): give every post a kind and check that a jev post is m
 - Produces: `<footer>` as the last child of the post page's `<article>` for a kind with lines, with
   one `<p>` per line.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `post-page.test.tsx`, add `FOOTER_LINES` to the import from `'@/data/posts'`, and add after the
 test `keeps the way back out of the article, …`:
@@ -691,7 +691,7 @@ it('gives an own post no footer', async () => {
 });
 ```
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 ```bash
 pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx
@@ -699,7 +699,7 @@ pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx
 
 Expected: FAIL. The article's last child is the post body's `DIV`, not a `FOOTER`.
 
-- [ ] **Step 3: Render the footer**
+- [x] **Step 3: Render the footer**
 
 In `apps/web/src/app/blog/[slug]/page.tsx`, import `FOOTER_LINES` beside `getPost`. Then add the
 footer as the last child of `<article>`, after `<PostBody blocks={post.body} />`, so that the
@@ -738,7 +738,7 @@ footer as the last child of `<article>`, after `<PostBody blocks={post.body} />`
 </article>
 ```
 
-- [ ] **Step 4: Run the tests until they pass**
+- [x] **Step 4: Run the tests until they pass**
 
 ```bash
 pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx
@@ -746,7 +746,7 @@ pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 5: Take the screenshots from a scratch change that is never committed**
+- [x] **Step 5: Take the screenshots from a scratch change that is never committed**
 
 No post is published, so for the screenshots the scratch post below is published in the working
 tree only. In `apps/web/src/data/posts.ts`, replace `export const posts: readonly Post[] = [];`
@@ -789,7 +789,7 @@ git restore apps/web/src/data/posts.ts
 git status --short    # clean
 ```
 
-- [ ] **Step 6: Review the change and run the gates**
+- [x] **Step 6: Review the change and run the gates**
 
 Run `ui-reviewer` on `apps/web/src/app/blog/[slug]/page.tsx`, naming the file. Then run, one at a
 time:
@@ -804,7 +804,7 @@ pnpm build
 
 Expected: exit 0 from each.
 
-- [ ] **Step 7: Commit and open the pull request**
+- [x] **Step 7: Commit and open the pull request**
 
 ```bash
 git add 'apps/web/src/app/blog/[slug]/page.tsx' apps/web/src/app/blog/__tests__/post-page.test.tsx docs/plans/2026-10-06-blog-publishing-plan.md

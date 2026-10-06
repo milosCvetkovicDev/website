@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { publishedPosts } from '@/data/posts';
+import { FOOTER_LINES, publishedPosts } from '@/data/posts';
 import { formatContentDate } from '@/lib/content-date';
 import { draftPost, everyBlockPost, hostileTitlePost } from '@/test/fixtures/posts';
 import PostPage, { dynamicParams, generateMetadata, generateStaticParams } from '../[slug]/page';
@@ -137,6 +137,22 @@ describe('the post page', () => {
     const back = screen.getByRole('link', { name: 'Back to Writing' });
     expect(back).toHaveAttribute('href', '/blog');
     expect(article.contains(back)).toBe(false);
+  });
+
+  it('ends a jev post with its footer lines, last inside the article, in --muted text', async () => {
+    render(await PostPage(paramsOf(hostileTitlePost.slug)));
+    const footer = document.querySelector('article')!.lastElementChild!;
+    expect(footer.tagName).toBe('FOOTER');
+    expect([...footer.children].map((line) => [line.tagName, line.textContent])).toEqual(
+      FOOTER_LINES.jev.map((line) => ['P', line]),
+    );
+    expect(footer.className).toContain('text-[var(--muted)]');
+    expect(footer.className).not.toMatch(/opacity-|text-\S+\/\d/);
+  });
+
+  it('gives an own post no footer', async () => {
+    render(await PostPage(paramsOf(everyBlockPost.slug)));
+    expect(document.querySelector('article footer')).toBeNull();
   });
 
   it('puts no text under aria-hidden, which the axe gate would measure anyway', async () => {
