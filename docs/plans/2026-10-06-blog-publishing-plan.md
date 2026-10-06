@@ -1350,7 +1350,7 @@ The twin's layout, which Task 8 parses:
 3. a blank line, then the body;
 4. for a kind with lines: a blank line, `---`, then each line as its own paragraph.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `serialise.test.ts`:
 
@@ -1499,7 +1499,7 @@ describe('blogToMarkdown()', () => {
 });
 `````
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 ```bash
 pnpm --filter web exec vitest run src/lib/__tests__/serialise.test.ts
@@ -1507,7 +1507,7 @@ pnpm --filter web exec vitest run src/lib/__tests__/serialise.test.ts
 
 Expected: FAIL, because `postToMarkdown is not a function`.
 
-- [ ] **Step 3: Split `table()` so that a post can always write its caption line**
+- [x] **Step 3: Split `table()` so that a post can always write its caption line**
 
 In `serialise.ts`:
 
@@ -1540,7 +1540,7 @@ function titleOf(page: PageRecord): string {
 }
 ```
 
-- [ ] **Step 4: Write the post serialiser**
+- [x] **Step 4: Write the post serialiser**
 
 Add `import { FOOTER_LINES, type Inline, type PostBlock, type PublishedPost } from '@/data/posts';`
 to the imports. Then add after `caseStudyToMarkdown`:
@@ -1662,7 +1662,7 @@ export function blogToMarkdown(page: PageRecord, list: readonly PublishedPost[])
 }
 ```
 
-- [ ] **Step 5: Run the tests until they pass, then typecheck**
+- [x] **Step 5: Run the tests until they pass, then typecheck**
 
 ```bash
 pnpm --filter web exec vitest run src/lib/__tests__/serialise.test.ts
@@ -1672,7 +1672,7 @@ pnpm typecheck
 Expected: PASS, and typecheck exits 0. If an expected string differs, fix the serialiser, not the
 expectation. The expectations follow D6 and the escaping rules the file's other tests pin.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/web/src/lib/serialise.ts apps/web/src/lib/__tests__/serialise.test.ts docs/plans/2026-10-06-blog-publishing-plan.md
