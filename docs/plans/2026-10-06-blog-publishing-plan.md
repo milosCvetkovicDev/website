@@ -945,6 +945,28 @@ Add to `defects`:
     [withTable({ rows: [['First run', 1234, '$0.10']] })],
     /: block 1: row 1, column 2 is not text$/,
   ],
+  [
+    'a column name used twice, in another case',
+    [withTable({ columns: ['Run', 'Cost', 'cost'], rows: [['First run', '$0.10', '$0.20']] })],
+    /: block 1: column 3, "cost", repeats an earlier column name$/,
+  ],
+  [
+    'a row header used twice, in another case',
+    [
+      withTable({
+        rows: [
+          ['First run', '1,234', '$0.10'],
+          ['first run', '987', '$0.08'],
+        ],
+      }),
+    ],
+    /: block 1: row 2: the row header "first run" repeats an earlier row header$/,
+  ],
+  [
+    'a row header with two spaces in a row',
+    [withTable({ rows: [['First  run', '1,234', '$0.10']] })],
+    /: block 1: row 1: the row header has a space at an end or two in a row$/,
+  ],
 ```
 
 The defect `a block of no known kind` broke a block with `kind: 'table'`, which is now a known kind,
@@ -958,12 +980,13 @@ so it takes a kind the model never will have, since a post holds no HTML:
   ],
 ```
 
-Add these three rows to the list of places in Task 2's naming defects, before its `] as const`:
+Add these four rows to the list of places in Task 2's naming defects, before its `] as const`:
 
 ```ts
       ['a table caption', { body: [tableBlock({ caption: 'What Jev measured' })] }, 'body[0].caption', 'Jev'],
       ['a table column', { body: [tableBlock({ columns: ['Run', 'TypeSafe', 'Cost'] })] }, 'body[0].columns[1]', 'TypeSafe'],
       ['a table cell', { body: [tableBlock({ rows: [['First run', 'Jev', '$0.10']] })] }, 'body[0].rows[0][1]', 'Jev'],
+      ['a table row header', { body: [tableBlock({ rows: [['Jev run', '1,234', '$0.10']] })] }, 'body[0].rows[0][0]', 'Jev'],
 ```
 
 Add to `accepted`:
@@ -991,7 +1014,7 @@ it('renders a table with its caption, its column headers and its row headers', (
       .map((cell) => cell.textContent),
   ).toEqual(block.columns);
   // Trimmed at the end: a table of three or more columns ends each row header with a real space,
-  // so the stacked line copies as the header and its first cell (`data-table.tsx`).
+  // so the stacked line copies as the header and its first value (`data-table.tsx`).
   expect(
     within(table)
       .getAllByRole('rowheader')
@@ -1033,8 +1056,8 @@ In `apps/web/src/data/posts.ts`, after `QuoteBlock`:
  * A table of plain-text cells, rendered by `components/data-table.tsx` like the site's other
  * tables. The caption names it, and the first cell of each row is that row's header (ADR 0034).
  *
- * Below 640px a table of three or more columns stacks each row: its header and first cell on one
- * line, then each other cell on a line of its own, with the column names hidden from sight
+ * Below 640px a table of three or more columns stacks each row: its header and first value on one
+ * line, then each other value on a line of its own, with the column names hidden from sight
  * (`data-table.tsx`, #226). A reader tells the values apart by their order alone, so:
  *
  * - no cell may be blank, which `posts.test.ts` checks;
@@ -1061,9 +1084,10 @@ export type PostBlock =
 Add this bullet to the header comment, after the one Task 2 added:
 
 ```ts
- * - A table needs a caption, two columns or more with a name each, one row or more, one cell per
- *   column in every row, a row header in each row, and no blank cell when it has three columns or
- *   more. `TableBlock` says what such a table looks like on a phone, and what its cells must say.
+ * - A table needs a caption, two columns or more with a name each and no name twice, one row or
+ *   more, one cell per column in every row, a row header in each row and no header twice, and no
+ *   blank cell when it has three columns or more. Names and headers are compared ignoring case.
+ *   `TableBlock` says what such a table looks like on a phone, and what its cells must say.
 ```
 
 In the last bullet, which lists what `posts.test.ts` checks, name a table's caption, column names
@@ -1107,18 +1131,35 @@ before `default:`:
         );
         return problems;
       }
-      columns.forEach((column: unknown, index) =>
-        problems.push(...lineProblems(column, `${where}: column ${index + 1}`)),
-      );
+      // A reader moves between rows by their headers, and hears each cell with its column's name,
+      // so two rows or two columns with one name could not be told apart (`data-table.test.tsx`
+      // holds the site's own tables to unique row headers). Compared ignoring case, as headings and
+      // tags are, since a screen reader says both alike; a blank one is reported as blank only.
+      const names = new Set<string>();
+      columns.forEach((column: unknown, index) => {
+        const [problem] = lineProblems(column, `${where}: column ${index + 1}`);
+        if (problem) {
+          problems.push(problem);
+          return;
+        }
+        const key = String(column).toLowerCase();
+        if (names.has(key)) {
+          problems.push(
+            `${where}: column ${index + 1}, ${JSON.stringify(column)}, repeats an earlier column name`,
+          );
+        }
+        names.add(key);
+      });
       if (!Array.isArray(rows) || rows.length === 0) {
         return [...problems, `${where}: the table has no rows`];
       }
-      // Below 640px a wide table draws no column names: each row is its header and first cell
-      // joined by a drawn " · ", then each other cell on a line of its own. A blank first cell
+      // Below 640px a wide table draws no column names: each row is its header and first value
+      // joined by a drawn " · ", then each other value on a line of its own. A blank first value
       // leaves the dot pointing at nothing, and a blank later one an empty line that shifts which
       // value a reader takes for which column. `stackable()` in `lib/serialise.ts` refuses the same
       // in the site's own tables, and `isWideTable` is the predicate both the page and it use.
       const stacks = isWideTable({ columns });
+      const headers = new Set<string>();
       rows.forEach((row: unknown, index) => {
         const at = `${where}: row ${index + 1}`;
         if (!Array.isArray(row) || row.length !== columns.length) {
@@ -1127,7 +1168,17 @@ before `default:`:
           );
           return;
         }
-        problems.push(...lineProblems(row[0], `${at}: the row header`));
+        const [headerProblem] = lineProblems(row[0], `${at}: the row header`);
+        if (headerProblem) problems.push(headerProblem);
+        else {
+          const key = String(row[0]).toLowerCase();
+          if (headers.has(key)) {
+            problems.push(
+              `${at}: the row header ${JSON.stringify(row[0])} repeats an earlier row header`,
+            );
+          }
+          headers.add(key);
+        }
         row.slice(1).forEach((cell: unknown, offset) => {
           const cellAt = `${at}, column ${offset + 2}`;
           if (typeof cell !== 'string') problems.push(`${cellAt} is not text`);

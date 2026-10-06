@@ -20,9 +20,10 @@
  * - Every post, draft or published, has a `kind`: `jev` for an article that reviews TypeSafe's Jev
  *   model, `own` otherwise. `posts.test.ts` fails when a published post that is not `jev` names Jev
  *   or TypeSafe in any text it shows, matched case-sensitively and as a whole word (ADR 0034).
- * - A table needs a caption, two columns or more with a name each, one row or more, one cell per
- *   column in every row, a row header in each row, and no blank cell when it has three columns or
- *   more. `TableBlock` says what such a table looks like on a phone, and what its cells must say.
+ * - A table needs a caption, two columns or more with a name each and no name twice, one row or
+ *   more, one cell per column in every row, a row header in each row and no header twice, and no
+ *   blank cell when it has three columns or more. Names and headers are compared ignoring case.
+ *   `TableBlock` says what such a table looks like on a phone, and what its cells must say.
  * - `src/data/__tests__/posts.test.ts` checks what a published post must hold: a unique slug of
  *   lowercase words and hyphens, real dates that are not in the future with `updatedAt` on or after
  *   `publishedAt`, a summary of 50 to 300 characters, a served title (`metaTitle` when set, then
@@ -91,8 +92,8 @@ export interface QuoteBlock {
  * A table of plain-text cells, rendered by `components/data-table.tsx` like the site's other
  * tables. The caption names it, and the first cell of each row is that row's header (ADR 0034).
  *
- * Below 640px a table of three or more columns stacks each row: its header and first cell on one
- * line, then each other cell on a line of its own, with the column names hidden from sight
+ * Below 640px a table of three or more columns stacks each row: its header and first value on one
+ * line, then each other value on a line of its own, with the column names hidden from sight
  * (`data-table.tsx`, #226). A reader tells the values apart by their order alone, so:
  *
  * - no cell may be blank, which `posts.test.ts` checks;

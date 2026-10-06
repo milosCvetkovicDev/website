@@ -194,18 +194,35 @@ function blockProblems(block: PostBlock, where: string, pages: ReadonlySet<strin
         );
         return problems;
       }
-      columns.forEach((column: unknown, index) =>
-        problems.push(...lineProblems(column, `${where}: column ${index + 1}`)),
-      );
+      // A reader moves between rows by their headers, and hears each cell with its column's name,
+      // so two rows or two columns with one name could not be told apart (`data-table.test.tsx`
+      // holds the site's own tables to unique row headers). Compared ignoring case, as headings and
+      // tags are, since a screen reader says both alike; a blank one is reported as blank only.
+      const names = new Set<string>();
+      columns.forEach((column: unknown, index) => {
+        const [problem] = lineProblems(column, `${where}: column ${index + 1}`);
+        if (problem) {
+          problems.push(problem);
+          return;
+        }
+        const key = String(column).toLowerCase();
+        if (names.has(key)) {
+          problems.push(
+            `${where}: column ${index + 1}, ${JSON.stringify(column)}, repeats an earlier column name`,
+          );
+        }
+        names.add(key);
+      });
       if (!Array.isArray(rows) || rows.length === 0) {
         return [...problems, `${where}: the table has no rows`];
       }
-      // Below 640px a wide table draws no column names: each row is its header and first cell
-      // joined by a drawn " · ", then each other cell on a line of its own. A blank first cell
+      // Below 640px a wide table draws no column names: each row is its header and first value
+      // joined by a drawn " · ", then each other value on a line of its own. A blank first value
       // leaves the dot pointing at nothing, and a blank later one an empty line that shifts which
       // value a reader takes for which column. `stackable()` in `lib/serialise.ts` refuses the same
       // in the site's own tables, and `isWideTable` is the predicate both the page and it use.
       const stacks = isWideTable({ columns });
+      const headers = new Set<string>();
       rows.forEach((row: unknown, index) => {
         const at = `${where}: row ${index + 1}`;
         if (!Array.isArray(row) || row.length !== columns.length) {
@@ -214,7 +231,17 @@ function blockProblems(block: PostBlock, where: string, pages: ReadonlySet<strin
           );
           return;
         }
-        problems.push(...lineProblems(row[0], `${at}: the row header`));
+        const [headerProblem] = lineProblems(row[0], `${at}: the row header`);
+        if (headerProblem) problems.push(headerProblem);
+        else {
+          const key = String(row[0]).toLowerCase();
+          if (headers.has(key)) {
+            problems.push(
+              `${at}: the row header ${JSON.stringify(row[0])} repeats an earlier row header`,
+            );
+          }
+          headers.add(key);
+        }
         row.slice(1).forEach((cell: unknown, offset) => {
           const cellAt = `${at}, column ${offset + 2}`;
           if (typeof cell !== 'string') problems.push(`${cellAt} is not text`);
@@ -777,6 +804,28 @@ const defects: [string, Post[], RegExp][] = [
     /: block 1: row 1, column 2 is not text$/,
   ],
   [
+    'a column name used twice, in another case',
+    [withTable({ columns: ['Run', 'Cost', 'cost'], rows: [['First run', '$0.10', '$0.20']] })],
+    /: block 1: column 3, "cost", repeats an earlier column name$/,
+  ],
+  [
+    'a row header used twice, in another case',
+    [
+      withTable({
+        rows: [
+          ['First run', '1,234', '$0.10'],
+          ['first run', '987', '$0.08'],
+        ],
+      }),
+    ],
+    /: block 1: row 2: the row header "first run" repeats an earlier row header$/,
+  ],
+  [
+    'a row header with two spaces in a row',
+    [withTable({ rows: [['First  run', '1,234', '$0.10']] })],
+    /: block 1: row 1: the row header has a space at an end or two in a row$/,
+  ],
+  [
     'an empty piece of inline code',
     [withBody(paragraph('Run ', { code: '' }, '.'))],
     /: block 1 \(paragraph\), piece 2: the inline code is empty$/,
@@ -1027,6 +1076,12 @@ const defects: [string, Post[], RegExp][] = [
         'a table cell',
         { body: [tableBlock({ rows: [['First run', 'Jev', '$0.10']] })] },
         'body[0].rows[0][1]',
+        'Jev',
+      ],
+      [
+        'a table row header',
+        { body: [tableBlock({ rows: [['Jev run', '1,234', '$0.10']] })] },
+        'body[0].rows[0][0]',
         'Jev',
       ],
     ] as const

@@ -142,7 +142,7 @@ describe('PostBody', () => {
         .map((cell) => cell.textContent),
     ).toEqual(block.columns);
     // Trimmed at the end: a table of three or more columns ends each row header with a real space,
-    // so the stacked line copies as the header and its first cell (`data-table.tsx`).
+    // so the stacked line copies as the header and its first value (`data-table.tsx`).
     expect(
       within(table)
         .getAllByRole('rowheader')
