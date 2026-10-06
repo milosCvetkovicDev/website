@@ -7498,9 +7498,14 @@
       "method": "file-line",
       "evaluation": "live",
       "covers": [
-        { "kind": "link", "token": "0030-generated-endpoints-as-static-route-handlers.md" }
+        {
+          "kind": "link",
+          "token": "0030-generated-endpoints-as-static-route-handlers.md"
+        }
       ],
-      "check": { "path": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md" }
+      "check": {
+        "path": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md"
+      }
     },
     {
       "id": "adr-index-0030-status",
@@ -7587,8 +7592,15 @@
       "claim": "The link to 0015-static-case-study-params.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
-      "covers": [{ "kind": "link", "token": "0015-static-case-study-params.md" }],
-      "check": { "path": "docs/adr/0015-static-case-study-params.md" }
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0015-static-case-study-params.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0015-static-case-study-params.md"
+      }
     },
     {
       "id": "adr-0030-link-0017-ai-discoverability-policy",
@@ -7597,8 +7609,15 @@
       "claim": "The link to 0017-ai-discoverability-policy.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
-      "covers": [{ "kind": "link", "token": "0017-ai-discoverability-policy.md" }],
-      "check": { "path": "docs/adr/0017-ai-discoverability-policy.md" }
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0017-ai-discoverability-policy.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0017-ai-discoverability-policy.md"
+      }
     },
     {
       "id": "adr-0030-link-0023-static-security-headers",
@@ -7607,8 +7626,15 @@
       "claim": "The link to 0023-static-security-headers.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
-      "covers": [{ "kind": "link", "token": "0023-static-security-headers.md" }],
-      "check": { "path": "docs/adr/0023-static-security-headers.md" }
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0023-static-security-headers.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0023-static-security-headers.md"
+      }
     },
     {
       "id": "adr-0030-link-0025-production-alias-noindex",
@@ -7617,8 +7643,15 @@
       "claim": "The link to 0025-production-alias-noindex.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
-      "covers": [{ "kind": "link", "token": "0025-production-alias-noindex.md" }],
-      "check": { "path": "docs/adr/0025-production-alias-noindex.md" }
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0025-production-alias-noindex.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0025-production-alias-noindex.md"
+      }
     },
     {
       "id": "adr-0030-link-0026-vercel-web-analytics",
@@ -7627,8 +7660,15 @@
       "claim": "The link to 0026-vercel-web-analytics.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
-      "covers": [{ "kind": "link", "token": "0026-vercel-web-analytics.md" }],
-      "check": { "path": "docs/adr/0026-vercel-web-analytics.md" }
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0026-vercel-web-analytics.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0026-vercel-web-analytics.md"
+      }
     },
     {
       "id": "adr-0030-script-check-build-output",
@@ -7637,8 +7677,16 @@
       "claim": "`pnpm check:build-output` is a script in ./package.json.",
       "method": "command",
       "evaluation": "live",
-      "covers": [{ "kind": "script", "token": "check:build-output" }],
-      "check": { "package": ".", "script": "check:build-output" }
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:build-output"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:build-output"
+      }
     },
     {
       "id": "adr-0030-accept-match",
@@ -7647,7 +7695,10 @@
       "claim": "next.config.ts keys each Markdown rewrite on ACCEPTS_MARKDOWN in its has conditions.",
       "method": "file-line",
       "evaluation": "live",
-      "check": { "path": "apps/web/next.config.ts", "contains": "has: [ACCEPTS_MARKDOWN]," }
+      "check": {
+        "path": "apps/web/next.config.ts",
+        "contains": "has: [ACCEPTS_MARKDOWN],"
+      }
     },
     {
       "id": "adr-0030-refuses-match",
@@ -7656,7 +7707,10 @@
       "claim": "next.config.ts skips each Markdown rewrite on REFUSES_MARKDOWN, a weight of zero, in its missing conditions.",
       "method": "file-line",
       "evaluation": "live",
-      "check": { "path": "apps/web/next.config.ts", "contains": "missing: [REFUSES_MARKDOWN]," }
+      "check": {
+        "path": "apps/web/next.config.ts",
+        "contains": "missing: [REFUSES_MARKDOWN],"
+      }
     },
     {
       "id": "adr-0030-before-files",
@@ -7665,7 +7719,10 @@
       "claim": "next.config.ts returns the Markdown rewrites as its beforeFiles rewrites.",
       "method": "file-line",
       "evaluation": "live",
-      "check": { "path": "apps/web/next.config.ts", "contains": "beforeFiles: markdownRewrites()" }
+      "check": {
+        "path": "apps/web/next.config.ts",
+        "contains": "beforeFiles: markdownRewrites()"
+      }
     },
     {
       "id": "adr-0030-live-negotiation-spec",
@@ -10241,6 +10298,92 @@
         "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
         "regex": "^\\| Squash commit message \\(`squash_merge_commit_message`\\)\\s+\\| (\\S+)",
         "equals": "`BLANK`:"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-adr-0028",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](../adr/0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to ../adr/0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-blog-engine-design",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](2026-09-28-blog-engine-design.md)",
+      "claim": "The link to 2026-09-28-blog-engine-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-28-blog-engine-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-design.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-blog-engine-plan",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](2026-09-28-blog-engine-plan.md)",
+      "claim": "The link to 2026-09-28-blog-engine-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-28-blog-engine-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-plan.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-script-web-build",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "`pnpm --filter web build`",
+      "claim": "`pnpm --filter web build` is a script in apps/web/package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "web build"
+        }
+      ],
+      "check": {
+        "package": "apps/web",
+        "script": "build"
+      }
+    },
+    {
+      "id": "plans-readme-link-2026-10-06-blog-publishing-design",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-10-06-blog-publishing-design.md)",
+      "claim": "The link to 2026-10-06-blog-publishing-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
       }
     }
   ]
