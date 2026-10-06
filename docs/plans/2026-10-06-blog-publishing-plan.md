@@ -425,7 +425,13 @@ Add to the end of `defects`:
         'body[0].content[1].code',
         'TypeSafe',
       ],
-      ['a list item', { body: [{ kind: 'list', items: [['Ask Jev.']] }] }, 'body[0].items[0][0]', 'Jev'],
+      [
+        'a list item',
+        // Numbered, because a body may not open with a bulleted list.
+        { body: [{ kind: 'list', ordered: true, items: [['Ask Jev.']] }] },
+        'body[0].items[0][0]',
+        'Jev',
+      ],
       ['a code block', { body: [{ kind: 'code', code: 'model = "Jev"' }] }, 'body[0].code', 'Jev'],
       // The page names the code figure by its language, and the twin's fence carries it.
       [
@@ -1355,8 +1361,8 @@ The twin's layout, which Task 8 parses:
 In `serialise.test.ts`:
 
 - add `blogToMarkdown`, `postBodyToMarkdown` and `postToMarkdown` to the import from `'../serialise'`;
-- import `buildPostIndex` from `'@/data/posts'`, `pages` from `'@/data/pages'`, and `everyBlockPost`,
-  `fixturePosts` and `hostileTitlePost` from `'@/test/fixtures/posts'`;
+- import `buildPostIndex` and `type PostBlock` from `'@/data/posts'`, `pages` from `'@/data/pages'`,
+  and `everyBlockPost`, `fixturePosts` and `hostileTitlePost` from `'@/test/fixtures/posts'`;
 - add this at the end of the file. It writes the site's origin as the file's `ORIGIN` constant, as
   the page and case-study tests do:
 
@@ -1461,7 +1467,38 @@ describe('postToMarkdown()', () => {
         [{ kind: 'table', caption: 'One column', columns: ['Only'], rows: [['a']] }],
         'fixture',
       ),
-    ).toThrow(/has one column/);
+    ).toThrow(/^serialise: the table at block 1 of fixture has one column/);
+  });
+
+  it.each<[string, PostBlock[], string]>([
+    [
+      'an empty heading',
+      [{ kind: 'heading', level: 3, text: ' ' }],
+      'serialise: the level-3 heading at block 1 of fixture is empty',
+    ],
+    [
+      'a link to another scheme',
+      [{ kind: 'paragraph', content: ['See ', { text: 'the file', href: 'ftp://example.com/a' }] }],
+      'serialise: the link "ftp://example.com/a" in block 1 of fixture is neither a path on this site nor an http(s) or mailto URL',
+    ],
+    [
+      'a link with no text in a list item',
+      [{ kind: 'list', items: [['One.'], [{ text: ' ', href: '/work' }]] }],
+      'serialise: the link to "/work" in item 2 of block 1 of fixture has no text',
+    ],
+    [
+      'a block kind it has no writer for',
+      [{ kind: 'video' } as unknown as PostBlock],
+      'postToMarkdown: no writer for the block kind "video" at block 1 of fixture',
+    ],
+  ])('names the post and the block for %s', (_name, body, message) => {
+    expect(() => postBodyToMarkdown(body, 'fixture')).toThrow(message);
+  });
+
+  it('names the post whose title is empty', () => {
+    expect(() => postToMarkdown({ ...everyBlockPost, title: ' ' })).toThrow(
+      'serialise: postToMarkdown: the title of /blog/fixture-every-block is empty',
+    );
   });
 });
 
@@ -1496,6 +1533,17 @@ describe('blogToMarkdown()', () => {
       ].join('\n'),
     );
   });
+
+  it('names itself, and the post whose title is empty, in an error', () => {
+    expect(() =>
+      blogToMarkdown({ ...pages['/blog'], title: {} as unknown as PageRecord['title'] }, [
+        everyBlockPost,
+      ]),
+    ).toThrow('blogToMarkdown: the record for /blog has no title');
+    expect(() => blogToMarkdown(pages['/blog'], [{ ...everyBlockPost, title: ' ' }])).toThrow(
+      'serialise: blogToMarkdown: the title of fixture-every-block is empty',
+    );
+  });
 });
 `````
 
@@ -1524,17 +1572,22 @@ function table(heading: string, content: Table, where = `the table under "${head
 }
 ```
 
-Change `heading`'s signature to `function heading(level: 1 | 2 | 3, value: string): string`.
+Change `heading`'s signature to
+``function heading(level: 1 | 2 | 3, value: string, what = `a level-${level} heading`): string``,
+so that a post's heading names its place in an error.
 
 Move the title lookup out of `pageToMarkdown` into a helper, keeping its error message, and have
 `pageToMarkdown` call it:
 
 ```ts
-/** A record's own title: the string, or the `absolute` one a record sets to skip the template. */
-function titleOf(page: PageRecord): string {
+/**
+ * A record's own title: the string, or the `absolute` one a record sets to skip the template.
+ * `caller` names the twin's writer in an error.
+ */
+function titleOf(page: PageRecord, caller: string): string {
   const title = typeof page.title === 'string' ? page.title : page.title?.absolute;
   if (typeof title !== 'string') {
-    throw new Error(`pageToMarkdown: the record for ${page.path} has no title`);
+    throw new Error(`${caller}: the record for ${page.path} has no title`);
   }
   return title;
 }
@@ -1560,19 +1613,26 @@ function codeSpan(code: string): string {
   return `${ticks}${pad}${code}${pad}${ticks}`;
 }
 
-/** A fenced code block, whose fence is one backtick longer than the code's longest run, three at least. */
+/**
+ * A fenced code block, whose fence is one backtick longer than the code's longest run, three at
+ * least.
+ */
 function codeBlock(code: string, language = ''): string {
   const fence = '`'.repeat(Math.max(3, longestBacktickRun(code) + 1));
   return `${fence}${language}\n${code}\n${fence}`;
 }
 
-/** A run of a post's inline pieces: text as `text()` writes it, code spans, and links. */
-function postInline(content: readonly Inline[]): string {
+/**
+ * A run of a post's inline pieces: text as `text()` writes it, code spans, and links; `where` names
+ * the block in a link's error. It cannot reuse `inline()`, which has no code piece and collapses
+ * every run of spaces in the joined line: a code span's spaces are code, and must stay as written.
+ */
+function postInline(content: readonly Inline[], where: string): string {
   const pieces = content.filter((piece) => piece !== '');
   return pieces
     .map((piece, index) => {
       if (typeof piece !== 'string') {
-        return piece.code !== undefined ? codeSpan(piece.code) : link(piece);
+        return piece.code !== undefined ? codeSpan(piece.code) : link(piece, where);
       }
       const next = pieces[index + 1];
       // `!` right before a link's `[` would make the link an image.
@@ -1584,23 +1644,25 @@ function postInline(content: readonly Inline[]): string {
     .trim();
 }
 
+/** One block of a post; `where` is its place, as in `block 3 of <slug>`, for an error. */
 function postBlock(content: PostBlock, where: string): string {
   switch (content.kind) {
     case 'heading':
-      return heading(content.level, content.text);
+      return heading(content.level, content.text, `the level-${content.level} heading at ${where}`);
     case 'paragraph':
-      return block(nonEmpty(postInline(content.content), where));
+      return block(nonEmpty(postInline(content.content, where), where));
     case 'list':
       return entries(content.items, where)
         .map((item, index) => {
           const marker = content.ordered ? `${index + 1}.` : '-';
-          return `${marker} ${block(nonEmpty(postInline(item), `item ${index + 1} of ${where}`))}`;
+          const at = `item ${index + 1} of ${where}`;
+          return `${marker} ${block(nonEmpty(postInline(item, at), at))}`;
         })
         .join('\n');
     case 'code':
       return codeBlock(nonEmpty(content.code, where), content.language);
     case 'quote':
-      return `> ${block(nonEmpty(postInline(content.content), where))}`;
+      return `> ${block(nonEmpty(postInline(content.content, where), where))}`;
     case 'table': {
       // Always captioned, even under a heading of the same words, so a draft's `Table:` line and
       // the twin's compare line for line (D6 of the publishing design).
@@ -1611,7 +1673,7 @@ function postBlock(content: PostBlock, where: string): string {
       // The types rule this out; a post cast from elsewhere must not lose a block silently.
       const unknown: never = content;
       throw new Error(
-        `postToMarkdown: no writer for the block kind "${(unknown as { kind: string }).kind}"`,
+        `postToMarkdown: no writer for the block kind "${(unknown as { kind: string }).kind}" at ${where}`,
       );
     }
   }
@@ -1646,15 +1708,16 @@ export function postToMarkdown(post: PublishedPost): string {
 
 /**
  * `/blog`'s twin. While no post is published it is the record, Coming Soon card included, as the
- * page shows. After that it lists each published post newest first, as the page does: the title as a
- * heading, the day it was published and its URL, then its summary.
+ * page shows. After that it lists the posts in the order given, which `publishedPosts` keeps
+ * newest first, as the page does: the title as a heading, the day it was published and its URL,
+ * then its summary.
  */
 export function blogToMarkdown(page: PageRecord, list: readonly PublishedPost[]): string {
   if (list.length === 0) return pageToMarkdown(page);
   return document([
-    opening(titleOf(page), page.summary, page.path, 'blogToMarkdown'),
+    opening(titleOf(page, 'blogToMarkdown'), page.summary, page.path, 'blogToMarkdown'),
     ...list.flatMap((post) => [
-      heading(2, post.title),
+      heading(2, post.title, `blogToMarkdown: the title of ${post.slug}`),
       `- Published: ${post.publishedAt}\n- URL: ${absoluteUrl(`/blog/${post.slug}`)}`,
       paragraph(post.summary, `blogToMarkdown: the summary of ${post.slug}`),
     ]),

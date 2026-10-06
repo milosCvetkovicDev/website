@@ -357,6 +357,17 @@ function namingProblems(post: PublishedPost): string[] {
   });
 }
 
+/**
+ * A block's list kind as the page and the twin draw it, reading `ordered` as they do; none for a
+ * block that is not a list.
+ */
+function listKind(block: unknown): 'numbered' | 'bulleted' | undefined {
+  if (!block || typeof block !== 'object' || (block as { kind?: unknown }).kind !== 'list') {
+    return undefined;
+  }
+  return (block as { ordered?: unknown }).ordered ? 'numbered' : 'bulleted';
+}
+
 /** What a published post must hold before anything renders it. */
 function contentProblems(post: PublishedPost, pages: ReadonlySet<string>): string[] {
   const problems: string[] = [];
@@ -423,6 +434,19 @@ function contentProblems(post: PublishedPost, pages: ReadonlySet<string>): strin
       return;
     }
     problems.push(...blockProblems(block as PostBlock, where, pages));
+    // CommonMark joins two lists of one kind that only a blank line parts, and the twin's dates
+    // are a bulleted list right above the body: the page's two lists would be one in the twin, and
+    // in the Markdown draft the twin is checked against.
+    const list = listKind(block);
+    if (list === 'bulleted' && index === 0) {
+      problems.push(
+        `${where}: the body opens with a bulleted list, which the twin, and a Markdown draft, would read as one list with the dates above it`,
+      );
+    } else if (list && list === listKind(post.body[index - 1])) {
+      problems.push(
+        `${where}: a ${list} list right after another, which the twin, and a Markdown draft, would read as one list`,
+      );
+    }
     const { kind, level, text } = block as { kind?: unknown; level?: unknown; text?: unknown };
     if (kind !== 'heading') return;
     if (level === 2) underLevelTwo = true;
@@ -739,13 +763,41 @@ const defects: [string, Post[], RegExp][] = [
   ],
   [
     'a list with no items',
-    [withBody({ kind: 'list', items: [] })],
-    /: block 1: the list has no items$/,
+    [withBody(paragraph('Text.'), { kind: 'list', items: [] })],
+    /: block 2: the list has no items$/,
   ],
   [
     'an empty list item',
-    [withBody({ kind: 'list', items: [['One.'], []] })],
-    /: block 1 \(list item 2\) is empty$/,
+    [withBody(paragraph('Text.'), { kind: 'list', items: [['One.'], []] })],
+    /: block 2 \(list item 2\) is empty$/,
+  ],
+  [
+    'a body that opens with a bulleted list',
+    [withBody({ kind: 'list', items: [['One.']] }, paragraph('Text.'))],
+    /: block 1: the body opens with a bulleted list, which the twin, and a Markdown draft, would read as one list with the dates above it$/,
+  ],
+  [
+    // `ordered: false` and no `ordered` are one kind, as the page draws them.
+    'two bulleted lists next to each other',
+    [
+      withBody(
+        paragraph('Text.'),
+        { kind: 'list', ordered: false, items: [['One.']] },
+        { kind: 'list', items: [['Two.']] },
+      ),
+    ],
+    /: block 3: a bulleted list right after another, which the twin, and a Markdown draft, would read as one list$/,
+  ],
+  [
+    'two numbered lists next to each other',
+    [
+      withBody(
+        paragraph('Text.'),
+        { kind: 'list', ordered: true, items: [['One.']] },
+        { kind: 'list', ordered: true, items: [['Two.']] },
+      ),
+    ],
+    /: block 3: a numbered list right after another, which the twin, and a Markdown draft, would read as one list$/,
   ],
   [
     'an empty code block',
@@ -1042,7 +1094,8 @@ const defects: [string, Post[], RegExp][] = [
       ],
       [
         'a list item',
-        { body: [{ kind: 'list', items: [['Ask Jev.']] }] },
+        // Numbered, because a body may not open with a bulleted list.
+        { body: [{ kind: 'list', ordered: true, items: [['Ask Jev.']] }] },
         'body[0].items[0][0]',
         'Jev',
       ],
@@ -1136,6 +1189,21 @@ const accepted: [string, Post[]][] = [
     [withTable({ columns: ['Run', 'Note'], rows: [['First run', '']] })],
   ],
   ['a table cell with | and * in it', [withTable({ rows: [['First run', 'a | b', '*']] })]],
+  // The twin's dates are a bulleted list, and CommonMark starts a new list when the kind changes.
+  [
+    'a body that opens with a numbered list',
+    [withBody({ kind: 'list', ordered: true, items: [['One.']] })],
+  ],
+  [
+    'a bulleted list right after a numbered one',
+    [
+      withBody(
+        paragraph('Text.'),
+        { kind: 'list', ordered: true, items: [['One.']] },
+        { kind: 'list', items: [['Two.']] },
+      ),
+    ],
+  ],
   [
     'headings with one text at different places in two posts',
     [

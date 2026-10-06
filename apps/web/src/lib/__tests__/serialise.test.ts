@@ -18,7 +18,7 @@ import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
 import { OWNER_TODO } from '@/data/owner-todo';
 import { pages } from '@/data/pages';
 import type { PageRecord, PageSection, Paragraph, TableSection } from '@/data/pages/types';
-import { buildPostIndex } from '@/data/posts';
+import { buildPostIndex, type PostBlock } from '@/data/posts';
 import { everyBlockPost, fixturePosts, hostileTitlePost } from '@/test/fixtures/posts';
 import { visible } from '@/test/markdown';
 import { buildMetadata } from '../metadata';
@@ -380,7 +380,7 @@ describe('pageToMarkdown() and renderSections()', () => {
       rows: [['Teams led', '4', 'extra']],
     };
     expect(() => renderSections([ragged])).toThrow(
-      'renderSections: row 1 of the table under "Quick facts" has 3 cells for 2 columns',
+      'serialise: row 1 of the table under "Quick facts" has 3 cells for 2 columns',
     );
   });
 
@@ -1003,7 +1003,38 @@ describe('postToMarkdown()', () => {
         [{ kind: 'table', caption: 'One column', columns: ['Only'], rows: [['a']] }],
         'fixture',
       ),
-    ).toThrow(/has one column/);
+    ).toThrow(/^serialise: the table at block 1 of fixture has one column/);
+  });
+
+  it.each<[string, PostBlock[], string]>([
+    [
+      'an empty heading',
+      [{ kind: 'heading', level: 3, text: ' ' }],
+      'serialise: the level-3 heading at block 1 of fixture is empty',
+    ],
+    [
+      'a link to another scheme',
+      [{ kind: 'paragraph', content: ['See ', { text: 'the file', href: 'ftp://example.com/a' }] }],
+      'serialise: the link "ftp://example.com/a" in block 1 of fixture is neither a path on this site nor an http(s) or mailto URL',
+    ],
+    [
+      'a link with no text in a list item',
+      [{ kind: 'list', items: [['One.'], [{ text: ' ', href: '/work' }]] }],
+      'serialise: the link to "/work" in item 2 of block 1 of fixture has no text',
+    ],
+    [
+      'a block kind it has no writer for',
+      [{ kind: 'video' } as unknown as PostBlock],
+      'postToMarkdown: no writer for the block kind "video" at block 1 of fixture',
+    ],
+  ])('names the post and the block for %s', (_name, body, message) => {
+    expect(() => postBodyToMarkdown(body, 'fixture')).toThrow(message);
+  });
+
+  it('names the post whose title is empty', () => {
+    expect(() => postToMarkdown({ ...everyBlockPost, title: ' ' })).toThrow(
+      'serialise: postToMarkdown: the title of /blog/fixture-every-block is empty',
+    );
   });
 });
 
@@ -1036,6 +1067,17 @@ describe('blogToMarkdown()', () => {
         'A test fixture that uses each block kind and each inline kind once or more, so a renderer that drops one is caught.',
         '',
       ].join('\n'),
+    );
+  });
+
+  it('names itself, and the post whose title is empty, in an error', () => {
+    expect(() =>
+      blogToMarkdown({ ...pages['/blog'], title: {} as unknown as PageRecord['title'] }, [
+        everyBlockPost,
+      ]),
+    ).toThrow('blogToMarkdown: the record for /blog has no title');
+    expect(() => blogToMarkdown(pages['/blog'], [{ ...everyBlockPost, title: ' ' }])).toThrow(
+      'serialise: blogToMarkdown: the title of fixture-every-block is empty',
     );
   });
 });

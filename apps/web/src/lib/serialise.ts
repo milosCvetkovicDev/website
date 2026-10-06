@@ -110,7 +110,9 @@ function destination(url: string): string {
   return url.replace(/[\\()]/g, '\\$&').replace(/[\s<>]/g, (mark) => encodeURIComponent(mark));
 }
 
-function link({ text: label, href }: InlineLink): string {
+/** A link; `where`, when given, names the block it stands in, as a post's errors do. */
+function link({ text: label, href }: InlineLink, where?: string): string {
+  const at = where ? ` in ${where}` : '';
   // A twin is read away from the site, so an on-site path becomes an absolute URL.
   let url: string;
   if (href.startsWith('/') && !href.startsWith('//')) {
@@ -119,11 +121,11 @@ function link({ text: label, href }: InlineLink): string {
     url = href;
   } else {
     throw new Error(
-      `serialise: the link "${href}" is neither a path on this site nor an http(s) or mailto URL`,
+      `serialise: the link "${href}"${at} is neither a path on this site nor an http(s) or mailto URL`,
     );
   }
   const visibleLabel = text(label).trim();
-  if (!visibleLabel) throw new Error(`serialise: the link to "${href}" has no text`);
+  if (!visibleLabel) throw new Error(`serialise: the link to "${href}"${at} has no text`);
   return `[${visibleLabel}](${destination(url)})`;
 }
 
@@ -159,8 +161,9 @@ function paragraph(value: Paragraph, what: string): string {
   return block(nonEmpty(inline(value), what));
 }
 
-function heading(level: 1 | 2 | 3, value: string): string {
-  const title = nonEmpty(inline(value), `a level-${level} heading`);
+/** A heading; `what` names it in an error, as in `postToMarkdown: the title of /blog/<slug>`. */
+function heading(level: 1 | 2 | 3, value: string, what = `a level-${level} heading`): string {
+  const title = nonEmpty(inline(value), what);
   // A run of `#` after a space ends an ATX heading's text and is dropped as its closing sequence.
   return `${'#'.repeat(level)} ${title.replace(/(^| )(#+)$/, '$1\\$2')}`;
 }
@@ -206,17 +209,18 @@ function cell(value: TableCell, what: string): string {
  * first cell must be text, not a list (drawn as a block of chips) nor a cell with a lead (set on a
  * line of its own), either of which would break the line after the dot; and no cell may be blank,
  * which would leave the dot pointing at nothing or an empty line in the row. Every table the site
- * renders is a page section that comes through here, so the build refuses such a row.
+ * renders comes through here when its twin is written, a page's or a case study's through
+ * `table()` and a post's through `postBlock()`, so writing the twin refuses such a row.
  */
 function captionedTable(
   { caption, columns, rows }: Table,
   where: string,
 ): { name: string; markdown: string } {
   if (columns.length === 0) {
-    throw new Error(`renderSections: ${where} has no columns`);
+    throw new Error(`serialise: ${where} has no columns`);
   }
   if (columns.length === 1) {
-    throw new Error(`renderSections: ${where} has one column, row headers with no cell to head`);
+    throw new Error(`serialise: ${where} has one column, row headers with no cell to head`);
   }
   const name = nonEmpty(inline(caption), `the caption of ${where}`);
   columns.forEach((column, index) => nonEmpty(inline(column), `column ${index + 1} of ${where}`));
@@ -224,7 +228,7 @@ function captionedTable(
   rows.forEach((row, index) => {
     if (row.length !== columns.length) {
       throw new Error(
-        `renderSections: row ${index + 1} of ${where} has ${row.length} cells for ${columns.length} columns`,
+        `serialise: row ${index + 1} of ${where} has ${row.length} cells for ${columns.length} columns`,
       );
     }
     nonEmpty(inline(row[0]), `the header of row ${index + 1} of ${where}`);
@@ -297,7 +301,7 @@ function document(parts: readonly string[]): string {
 function opening(title: string, summary: string, path: string, caller: string): string {
   assertPathname(path, caller);
   return blocks([
-    heading(1, title),
+    heading(1, title, `${caller}: the title of ${path}`),
     paragraph(summary, `${caller}: the summary of ${path}`),
     `Source: ${absoluteUrl(path)}`,
   ]);
@@ -308,11 +312,14 @@ export function renderSections(sections: readonly PageSection[]): string {
   return blocks(sections.flatMap(section));
 }
 
-/** A record's own title: the string, or the `absolute` one a record sets to skip the template. */
-function titleOf(page: PageRecord): string {
+/**
+ * A record's own title: the string, or the `absolute` one a record sets to skip the template.
+ * `caller` names the twin's writer in an error.
+ */
+function titleOf(page: PageRecord, caller: string): string {
   const title = typeof page.title === 'string' ? page.title : page.title?.absolute;
   if (typeof title !== 'string') {
-    throw new Error(`pageToMarkdown: the record for ${page.path} has no title`);
+    throw new Error(`${caller}: the record for ${page.path} has no title`);
   }
   return title;
 }
@@ -324,7 +331,7 @@ function titleOf(page: PageRecord): string {
  */
 export function pageToMarkdown(page: PageRecord): string {
   return document([
-    opening(titleOf(page), page.summary, page.path, 'pageToMarkdown'),
+    opening(titleOf(page, 'pageToMarkdown'), page.summary, page.path, 'pageToMarkdown'),
     renderSections(page.sections),
   ]);
 }
@@ -406,19 +413,26 @@ function codeSpan(code: string): string {
   return `${ticks}${pad}${code}${pad}${ticks}`;
 }
 
-/** A fenced code block, whose fence is one backtick longer than the code's longest run, three at least. */
+/**
+ * A fenced code block, whose fence is one backtick longer than the code's longest run, three at
+ * least.
+ */
 function codeBlock(code: string, language = ''): string {
   const fence = '`'.repeat(Math.max(3, longestBacktickRun(code) + 1));
   return `${fence}${language}\n${code}\n${fence}`;
 }
 
-/** A run of a post's inline pieces: text as `text()` writes it, code spans, and links. */
-function postInline(content: readonly Inline[]): string {
+/**
+ * A run of a post's inline pieces: text as `text()` writes it, code spans, and links; `where` names
+ * the block in a link's error. It cannot reuse `inline()`, which has no code piece and collapses
+ * every run of spaces in the joined line: a code span's spaces are code, and must stay as written.
+ */
+function postInline(content: readonly Inline[], where: string): string {
   const pieces = content.filter((piece) => piece !== '');
   return pieces
     .map((piece, index) => {
       if (typeof piece !== 'string') {
-        return piece.code !== undefined ? codeSpan(piece.code) : link(piece);
+        return piece.code !== undefined ? codeSpan(piece.code) : link(piece, where);
       }
       const next = pieces[index + 1];
       // `!` right before a link's `[` would make the link an image.
@@ -430,23 +444,25 @@ function postInline(content: readonly Inline[]): string {
     .trim();
 }
 
+/** One block of a post; `where` is its place, as in `block 3 of <slug>`, for an error. */
 function postBlock(content: PostBlock, where: string): string {
   switch (content.kind) {
     case 'heading':
-      return heading(content.level, content.text);
+      return heading(content.level, content.text, `the level-${content.level} heading at ${where}`);
     case 'paragraph':
-      return block(nonEmpty(postInline(content.content), where));
+      return block(nonEmpty(postInline(content.content, where), where));
     case 'list':
       return entries(content.items, where)
         .map((item, index) => {
           const marker = content.ordered ? `${index + 1}.` : '-';
-          return `${marker} ${block(nonEmpty(postInline(item), `item ${index + 1} of ${where}`))}`;
+          const at = `item ${index + 1} of ${where}`;
+          return `${marker} ${block(nonEmpty(postInline(item, at), at))}`;
         })
         .join('\n');
     case 'code':
       return codeBlock(nonEmpty(content.code, where), content.language);
     case 'quote':
-      return `> ${block(nonEmpty(postInline(content.content), where))}`;
+      return `> ${block(nonEmpty(postInline(content.content, where), where))}`;
     case 'table': {
       // Always captioned, even under a heading of the same words, so a draft's `Table:` line and
       // the twin's compare line for line (D6 of the publishing design).
@@ -457,7 +473,7 @@ function postBlock(content: PostBlock, where: string): string {
       // The types rule this out; a post cast from elsewhere must not lose a block silently.
       const unknown: never = content;
       throw new Error(
-        `postToMarkdown: no writer for the block kind "${(unknown as { kind: string }).kind}"`,
+        `postToMarkdown: no writer for the block kind "${(unknown as { kind: string }).kind}" at ${where}`,
       );
     }
   }
@@ -492,15 +508,16 @@ export function postToMarkdown(post: PublishedPost): string {
 
 /**
  * `/blog`'s twin. While no post is published it is the record, Coming Soon card included, as the
- * page shows. After that it lists each published post newest first, as the page does: the title as a
- * heading, the day it was published and its URL, then its summary.
+ * page shows. After that it lists the posts in the order given, which `publishedPosts` keeps
+ * newest first, as the page does: the title as a heading, the day it was published and its URL,
+ * then its summary.
  */
 export function blogToMarkdown(page: PageRecord, list: readonly PublishedPost[]): string {
   if (list.length === 0) return pageToMarkdown(page);
   return document([
-    opening(titleOf(page), page.summary, page.path, 'blogToMarkdown'),
+    opening(titleOf(page, 'blogToMarkdown'), page.summary, page.path, 'blogToMarkdown'),
     ...list.flatMap((post) => [
-      heading(2, post.title),
+      heading(2, post.title, `blogToMarkdown: the title of ${post.slug}`),
       `- Published: ${post.publishedAt}\n- URL: ${absoluteUrl(`/blog/${post.slug}`)}`,
       paragraph(post.summary, `blogToMarkdown: the summary of ${post.slug}`),
     ]),
@@ -512,7 +529,7 @@ export function blogToMarkdown(page: PageRecord, list: readonly PublishedPost[])
  * `captionedTable()`).
  */
 function stackable([, first, ...rest]: TableRow, columns: readonly string[], where: string): void {
-  const what = (column: number) => `renderSections: the ${columns[column]} of ${where}`;
+  const what = (column: number) => `serialise: the ${columns[column]} of ${where}`;
   if (Array.isArray(first)) {
     throw new Error(`${what(1)} is a list, which cannot run on after the row header on a phone`);
   }
