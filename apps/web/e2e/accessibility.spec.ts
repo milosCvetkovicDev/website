@@ -34,7 +34,7 @@ import {
  * visible text). The fixes (ADR 0008) were verified by hand; this spec is what keeps them fixed.
  *
  * The run mirrors Lighthouse's accessibility category: axe-core with the `wcag2a` and `wcag2aa`
- * tags plus the rule overrides below, copied from Lighthouse 13.4.1
+ * tags plus the rule overrides below, as Lighthouse 13.5.0 sets them
  * (core/gather/gatherers/accessibility.js). The overrides are where the experimental
  * `label-content-name-mismatch` rule is switched on; axe leaves it off by default. Only
  * `violations` fail the test. `incomplete` results (axe could not decide, typically a background it
