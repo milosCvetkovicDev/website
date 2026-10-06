@@ -28,7 +28,7 @@ This design departs from the issue in three ways, each recorded in
   and the feed do not both edit one file.
 
 > **2026-10-06:** the bullet "No agent writes a post" no longer holds.
-> [ADR 0033](../adr/0033-blog-posts-drafted-with-claude.md) supersedes ADR 0028: posts are drafted
+> [ADR 0034](../adr/0034-blog-posts-drafted-with-claude.md) supersedes ADR 0028: posts are drafted
 > with Claude and approved by the owner line by line.
 > [The publishing design](2026-10-06-blog-publishing-design.md) adds the `kind` flag, the disclosure
 > footer, a table block and the publish check.
@@ -83,7 +83,7 @@ This design departs from the issue in three ways, each recorded in
 ## Owner decisions
 
 - Typed blocks over MDX, and that no agent writes a post (ADR 0028). **2026-10-06:** the second
-  half no longer holds: [ADR 0033](../adr/0033-blog-posts-drafted-with-claude.md) supersedes
+  half no longer holds: [ADR 0034](../adr/0034-blog-posts-drafted-with-claude.md) supersedes
   ADR 0028.
 - The empty state in D5, or dropping the nav link while the blog is empty.
 - The feed's title and author: the name the site already uses and `https://miloscvetkovic.dev`,

@@ -1,4 +1,4 @@
-# 0033. Blog posts are drafted with Claude and approved by the owner, line by line
+# 0034. Blog posts are drafted with Claude and approved by the owner, line by line
 
 ## Status
 

@@ -67,8 +67,8 @@ After P5 merges, the first post also has to pass these checks in production:
 - Under `docs/`, every new relative link, every backticked `pnpm` command outside a fenced block and
   every path:line citation needs an entry in `docs/drift-manifest.json`. Check with
   `node scripts/check-docs-drift.ts --skip-requires admin`, not through pnpm, which rejects the `--`.
-- ADR 0033 was the next free number on 2026-10-06. Re-check it on `origin/main` and in the open pull
-  requests before writing the record.
+- ADR 0034 was the next free number on 2026-10-06, once #233 had taken 0033 for its Dependabot
+  record. Re-check it on `origin/main` and in the open pull requests before writing the record.
 - Run verification one suite at a time: parallel sessions load this machine enough to fail timing
   assertions that pass in CI.
 - Only P5 changes what a page visibly says, so only P5 bumps content dates.
@@ -95,7 +95,7 @@ week"`. It must parse to the title the twin serves. Pinned in Task 8.
 
 | Slice | Creates                                                                                                                                                                                                            | Modifies                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1    | `docs/adr/0033-blog-posts-drafted-with-claude.md`                                                                                                                                                                  | `docs/adr/0028-blog-posts-as-typed-data.md`, `docs/adr/README.md`, `apps/web/src/data/posts.ts` (comment only), `docs/plans/2026-09-28-blog-engine-design.md`, `docs/plans/2026-10-06-blog-publishing-design.md`, `docs/plans/README.md`, `docs/drift-manifest.json`                                                                                                                                                                                                                                 |
+| P1    | `docs/adr/0034-blog-posts-drafted-with-claude.md`                                                                                                                                                                  | `docs/adr/0028-blog-posts-as-typed-data.md`, `docs/adr/README.md`, `apps/web/src/data/posts.ts` (comment only), `docs/plans/2026-09-28-blog-engine-design.md`, `docs/plans/2026-10-06-blog-publishing-design.md`, `docs/plans/README.md`, `docs/drift-manifest.json`                                                                                                                                                                                                                                 |
 | P2    |                                                                                                                                                                                                                    | `apps/web/src/data/posts.ts`, `apps/web/src/test/fixtures/posts.ts`, `apps/web/src/data/__tests__/posts.test.ts`, `apps/web/src/app/blog/[slug]/page.tsx`, `apps/web/src/app/blog/__tests__/post-page.test.tsx`                                                                                                                                                                                                                                                                                      |
 | P3    |                                                                                                                                                                                                                    | `apps/web/src/data/posts.ts`, `apps/web/src/test/fixtures/posts.ts`, `apps/web/src/data/__tests__/posts.test.ts`, `apps/web/src/components/post-body.tsx`, `apps/web/src/components/__tests__/post-body.test.tsx`, `apps/web/src/app/blog/__tests__/post-page.test.tsx`                                                                                                                                                                                                                              |
 | P4    | `apps/web/src/app/blog/[slug]/index.md/route.ts`, `scripts/post-draft-check.mjs`, `scripts/post-draft-check.test.mjs`, `apps/web/src/test/fixtures/post-draft.md`, `apps/web/src/lib/__tests__/post-draft.test.ts` | `apps/web/src/lib/serialise.ts`, `apps/web/src/lib/__tests__/serialise.test.ts`, `apps/web/src/app/blog/index.md/route.ts`, `apps/web/src/app/blog/__tests__/post-page.test.tsx`, `apps/web/src/data/__tests__/pages.test.ts`, `apps/web/next.config.ts`, `apps/web/src/test/next-config.test.ts`, `apps/web/e2e/endpoints.ts`, `.prettierignore`, `.claude/rules/app-router-and-content.md`, `.claude/rules/ci-and-scripts.md`, `docs/plans/2026-09-28-blog-engine-plan.md`, `docs/plans/README.md` |
@@ -103,13 +103,13 @@ week"`. It must parse to the title the twin serves. Pinned in Task 8.
 
 ---
 
-### Task 1: P1, ADR 0033 and the records it changes
+### Task 1: P1, ADR 0034 and the records it changes
 
 **Files:**
 
-- Create: `docs/adr/0033-blog-posts-drafted-with-claude.md`
+- Create: `docs/adr/0034-blog-posts-drafted-with-claude.md`
 - Modify: `docs/adr/0028-blog-posts-as-typed-data.md` (Status), `docs/adr/README.md` (row 0028, a new
-  row 0033), `apps/web/src/data/posts.ts` (the header comment), the Context section and the Owner
+  row 0034), `apps/web/src/data/posts.ts` (the header comment), the Context section and the Owner
   decisions of `docs/plans/2026-09-28-blog-engine-design.md`, the header of
   `docs/plans/2026-10-06-blog-publishing-design.md`, `docs/plans/README.md` (the engine design's
   row), `docs/drift-manifest.json`, `docs/plans/2026-10-06-blog-publishing-plan.md` (this task's
@@ -118,25 +118,25 @@ week"`. It must parse to the title the twin serves. Pinned in Task 8.
 
 **Interfaces:**
 
-- Produces: ADR 0033, which the code comments of Tasks 2 to 10 cite.
+- Produces: ADR 0034, which the code comments of Tasks 2 to 10 cite.
 
-- [x] **Step 1: Confirm that 0033 is free**
+- [x] **Step 1: Confirm that 0034 is free**
 
 ```bash
 git fetch origin
-git ls-tree --name-only origin/main docs/adr/ | grep -E '/003[3-9]-'
-gh pr list --state open --json number,files --jq '.[] | select(any(.files[]; .path | test("^docs/adr/003[3-9]-"))) | .number'
+git ls-tree --name-only origin/main docs/adr/ | grep -E '/00(3[4-9]|[4-9][0-9])-'
+gh pr list --state open --json number,files --jq '.[] | select(any(.files[]; .path | test("^docs/adr/00(3[4-9]|[4-9][0-9])-"))) | .number'
 ```
 
-Expected: no output from either command. If 0033 is taken, use the next free number everywhere this
-plan says 0033: the file name, the H1, the index row, the pointers and the code comments.
+Expected: no output from either command. If 0034 is taken, use the next free number everywhere this
+plan says 0034: the file name, the H1, the index row, the pointers and the code comments.
 
 - [x] **Step 2: Write the record**
 
-Create `docs/adr/0033-blog-posts-drafted-with-claude.md`:
+Create `docs/adr/0034-blog-posts-drafted-with-claude.md`:
 
 ```markdown
-# 0033. Blog posts are drafted with Claude and approved by the owner, line by line
+# 0034. Blog posts are drafted with Claude and approved by the owner, line by line
 
 ## Status
 
@@ -230,10 +230,10 @@ block kinds.
 In `docs/adr/0028-blog-posts-as-typed-data.md`, replace the line `Accepted` under `## Status` with:
 
 ```markdown
-Superseded by ADR-0033
+Superseded by ADR-0034
 
 Two of the decisions below no longer apply, and
-[ADR 0033](0033-blog-posts-drafted-with-claude.md) replaces both. Decision 5 goes, because posts
+[ADR 0034](0034-blog-posts-drafted-with-claude.md) replaces both. Decision 5 goes, because posts
 are now drafted with Claude and approved by the owner line by line. Decision 1's list of block kinds
 gains a `table`. The rest of this record still applies.
 ```
@@ -243,11 +243,11 @@ Leave the H1 and every other section as they are: ADR 0012 forbids editing an ac
 
 - [x] **Step 4: Update the ADR index**
 
-In `docs/adr/README.md`, set row 0028's status cell to `Superseded by ADR-0033` and add this row
-after 0032:
+In `docs/adr/README.md`, set row 0028's status cell to `Superseded by ADR-0034` and add this row
+after the last one:
 
 ```markdown
-| 0033 | [Blog posts are drafted with Claude and approved by the owner, line by line](0033-blog-posts-drafted-with-claude.md) | Accepted | 2026-10-06 |
+| 0034 | [Blog posts are drafted with Claude and approved by the owner, line by line](0034-blog-posts-drafted-with-claude.md) | Accepted | 2026-10-06 |
 ```
 
 The Prettier hook pads the table.
@@ -259,7 +259,7 @@ In `apps/web/src/data/posts.ts`, replace the line
 
 ```ts
  * For whoever adds a post. A post is drafted with Claude outside this repository, approved line by
- * line by the owner, and added here by a pull request that only the owner merges (ADR 0033):
+ * line by the owner, and added here by a pull request that only the owner merges (ADR 0034):
 ```
 
 In the first bullet under it, replace these two lines:
@@ -283,7 +283,7 @@ At the end of the Context section of `docs/plans/2026-09-28-blog-engine-design.m
 
 ```markdown
 > **2026-10-06:** the bullet "No agent writes a post" no longer holds.
-> [ADR 0033](../adr/0033-blog-posts-drafted-with-claude.md) supersedes ADR 0028: posts are drafted
+> [ADR 0034](../adr/0034-blog-posts-drafted-with-claude.md) supersedes ADR 0028: posts are drafted
 > with Claude and approved by the owner line by line.
 > [The publishing design](2026-10-06-blog-publishing-design.md) adds the `kind` flag, the disclosure
 > footer, a table block and the publish check.
@@ -294,14 +294,14 @@ In the same design's Owner decisions, append to the bullet
 
 ```markdown
 **2026-10-06:** the second half no longer holds:
-[ADR 0033](../adr/0033-blog-posts-drafted-with-claude.md) supersedes ADR 0028.
+[ADR 0034](../adr/0034-blog-posts-drafted-with-claude.md) supersedes ADR 0028.
 ```
 
 In `docs/plans/README.md`, append to the notes of the engine design's row, without rewriting them:
-`2026-10-06: ADR 0033 supersedes ADR 0028; posts are drafted with Claude and approved line by line by the owner.`
+`2026-10-06: ADR 0034 supersedes ADR 0028; posts are drafted with Claude and approved line by line by the owner.`
 
 In the header of `docs/plans/2026-10-06-blog-publishing-design.md`, whose status already reads
-`Accepted (2026-10-06)`, add `[ADR 0033](../adr/0033-blog-posts-drafted-with-claude.md)` to the
+`Accepted (2026-10-06)`, add `[ADR 0034](../adr/0034-blog-posts-drafted-with-claude.md)` to the
 **Related** line.
 
 - [x] **Step 7: Catalogue the new links**
@@ -315,10 +315,10 @@ Expected: exit 1, with the new links reported `uncatalogued`. Give each one an e
 `file-line`, `evaluation` `live`, `covers` naming the link token, and `check.path` the file the link
 resolves to from the repository root.
 
-The plan already links ADR 0033 in the text it quotes. Its two entries,
-`blog-publishing-plan-link-adr-0033` and `blog-publishing-plan-link-adr-0033-from-plans`, check
+The plan already links ADR 0034 in the text it quotes. Its two entries,
+`blog-publishing-plan-link-adr-0034` and `blog-publishing-plan-link-adr-0034-from-plans`, check
 that the plan creates the record, because it did not exist when the plan was written. Now that it
-exists, point both at it: set each `check` to `{ "path": "docs/adr/0033-blog-posts-drafted-with-claude.md" }`
+exists, point both at it: set each `check` to `{ "path": "docs/adr/0034-blog-posts-drafted-with-claude.md" }`
 and each `claim` to say that the link resolves to that record. Run the check again.
 
 Expected: `0 drift, 0 uncatalogued`.
@@ -337,13 +337,13 @@ the pointer links an accepted record with a later number.
 - [x] **Step 9: Commit, review and open the pull request**
 
 ```bash
-git add docs/adr/0033-blog-posts-drafted-with-claude.md docs/adr/0028-blog-posts-as-typed-data.md docs/adr/README.md apps/web/src/data/posts.ts docs/plans/2026-09-28-blog-engine-design.md docs/plans/2026-10-06-blog-publishing-design.md docs/plans/README.md docs/drift-manifest.json docs/plans/2026-10-06-blog-publishing-plan.md
-git commit -m "docs(adr): supersede ADR 0028 with ADR 0033, posts drafted with Claude"
+git add docs/adr/0034-blog-posts-drafted-with-claude.md docs/adr/0028-blog-posts-as-typed-data.md docs/adr/README.md apps/web/src/data/posts.ts docs/plans/2026-09-28-blog-engine-design.md docs/plans/2026-10-06-blog-publishing-design.md docs/plans/README.md docs/drift-manifest.json docs/plans/2026-10-06-blog-publishing-plan.md
+git commit -m "docs(adr): supersede ADR 0028 with ADR 0034, posts drafted with Claude"
 ```
 
 Run `adversarial-reviewer` on `git diff origin/main...HEAD`. Then follow
 `.claude/skills/open-pr/SKILL.md` with the title
-`docs(adr): supersede ADR 0028 with ADR 0033 and plan blog publishing`. In `docs/plans/README.md`,
+`docs(adr): supersede ADR 0028 with ADR 0034 and plan blog publishing`. In `docs/plans/README.md`,
 leave the rows of this design and this plan `In review`: they stay so until Task 10's pull request,
 which sets both to `Shipped`.
 
@@ -383,7 +383,7 @@ Add to the end of `defects`:
     [published({ kind })],
     /^fixture-every-block: kind must be "own" or "jev", not (?:undefined|".*")$/,
   ]),
-  // Each place a post shows text. A name in any of them makes an `own` post a defect (ADR 0033).
+  // Each place a post shows text. A name in any of them makes an `own` post a defect (ADR 0034).
   ...(
     [
       ['the title', { title: 'Fixture: what TypeSafe measures' }, 'title', 'TypeSafe'],
@@ -429,7 +429,7 @@ Add to the end of `accepted`:
       [withBody(paragraph(`A sentence with ${word} in it.`))],
     ],
   ),
-  // A URL is not text the post shows; ADR 0033 checks the link's text.
+  // A URL is not text the post shows; ADR 0034 checks the link's text.
   ['an own post linking to a TypeSafe URL', [withLink('https://example.com/TypeSafe', 'the example page')]],
 ```
 
@@ -476,7 +476,7 @@ In `apps/web/src/data/posts.ts`, add this bullet to the header comment, after th
 ```ts
  * - Every post, draft or published, has a `kind`: `jev` for an article that reviews TypeSafe's Jev
  *   model, `own` otherwise. `posts.test.ts` fails when a published post that is not `jev` names Jev
- *   or TypeSafe in any text it shows (ADR 0033).
+ *   or TypeSafe in any text it shows (ADR 0034).
 ```
 
 Above `interface PostContent`:
@@ -484,7 +484,7 @@ Above `interface PostContent`:
 ```ts
 /**
  * Which kind of article a post is, as the writing room's tracker names it: `jev` for an article
- * that reviews TypeSafe's Jev model, `own` for every other (ADR 0033).
+ * that reviews TypeSafe's Jev model, `own` for every other (ADR 0034).
  */
 export type PostKind = 'own' | 'jev';
 ```
@@ -500,7 +500,7 @@ After `export type Post = PublishedPost | DraftPost;`:
 
 ```ts
 /**
- * The lines a post of each kind ends with, in order (ADR 0033), in the owner's own words. The post
+ * The lines a post of each kind ends with, in order (ADR 0034), in the owner's own words. The post
  * page renders them in a `<footer>`, last inside its `<article>`, and the twin writes them after a
  * `---` rule. The feed carries only summaries, so no line reaches it.
  */
@@ -693,7 +693,7 @@ footer as the last child of `<article>`, after `<PostBody blocks={post.body} />`
 
   <PostBody blocks={post.body} />
   {/* The kind's closing lines, inside the article so that an extractor reading the article
-      keeps them (ADR 0033); `--muted` rather than an opacity step (ADR 0011). */}
+      keeps them (ADR 0034); `--muted` rather than an opacity step (ADR 0011). */}
   {FOOTER_LINES[post.kind].length > 0 ? (
     <footer className="mt-12 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
       {FOOTER_LINES[post.kind].map((line) => (
@@ -781,7 +781,7 @@ Run `adversarial-reviewer` on `git diff origin/main...HEAD`. Then follow
 `.claude/skills/open-pr/SKILL.md` with the title
 `feat(blog): give posts a kind and end jev posts with the disclosure line`. Its body:
 
-- cites D2 to D4 and ADR 0033;
+- cites D2 to D4 and ADR 0034;
 - pastes the gate output;
 - describes the three screenshots;
 - triages the review findings as fixed, deferred with a reason, or rejected with a reason.
@@ -919,7 +919,7 @@ In `apps/web/src/data/posts.ts`, after `QuoteBlock`:
  * A table of plain-text cells, rendered by `components/data-table.tsx` like the site's other
  * tables. The caption names it, and the first cell of each row is that row's header. A table of
  * three or more columns stacks into one card per row on a phone, so none of its cells may be blank:
- * the card would show a label with nothing beside it (ADR 0033).
+ * the card would show a label with nothing beside it (ADR 0034).
  */
 export interface TableBlock {
   readonly kind: 'table';
@@ -1137,7 +1137,7 @@ git commit -m "docs(plans): tick the table block's screenshot and review steps"
 
 Run `adversarial-reviewer` on `git diff origin/main...HEAD`. Then follow
 `.claude/skills/open-pr/SKILL.md` with the title
-`feat(blog): add a table block to posts, rendered by DataTable`. Its body cites D5 and ADR 0033,
+`feat(blog): add a table block to posts, rendered by DataTable`. Its body cites D5 and ADR 0034,
 pastes the gate output, describes the screenshots, and triages the findings.
 
 ---
@@ -1443,7 +1443,7 @@ export function postBodyToMarkdown(body: readonly PostBlock[], slug: string): st
 }
 
 /**
- * A post's twin (61e, ADR 0033): the opening every twin shares, the post's dates, its body, and,
+ * A post's twin (61e, ADR 0034): the opening every twin shares, the post's dates, its body, and,
  * for a kind with footer lines, a `---` rule and each line, as the page ends its article.
  * `scripts/post-draft-check.mjs` compares an approved draft with this output, and
  * `src/lib/__tests__/post-draft.test.ts` keeps the two in step.
@@ -1888,6 +1888,11 @@ describe('the publish check', () => {
       ['CRLF line endings and a byte-order mark', `﻿${draft().replace(/\n/g, '\r\n')}`, twin()],
       ["an absolute link on the twin's origin", draft(replace(BODY, 0, SERVED[0])), twin()],
       [
+        'a no-break space on both sides',
+        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234 tokens'))),
+        twin({ body: replace(SERVED, 0, SERVED[0].replace('1,234 tokens', '1,234 tokens')) }),
+      ],
+      [
         'a single-quoted title with a doubled quote, as Prettier writes YAML',
         draft(BODY, replace(FRONT, 1, "title: 'Where the tokens go: one week''s count'")),
         twin({ title: "Where the tokens go: one week's count" }),
@@ -1943,6 +1948,13 @@ describe('the publish check', () => {
         twin({ body: replace(SERVED, 0, 'Call `snake\\_case` here.') }),
         'own',
         /^\+ Call `snake\\_case` here\.$/m,
+      ],
+      [
+        'a no-break space in the draft where the twin has a plain space',
+        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234 tokens'))),
+        twin(),
+        'own',
+        /^- A paragraph .* 1,234 tokens\.$/m,
       ],
       [
         'kept bold, which the comparison alone would pass',
@@ -2231,7 +2243,7 @@ Create `scripts/post-draft-check.mjs`:
 
 ```js
 #!/usr/bin/env node
-// The publish check (D8 of docs/plans/2026-10-06-blog-publishing-design.md, ADR 0033). It compares
+// The publish check (D8 of docs/plans/2026-10-06-blog-publishing-design.md, ADR 0034). It compares
 // an approved blog draft with the Markdown twin the site serves for the post, and fails on any
 // difference in the words.
 //
@@ -2443,12 +2455,13 @@ export function inlineTokens(source, links = true) {
 }
 
 /**
- * Plain text in canonical form: whitespace collapsed, and every backslash, backtick and bracket
- * escaped. Only a real code span or link writes those bare, so text that reads like one never
- * equals one.
+ * Plain text in canonical form: runs of spaces, tabs and line breaks collapsed to one space, as the
+ * serialiser's `text()` collapses them, and every backslash, backtick and bracket escaped. A
+ * no-break or thin space is kept, because the page shows it. Only a real code span or link writes
+ * those three bare, so text that reads like one never equals one.
  * @param {string} value
  */
-const canonicalText = (value) => value.replace(/\s+/g, ' ').replace(/[\\`[\]]/g, '\\$&');
+const canonicalText = (value) => value.replace(/[ \t\r\n]+/g, ' ').replace(/[\\`[\]]/g, '\\$&');
 
 /**
  * A link destination in canonical form: on the twin's origin it is the path a draft writes, and a
@@ -3159,7 +3172,7 @@ Create `apps/web/src/lib/__tests__/post-draft.test.ts`:
 /**
  * @vitest-environment node
  *
- * The publish check against the serialiser it reads (ADR 0033). The fixture draft is the approved
+ * The publish check against the serialiser it reads (ADR 0034). The fixture draft is the approved
  * draft the every-block fixture would come from, written in the variant Markdown a draft may use. A
  * change to how `postToMarkdown` escapes or lays out a block fails here, in CI, rather than at the
  * next publish.
@@ -3223,7 +3236,7 @@ kind's `FOOTER_LINES`. `/blog`'s twin is written by `blogToMarkdown()`, which li
 posts once there are any. The post format an approved draft must follow, and the publish check
 (`scripts/post-draft-check.mjs`) that compares the draft with the served twin, are in
 `docs/plans/2026-10-06-blog-publishing-design.md`. That document is the contract the writing room's
-publish mode reads (ADR 0033). A change to how a post block is written there must keep
+publish mode reads (ADR 0034). A change to how a post block is written there must keep
 `src/lib/__tests__/post-draft.test.ts` green.
 ```
 

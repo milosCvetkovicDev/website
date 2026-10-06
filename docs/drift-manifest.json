@@ -7141,11 +7141,11 @@
       "anchor": "| 0028 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0028's record carries the status line \"Superseded by ADR-0033\".",
+      "claim": "ADR 0028's record carries the status line \"Superseded by ADR-0034\".",
       "check": {
         "file": "docs/adr/0028-blog-posts-as-typed-data.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Superseded by ADR-0033"
+        "equals": "Superseded by ADR-0034"
       }
     },
     {
@@ -7154,11 +7154,11 @@
       "anchor": "| 0028 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0028 gives the record's status line, \"Superseded by ADR-0033\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0028 gives the record's status line, \"Superseded by ADR-0034\" (ADR 0012: the status in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0028 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Superseded by ADR-0033"
+        "equals": "Superseded by ADR-0034"
       }
     },
     {
@@ -7231,20 +7231,20 @@
       }
     },
     {
-      "id": "adr-0028-link-0033-blog-posts-drafted-with-claude",
+      "id": "adr-0028-link-0034-blog-posts-drafted-with-claude",
       "doc": "docs/adr/0028-blog-posts-as-typed-data.md",
-      "anchor": "](0033-blog-posts-drafted-with-claude.md)",
-      "claim": "The link to 0033-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to 0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
       "covers": [
         {
           "kind": "link",
-          "token": "0033-blog-posts-drafted-with-claude.md"
+          "token": "0034-blog-posts-drafted-with-claude.md"
         }
       ],
       "check": {
-        "path": "docs/adr/0033-blog-posts-drafted-with-claude.md"
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
       }
     },
     {
@@ -7743,20 +7743,20 @@
       }
     },
     {
-      "id": "adr-readme-link-0033-blog-posts-drafted-with-claude",
+      "id": "adr-readme-link-0034-blog-posts-drafted-with-claude",
       "doc": "docs/adr/README.md",
-      "anchor": "](0033-blog-posts-drafted-with-claude.md)",
-      "claim": "The link to 0033-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to 0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
       "covers": [
         {
           "kind": "link",
-          "token": "0033-blog-posts-drafted-with-claude.md"
+          "token": "0034-blog-posts-drafted-with-claude.md"
         }
       ],
       "check": {
-        "path": "docs/adr/0033-blog-posts-drafted-with-claude.md"
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
       }
     },
     {
@@ -7916,80 +7916,80 @@
       }
     },
     {
-      "id": "adr-index-0033-status",
+      "id": "adr-index-0034-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0033 |",
+      "anchor": "| 0034 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0033's record carries the status line \"Accepted\".",
+      "claim": "ADR 0034's record carries the status line \"Accepted\".",
       "check": {
-        "file": "docs/adr/0033-blog-posts-drafted-with-claude.md",
+        "file": "docs/adr/0034-blog-posts-drafted-with-claude.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
         "equals": "Accepted"
       }
     },
     {
-      "id": "adr-index-0033-cell-status",
+      "id": "adr-index-0034-cell-status",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0033 |",
+      "anchor": "| 0034 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0033 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0034 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
-        "regex": "^\\| 0033 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "regex": "^\\| 0034 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
         "equals": "Accepted"
       }
     },
     {
-      "id": "adr-index-0033-date",
+      "id": "adr-index-0034-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0033 |",
+      "anchor": "| 0034 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0033's record carries the Date \"2026-10-06\".",
+      "claim": "ADR 0034's record carries the Date \"2026-10-06\".",
       "check": {
-        "file": "docs/adr/0033-blog-posts-drafted-with-claude.md",
+        "file": "docs/adr/0034-blog-posts-drafted-with-claude.md",
         "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
         "equals": "2026-10-06"
       }
     },
     {
-      "id": "adr-index-0033-cell-date",
+      "id": "adr-index-0034-cell-date",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0033 |",
+      "anchor": "| 0034 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0033 gives the record's Date, \"2026-10-06\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0034 gives the record's Date, \"2026-10-06\" (ADR 0012: the status in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
-        "regex": "^\\| 0033 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "regex": "^\\| 0034 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
         "equals": "2026-10-06"
       }
     },
     {
-      "id": "adr-index-0033-title",
+      "id": "adr-index-0034-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0033 |",
+      "anchor": "| 0034 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0033's record carries the H1 title \"Blog posts are drafted with Claude and approved by the owner, line by line\".",
+      "claim": "ADR 0034's record carries the H1 title \"Blog posts are drafted with Claude and approved by the owner, line by line\".",
       "check": {
-        "file": "docs/adr/0033-blog-posts-drafted-with-claude.md",
+        "file": "docs/adr/0034-blog-posts-drafted-with-claude.md",
         "regex": "^# \\d{4}\\. (.+)$",
         "equals": "Blog posts are drafted with Claude and approved by the owner, line by line"
       }
     },
     {
-      "id": "adr-index-0033-cell-title",
+      "id": "adr-index-0034-cell-title",
       "doc": "docs/adr/README.md",
-      "anchor": "| 0033 |",
+      "anchor": "| 0034 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0033 gives the record's H1 title, \"Blog posts are drafted with Claude and approved by the owner, line by line\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0034 gives the record's H1 title, \"Blog posts are drafted with Claude and approved by the owner, line by line\" (ADR 0012: the status in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
-        "regex": "^\\| 0033 \\| \\[(.+?)\\]\\(0033-",
+        "regex": "^\\| 0034 \\| \\[(.+?)\\]\\(0034-",
         "equals": "Blog posts are drafted with Claude and approved by the owner, line by line"
       }
     },
@@ -8248,8 +8248,8 @@
       }
     },
     {
-      "id": "adr-0033-link-0028-blog-posts-as-typed-data",
-      "doc": "docs/adr/0033-blog-posts-drafted-with-claude.md",
+      "id": "adr-0034-link-0028-blog-posts-as-typed-data",
+      "doc": "docs/adr/0034-blog-posts-drafted-with-claude.md",
       "anchor": "](0028-blog-posts-as-typed-data.md)",
       "claim": "The link to 0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
       "method": "file-line",
@@ -8265,8 +8265,8 @@
       }
     },
     {
-      "id": "adr-0033-link-plans-2026-10-06-blog-publishing-design",
-      "doc": "docs/adr/0033-blog-posts-drafted-with-claude.md",
+      "id": "adr-0034-link-plans-2026-10-06-blog-publishing-design",
+      "doc": "docs/adr/0034-blog-posts-drafted-with-claude.md",
       "anchor": "](../plans/2026-10-06-blog-publishing-design.md)",
       "claim": "The link to ../plans/2026-10-06-blog-publishing-design.md resolves to a file in the repository.",
       "method": "file-line",
@@ -10252,20 +10252,20 @@
       }
     },
     {
-      "id": "plan-blog-engine-design-link-adr-0033-blog-posts-drafted-with-claude",
+      "id": "plan-blog-engine-design-link-adr-0034-blog-posts-drafted-with-claude",
       "doc": "docs/plans/2026-09-28-blog-engine-design.md",
-      "anchor": "](../adr/0033-blog-posts-drafted-with-claude.md)",
-      "claim": "The link to ../adr/0033-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "anchor": "](../adr/0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to ../adr/0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
       "covers": [
         {
           "kind": "link",
-          "token": "../adr/0033-blog-posts-drafted-with-claude.md"
+          "token": "../adr/0034-blog-posts-drafted-with-claude.md"
         }
       ],
       "check": {
-        "path": "docs/adr/0033-blog-posts-drafted-with-claude.md"
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
       }
     },
     {
@@ -10441,20 +10441,20 @@
       }
     },
     {
-      "id": "blog-publishing-design-link-adr-0033",
+      "id": "blog-publishing-design-link-adr-0034",
       "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
-      "anchor": "](../adr/0033-blog-posts-drafted-with-claude.md)",
-      "claim": "The link to ../adr/0033-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "anchor": "](../adr/0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to ../adr/0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
       "covers": [
         {
           "kind": "link",
-          "token": "../adr/0033-blog-posts-drafted-with-claude.md"
+          "token": "../adr/0034-blog-posts-drafted-with-claude.md"
         }
       ],
       "check": {
-        "path": "docs/adr/0033-blog-posts-drafted-with-claude.md"
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
       }
     },
     {
@@ -10530,7 +10530,7 @@
       "id": "blog-publishing-plan-link-adr-0028",
       "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
       "anchor": "](0028-blog-posts-as-typed-data.md)",
-      "claim": "The ADR 0033 text that Task 1 quotes links ADR 0028 relative to docs/adr, where the record is.",
+      "claim": "The ADR 0034 text that Task 1 quotes links ADR 0028 relative to docs/adr, where the record is.",
       "method": "file-line",
       "evaluation": "live",
       "covers": [
@@ -10547,7 +10547,7 @@
       "id": "blog-publishing-plan-link-design-from-adr",
       "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
       "anchor": "](../plans/2026-10-06-blog-publishing-design.md)",
-      "claim": "The ADR 0033 text that Task 1 quotes links the publishing design relative to docs/adr, and the design exists.",
+      "claim": "The ADR 0034 text that Task 1 quotes links the publishing design relative to docs/adr, and the design exists.",
       "method": "file-line",
       "evaluation": "live",
       "covers": [
@@ -10561,37 +10561,37 @@
       }
     },
     {
-      "id": "blog-publishing-plan-link-adr-0033",
+      "id": "blog-publishing-plan-link-adr-0034",
       "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
-      "anchor": "](0033-blog-posts-drafted-with-claude.md)",
-      "claim": "The ADR 0028 pointer and the index row that Task 1 quotes link ADR 0033 relative to docs/adr, and the link resolves to the record, docs/adr/0033-blog-posts-drafted-with-claude.md.",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The ADR 0028 pointer and the index row that Task 1 quotes link ADR 0034 relative to docs/adr, and the link resolves to the record, docs/adr/0034-blog-posts-drafted-with-claude.md.",
       "method": "file-line",
       "evaluation": "live",
       "covers": [
         {
           "kind": "link",
-          "token": "0033-blog-posts-drafted-with-claude.md"
+          "token": "0034-blog-posts-drafted-with-claude.md"
         }
       ],
       "check": {
-        "path": "docs/adr/0033-blog-posts-drafted-with-claude.md"
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
       }
     },
     {
-      "id": "blog-publishing-plan-link-adr-0033-from-plans",
+      "id": "blog-publishing-plan-link-adr-0034-from-plans",
       "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
-      "anchor": "](../adr/0033-blog-posts-drafted-with-claude.md)",
-      "claim": "The dated note and the Related link that Task 1 quotes link ADR 0033 relative to docs/plans, and the link resolves to the record, docs/adr/0033-blog-posts-drafted-with-claude.md.",
+      "anchor": "](../adr/0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The dated note and the Related link that Task 1 quotes link ADR 0034 relative to docs/plans, and the link resolves to the record, docs/adr/0034-blog-posts-drafted-with-claude.md.",
       "method": "file-line",
       "evaluation": "live",
       "covers": [
         {
           "kind": "link",
-          "token": "../adr/0033-blog-posts-drafted-with-claude.md"
+          "token": "../adr/0034-blog-posts-drafted-with-claude.md"
         }
       ],
       "check": {
-        "path": "docs/adr/0033-blog-posts-drafted-with-claude.md"
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
       }
     },
     {

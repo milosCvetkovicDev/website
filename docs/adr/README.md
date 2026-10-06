@@ -53,13 +53,13 @@ perform an operation.
 | 0025 | [The public `vercel.app` production alias answers `X-Robots-Tag: noindex`](0025-production-alias-noindex.md)                             | Accepted                                      | 2026-09-25 |
 | 0026 | [Vercel Web Analytics loads in Vercel deployments only](0026-vercel-web-analytics.md)                                                    | Accepted (corrected 2026-09-27)               | 2026-09-26 |
 | 0027 | [vite 8 is declared in `apps/web`, and `allowBuilds` keeps one entry](0027-vite-8-in-apps-web.md)                                        | Accepted                                      | 2026-09-28 |
-| 0028 | [Blog posts are typed data, and the owner writes every one](0028-blog-posts-as-typed-data.md)                                            | Superseded by ADR-0033                        | 2026-09-29 |
+| 0028 | [Blog posts are typed data, and the owner writes every one](0028-blog-posts-as-typed-data.md)                                            | Superseded by ADR-0034                        | 2026-09-29 |
 | 0029 | [A read-only, unauthenticated MCP server at /mcp is the site's one server function](0029-read-only-mcp-server.md)                        | Proposed                                      | 2026-09-30 |
 | 0030 | [Generated endpoints are static route handlers; pages negotiate twins by rewrite](0030-generated-endpoints-as-static-route-handlers.md)  | Accepted                                      | 2026-10-01 |
 | 0031 | [Structured data is one graph joined by @id, in separate blocks, asserting only what a page shows](0031-structured-data-graph.md)        | Accepted                                      | 2026-10-02 |
 | 0032 | [Playwright's Chromium keeps V8's garbage collector on the main thread](0032-e2e-chromium-single-threaded-gc.md)                         | Accepted                                      | 2026-10-05 |
 | 0033 | [Dependabot's catch-all groups exclude the packages that have groups of their own](0033-dependabot-group-exclusions.md)                  | Accepted                                      | 2026-10-06 |
-| 0033 | [Blog posts are drafted with Claude and approved by the owner, line by line](0033-blog-posts-drafted-with-claude.md)                     | Accepted                                      | 2026-10-06 |
+| 0034 | [Blog posts are drafted with Claude and approved by the owner, line by line](0034-blog-posts-drafted-with-claude.md)                     | Accepted                                      | 2026-10-06 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see

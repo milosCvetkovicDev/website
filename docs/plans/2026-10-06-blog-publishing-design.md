@@ -5,7 +5,7 @@
 **Branch:** one per slice, listed under Slices; this design ships with the first,
 `docs/blog-publishing-design`
 **Related:** #61, [ADR 0028](../adr/0028-blog-posts-as-typed-data.md),
-[ADR 0033](../adr/0033-blog-posts-drafted-with-claude.md),
+[ADR 0034](../adr/0034-blog-posts-drafted-with-claude.md),
 [the blog engine design](2026-09-28-blog-engine-design.md), ADR 0012 (how a decision is superseded)
 
 ## Context
@@ -55,7 +55,7 @@ apart from the front matter and the footer line.
 
 | #   | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                         | Why                                                                                                                                                                                                                                                                                                                                                                                                         |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | ADR 0033 supersedes ADR 0028. It states that posts are drafted with Claude from the owner's own explanation of each finding, every fact is checked against its source, and the owner approves every line; drafting happens outside this repository, and only an approved post reaches `posts.ts`, by pull request. It also records D2 to D5 and D8. ADR 0028's status becomes `Superseded by ADR-0033`, with the pointer line ADR 0012 requires. | ADR 0012 has no partial supersession: a changed decision supersedes its record. The pointer says that decision 5 and decision 1's list of block kinds no longer apply, and that the rest of ADR 0028 still applies.                                                                                                                                                                                         |
+| D1  | ADR 0034 supersedes ADR 0028. It states that posts are drafted with Claude from the owner's own explanation of each finding, every fact is checked against its source, and the owner approves every line; drafting happens outside this repository, and only an approved post reaches `posts.ts`, by pull request. It also records D2 to D5 and D8. ADR 0028's status becomes `Superseded by ADR-0034`, with the pointer line ADR 0012 requires. | ADR 0012 has no partial supersession: a changed decision supersedes its record. The pointer says that decision 5 and decision 1's list of block kinds no longer apply, and that the rest of ADR 0028 still applies.                                                                                                                                                                                         |
 | D2  | Every post, draft or published, carries `kind: 'own' \| 'jev'`, required, with the values the writing room's tracker uses.                                                                                                                                                                                                                                                                                                                       | Publishing copies the value across unchanged, and a required field forces the choice for every post.                                                                                                                                                                                                                                                                                                        |
 | D3  | `FOOTER_LINES`, beside `posts` in `posts.ts`, maps each kind to its lines: none for `own`, "I have no relationship with TypeSafe." for `jev`. The post page renders them as a `<footer>`, last inside `<article>`, above a top border, in `--muted` text; a kind with no lines renders no footer. The twin ends with them (D6). The feed carries summaries only, so no line appears there.                                                       | The line is set once, in data the twin and the page both read. Inside `<article>`, a reader that extracts the article keeps the disclosure. `--muted` follows ADR 0011: text is never dimmed with an opacity step.                                                                                                                                                                                          |
 | D4  | `posts.test.ts` fails when any text of a published post names Jev or TypeSafe as a whole word (`/(?<![\p{L}\p{M}\p{N}_])(?:Jev\|TypeSafe)(?![\p{L}\p{M}\p{N}_])/u`: no letter, mark, digit or underscore of any script on either side) and its kind is not `jev`: the title, `metaTitle`, summary, tags, headings, inline text, link text, code, and a table's caption, columns and cells.                                                       | A published post that names Jev or TypeSafe as their owners write them cannot leave the flag out. The match is case-sensitive, so "typesafe" or "type-safe" in a post about TypeScript does not trip it, and neither does a surname such as Jevtić or Jevđević, whose `đ` an ASCII `\b` would take for a word edge. The cost: another casing ("JEV", "Typesafe") or a name joined to a digit is not caught. |
@@ -86,14 +86,14 @@ brackets, `[a, b]`.
 | (tracker)     | `kind`      | Read from the writing room's tracker, not from the front matter (D2).                                                                                  |
 
 The owner approves the front matter with the article. The check compares the slug, the title and
-the summary as well as the body. `metaTitle` and `tags`, which the twin does not carry, are copied as
-written, and the pull request's description quotes each beside the entry's.
+the summary as well as the body. `metaTitle` and `tags`, which the twin does not carry, are copied
+as written, and the pull request's description quotes each beside the entry's.
 
 ### Body
 
 Blocks are separated by a blank line. A paragraph or a list item may wrap onto more lines, but a
-line that starts a heading, a list, a quote, a fence or a table row straight after a paragraph's line
-is refused: start each block after a blank line.
+line that starts a heading, a list, a quote, a fence or a table row straight after a paragraph's
+line is refused: start each block after a blank line.
 
 | `draft.md`                                                     | Post block or piece        |
 | -------------------------------------------------------------- | -------------------------- |
@@ -112,11 +112,11 @@ this site names a page that exists. The first column of a table is its row heade
 
 Not allowed, and caught by the check when present: bold or italics, images, raw HTML or HTML
 comments, entity references such as `&amp;`, footnotes, `#` or `####` and deeper headings, setext
-headings, code or links in a heading or a table cell, nested lists, an ordered list that does not
-start at 1, a list item or quote of more than one paragraph, hard line breaks, reference-style
-links, autolinks and bare `http://` or `https://` URLs, a line indented with a tab, a block that
-does not start after a blank line, and a `---` rule inside the body. The disclosure line is not
-written in `draft.md`: the site adds it (D3).
+headings, code or links in a heading, a table caption or a table cell, nested lists, an ordered
+list that does not start at 1, a list item or quote of more than one paragraph, hard line breaks,
+reference-style links, autolinks and bare `http://` or `https://` URLs, a line indented with a tab,
+a block that does not start after a blank line, and a `---` rule inside the body. The disclosure
+line is not written in `draft.md`: the site adds it (D3).
 
 ## The publish check
 
@@ -134,9 +134,11 @@ serialised as `\*\*bold\*\*`, which canonicalises to the draft's own `**bold**`.
 
 Both sides are first canonicalised by the inverse of what the serialiser does on purpose, and
 nothing else: backslash escapes are removed from text, an absolute URL on the origin the twin's
-`Source:` line names becomes its path, whitespace inside a paragraph or list item collapses, `*` and
-`+` list markers become `-`, an ordered list is renumbered from 1, table cells are trimmed and the
-delimiter row is normalised, and a code fence is reduced to the shortest that holds its content.
+`Source:` line names becomes its path, a run of spaces, tabs and line breaks inside a paragraph or
+list item collapses to one space as the serialiser's `text()` collapses it (a no-break or thin space
+is kept, so it differs from a plain one), `*` and `+` list markers become `-`, an ordered list is
+renumbered from 1, table cells are trimmed and the delimiter row is normalised, and a code fence is
+reduced to the shortest that holds its content.
 
 The canonical form keeps kinds apart. Each block is written under a line naming its kind (`heading
 2:`, `paragraph:`, `list ordered:`, `quote:`, `code ts:`, `table:` and so on), and running text is
@@ -165,7 +167,7 @@ not the next publish.
 
 | Slice | Branch                        | Delivers                                                                                                                                                                                                                 | Builds on |
 | ----- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
-| P1    | `docs/blog-publishing-design` | ADR 0033 and ADR 0028's status and pointer (D1), the `posts.ts` header comment, dated notes in the engine design's Context, in its Owner decisions and in its index row, this design and its plan, and their index rows. | `main`    |
+| P1    | `docs/blog-publishing-design` | ADR 0034 and ADR 0028's status and pointer (D1), the `posts.ts` header comment, dated notes in the engine design's Context, in its Owner decisions and in its index row, this design and its plan, and their index rows. | `main`    |
 | P2    | `feat/blog-post-kind`         | D2 to D4: `kind`, `FOOTER_LINES`, the footer on the post page, the naming check, and fixtures of both kinds.                                                                                                             | P1        |
 | P3    | `feat/blog-table-block`       | D5: the type, `PostBody`, the fixtures and the rules. After P2, since both edit the same four files.                                                                                                                     | P2        |
 | P4    | `feat/blog-markdown-twins`    | 61e with D6, `post-draft-check.mjs` (D8) and its tests, the fixture draft and the round-trip test, and D7's pointer in the rule file. It lands before the first post, as the engine plan requires.                       | P3        |
@@ -182,13 +184,14 @@ not the next publish.
   headers.
 - The serialiser test: every block and inline kind of every fixture, the table's caption line, and
   the footer rule and line for `jev` and none for `own`.
-- The round-trip test, `post-draft.test.ts`: the fixture post through `postToMarkdown` and the check.
+- The round-trip test, `post-draft.test.ts`: the fixture post through `postToMarkdown` and the
+  check.
 - `scripts/post-draft-check.test.mjs`: one case per canonicalisation rule that must compare equal,
   and one per change that must be caught: a number, a word, a dropped block, kept bold, a table
-  cell, a missing or extra footer line, a changed slug, title or summary, a changed block kind, and
-  a link or code span flattened into text. One case per refused syntax. Exit 2 for a missing file,
-  no front matter, an opening it cannot find, and any other error, such as a directory given as the
-  draft.
+  cell, a missing or extra footer line, a changed slug, title or summary, a changed block kind, a
+  link or code span flattened into text, and a no-break space the entry wrote as a plain one. One
+  case per refused syntax. Exit 2 for a missing file, no front matter, an opening it cannot find,
+  and any other error, such as a directory given as the draft.
 - End to end: while `posts` is empty there is no post to load, so the footer and the table are
   proven by the component tests, with screenshots in light, dark and a phone viewport from a scratch
   post added to `posts.ts` in the working tree and never committed. P5 brings the first real post
