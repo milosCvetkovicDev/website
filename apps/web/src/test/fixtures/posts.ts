@@ -4,9 +4,10 @@
  * path against these instead, through `vi.mock('@/data/posts')` or `buildPostIndex(fixturePosts)`.
  *
  * Between them they hold every block kind and every inline kind, both heading levels, both list
- * styles, a code block with a language and one without, links of both allowed forms, a title with
- * `&`, `<` and `"` in it, a draft, and two published posts with different dates, one of each kind,
- * listed oldest first so that a newest-first sort has something to do.
+ * styles, a code block with a language and one without, a table of three columns with | and * in a
+ * cell, links of both allowed forms, a title with `&`, `<` and `"` in it, a draft, and two
+ * published posts with different dates, one of each kind, listed oldest first so that a
+ * newest-first sort has something to do.
  * `src/data/__tests__/posts.test.ts` fails when a kind is missing here, and when any of these stops
  * passing the post checker.
  *
@@ -62,6 +63,15 @@ export const everyBlockPost: PublishedPost = {
     {
       kind: 'quote',
       content: ['A quotation, with ', { code: 'code' }, ' and plain text in it.'],
+    },
+    {
+      kind: 'table',
+      caption: 'Fixture: a table of three columns',
+      columns: ['Fixture run', 'Blocks', 'Result'],
+      rows: [
+        ['First run', '9', 'Every block rendered'],
+        ['Second run', '9', 'The same, with | and * in a cell'],
+      ],
     },
   ],
 };

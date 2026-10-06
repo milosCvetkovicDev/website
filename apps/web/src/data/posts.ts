@@ -20,6 +20,8 @@
  * - Every post, draft or published, has a `kind`: `jev` for an article that reviews TypeSafe's Jev
  *   model, `own` otherwise. `posts.test.ts` fails when a published post that is not `jev` names Jev
  *   or TypeSafe in any text it shows, matched case-sensitively and as a whole word (ADR 0034).
+ * - A table needs a caption, two columns or more, one cell per column in every row, a row header in
+ *   each row, and no blank cell when it has three columns or more.
  * - `src/data/__tests__/posts.test.ts` checks what a published post must hold: a unique slug of
  *   lowercase words and hyphens, real dates that are not in the future with `updatedAt` on or after
  *   `publishedAt`, a summary of 50 to 300 characters, a served title (`metaTitle` when set, then
@@ -83,8 +85,22 @@ export interface QuoteBlock {
   readonly content: readonly Inline[];
 }
 
-/** Every block a post's body is built from; a sixth kind needs a renderer wherever posts render. */
-export type PostBlock = HeadingBlock | ParagraphBlock | ListBlock | CodeBlock | QuoteBlock;
+/**
+ * A table of plain-text cells, rendered by `components/data-table.tsx` like the site's other
+ * tables. The caption names it, and the first cell of each row is that row's header. A table of
+ * three or more columns stacks into one card per row on a phone, so none of its cells may be blank:
+ * the card would show a label with nothing beside it (ADR 0034).
+ */
+export interface TableBlock {
+  readonly kind: 'table';
+  readonly caption: string;
+  readonly columns: readonly string[];
+  readonly rows: readonly (readonly [header: string, ...cells: string[]])[];
+}
+
+/** Every block a post's body is built from; a seventh kind needs a renderer wherever posts render. */
+export type PostBlock =
+  HeadingBlock | ParagraphBlock | ListBlock | CodeBlock | QuoteBlock | TableBlock;
 
 /**
  * Which kind of article a post is, as the writing room's tracker names it: `jev` for an article

@@ -113,7 +113,7 @@ describe('the post page', () => {
   it('renders every block kind of the post, in its order', async () => {
     render(await PostPage(paramsOf(everyBlockPost.slug)));
     const body = document.querySelector('[data-post-body]')!;
-    // One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote.
+    // One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote, a table.
     expect([...body.children].map((element) => element.tagName)).toEqual([
       'P',
       'H2',
@@ -123,6 +123,7 @@ describe('the post page', () => {
       'FIGURE',
       'FIGURE',
       'BLOCKQUOTE',
+      'DIV',
     ]);
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('A level-two heading');
     expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('A level-three heading');

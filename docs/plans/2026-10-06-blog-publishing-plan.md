@@ -892,7 +892,7 @@ Run `adversarial-reviewer` on `git diff origin/main...HEAD`. Then follow
 - Produces, in the fixtures: the last block of `everyBlockPost` is the table below. Task 6 asserts it
   verbatim.
 
-- [ ] **Step 1: Write the failing rule tests**
+- [x] **Step 1: Write the failing rule tests**
 
 In `posts.test.ts`, beside the other helpers:
 
@@ -932,6 +932,17 @@ Add to `defects`:
   ],
 ```
 
+The defect `a block of no known kind` broke a block with `kind: 'table'`, which is now a known kind,
+so it takes a kind the model never will have, since a post holds no HTML:
+
+```ts
+  [
+    'a block of no known kind',
+    [withBody({ kind: 'html', content: '<p>Text.</p>' })],
+    /: block 1: unknown block kind "html"$/,
+  ],
+```
+
 Add these three rows to the list of places in Task 2's naming defects, before its `] as const`:
 
 ```ts
@@ -949,7 +960,7 @@ Add to `accepted`:
 
 In the test `hold every block kind, …`, add `table: true,` to `kinds`.
 
-- [ ] **Step 2: Write the failing render tests**
+- [x] **Step 2: Write the failing render tests**
 
 In `post-body.test.tsx`, add `case 'table': return 'DIV';` to `tagOf`, and add:
 
@@ -964,10 +975,12 @@ it('renders a table with its caption, its column headers and its row headers', (
       .getAllByRole('columnheader')
       .map((cell) => cell.textContent),
   ).toEqual(block.columns);
+  // Trimmed: a table of three or more columns ends each row header with a real space, so the
+  // stacked line copies as the header and its first cell (`data-table.tsx`).
   expect(
     within(table)
       .getAllByRole('rowheader')
-      .map((cell) => cell.textContent),
+      .map((cell) => cell.textContent?.trim()),
   ).toEqual(block.rows.map(([header]) => header));
 });
 ```
@@ -976,7 +989,7 @@ In `post-page.test.tsx`, in the test `renders every block kind of the post, in i
 `'DIV'` to the expected list, and change its comment to
 `// One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote, a table.`
 
-- [ ] **Step 3: Run them to see them fail**
+- [x] **Step 3: Run them to see them fail**
 
 ```bash
 pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts src/components/__tests__/post-body.test.tsx src/app/blog/__tests__/post-page.test.tsx
@@ -985,7 +998,7 @@ pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts src/component
 Expected: FAIL. The table defects are reported as `unknown block kind "table"`, the fixtures have no
 table, and no table renders.
 
-- [ ] **Step 4: Add the type**
+- [x] **Step 4: Add the type**
 
 In `apps/web/src/data/posts.ts`, after `QuoteBlock`:
 
@@ -1019,7 +1032,7 @@ Add this bullet to the header comment, after the one Task 2 added:
  *   each row, and no blank cell when it has three columns or more.
 ```
 
-- [ ] **Step 5: Add the fixture table**
+- [x] **Step 5: Add the fixture table**
 
 In `apps/web/src/test/fixtures/posts.ts`, add as the last block of `everyBlockPost.body`, after the
 quote:
@@ -1039,7 +1052,7 @@ quote:
 In the header comment, change `a code block with a language and one without,` to
 `a code block with a language and one without, a table of three columns with | and * in a cell,`.
 
-- [ ] **Step 6: Add the table rules**
+- [x] **Step 6: Add the table rules**
 
 In `blockProblems` in `posts.test.ts`, add before `default:`:
 
@@ -1086,7 +1099,7 @@ In `blockProblems` in `posts.test.ts`, add before `default:`:
     }
 ```
 
-- [ ] **Step 7: Render the table**
+- [x] **Step 7: Render the table**
 
 In `apps/web/src/components/post-body.tsx`, add `import { DataTable } from './data-table';` after
 the `@/lib/links` import, and before `default:` in `Block`:
@@ -1104,7 +1117,7 @@ the `@/lib/links` import, and before `default:` in `Block`:
 
 In the comment above `const unhandled: never = block;`, change `A sixth` to `A seventh`.
 
-- [ ] **Step 8: Run the tests until they pass, then typecheck**
+- [x] **Step 8: Run the tests until they pass, then typecheck**
 
 ```bash
 pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts src/components/__tests__/post-body.test.tsx src/app/blog/__tests__/post-page.test.tsx
@@ -1114,7 +1127,7 @@ pnpm typecheck
 Expected: PASS, and typecheck exits 0. `post-body.test.tsx`'s `tagOf` and `PostBody`'s
 `never` default are the switches that fail typecheck if they miss the new kind.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add apps/web/src/data/posts.ts apps/web/src/test/fixtures/posts.ts apps/web/src/data/__tests__/posts.test.ts apps/web/src/components/post-body.tsx apps/web/src/components/__tests__/post-body.test.tsx apps/web/src/app/blog/__tests__/post-page.test.tsx docs/plans/2026-10-06-blog-publishing-plan.md
@@ -1127,7 +1140,7 @@ git commit -m "feat(blog): add a table block to posts, rendered by DataTable"
 
 **Files:** none changed for good. The screenshots come from a scratch change.
 
-- [ ] **Step 1: Take the screenshots from a scratch change that is never committed**
+- [x] **Step 1: Take the screenshots from a scratch change that is never committed**
 
 No post is published, so for the screenshots the scratch post below is published in the working
 tree only. In `apps/web/src/data/posts.ts`, replace `export const posts: readonly Post[] = [];`
@@ -1187,7 +1200,7 @@ git restore apps/web/src/data/posts.ts
 git status --short    # clean
 ```
 
-- [ ] **Step 2: Review and run the gates**
+- [x] **Step 2: Review and run the gates**
 
 Run `ui-reviewer` on `apps/web/src/components/post-body.tsx`, then:
 
@@ -1201,7 +1214,7 @@ pnpm build
 
 Expected: exit 0 from each.
 
-- [ ] **Step 3: Open the pull request**
+- [x] **Step 3: Open the pull request**
 
 Tick this task's boxes in this plan and commit them on their own, since this task changes no code:
 

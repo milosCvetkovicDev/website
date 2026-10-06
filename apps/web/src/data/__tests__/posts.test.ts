@@ -180,6 +180,46 @@ function blockProblems(block: PostBlock, where: string, pages: ReadonlySet<strin
       }
       return problems;
     }
+    case 'table': {
+      const problems = lineProblems(block.caption, `${where}: the table caption`);
+      const { columns, rows }: { columns: unknown; rows: unknown } = block;
+      if (!Array.isArray(columns) || columns.length < 2) {
+        const count = Array.isArray(columns) ? columns.length : 0;
+        problems.push(
+          `${where}: the table has ${count} column${count === 1 ? '' : 's'}; it needs the row headers and a column of values`,
+        );
+        return problems;
+      }
+      columns.forEach((column: unknown, index) =>
+        problems.push(...lineProblems(column, `${where}: column ${index + 1}`)),
+      );
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return [...problems, `${where}: the table has no rows`];
+      }
+      // A stacked card shows each cell beside its column's name, so a blank one points at nothing.
+      const stacks = columns.length >= 3;
+      rows.forEach((row: unknown, index) => {
+        const at = `${where}: row ${index + 1}`;
+        if (!Array.isArray(row) || row.length !== columns.length) {
+          problems.push(
+            `${at} has ${Array.isArray(row) ? row.length : 0} cells for ${columns.length} columns`,
+          );
+          return;
+        }
+        problems.push(...lineProblems(row[0], `${at}: the row header`));
+        row.slice(1).forEach((cell: unknown, offset) => {
+          const cellAt = `${at}, column ${offset + 2}`;
+          if (typeof cell !== 'string') problems.push(`${cellAt} is not text`);
+          else if (hasInvisible(cell)) problems.push(`${cellAt} ${INVISIBLE_PROBLEM}`);
+          else if (stacks && !cell.trim()) {
+            problems.push(
+              `${cellAt} is blank, and a table of three or more columns cannot show a blank cell on a phone`,
+            );
+          }
+        });
+      });
+      return problems;
+    }
     default: {
       const { kind } = block as { kind?: unknown };
       return [`${where}: unknown block kind ${JSON.stringify(kind)}`];
@@ -520,6 +560,14 @@ const withLink = (href: string, text = 'the linked page') =>
 const withTags = (...tags: unknown[]) => published({ tags });
 const withCode = (language: unknown, code = 'const fixture = 1;') =>
   withBody({ kind: 'code', language, code });
+const tableBlock = (fields: Record<string, unknown> = {}) => ({
+  kind: 'table',
+  caption: 'Fixture results',
+  columns: ['Run', 'Tokens', 'Cost'],
+  rows: [['First run', '1,234', '$0.10']],
+  ...fields,
+});
+const withTable = (fields: Record<string, unknown>) => withBody(tableBlock(fields));
 const withTitle = (title: string, metaTitle?: string) =>
   published(metaTitle === undefined ? { title } : { title, metaTitle });
 const summaryOf = (length: number) => published({ summary: 'x'.repeat(length) });
@@ -670,6 +718,42 @@ const defects: [string, Post[], RegExp][] = [
     /: block 1: the code block is empty$/,
   ],
   [
+    'a table with no caption',
+    [withTable({ caption: '' })],
+    /: block 1: the table caption is empty$/,
+  ],
+  [
+    'a table with one column',
+    [withTable({ columns: ['Run'], rows: [['First run']] })],
+    /: block 1: the table has 1 column; it needs the row headers and a column of values$/,
+  ],
+  [
+    'a table with an empty column name',
+    [withTable({ columns: ['Run', '', 'Cost'] })],
+    /: block 1: column 2 is empty$/,
+  ],
+  ['a table with no rows', [withTable({ rows: [] })], /: block 1: the table has no rows$/],
+  [
+    'a short table row',
+    [withTable({ rows: [['First run', '1,234']] })],
+    /: block 1: row 1 has 2 cells for 3 columns$/,
+  ],
+  [
+    'a table row with no header',
+    [withTable({ rows: [['', '1,234', '$0.10']] })],
+    /: block 1: row 1: the row header is empty$/,
+  ],
+  [
+    'a blank cell in a table of three columns',
+    [withTable({ rows: [['First run', ' ', '$0.10']] })],
+    /: block 1: row 1, column 2 is blank, and a table of three or more columns cannot show a blank cell on a phone$/,
+  ],
+  [
+    'a table cell with a line break',
+    [withTable({ rows: [['First run', '1,234\n5', '$0.10']] })],
+    /: block 1: row 1, column 2 holds a line break, a control or a direction character$/,
+  ],
+  [
     'an empty piece of inline code',
     [withBody(paragraph('Run ', { code: '' }, '.'))],
     /: block 1 \(paragraph\), piece 2: the inline code is empty$/,
@@ -686,8 +770,8 @@ const defects: [string, Post[], RegExp][] = [
   ],
   [
     'a block of no known kind',
-    [withBody({ kind: 'table', rows: [] })],
-    /: block 1: unknown block kind "table"$/,
+    [withBody({ kind: 'html', content: '<p>Text.</p>' })],
+    /: block 1: unknown block kind "html"$/,
   ],
   ...[
     'http://example.com',
@@ -904,6 +988,24 @@ const defects: [string, Post[], RegExp][] = [
         'body[0].content[0]',
         'TypeSafe',
       ],
+      [
+        'a table caption',
+        { body: [tableBlock({ caption: 'What Jev measured' })] },
+        'body[0].caption',
+        'Jev',
+      ],
+      [
+        'a table column',
+        { body: [tableBlock({ columns: ['Run', 'TypeSafe', 'Cost'] })] },
+        'body[0].columns[1]',
+        'TypeSafe',
+      ],
+      [
+        'a table cell',
+        { body: [tableBlock({ rows: [['First run', 'Jev', '$0.10']] })] },
+        'body[0].rows[0][1]',
+        'Jev',
+      ],
     ] as const
   ).map(([place, fields, path, name]): [string, Post[], RegExp] => [
     `${name} named in ${place} of an own post`,
@@ -951,6 +1053,11 @@ const accepted: [string, Post[]][] = [
     [withCode(language)],
   ]),
   ['code with backticks and a fence in it', [withCode('md', '```ts\nconst a = `b`;\n```')]],
+  [
+    'a two-column table with a blank cell',
+    [withTable({ columns: ['Run', 'Note'], rows: [['First run', '']] })],
+  ],
+  ['a table cell with | and * in it', [withTable({ rows: [['First run', 'a | b', '*']] })]],
   [
     'headings with one text at different places in two posts',
     [
@@ -1087,6 +1194,7 @@ describe('the post fixtures', () => {
       list: true,
       code: true,
       quote: true,
+      table: true,
     } satisfies Record<PostBlock['kind'], true>;
     expect(new Set(blocks.map(({ kind }) => kind))).toEqual(new Set(Object.keys(kinds)));
     const headings = blocks.filter((block) => block.kind === 'heading');
