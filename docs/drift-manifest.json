@@ -1920,6 +1920,26 @@
       }
     },
     {
+      "id": "adr-0018-link-0012-correcting-accepted-records",
+      "doc": "docs/adr/0018-dependency-update-policy.md",
+      "anchor": "](0012-correcting-accepted-records.md)",
+      "claim": "The link to 0012-correcting-accepted-records.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0012-correcting-accepted-records.md" }],
+      "check": { "path": "docs/adr/0012-correcting-accepted-records.md" }
+    },
+    {
+      "id": "adr-0018-link-0033-dependabot-group-exclusions",
+      "doc": "docs/adr/0018-dependency-update-policy.md",
+      "anchor": "](0033-dependabot-group-exclusions.md)",
+      "claim": "The link to 0033-dependabot-group-exclusions.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0033-dependabot-group-exclusions.md" }],
+      "check": { "path": "docs/adr/0033-dependabot-group-exclusions.md" }
+    },
+    {
       "id": "adr-0020-link-0021-squash-only-merges-and-required-checks",
       "doc": "docs/adr/0020-branch-protection-on-main.md",
       "anchor": "](0021-squash-only-merges-and-required-checks.md)",
@@ -6030,24 +6050,24 @@
       "anchor": "| 0018 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0018's record carries the status line \"Accepted\".",
+      "claim": "ADR 0018's record carries the status line \"Accepted (corrected 2026-10-06)\".",
       "check": {
         "file": "docs/adr/0018-dependency-update-policy.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-10-06)"
       }
     },
     {
       "id": "adr-index-0018-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0018 |",
-      "claim": "The index row for ADR 0018 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0018 gives the record's status line, \"Accepted (corrected 2026-10-06)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0018 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-10-06)"
       }
     },
     {
@@ -7936,6 +7956,183 @@
       "check": {
         "package": "apps/web",
         "script": "build"
+      }
+    },
+    {
+      "id": "adr-readme-link-0033-dependabot-group-exclusions",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0033-dependabot-group-exclusions.md)",
+      "claim": "The link to 0033-dependabot-group-exclusions.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0033-dependabot-group-exclusions.md" }],
+      "check": { "path": "docs/adr/0033-dependabot-group-exclusions.md" }
+    },
+    {
+      "id": "adr-index-0033-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0033's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0033-dependabot-group-exclusions.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0033-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0033 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0033 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0033-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0033's record carries the Date \"2026-10-06\".",
+      "check": {
+        "file": "docs/adr/0033-dependabot-group-exclusions.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-06"
+      }
+    },
+    {
+      "id": "adr-index-0033-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0033 gives the record's Date, \"2026-10-06\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0033 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-06"
+      }
+    },
+    {
+      "id": "adr-index-0033-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0033's record carries the H1 title \"Dependabot's catch-all groups exclude the packages that have groups of their own\".",
+      "check": {
+        "file": "docs/adr/0033-dependabot-group-exclusions.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Dependabot's catch-all groups exclude the packages that have groups of their own"
+      }
+    },
+    {
+      "id": "adr-index-0033-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0033 gives the record's H1 title, \"Dependabot's catch-all groups exclude the packages that have groups of their own\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0033 \\| \\[(.+?)\\]\\(0033-",
+        "equals": "Dependabot's catch-all groups exclude the packages that have groups of their own"
+      }
+    },
+    {
+      "id": "adr-0033-link-0018-dependency-update-policy",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "](0018-dependency-update-policy.md)",
+      "claim": "The link to 0018-dependency-update-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0018-dependency-update-policy.md" }],
+      "check": { "path": "docs/adr/0018-dependency-update-policy.md" }
+    },
+    {
+      "id": "adr-0033-minor-and-patch-exclusions",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "`exclude-patterns: ['vite', '@vitejs/*', 'vitest', '@vitest/*', 'lighthouse']`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The minor-and-patch group excludes ['vite', '@vitejs/*', 'vitest', '@vitest/*', 'lighthouse'], the patterns of the vite and lighthouse groups.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "\\n {6}minor-and-patch:\\n {8}update-types: \\[minor, patch\\]\\n {8}exclude-patterns: (\\[[^\\]\\n]*\\])",
+        "equals": "['vite', '@vitejs/*', 'vitest', '@vitest/*', 'lighthouse']"
+      }
+    },
+    {
+      "id": "adr-0033-security-exclusion",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "`exclude-patterns: ['lighthouse']`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The security group excludes ['lighthouse'], the pattern of the lighthouse-security group.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "\\n {6}security:\\n {8}applies-to: security-updates\\n {8}patterns: \\['\\*'\\]\\n {8}exclude-patterns: (\\[[^\\]\\n]*\\])",
+        "equals": "['lighthouse']"
+      }
+    },
+    {
+      "id": "adr-0033-vite-patterns",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "`vite` and `lighthouse` groups, and `security` carries",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The vite group's patterns are ['vite', '@vitejs/*', 'vitest', '@vitest/*'], the list minor-and-patch excludes.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "\\n {6}vite:\\n {8}patterns: (\\[[^\\]\\n]*\\])",
+        "equals": "['vite', '@vitejs/*', 'vitest', '@vitest/*']"
+      }
+    },
+    {
+      "id": "adr-0033-lighthouse-patterns",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "`vite` and `lighthouse` groups, and `security` carries",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The lighthouse group's patterns are ['lighthouse'], which minor-and-patch excludes.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "\\n {6}lighthouse:\\n {8}patterns: (\\[[^\\]\\n]*\\])",
+        "equals": "['lighthouse']"
+      }
+    },
+    {
+      "id": "adr-0033-lighthouse-security-patterns",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "pattern of `lighthouse-security`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The lighthouse-security group applies to security updates with the patterns ['lighthouse'], which security excludes.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "\\n {6}lighthouse-security:\\n {8}applies-to: security-updates\\n {8}patterns: (\\[[^\\]\\n]*\\])",
+        "equals": "['lighthouse']"
+      }
+    },
+    {
+      "id": "adr-0033-script-check-docs-drift",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "`pnpm check:docs-drift`",
+      "claim": "`pnpm check:docs-drift` is a script in the root package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [{ "kind": "script", "token": "check:docs-drift" }],
+      "check": {
+        "package": ".",
+        "script": "check:docs-drift",
+        "runs": "scripts/check-docs-drift.ts"
       }
     },
     {

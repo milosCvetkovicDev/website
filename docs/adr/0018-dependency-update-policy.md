@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (corrected 2026-10-06)
 
 ## Date
 
@@ -312,3 +312,38 @@ requires on `main`, which are still the `quality` and `e2e` jobs.
 - **Raise `engines.node` to `22.x`,** as ADR 0002 anticipated. It excludes the Node 24 and 26 lines
   the lockfile explicitly admits, so it would refuse a working toolchain; the lockfile intersection
   refuses only what is actually unsupported.
+
+## Corrections
+
+### 2026-10-06
+
+One statement in `## Decision` is false. Under [ADR 0012](0012-correcting-accepted-records.md) it is
+annotated here, and the decision text stays as accepted; which option the decision selects is
+unchanged.
+
+**Why the vite group is declared ahead of `minor-and-patch`.** The record says: "It goes ahead of
+`minor-and-patch` because Dependabot places a dependency in the first group that matches it."
+Dependabot does not, and the position protected less than the sentence says. Since
+dependabot/dependabot-core#13044, #13098 and #13180, merged in September 2025, before this record
+was accepted, a group that matches a dependency by a wildcard gives it up to a group that scores
+higher, and a group with no patterns, as `minor-and-patch` is, scores higher than `@vitejs/*` and
+`@vitest/*` and never gives a dependency up. A group with an open pull request claims its members
+before any other group runs, and a refresh of that pull request updates every member. The order
+counts only in a run where neither group has an open pull request: the groups then run as declared,
+and the first to update a dependency that both keep claims it. So the vite group's position kept
+`vite` and `vitest` out of `minor-and-patch` in such runs, never kept `@vitejs/plugin-react` or
+`@vitest/coverage-v8` out, and kept nothing out while a `minor-and-patch` pull request was open,
+which is how all four arrived in #232. The sentence follows GitHub's options reference for `groups`,
+which says "it's included in the first group that it matches" (read on 2026-10-06), so the
+documentation and the implementation disagree.
+
+Evidence: the Dependabot job of 2026-10-05 that ran every group (Actions run 37363207945) logged
+"Skipping @vitejs/plugin-react for group 'vite' - belongs to more specific group 'minor-and-patch'"
+and, after "Marking group 'minor-and-patch' as handled", "Skipping vitest in group vite as it has
+already been handled by a previous group"; the job that refreshed the `minor-and-patch` pull request
+(Actions run 37363210348) logged a dependency change "in group minor-and-patch" for each of vite
+8.3.2, vitest 5.0.3 and `@vitest/coverage-v8` 5.0.3, which arrived in #232. The scores, the claim
+and the order are in dependabot-core at 47c1f006: `pattern_specificity_calculator.rb`,
+`dependency_snapshot.rb` (`mark_group_handled`) and `operations/group_update_all_versions.rb`. What
+keeps the vite family out of `minor-and-patch` is recorded in
+[ADR 0033](0033-dependabot-group-exclusions.md).
