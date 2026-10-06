@@ -7,8 +7,8 @@
  * For whoever adds a post. A post is drafted with Claude outside this repository, approved line by
  * line by the owner, and added here by a pull request that only the owner merges (ADR 0033):
  *
- * - Add a post to `posts` as `draft: true` while it is being written. A draft renders nowhere and
- *   needs no dates. Everything that shows posts reads `publishedPosts` or `getPost`, never `posts`.
+ * - A post can wait in `posts` as `draft: true`: a draft renders nowhere and needs no dates.
+ *   Everything that shows posts reads `publishedPosts` or `getPost`, never `posts`.
  * - Publish it by setting `draft: false` with `publishedAt` and `updatedAt`, both the day it goes
  *   live as `YYYY-MM-DD`. Later, bump `updatedAt` in the commit that changes what the post says,
  *   and only then: it is the date readers and crawlers are shown as the last change. /blog lists

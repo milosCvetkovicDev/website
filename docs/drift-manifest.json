@@ -7515,14 +7515,9 @@
       "method": "file-line",
       "evaluation": "live",
       "covers": [
-        {
-          "kind": "link",
-          "token": "0030-generated-endpoints-as-static-route-handlers.md"
-        }
+        { "kind": "link", "token": "0030-generated-endpoints-as-static-route-handlers.md" }
       ],
-      "check": {
-        "path": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md"
-      }
+      "check": { "path": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md" }
     },
     {
       "id": "adr-index-0030-status",
@@ -7609,15 +7604,8 @@
       "claim": "The link to 0015-static-case-study-params.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
-      "covers": [
-        {
-          "kind": "link",
-          "token": "0015-static-case-study-params.md"
-        }
-      ],
-      "check": {
-        "path": "docs/adr/0015-static-case-study-params.md"
-      }
+      "covers": [{ "kind": "link", "token": "0015-static-case-study-params.md" }],
+      "check": { "path": "docs/adr/0015-static-case-study-params.md" }
     },
     {
       "id": "adr-0030-link-0017-ai-discoverability-policy",
@@ -7626,15 +7614,8 @@
       "claim": "The link to 0017-ai-discoverability-policy.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
-      "covers": [
-        {
-          "kind": "link",
-          "token": "0017-ai-discoverability-policy.md"
-        }
-      ],
-      "check": {
-        "path": "docs/adr/0017-ai-discoverability-policy.md"
-      }
+      "covers": [{ "kind": "link", "token": "0017-ai-discoverability-policy.md" }],
+      "check": { "path": "docs/adr/0017-ai-discoverability-policy.md" }
     },
     {
       "id": "adr-0030-link-0023-static-security-headers",
@@ -7643,15 +7624,8 @@
       "claim": "The link to 0023-static-security-headers.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
-      "covers": [
-        {
-          "kind": "link",
-          "token": "0023-static-security-headers.md"
-        }
-      ],
-      "check": {
-        "path": "docs/adr/0023-static-security-headers.md"
-      }
+      "covers": [{ "kind": "link", "token": "0023-static-security-headers.md" }],
+      "check": { "path": "docs/adr/0023-static-security-headers.md" }
     },
     {
       "id": "adr-0030-link-0025-production-alias-noindex",
@@ -7660,15 +7634,8 @@
       "claim": "The link to 0025-production-alias-noindex.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
-      "covers": [
-        {
-          "kind": "link",
-          "token": "0025-production-alias-noindex.md"
-        }
-      ],
-      "check": {
-        "path": "docs/adr/0025-production-alias-noindex.md"
-      }
+      "covers": [{ "kind": "link", "token": "0025-production-alias-noindex.md" }],
+      "check": { "path": "docs/adr/0025-production-alias-noindex.md" }
     },
     {
       "id": "adr-0030-link-0026-vercel-web-analytics",
@@ -7677,15 +7644,8 @@
       "claim": "The link to 0026-vercel-web-analytics.md resolves to a file in the repository.",
       "method": "file-line",
       "evaluation": "live",
-      "covers": [
-        {
-          "kind": "link",
-          "token": "0026-vercel-web-analytics.md"
-        }
-      ],
-      "check": {
-        "path": "docs/adr/0026-vercel-web-analytics.md"
-      }
+      "covers": [{ "kind": "link", "token": "0026-vercel-web-analytics.md" }],
+      "check": { "path": "docs/adr/0026-vercel-web-analytics.md" }
     },
     {
       "id": "adr-0030-script-check-build-output",
@@ -7694,16 +7654,8 @@
       "claim": "`pnpm check:build-output` is a script in ./package.json.",
       "method": "command",
       "evaluation": "live",
-      "covers": [
-        {
-          "kind": "script",
-          "token": "check:build-output"
-        }
-      ],
-      "check": {
-        "package": ".",
-        "script": "check:build-output"
-      }
+      "covers": [{ "kind": "script", "token": "check:build-output" }],
+      "check": { "package": ".", "script": "check:build-output" }
     },
     {
       "id": "adr-0030-accept-match",
@@ -7712,10 +7664,7 @@
       "claim": "next.config.ts keys each Markdown rewrite on ACCEPTS_MARKDOWN in its has conditions.",
       "method": "file-line",
       "evaluation": "live",
-      "check": {
-        "path": "apps/web/next.config.ts",
-        "contains": "has: [ACCEPTS_MARKDOWN],"
-      }
+      "check": { "path": "apps/web/next.config.ts", "contains": "has: [ACCEPTS_MARKDOWN]," }
     },
     {
       "id": "adr-0030-refuses-match",
@@ -7724,10 +7673,7 @@
       "claim": "next.config.ts skips each Markdown rewrite on REFUSES_MARKDOWN, a weight of zero, in its missing conditions.",
       "method": "file-line",
       "evaluation": "live",
-      "check": {
-        "path": "apps/web/next.config.ts",
-        "contains": "missing: [REFUSES_MARKDOWN],"
-      }
+      "check": { "path": "apps/web/next.config.ts", "contains": "missing: [REFUSES_MARKDOWN]," }
     },
     {
       "id": "adr-0030-before-files",
@@ -7736,10 +7682,7 @@
       "claim": "next.config.ts returns the Markdown rewrites as its beforeFiles rewrites.",
       "method": "file-line",
       "evaluation": "live",
-      "check": {
-        "path": "apps/web/next.config.ts",
-        "contains": "beforeFiles: markdownRewrites()"
-      }
+      "check": { "path": "apps/web/next.config.ts", "contains": "beforeFiles: markdownRewrites()" }
     },
     {
       "id": "adr-0030-live-negotiation-spec",

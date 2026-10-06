@@ -82,7 +82,9 @@ This design departs from the issue in three ways, each recorded in
 
 ## Owner decisions
 
-- Typed blocks over MDX, and that no agent writes a post (ADR 0028).
+- Typed blocks over MDX, and that no agent writes a post (ADR 0028). **2026-10-06:** the second
+  half no longer holds: [ADR 0033](../adr/0033-blog-posts-drafted-with-claude.md) supersedes
+  ADR 0028.
 - The empty state in D5, or dropping the nav link while the blog is empty.
 - The feed's title and author: the name the site already uses and `https://miloscvetkovic.dev`,
   with no address.

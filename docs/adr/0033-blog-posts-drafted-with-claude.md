@@ -56,7 +56,8 @@ block kinds.
 ### Positive
 
 - The owner can publish as fast as the writing room drafts. Every Jev article tells its reader
-  plainly that the owner has no relationship with TypeSafe, and the flag cannot be forgotten.
+  plainly that the owner has no relationship with TypeSafe, and a post that names Jev or TypeSafe
+  as their owners write them cannot leave the flag out.
 - A post that changes on its way into `posts.ts` fails a check. Nobody has to reread it to notice.
 - Measured results get a table with real row and column headers, and the stacked phone layout that
   the site's other tables have.
@@ -67,7 +68,8 @@ block kinds.
 - The check keeps its own copy of `FOOTER_LINES`, because a plain script cannot import the app's
   TypeScript. A test in the web suite fails when the two copies differ.
 - The naming check is a word match. It cannot tell a post about Jev from one that names it in
-  passing, and both must be `jev`.
+  passing, and both must be `jev`. It is case-sensitive and needs a non-word character on each
+  side, so another casing ("JEV", "Typesafe") or a name joined to a digit is not caught.
 - Table cells are plain text, with no code, links, chips or icons, because a pipe table in a draft
   cannot express them.
 

@@ -72,6 +72,8 @@ After P5 merges, the first post also has to pass these checks in production:
 - Run verification one suite at a time: parallel sessions load this machine enough to fail timing
   assertions that pass in CI.
 - Only P5 changes what a page visibly says, so only P5 bumps content dates.
+- Each task ticks its own steps' checkboxes in this plan in its own commit, so this plan is in every
+  task's `git add`. Task 5, which changes no code, commits its ticks on their own.
 
 ## Review Focus
 
@@ -107,16 +109,18 @@ week"`. It must parse to the title the twin serves. Pinned in Task 8.
 
 - Create: `docs/adr/0033-blog-posts-drafted-with-claude.md`
 - Modify: `docs/adr/0028-blog-posts-as-typed-data.md` (Status), `docs/adr/README.md` (row 0028, a new
-  row 0033), `apps/web/src/data/posts.ts` (the header comment), the Context section of
-  `docs/plans/2026-09-28-blog-engine-design.md`, the header of
-  `docs/plans/2026-10-06-blog-publishing-design.md`, `docs/drift-manifest.json`
+  row 0033), `apps/web/src/data/posts.ts` (the header comment), the Context section and the Owner
+  decisions of `docs/plans/2026-09-28-blog-engine-design.md`, the header of
+  `docs/plans/2026-10-06-blog-publishing-design.md`, `docs/plans/README.md` (the engine design's
+  row), `docs/drift-manifest.json`, `docs/plans/2026-10-06-blog-publishing-plan.md` (this task's
+  boxes)
 - Branch: `docs/blog-publishing-design`, which already holds the design and this plan.
 
 **Interfaces:**
 
 - Produces: ADR 0033, which the code comments of Tasks 2 to 10 cite.
 
-- [ ] **Step 1: Confirm that 0033 is free**
+- [x] **Step 1: Confirm that 0033 is free**
 
 ```bash
 git fetch origin
@@ -127,7 +131,7 @@ gh pr list --state open --json number,files --jq '.[] | select(any(.files[]; .pa
 Expected: no output from either command. If 0033 is taken, use the next free number everywhere this
 plan says 0033: the file name, the H1, the index row, the pointers and the code comments.
 
-- [ ] **Step 2: Write the record**
+- [x] **Step 2: Write the record**
 
 Create `docs/adr/0033-blog-posts-drafted-with-claude.md`:
 
@@ -190,7 +194,8 @@ block kinds.
 ### Positive
 
 - The owner can publish as fast as the writing room drafts. Every Jev article tells its reader
-  plainly that the owner has no relationship with TypeSafe, and the flag cannot be forgotten.
+  plainly that the owner has no relationship with TypeSafe, and a post that names Jev or TypeSafe
+  as their owners write them cannot leave the flag out.
 - A post that changes on its way into `posts.ts` fails a check. Nobody has to reread it to notice.
 - Measured results get a table with real row and column headers, and the stacked phone layout that
   the site's other tables have.
@@ -201,7 +206,8 @@ block kinds.
 - The check keeps its own copy of `FOOTER_LINES`, because a plain script cannot import the app's
   TypeScript. A test in the web suite fails when the two copies differ.
 - The naming check is a word match. It cannot tell a post about Jev from one that names it in
-  passing, and both must be `jev`.
+  passing, and both must be `jev`. It is case-sensitive and needs a non-word character on each
+  side, so another casing ("JEV", "Typesafe") or a name joined to a digit is not caught.
 - Table cells are plain text, with no code, links, chips or icons, because a pipe table in a draft
   cannot express them.
 
@@ -219,7 +225,7 @@ block kinds.
   required field makes the choice explicit for every post.
 ```
 
-- [ ] **Step 3: Supersede ADR 0028**
+- [x] **Step 3: Supersede ADR 0028**
 
 In `docs/adr/0028-blog-posts-as-typed-data.md`, replace the line `Accepted` under `## Status` with:
 
@@ -235,7 +241,7 @@ gains a `table`. The rest of this record still applies.
 Leave the H1 and every other section as they are: ADR 0012 forbids editing an accepted
 `## Decision`.
 
-- [ ] **Step 4: Update the ADR index**
+- [x] **Step 4: Update the ADR index**
 
 In `docs/adr/README.md`, set row 0028's status cell to `Superseded by ADR-0033` and add this row
 after 0032:
@@ -246,7 +252,7 @@ after 0032:
 
 The Prettier hook pads the table.
 
-- [ ] **Step 5: Rewrite the comment at the top of `posts.ts`**
+- [x] **Step 5: Rewrite the comment at the top of `posts.ts`**
 
 In `apps/web/src/data/posts.ts`, replace the line
 ` * For the owner, who writes every post; no agent drafts one (ADR 0028):` with:
@@ -256,7 +262,21 @@ In `apps/web/src/data/posts.ts`, replace the line
  * line by the owner, and added here by a pull request that only the owner merges (ADR 0033):
 ```
 
-- [ ] **Step 6: Add the dated notes**
+In the first bullet under it, replace these two lines:
+
+```ts
+ * - Add a post to `posts` as `draft: true` while it is being written. A draft renders nowhere and
+ *   needs no dates. Everything that shows posts reads `publishedPosts` or `getPost`, never `posts`.
+```
+
+with these, which keep the rest of the bullet:
+
+```ts
+ * - A post can wait in `posts` as `draft: true`: a draft renders nowhere and needs no dates.
+ *   Everything that shows posts reads `publishedPosts` or `getPost`, never `posts`.
+```
+
+- [x] **Step 6: Add the dated notes**
 
 At the end of the Context section of `docs/plans/2026-09-28-blog-engine-design.md`, before its next
 `##` heading, add:
@@ -269,11 +289,22 @@ At the end of the Context section of `docs/plans/2026-09-28-blog-engine-design.m
 > footer, a table block and the publish check.
 ```
 
+In the same design's Owner decisions, append to the bullet
+`Typed blocks over MDX, and that no agent writes a post (ADR 0028).`, without rewriting it:
+
+```markdown
+**2026-10-06:** the second half no longer holds:
+[ADR 0033](../adr/0033-blog-posts-drafted-with-claude.md) supersedes ADR 0028.
+```
+
+In `docs/plans/README.md`, append to the notes of the engine design's row, without rewriting them:
+`2026-10-06: ADR 0033 supersedes ADR 0028; posts are drafted with Claude and approved line by line by the owner.`
+
 In the header of `docs/plans/2026-10-06-blog-publishing-design.md`, whose status already reads
 `Accepted (2026-10-06)`, add `[ADR 0033](../adr/0033-blog-posts-drafted-with-claude.md)` to the
 **Related** line.
 
-- [ ] **Step 7: Catalogue the new links**
+- [x] **Step 7: Catalogue the new links**
 
 ```bash
 node scripts/check-docs-drift.ts --skip-requires admin
@@ -292,7 +323,7 @@ and each `claim` to say that the link resolves to that record. Run the check aga
 
 Expected: `0 drift, 0 uncatalogued`.
 
-- [ ] **Step 8: Run the gates this slice touches**
+- [x] **Step 8: Run the gates this slice touches**
 
 ```bash
 pnpm check:adrs
@@ -303,17 +334,18 @@ pnpm lint
 Expected: exit 0 from each. `check:adrs` passes only if row 0028's status matches its record and
 the pointer links an accepted record with a later number.
 
-- [ ] **Step 9: Commit, review and open the pull request**
+- [x] **Step 9: Commit, review and open the pull request**
 
 ```bash
-git add docs/adr/0033-blog-posts-drafted-with-claude.md docs/adr/0028-blog-posts-as-typed-data.md docs/adr/README.md apps/web/src/data/posts.ts docs/plans/2026-09-28-blog-engine-design.md docs/plans/2026-10-06-blog-publishing-design.md docs/drift-manifest.json
+git add docs/adr/0033-blog-posts-drafted-with-claude.md docs/adr/0028-blog-posts-as-typed-data.md docs/adr/README.md apps/web/src/data/posts.ts docs/plans/2026-09-28-blog-engine-design.md docs/plans/2026-10-06-blog-publishing-design.md docs/plans/README.md docs/drift-manifest.json docs/plans/2026-10-06-blog-publishing-plan.md
 git commit -m "docs(adr): supersede ADR 0028 with ADR 0033, posts drafted with Claude"
 ```
 
 Run `adversarial-reviewer` on `git diff origin/main...HEAD`. Then follow
 `.claude/skills/open-pr/SKILL.md` with the title
 `docs(adr): supersede ADR 0028 with ADR 0033 and plan blog publishing`. In `docs/plans/README.md`,
-leave this slice's rows `In review`; they become `Shipped` in the pull request after it merges.
+leave the rows of this design and this plan `In review`: they stay so until Task 10's pull request,
+which sets both to `Shipped`.
 
 ---
 
@@ -584,7 +616,7 @@ it `kind: 'own'`: every other test file spreads a fixture, so there should be no
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/web/src/data/posts.ts apps/web/src/test/fixtures/posts.ts apps/web/src/data/__tests__/posts.test.ts
+git add apps/web/src/data/posts.ts apps/web/src/test/fixtures/posts.ts apps/web/src/data/__tests__/posts.test.ts docs/plans/2026-10-06-blog-publishing-plan.md
 git commit -m "feat(blog): give every post a kind and check that a jev post is marked jev"
 ```
 
@@ -635,24 +667,41 @@ Expected: FAIL. The article's last child is the post body's `DIV`, not a `FOOTER
 
 - [ ] **Step 3: Render the footer**
 
-In `apps/web/src/app/blog/[slug]/page.tsx`, import `FOOTER_LINES` beside `getPost`, then replace
-`<PostBody blocks={post.body} />` with:
+In `apps/web/src/app/blog/[slug]/page.tsx`, import `FOOTER_LINES` beside `getPost`. Then add the
+footer as the last child of `<article>`, after `<PostBody blocks={post.body} />`, so that the
+`<article>` element reads:
 
 ```tsx
-<PostBody blocks={post.body} />;
-{
-  /* The kind's closing lines, inside the article so that an extractor reading the article
-              keeps them (ADR 0033); `--muted` rather than an opacity step (ADR 0011). */
-}
-{
-  FOOTER_LINES[post.kind].length > 0 ? (
+<article>
+  <header className="mb-12">
+    <h1 className="mb-6 text-4xl font-bold wrap-break-word md:text-5xl">{post.title}</h1>
+    <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+      <div className="flex gap-2">
+        <dt className="text-[var(--muted)]">Published</dt>
+        <dd>
+          <time dateTime={post.publishedAt}>{published}</time>
+        </dd>
+      </div>
+      <div className="flex gap-2">
+        <dt className="text-[var(--muted)]">Updated</dt>
+        <dd>
+          <time dateTime={post.updatedAt}>{updated}</time>
+        </dd>
+      </div>
+    </dl>
+  </header>
+
+  <PostBody blocks={post.body} />
+  {/* The kind's closing lines, inside the article so that an extractor reading the article
+      keeps them (ADR 0033); `--muted` rather than an opacity step (ADR 0011). */}
+  {FOOTER_LINES[post.kind].length > 0 ? (
     <footer className="mt-12 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
       {FOOTER_LINES[post.kind].map((line) => (
         <p key={line}>{line}</p>
       ))}
     </footer>
-  ) : null;
-}
+  ) : null}
+</article>
 ```
 
 - [ ] **Step 4: Run the tests until they pass**
@@ -724,7 +773,7 @@ Expected: exit 0 from each.
 - [ ] **Step 7: Commit and open the pull request**
 
 ```bash
-git add 'apps/web/src/app/blog/[slug]/page.tsx' apps/web/src/app/blog/__tests__/post-page.test.tsx
+git add 'apps/web/src/app/blog/[slug]/page.tsx' apps/web/src/app/blog/__tests__/post-page.test.tsx docs/plans/2026-10-06-blog-publishing-plan.md
 git commit -m "feat(blog): end a jev post with its disclosure line in the article footer"
 ```
 
@@ -993,7 +1042,7 @@ Expected: PASS, and typecheck exits 0. `post-body.test.tsx`'s `tagOf` and `PostB
 - [ ] **Step 9: Commit**
 
 ```bash
-git add apps/web/src/data/posts.ts apps/web/src/test/fixtures/posts.ts apps/web/src/data/__tests__/posts.test.ts apps/web/src/components/post-body.tsx apps/web/src/components/__tests__/post-body.test.tsx apps/web/src/app/blog/__tests__/post-page.test.tsx
+git add apps/web/src/data/posts.ts apps/web/src/test/fixtures/posts.ts apps/web/src/data/__tests__/posts.test.ts apps/web/src/components/post-body.tsx apps/web/src/components/__tests__/post-body.test.tsx apps/web/src/app/blog/__tests__/post-page.test.tsx docs/plans/2026-10-06-blog-publishing-plan.md
 git commit -m "feat(blog): add a table block to posts, rendered by DataTable"
 ```
 
@@ -1078,6 +1127,13 @@ pnpm build
 Expected: exit 0 from each.
 
 - [ ] **Step 3: Open the pull request**
+
+Tick this task's boxes in this plan and commit them on their own, since this task changes no code:
+
+```bash
+git add docs/plans/2026-10-06-blog-publishing-plan.md
+git commit -m "docs(plans): tick the table block's screenshot and review steps"
+```
 
 Run `adversarial-reviewer` on `git diff origin/main...HEAD`. Then follow
 `.claude/skills/open-pr/SKILL.md` with the title
@@ -1435,7 +1491,7 @@ expectation. The expectations follow D6 and the escaping rules the file's other 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/web/src/lib/serialise.ts apps/web/src/lib/__tests__/serialise.test.ts
+git add apps/web/src/lib/serialise.ts apps/web/src/lib/__tests__/serialise.test.ts docs/plans/2026-10-06-blog-publishing-plan.md
 git commit -m "feat(web): write a post and the /blog list as Markdown twins (61e)"
 ```
 
@@ -1621,7 +1677,7 @@ with no paths, as the card route does while nothing is published.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add 'apps/web/src/app/blog/[slug]/index.md/route.ts' apps/web/src/app/blog/index.md/route.ts apps/web/src/app/blog/__tests__/post-page.test.tsx apps/web/src/data/__tests__/pages.test.ts apps/web/next.config.ts apps/web/src/test/next-config.test.ts apps/web/e2e/endpoints.ts
+git add 'apps/web/src/app/blog/[slug]/index.md/route.ts' apps/web/src/app/blog/index.md/route.ts apps/web/src/app/blog/__tests__/post-page.test.tsx apps/web/src/data/__tests__/pages.test.ts apps/web/next.config.ts apps/web/src/test/next-config.test.ts apps/web/e2e/endpoints.ts docs/plans/2026-10-06-blog-publishing-plan.md
 git commit -m "feat(web): serve each post's Markdown twin and list the posts in /blog's (61e)"
 ```
 
@@ -1649,13 +1705,14 @@ git commit -m "feat(web): serve each post's Markdown twin and list the posts in 
 
 Create `scripts/post-draft-check.test.mjs`:
 
-````js
+`````js
 // Tests for the publish check. Run with `pnpm test:scripts` (node:test, no dependency).
 //
 // The cases that matter are the ones where a naive comparison passes a changed post: a number or a
 // word changed, a block dropped, kept bold that the twin escapes and the canonical form unescapes
-// again, an escape slipped into inline code, a `---` inside a code block taken for the footer rule,
-// and a missing disclosure line.
+// again, a link, code span or heading that the entry flattened into plain text, an escape slipped
+// into inline code, a `---` inside a code block taken for the footer rule, and a missing disclosure
+// line.
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -1744,7 +1801,7 @@ function twin({ body = SERVED, kind = 'own', title = TITLE, summary = SUMMARY } 
 const draft = (body = BODY, front = FRONT) => md([...front, ...body]);
 
 /**
- * `lines` with the line at `index` replaced by `replacement`, which may be several lines.
+ * `lines` with the line at `index` replaced by `replacement`, which may be several lines or none.
  * @param {string[]} lines @param {number} index @param {...string} replacement
  */
 const replace = (lines, index, ...replacement) => [
@@ -1752,6 +1809,17 @@ const replace = (lines, index, ...replacement) => [
   ...replacement,
   ...lines.slice(index + 1),
 ];
+
+/**
+ * A `read` for `check()` over the given files, failing as `readFileSync` does on any other path.
+ * @param {Record<string, string>} files
+ */
+const reader = (files) => (/** @type {string} */ path) => {
+  if (!(path in files)) {
+    throw Object.assign(new Error(`ENOENT: no such file, open '${path}'`), { code: 'ENOENT' });
+  }
+  return files[path];
+};
 
 describe('the publish check', () => {
   it('finds nothing when the twin serves the approved draft', () => {
@@ -1788,6 +1856,12 @@ describe('the publish check', () => {
         twin(),
       ],
       [
+        '+ list markers',
+        draft(replace(replace(BODY, 10, '+ First item'), 11, '+ Second item')),
+        twin(),
+      ],
+      ['a list item wrapped over two lines', draft(replace(BODY, 10, '- First', '  item')), twin()],
+      [
         'an ordered list numbered 1, 1',
         draft(replace(replace(BODY, 10, '1. First item'), 11, '1. Second item')),
         twin({ body: replace(replace(SERVED, 10, '1. First item'), 11, '2. Second item') }),
@@ -1797,17 +1871,21 @@ describe('the publish check', () => {
         draft(replace(replace(BODY, 6, 'Day    | Tokens | Cost'), 8, 'Monday | 1,234  | $0.10')),
         twin(),
       ],
+      ['a Table: line directly above its table', draft(replace(BODY, 5)), twin()],
       [
-        'a Table: line directly above its table',
-        draft([...BODY.slice(0, 5), ...BODY.slice(6)]),
-        twin(),
+        'a link and a code span wrapped onto the next line',
+        draft(replace(BODY, 0, 'See [the', 'docs](https://example.com/docs) and `a *', 'b` here.')),
+        twin({
+          body: replace(SERVED, 0, 'See [the docs](https://example.com/docs) and `a * b` here.'),
+        }),
       ],
       ['a ~~~ fence', draft(replace(replace(BODY, 13, '~~~yaml'), 17, '~~~')), twin()],
       [
-        'CRLF line endings and a byte-order mark',
-        `\uFEFF${draft().replace(/\n/g, '\r\n')}`,
+        'a code fence of four backticks',
+        draft(replace(replace(BODY, 13, '````yaml'), 17, '````')),
         twin(),
       ],
+      ['CRLF line endings and a byte-order mark', `﻿${draft().replace(/\n/g, '\r\n')}`, twin()],
       ["an absolute link on the twin's origin", draft(replace(BODY, 0, SERVED[0])), twin()],
       [
         'a single-quoted title with a doubled quote, as Prettier writes YAML',
@@ -1874,6 +1952,13 @@ describe('the publish check', () => {
         /^line 8: an emphasis marker \*/m,
       ],
       [
+        "a slug that is not the twin's",
+        draft(BODY, replace(FRONT, 2, 'slug: where-the-tokens-went')),
+        twin(),
+        'own',
+        /^the slug differs \(- draft, \+ twin\):\n- where-the-tokens-went\n\+ where-the-tokens-go$/m,
+      ],
+      [
         'a changed title',
         draft(),
         twin({ title: 'Where the tokens went: one week' }),
@@ -1911,6 +1996,51 @@ describe('the publish check', () => {
     }
   });
 
+  describe('exits 1 when the entry flattened syntax into text or changed a block kind', () => {
+    /** @type {[string, string[], string[], RegExp][]} */
+    const cases = [
+      [
+        'a link written as plain text',
+        replace(BODY, 0, 'See [the work page](/work).'),
+        replace(SERVED, 0, 'See \\[the work page\\](/work).'),
+        /^- See \[the work page\]\(\/work\)\.\n\+ See \\\[the work page\\\]\(\/work\)\.$/m,
+      ],
+      [
+        'a code span written as plain text',
+        replace(BODY, 0, 'Run `foo` now.'),
+        replace(SERVED, 0, 'Run \\`foo\\` now.'),
+        /^- Run `foo` now\.\n\+ Run \\`foo\\` now\.$/m,
+      ],
+      [
+        'a heading written as a paragraph',
+        BODY,
+        replace(SERVED, 2, '\\## Results'),
+        /^- heading 2:\n\+ paragraph:\n {2}## Results$/m,
+      ],
+      [
+        'a quote written as a paragraph',
+        BODY,
+        replace(SERVED, 19, '\\> A quote.'),
+        /^- quote:\n\+ paragraph:\n {2}> A quote\.$/m,
+      ],
+      [
+        'a one-item list written as a paragraph',
+        replace(BODY, 11),
+        replace(replace(SERVED, 11), 10, '\\- First item'),
+        /^- list bullet:\n\+ paragraph:\n {2}- First item$/m,
+      ],
+    ];
+    for (const [name, approved, served, pattern] of cases) {
+      it(name, () => {
+        const files = { 'draft.md': draft(approved), 'twin.md': twin({ body: served }) };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, /^the body differs/m);
+        assert.match(output, pattern);
+      });
+    }
+  });
+
   describe('reports syntax the post format refuses, in the draft as written', () => {
     /** @type {[string, string | string[], RegExp][]} */
     const cases = [
@@ -1918,6 +2048,8 @@ describe('the publish check', () => {
       ['raw HTML', 'Some <em>markup</em>.', /raw HTML/],
       ['an HTML comment', '<!-- a note -->', /an HTML comment/],
       ['an autolink', 'See <https://example.com>.', /an autolink/],
+      ['a bare URL', 'See https://example.com for more.', /a bare URL/],
+      ['an entity reference', 'Fish &amp; chips, &#169; and &#x2014;.', /an entity reference/],
       ['a footnote', 'A claim.[^1]', /a footnote/],
       ['a reference-style link', 'See [the docs][docs].', /a reference-style link/],
       ['a level-1 heading', '# A second title', /a level-1 heading/],
@@ -1925,14 +2057,51 @@ describe('the publish check', () => {
       ['a setext heading', ['A heading', '---'], /a setext heading underline/],
       ['a --- rule', ['---'], /a --- rule/],
       ['a nested list', ['- An item', '  - A nested item'], /a nested list/],
+      ['an ordered list that starts at 3', ['3. Third', '4. Fourth'], /starts at 3/],
       ['a quote of two paragraphs', ['> One.', '>', '> Two.'], /an empty quote line/],
       ['a hard line break', ['A line that breaks  ', 'here.'], /a hard line break/],
+      ['a line indented with a tab', '\tIndented text.', /a line indented with a tab/],
       ['italics with underscores', 'Some _italic_ text.', /an emphasis marker _/],
       ['strikethrough', 'Some ~~struck~~ text.', /strikethrough/],
       [
         'a second paragraph in a list item',
         ['- An item', '', '  A second paragraph.'],
         /an indented block/,
+      ],
+      [
+        'a heading straight after a paragraph line',
+        ['A paragraph line.', '## A heading'],
+        /^line 30: start each block after a blank line$/,
+      ],
+      [
+        'a list straight after a paragraph line',
+        ['A paragraph line.', '- An item'],
+        /^line 30: start each block after a blank line$/,
+      ],
+      [
+        'a code span in a table cell',
+        ['| Flag | Effect |', '| --- | --- |', '| `--kind` | Picks the footer |'],
+        /^line 31: a table's caption and cells are plain text: no code or links$/,
+      ],
+      [
+        'a link in a table cell',
+        ['| Page | Note |', '| --- | --- |', '| [Work](/work) | The case studies |'],
+        /^line 31: a table's caption and cells are plain text: no code or links$/,
+      ],
+      [
+        'code in a table caption',
+        [
+          'Table: The `--kind` flag',
+          '| Flag | Effect |',
+          '| --- | --- |',
+          '| kind | Picks the footer |',
+        ],
+        /^line 29: a table's caption and cells are plain text: no code or links$/,
+      ],
+      [
+        'code in a heading',
+        '## The `--kind` flag',
+        /^line 29: a heading is plain text: no code or links$/,
       ],
     ];
     for (const [name, lines, pattern] of cases) {
@@ -1960,13 +2129,6 @@ describe('the publish check', () => {
 });
 
 describe('check()', () => {
-  /** @param {Record<string, string>} files */
-  const reader = (files) => (/** @type {string} */ path) => {
-    if (!(path in files)) {
-      throw Object.assign(new Error(`ENOENT: no such file, open '${path}'`), { code: 'ENOENT' });
-    }
-    return files[path];
-  };
   const files = { 'draft.md': draft(), 'twin.md': twin({ kind: 'jev' }) };
 
   it('exits 0 quietly when the two agree', () => {
@@ -2004,7 +2166,7 @@ describe('check()', () => {
           FRONT.filter((line) => !line.startsWith('description:')),
         ),
       },
-      /needs a title and a description/,
+      /needs a title, a slug and a description/,
     ],
     [
       'a twin that does not open with its title',
@@ -2020,6 +2182,18 @@ describe('check()', () => {
       assert.match(output, pattern);
     });
   }
+
+  it('exits 2, not 1, for an error that is not a difference: a directory as the draft', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'post-draft-check-'));
+    try {
+      writeFileSync(join(dir, 'twin.md'), twin());
+      const { status, output } = check(['--kind', 'own', dir, join(dir, 'twin.md')]);
+      assert.equal(status, 2);
+      assert.match(output, /^post-draft-check: EISDIR/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('the command', () => {
@@ -2034,13 +2208,14 @@ describe('the command', () => {
         spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' }).status;
       assert.equal(run('--kind', 'own', join(dir, 'draft.md'), join(dir, 'twin.md')), 0);
       assert.equal(run('--kind', 'jev', join(dir, 'draft.md'), join(dir, 'twin.md')), 1);
+      assert.equal(run('--kind', 'own', dir, join(dir, 'twin.md')), 2);
       assert.equal(run(), 2);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 });
-````
+`````
 
 - [ ] **Step 2: Run them to see them fail**
 
@@ -2064,9 +2239,11 @@ Create `scripts/post-draft-check.mjs`:
 //
 // First it reports any syntax the post format refuses, in the draft as written. The comparison
 // cannot see it: a literal `**bold**` kept in the entry is escaped by the twin and unescaped again
-// here. Then it compares the title, the summary, the body and the footer, after undoing on both
-// sides only what the serialiser does on purpose. Exit 0 when they agree, quietly; 1 with each
-// difference; 2 when the check could not run. Plain Node, no dependencies.
+// here. Then it compares the slug, the title, the summary, the body and the footer, after undoing on
+// both sides only what the serialiser does on purpose. The canonical form keeps every block's kind,
+// and keeps text apart from code spans and links, so syntax the entry flattened into plain text is
+// a difference. Exit 0 when they agree, quietly; 1 with each difference; 2 when the check could not
+// run, whatever stopped it. Plain Node, no dependencies.
 
 import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -2090,6 +2267,9 @@ const ESCAPE = /\\([!-/:-@[-`{-~])/g;
 
 /** A code fence's opening line: three or more backticks or tildes, then the info string. */
 const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+
+/** An ATX heading: its run of `#`, then its text without the optional closing run. */
+const HEADING = /^ {0,3}(#{1,6})(?: +(.*?))?(?: +#+)? *$/;
 
 /** A list item's first line: its marker, then its text. */
 const LIST_ITEM = /^ {0,3}([-*+]|\d{1,9}[.)]) +(.*)$/;
@@ -2139,11 +2319,10 @@ function codeSpan(code) {
 /**
  * A fenced code block in the shortest backtick fence that holds it, three at least.
  * @param {string} code
- * @param {string} info
  */
-function codeFence(code, info) {
+function codeFence(code) {
   const fence = '`'.repeat(Math.max(3, longestRun(code) + 1));
-  return `${fence}${info}\n${code}\n${fence}`;
+  return `${fence}\n${code}\n${fence}`;
 }
 
 /**
@@ -2161,74 +2340,156 @@ function closingRun(source, from, length) {
   return -1;
 }
 
-/** @typedef {{ text: string } | { code: string }} Token */
+/**
+ * The inline link whose `[` is at `at`: its label as written, its destination with the escapes
+ * removed, and the index after its `)`. Null when no link opens there. The label may hold code spans
+ * and balanced brackets; the destination has no whitespace, as the serialiser writes it.
+ * @param {string} source
+ * @param {number} at
+ * @returns {{ label: string, href: string, end: number } | null}
+ */
+function linkAt(source, at) {
+  let depth = 0;
+  let close = at + 1;
+  for (; close < source.length; close += 1) {
+    const char = source[close];
+    if (char === '\\') {
+      close += 1;
+    } else if (char === '`') {
+      const run = /^`+/.exec(source.slice(close))?.[0] ?? '`';
+      const end = closingRun(source, close + run.length, run.length);
+      close = (end === -1 ? close : end) + run.length - 1;
+    } else if (char === '[') {
+      depth += 1;
+    } else if (char === ']') {
+      if (depth === 0) break;
+      depth -= 1;
+    }
+  }
+  if (source[close] !== ']' || source[close + 1] !== '(') return null;
+  let href = '';
+  let parens = 0;
+  for (let index = close + 2; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '\\' && /^[!-/:-@[-`{-~]$/.test(source[index + 1] ?? '')) {
+      href += source[index + 1];
+      index += 1;
+    } else if (/\s/.test(char)) {
+      return null;
+    } else if (char === ')' && parens === 0) {
+      return { label: source.slice(at + 1, close), href, end: index + 1 };
+    } else {
+      if (char === '(') parens += 1;
+      if (char === ')') parens -= 1;
+      href += char;
+    }
+  }
+  return null;
+}
 
 /**
- * A run of inline Markdown as text and code spans. A backslash escape stays in its text, so an
- * escaped backtick never opens a span. A backtick run with no closing run of the same length is
- * text, as CommonMark has it.
+ * @typedef {{ text: string }} TextRun Text as written, its escapes kept.
+ * @typedef {{ code: string }} CodeSpan
+ * @typedef {{ label: Token[], href: string }} Link Its label holds text and code spans only.
+ * @typedef {TextRun | CodeSpan | Link} Token
+ */
+
+/**
+ * A run of inline Markdown as text, code spans and links. A backslash escape stays in its text, so
+ * an escaped backtick or bracket never opens a span or a link. A backtick run with no closing run of
+ * the same length is text, as is a `[` that opens no inline link, as CommonMark has it.
  * @param {string} source
+ * @param {boolean} [links] false inside a link's label, which cannot hold another link
  * @returns {Token[]}
  */
-export function inlineTokens(source) {
+export function inlineTokens(source, links = true) {
   /** @type {Token[]} */
   const tokens = [];
   let text = '';
+  const flush = () => {
+    if (text) tokens.push({ text });
+    text = '';
+  };
   let at = 0;
   while (at < source.length) {
-    if (source[at] === '\\' && at + 1 < source.length) {
+    const char = source[at];
+    const link = char === '[' && links ? linkAt(source, at) : null;
+    if (char === '\\' && at + 1 < source.length) {
       text += source.slice(at, at + 2);
       at += 2;
-    } else if (source[at] === '`') {
+    } else if (char === '`') {
       const run = /^`+/.exec(source.slice(at))?.[0] ?? '`';
       const close = closingRun(source, at + run.length, run.length);
       if (close === -1) {
         text += run;
         at += run.length;
       } else {
-        if (text) tokens.push({ text });
-        text = '';
+        flush();
         const code = source.slice(at + run.length, close).replace(/\n/g, ' ');
         tokens.push({ code: /^ .* $/s.test(code) && code.trim() ? code.slice(1, -1) : code });
         at = close + run.length;
       }
+    } else if (link) {
+      flush();
+      tokens.push({ label: inlineTokens(link.label, false), href: link.href });
+      at = link.end;
     } else {
-      text += source[at];
+      text += char;
       at += 1;
     }
   }
-  if (text) tokens.push({ text });
+  flush();
   return tokens;
 }
 
-/** @param {string} value */
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * Plain text in canonical form: whitespace collapsed, and every backslash, backtick and bracket
+ * escaped. Only a real code span or link writes those bare, so text that reads like one never
+ * equals one.
+ * @param {string} value
+ */
+const canonicalText = (value) => value.replace(/\s+/g, ' ').replace(/[\\`[\]]/g, '\\$&');
 
 /**
- * The twin's origin at the start of a link destination, with the slash after it or, for a link to
- * the home page, before the closing parenthesis. Replaced by `/`, it leaves the path a draft writes.
+ * A link destination in canonical form: on the twin's origin it is the path a draft writes, and a
+ * backslash or parenthesis is escaped, so that the destination ends at the first bare `)`.
+ * @param {string} href
  * @param {string} origin
  */
-const onSite = (origin) =>
-  new RegExp(String.raw`(?<=\]\()` + escapeRegExp(origin) + String.raw`(?:/|(?=\)))`, 'g');
+function canonicalHref(href, origin) {
+  let path = href;
+  if (href === origin) path = '/';
+  else if (href.startsWith(`${origin}/`)) path = href.slice(origin.length);
+  return path.replace(/[\\()]/g, '\\$&');
+}
 
 /**
- * Inline Markdown in canonical form. In the text, escapes are removed, whitespace is collapsed, and
- * a link on the twin's origin is written as its path. Code spans are rewritten as the serialiser
- * writes them, with their content untouched.
+ * @param {Token[]} tokens
+ * @param {string} origin
+ * @returns {string}
+ */
+function canonicalTokens(tokens, origin) {
+  return tokens
+    .map((token) => {
+      if ('code' in token) return codeSpan(token.code);
+      if ('label' in token) {
+        const label = canonicalTokens(token.label, origin).trim();
+        return `[${label}](${canonicalHref(token.href, origin)})`;
+      }
+      return canonicalText(token.text.replace(ESCAPE, '$1'));
+    })
+    .join('');
+}
+
+/**
+ * Inline Markdown in canonical form. Text has its escapes removed and is written as
+ * `canonicalText()` writes it, code spans as the serialiser writes them with their content
+ * untouched, and links as Markdown links, a link on the twin's origin by its path.
  * @param {string} source
  * @param {string} origin
  */
 export function canonicalInline(source, origin) {
-  const link = onSite(origin);
-  return inlineTokens(source)
-    .map((token) =>
-      'code' in token
-        ? codeSpan(token.code)
-        : token.text.replace(link, '/').replace(ESCAPE, '$1').replace(/\s+/g, ' '),
-    )
-    .join('')
-    .trim();
+  return canonicalTokens(inlineTokens(source), origin).trim();
 }
 
 /**
@@ -2272,6 +2533,13 @@ export function splitBlocks(markdown) {
   return blocks;
 }
 
+/** @param {string[]} lines */
+const isTable = (lines) =>
+  lines.length > 1 &&
+  lines[0].includes('|') &&
+  lines[1].includes('|') &&
+  DELIMITER_ROW.test(lines[1]);
+
 /**
  * A pipe table row with its cells trimmed and in canonical form, or the delimiter row as `---`s.
  * @param {string} line
@@ -2290,6 +2558,18 @@ function tableRow(line, delimiter, origin) {
 }
 
 /**
+ * A table in canonical form, under its `Table:` caption line when it has one.
+ * @param {string[]} lines the header row, the delimiter row and the body rows
+ * @param {string | null} caption
+ * @param {string} origin
+ */
+function canonicalTable(lines, caption, origin) {
+  const captioned = caption === null ? [] : [`Table: ${canonicalInline(caption.slice(7), origin)}`];
+  const rows = lines.map((line, index) => tableRow(line, index === 1, origin));
+  return ['table:', ...captioned, ...rows].join('\n');
+}
+
+/**
  * A list with `-` for every bullet, ordered items numbered from 1, and each item's lines joined.
  * @param {string[]} lines
  * @param {string} origin
@@ -2303,58 +2583,66 @@ function canonicalList(lines, origin) {
     else items[items.length - 1]?.text.push(line);
   }
   let number = 0;
-  return items
-    .map(({ ordered, text }) => {
-      const marker = ordered ? `${(number += 1)}.` : '-';
-      return `${marker} ${canonicalInline(text.join('\n'), origin)}`;
-    })
-    .join('\n');
+  const shown = items.map(({ ordered, text }) => {
+    const marker = ordered ? `${(number += 1)}.` : '-';
+    return `${marker} ${canonicalInline(text.join('\n'), origin)}`;
+  });
+  return [items[0]?.ordered ? 'list ordered:' : 'list bullet:', ...shown].join('\n');
 }
 
 /**
- * One block in canonical form. A `Table:` line written directly above its table becomes two blocks.
+ * One block in canonical form: a line naming its kind, then its content. A block of one kind never
+ * equals a block of another, so a heading, quote or list item written as a paragraph is a
+ * difference.
  * @param {string[]} lines
  * @param {string} origin
- * @returns {string[]}
+ * @returns {string}
  */
 function canonicalBlock(lines, origin) {
   const [first] = lines;
   const opened = opensFence(first);
   if (opened) {
     const closed = lines.length > 1 && closesFence(lines[lines.length - 1], opened.run);
-    return [codeFence(lines.slice(1, closed ? -1 : lines.length).join('\n'), opened.info)];
+    const code = lines.slice(1, closed ? -1 : lines.length).join('\n');
+    return `code${opened.info ? ` ${opened.info}` : ''}:\n${codeFence(code)}`;
   }
-  if (lines.length > 1 && first.startsWith('Table: ') && lines[1].includes('|')) {
-    return [canonicalInline(first, origin), ...canonicalBlock(lines.slice(1), origin)];
+  if (first.startsWith('Table: ') && isTable(lines.slice(1))) {
+    return canonicalTable(lines.slice(1), first, origin);
   }
-  if (
-    lines.length > 1 &&
-    first.includes('|') &&
-    lines[1].includes('|') &&
-    DELIMITER_ROW.test(lines[1])
-  ) {
-    return [lines.map((line, index) => tableRow(line, index === 1, origin)).join('\n')];
-  }
-  const heading = /^ {0,3}(#{1,6})(?: +(.*?))?(?: +#+)? *$/.exec(first);
+  if (isTable(lines)) return canonicalTable(lines, null, origin);
+  const heading = HEADING.exec(first);
   if (heading && lines.length === 1) {
-    return [`${heading[1]} ${canonicalInline(heading[2] ?? '', origin)}`];
+    const level = heading[1].length;
+    return `heading ${level}:\n${heading[1]} ${canonicalInline(heading[2] ?? '', origin)}`;
   }
-  if (LIST_ITEM.test(first)) return [canonicalList(lines, origin)];
+  if (LIST_ITEM.test(first)) return canonicalList(lines, origin);
   if (/^ {0,3}>/.test(first)) {
-    return [
-      `> ${canonicalInline(lines.map((line) => line.replace(/^ {0,3}> ?/, '')).join('\n'), origin)}`,
-    ];
+    const quoted = lines.map((line) => line.replace(/^ {0,3}> ?/, '')).join('\n');
+    return `quote:\n> ${canonicalInline(quoted, origin)}`;
   }
-  return [canonicalInline(lines.join('\n'), origin)];
+  return `paragraph:\n${canonicalInline(lines.join('\n'), origin)}`;
 }
 
 /**
- * Blocks in canonical form: the form in which the two sides are compared.
+ * Blocks in canonical form: the form in which the two sides are compared. A `Table:` line is its
+ * table's caption whether a blank line separates them or not.
  * @param {string[][]} blocks
  * @param {string} origin
  */
 export function canonicalise(blocks, origin) {
-  return blocks.flatMap((lines) => canonicalBlock(lines, origin));
+  /** @type {string[]} */
+  const canonical = [];
+  for (let index = 0; index < blocks.length; index += 1) {
+    const lines = blocks[index];
+    const next = blocks[index + 1];
+    if (lines.length === 1 && lines[0].startsWith('Table: ') && next && isTable(next)) {
+      canonical.push(canonicalTable(next, lines[0], origin));
+      index += 1;
+    } else {
+      canonical.push(canonicalBlock(lines, origin));
+    }
+  }
+  return canonical;
 }
 
 /**
@@ -2393,8 +2681,9 @@ export function parseDraft(source) {
 
 /**
  * The served twin's parts, as `postToMarkdown` writes them: the `#` title, the summary, the
- * `Source:` line (on-site links are written on its origin), the Published and Updated lines, the
- * body, and the footer lines that follow the last `---` rule outside a code block.
+ * `Source:` line (on-site links are written on its origin, and its last path segment is the slug),
+ * the Published and Updated lines, the body, and the footer lines that follow the last `---` rule
+ * outside a code block.
  * @param {string} source
  */
 export function parseTwin(source) {
@@ -2411,15 +2700,16 @@ export function parseTwin(source) {
   ) {
     throw new CannotRun('the twin has no Published and Updated lines after its Source line');
   }
-  let origin;
+  let page;
   try {
-    origin = new URL(url[1]).origin;
+    page = new URL(url[1]);
   } catch {
     throw new CannotRun(`the twin's Source line names no URL: ${url[1]}`);
   }
   const rule = rest.map((block) => block.length === 1 && block[0] === '---').lastIndexOf(true);
   return {
-    origin,
+    origin: page.origin,
+    slug: page.pathname.slice(page.pathname.lastIndexOf('/') + 1),
     title: heading[1],
     summary: summary.join('\n'),
     body: rule === -1 ? rest : rest.slice(0, rule),
@@ -2435,6 +2725,7 @@ const REFUSED_LINES = [
   [/^ {2,}(?:[-*+]|\d{1,9}[.)]) /, 'a nested list'],
   [/^ {0,3}> *$/, 'an empty quote line, which makes a quote of more than one paragraph'],
   [/^ {0,3}> *>/, 'a quote inside a quote'],
+  [/^ *\t/, 'a line indented with a tab; indent with spaces'],
 ];
 
 /** @type {[RegExp, string][]} */
@@ -2446,11 +2737,97 @@ const REFUSED_INLINE = [
   [/\*/, 'an emphasis marker *; write \\* for the character'],
   [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/u, 'an emphasis marker _; write \\_ for the character'],
   [/~~/, 'strikethrough'],
+  [
+    /&(?:#\d+|#[Xx][\dA-Fa-f]+|[A-Za-z][\dA-Za-z]*);/,
+    'an entity reference; write the character itself, or \\& for an ampersand',
+  ],
 ];
+
+/** @typedef {'heading' | 'list' | 'quote' | 'caption' | 'table' | 'paragraph' | 'code'} BlockKind */
+
+/**
+ * The kind of block a line opens after a blank line, as `canonicalBlock` reads it.
+ * @param {string} line
+ * @param {string} next the line after it
+ * @returns {BlockKind}
+ */
+function blockKind(line, next) {
+  if (HEADING.test(line)) return 'heading';
+  if (LIST_ITEM.test(line)) return 'list';
+  if (/^ {0,3}>/.test(line)) return 'quote';
+  if (line.startsWith('Table: ') && next.includes('|')) return 'caption';
+  if (isTable([line, next])) return 'table';
+  return 'paragraph';
+}
+
+/**
+ * Whether `line` may follow a line of `block` with no blank line between them. Nothing follows a
+ * heading or a closing fence. A paragraph's next line must not start a block of its own: a heading,
+ * a list item (an ordered one only from 1, as CommonMark has it), a quote, a fence or a table row.
+ * A list's next item, a quote's next `>` line and a table's next row continue them.
+ * @param {BlockKind} block
+ * @param {string} line
+ */
+function continues(block, line) {
+  if (block === 'heading' || block === 'code' || opensFence(line)) return false;
+  if (HEADING.test(line)) return false;
+  if (/^ {0,3}(?:[-*+]|1[.)]) +\S/.test(line)) return block === 'list';
+  if (/^ {0,3}>/.test(line)) return block === 'quote';
+  if (/^ {0,3}\|/.test(line) || (line.includes('|') && DELIMITER_ROW.test(line))) {
+    return block === 'table' || block === 'caption';
+  }
+  return true;
+}
+
+/**
+ * Running text as the refusals read it: escapes dropped, a code span as a space, and a link as its
+ * label in brackets, or as a space when `labels` is false.
+ * @param {Token[]} tokens
+ * @param {boolean} labels
+ * @returns {string}
+ */
+function prose(tokens, labels) {
+  return tokens
+    .map((token) => {
+      if ('code' in token) return ' ';
+      if ('label' in token) return labels ? `[${prose(token.label, true)}]` : ' ';
+      return token.text.replace(ESCAPE, '');
+    })
+    .join('');
+}
+
+/**
+ * The refused inline syntax in one run of text: a heading, a table row or caption, or the lines of a
+ * paragraph, list item or quote joined, so a code span or link wrapped onto the next line is read
+ * whole. Code spans, escapes and link destinations are left alone.
+ * @param {string} source
+ * @param {string} at where the run is, for the messages
+ * @param {BlockKind} block
+ * @returns {string[]}
+ */
+function refusedInline(source, at, block) {
+  /** @type {string[]} */
+  const problems = [];
+  const tokens = inlineTokens(source);
+  if (tokens.some((token) => !('text' in token))) {
+    if (block === 'heading') problems.push(`${at}: a heading is plain text: no code or links`);
+    if (block === 'caption' || block === 'table') {
+      problems.push(`${at}: a table's caption and cells are plain text: no code or links`);
+    }
+  }
+  const text = prose(tokens, true);
+  for (const [pattern, what] of REFUSED_INLINE) {
+    if (pattern.test(text)) problems.push(`${at}: ${what}`);
+  }
+  if (/https?:\/\//i.test(prose(tokens, false))) {
+    problems.push(`${at}: a bare URL, which GFM makes a link; write it as a link or as code`);
+  }
+  return problems;
+}
 
 /**
  * Every use of syntax the post format refuses, in the draft's body as written, by line. Code is
- * left alone: fenced blocks entirely, and code spans, escapes and link destinations within a line.
+ * left alone: fenced blocks entirely, and code spans, escapes and link destinations in running text.
  * @param {string} body
  * @param {number} [firstLine] the draft's line number for the body's first line
  * @returns {string[]}
@@ -2461,19 +2838,54 @@ export function refusedSyntax(body, firstLine = 1) {
   const lines = body.split('\n');
   /** @type {string | null} */
   let fence = null;
+  /** @type {BlockKind | null} the block the line above belongs to; null after a blank line */
+  let block = null;
+  /** @type {{ kind: BlockKind, from: number, to: number, text: string[] } | null} */
+  let run = null;
+  const endRun = () => {
+    if (run) {
+      const [from, to] = [firstLine + run.from, firstLine + run.to];
+      const at = from === to ? `line ${from}` : `lines ${from}-${to}`;
+      problems.push(...refusedInline(run.text.join('\n'), at, run.kind));
+    }
+    run = null;
+  };
   lines.forEach((line, index) => {
     const at = `line ${firstLine + index}`;
     if (fence !== null) {
-      if (closesFence(line, fence)) fence = null;
+      if (closesFence(line, fence)) {
+        fence = null;
+        block = 'code';
+      }
       return;
     }
-    const opened = opensFence(line);
-    if (opened) {
-      fence = opened.run;
+    if (!line.trim()) {
+      endRun();
+      block = null;
       return;
     }
     const previous = lines[index - 1] ?? '';
     const next = lines[index + 1] ?? '';
+    if (block !== null && !continues(block, line)) {
+      problems.push(`${at}: start each block after a blank line`);
+      block = null;
+    }
+    const opened = opensFence(line);
+    if (opened) {
+      endRun();
+      fence = opened.run;
+      return;
+    }
+    if (block === null) {
+      endRun();
+      block = blockKind(line, next);
+      const start = /^ {0,3}(\d{1,9})[.)] /.exec(line)?.[1];
+      if (block === 'list' && start !== undefined && Number(start) !== 1) {
+        problems.push(`${at}: an ordered list that starts at ${start}; the page numbers it from 1`);
+      }
+    } else if (block === 'caption') {
+      block = 'table';
+    }
     for (const [pattern, what] of REFUSED_LINES) {
       if (pattern.test(line)) problems.push(`${at}: ${what}`);
     }
@@ -2490,15 +2902,18 @@ export function refusedSyntax(body, firstLine = 1) {
       );
     }
     if (/(?: {2,}|\\)$/.test(line) && next.trim()) problems.push(`${at}: a hard line break`);
-    const prose = inlineTokens(line.replace(/^ {0,3}(?:[-*+]|\d{1,9}[.)]) +/, ''))
-      .map((token) =>
-        'text' in token ? token.text.replace(ESCAPE, '').replace(/\]\([^)\s]*\)/g, ']') : ' ',
-      )
-      .join('');
-    for (const [pattern, what] of REFUSED_INLINE) {
-      if (pattern.test(prose)) problems.push(`${at}: ${what}`);
+    const item = block === 'list' ? LIST_ITEM.exec(line) : null;
+    if (block === 'heading' || block === 'caption' || block === 'table' || item) endRun();
+    const text = item ? item[2] : block === 'quote' ? line.replace(/^ {0,3}> ?/, '') : line;
+    if (run) {
+      run.to = index;
+      run.text.push(text);
+    } else {
+      run = { kind: block, from: index, to: index, text: [text] };
     }
+    if (block === 'heading' || block === 'caption' || block === 'table') endRun();
   });
+  endRun();
   if (fence !== null) problems.push(`the code fence opened with ${fence} is never closed`);
   return problems;
 }
@@ -2546,7 +2961,8 @@ export function lineDiff(a, b) {
 
 /**
  * Every way the twin differs from the approved draft, and every use of refused syntax in the draft.
- * None when the twin serves the approved words.
+ * None when the twin serves the approved words. Front-matter values are plain text, as the entry's
+ * strings are, so they are compared as text runs.
  * @param {string} draftSource
  * @param {string} twinSource
  * @param {'own' | 'jev'} kind
@@ -2555,21 +2971,22 @@ export function lineDiff(a, b) {
 export function differences(draftSource, twinSource, kind) {
   const draft = parseDraft(draftSource);
   const twin = parseTwin(twinSource);
+  const [title, slug, description] = ['title', 'slug', 'description'].map((key) =>
+    draft.front.get(key),
+  );
+  if (!title || !slug || !description) {
+    throw new CannotRun('the front matter needs a title, a slug and a description');
+  }
   const problems = refusedSyntax(draft.body, draft.firstBodyLine);
-  const title = draft.front.get('title');
-  const description = draft.front.get('description');
-  if (!title || !description)
-    throw new CannotRun('the front matter needs a title and a description');
+  /** @param {string} value */
+  const plain = (value) => canonicalText(value).trim();
   /** @type {[string, string, string][]} */
   const fields = [
-    ['title', title, twin.title],
-    ['summary', description, twin.summary],
+    ['slug', slug, twin.slug],
+    ['title', plain(title), canonicalInline(twin.title, twin.origin)],
+    ['summary', plain(description), canonicalInline(twin.summary, twin.origin)],
   ];
-  for (const [what, approved, served] of fields) {
-    const [want, got] = [
-      canonicalInline(approved, twin.origin),
-      canonicalInline(served, twin.origin),
-    ];
+  for (const [what, want, got] of fields) {
     if (want !== got) problems.push(`the ${what} differs (- draft, + twin):\n- ${want}\n+ ${got}`);
   }
   const body = lineDiff(
@@ -2579,7 +2996,7 @@ export function differences(draftSource, twinSource, kind) {
   if (body) problems.push(`the body differs (- draft, + twin):\n${body}`);
   const footer = twin.footer.map((line) => canonicalInline(line, twin.origin));
   const expected = FOOTER_LINES[kind];
-  if (footer.join('\n') !== expected.join('\n')) {
+  if (JSON.stringify(footer) !== JSON.stringify(expected.map(plain))) {
     problems.push(
       `the footer is ${JSON.stringify(footer)}, but a post of kind ${kind} ends with ${JSON.stringify(expected)}`,
     );
@@ -2588,7 +3005,8 @@ export function differences(draftSource, twinSource, kind) {
 }
 
 /**
- * The check as a command: its exit status and what it prints.
+ * The check as a command: its exit status and what it prints. Exit 1 means differences and nothing
+ * else, so every error, an unreadable file as much as a bug, exits 2 with its message.
  * @param {string[]} argv the arguments after the script's path
  * @param {(path: string) => string} [read]
  * @returns {{ status: 0 | 1 | 2, output: string }}
@@ -2604,13 +3022,8 @@ export function check(argv, read = (path) => readFileSync(path, 'utf8')) {
       ? { status: 0, output: '' }
       : { status: 1, output: `${problems.join('\n\n')}\n` };
   } catch (error) {
-    if (
-      error instanceof CannotRun ||
-      (error instanceof Error && 'code' in error && error.code === 'ENOENT')
-    ) {
-      return { status: 2, output: `post-draft-check: ${error.message}\n` };
-    }
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    return { status: 2, output: `post-draft-check: ${message}\n` };
   }
 }
 
@@ -2653,7 +3066,7 @@ the design names.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add scripts/post-draft-check.mjs scripts/post-draft-check.test.mjs
+git add scripts/post-draft-check.mjs scripts/post-draft-check.test.mjs docs/plans/2026-10-06-blog-publishing-plan.md
 git commit -m "feat(scripts): compare an approved blog draft with its served twin"
 ```
 
@@ -2800,8 +3213,8 @@ the fixture to match a serialiser bug.
 - [ ] **Step 5: Point the rules at the format and the check**
 
 In `.claude/rules/app-router-and-content.md`, in the bullet on the Markdown twins (#59), change
-`and \`work/[slug]/index.md/route.ts\` for the case studies` to
-`` `work/[slug]/index.md/route.ts`for the case studies and`blog/[slug]/index.md/route.ts` for the published posts (61e) ``.
+``and `work/[slug]/index.md/route.ts` for the case studies`` to
+`` `work/[slug]/index.md/route.ts` for the case studies and `blog/[slug]/index.md/route.ts` for the published posts (61e) ``.
 Add this paragraph after that bullet list:
 
 ```markdown
@@ -2824,7 +3237,7 @@ Add a row to its command table, in the shape of its neighbours:
 
 - In `docs/plans/2026-09-28-blog-engine-plan.md`, tick Task 5's steps (61e). Its Step 3 is met by
   `e2e/markdown-twins.spec.ts`, through the new `MARKDOWN_TWINS` entries, so add a note saying so.
-- In this plan, tick Tasks 6 to 9.
+- In this plan, tick this task's steps (Tasks 6 to 8 ticked their own in their commits).
 - In `docs/plans/README.md`, update the blog-engine plan row's notes to name this pull request
   for 61e.
 
@@ -2878,11 +3291,11 @@ Only when all of these hold:
 - the owner has approved article 01 in the writing room;
 - the writing room's publish mode has been updated to the format and branch above.
 
-That last update happens outside this repository, as the design's last section lists.
-
 **Files:**
 
-- Modify: `apps/web/src/data/posts.ts`, `apps/web/src/data/static-routes.ts`
+- Modify: `apps/web/src/data/posts.ts`, `apps/web/src/data/static-routes.ts`, `docs/plans/README.md`
+  (this design's and this plan's rows), `docs/plans/2026-10-06-blog-publishing-plan.md` (this
+  task's boxes)
 - Branch: `feat/blog-01-<slug>` from `origin/main`, where `<slug>` is the slug in the approved draft's
   front matter.
 
@@ -2911,7 +3324,8 @@ tables say:
   would pass 60 characters);
 - `summary` from `description`;
 - `tags` if the front matter gives any;
-- `publishedAt` and `updatedAt`, both set to today, the day the pull request opens (D9);
+- `publishedAt` and `updatedAt`, both set to today as a UTC day, `date -u +%F`, the day the pull
+  request opens (D9);
 - `body` block by block. Write the text as plain strings, never escaped: the serialiser escapes.
 
 Set `STATIC_ROUTE_UPDATED['/blog']` in `apps/web/src/data/static-routes.ts` to the same day.
@@ -2926,37 +3340,60 @@ Expected: PASS. A failure names the rule, for example a Jev name in an `own` pos
 or a heading order. Fix the entry. If the draft itself breaks a rule, stop: the fix belongs in the
 writing room, approved by the owner.
 
-- [ ] **Step 4: Serve the twin and run the publish check**
+- [ ] **Step 4: Serve the twin, run the publish check and take the screenshots**
+
+Fill in the first three lines, save the block as a script outside the repository, and run it with
+`bash` (it ends with `exit`, so do not paste it into an interactive shell). It builds, starts
+`next start` on the first free port from 3217, waits until the server answers (or stops waiting
+when it exits), and fetches the twin, failing on an empty or failed fetch. It runs the check and, when the check passes, takes the
+screenshots. Its `trap` stops the server and removes the twin and the server log however it exits,
+so a rerun after any fix rebuilds and starts a fresh server.
 
 ```bash
-pnpm --filter web build
-pnpm --filter web exec next start -p 3217    # in a second shell
+SLUG='<slug>'
+KIND='<kind>'
+DRAFT='<path to the approved draft.md>'
+pnpm --filter web build || exit 1
+PORT=3217
+while lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; do PORT=$((PORT + 1)); done
 TWIN="$(mktemp)"
-curl -sf http://localhost:3217/blog/<slug>/index.md -o "$TWIN"
-node scripts/post-draft-check.mjs --kind <kind> <path to the approved draft.md> "$TWIN"; echo "exit $?"
-```
-
-Expected: no output, then `exit 0`. On exit 1, each difference is a place where the entry is not
-the approved text: fix the entry, rebuild and run again. The writing room's style and privacy checks
-run on the same served twin.
-
-- [ ] **Step 5: Screenshots and the full gates**
-
-With the server from Step 4 still running on port 3217:
-
-```bash
-OUT="$(mktemp -d)"
-for route in blog blog/<slug>; do
-  name="$(echo "$route" | tr / -)"
-  pnpm --filter web exec playwright screenshot --color-scheme=light --viewport-size=1280,900 --full-page "http://localhost:3217/$route" "$OUT/$name-light.png"
-  pnpm --filter web exec playwright screenshot --color-scheme=dark --viewport-size=1280,900 --full-page "http://localhost:3217/$route" "$OUT/$name-dark.png"
-  pnpm --filter web exec playwright screenshot --device="Pixel 7" --full-page "http://localhost:3217/$route" "$OUT/$name-mobile.png"
+LOG="$(mktemp)"
+(cd apps/web && exec node_modules/.bin/next start -p "$PORT") >"$LOG" 2>&1 &
+SERVER=$!
+trap 'kill "$SERVER" 2>/dev/null; wait "$SERVER" 2>/dev/null; rm -f "$TWIN" "$LOG"' EXIT
+for _ in $(seq 60); do
+  curl -fs -o /dev/null "http://localhost:$PORT/blog" && break
+  kill -0 "$SERVER" 2>/dev/null || break
+  sleep 1
 done
-echo "$OUT"
+curl -fsS "http://localhost:$PORT/blog/$SLUG/index.md" -o "$TWIN" && test -s "$TWIN" || {
+  cat "$LOG"
+  exit 2
+}
+node scripts/post-draft-check.mjs --kind "$KIND" "$DRAFT" "$TWIN"
+STATUS=$?
+echo "publish check: exit $STATUS"
+if [ "$STATUS" -eq 0 ]; then
+  OUT="$(mktemp -d)"
+  for route in blog "blog/$SLUG"; do
+    name="$(echo "$route" | tr / -)"
+    pnpm --filter web exec playwright screenshot --color-scheme=light --viewport-size=1280,900 --full-page "http://localhost:$PORT/$route" "$OUT/$name-light.png"
+    pnpm --filter web exec playwright screenshot --color-scheme=dark --viewport-size=1280,900 --full-page "http://localhost:$PORT/$route" "$OUT/$name-dark.png"
+    pnpm --filter web exec playwright screenshot --device="Pixel 7" --full-page "http://localhost:$PORT/$route" "$OUT/$name-mobile.png"
+  done
+  echo "screenshots: $OUT"
+fi
+exit "$STATUS"
 ```
+
+Expected: the check prints nothing, then `publish check: exit 0` and the screenshots' directory. On
+exit 1, each difference is a place where the entry is not the approved text: fix the entry and run
+the block again. Exit 2 means the check could not run, and it says why.
+
+- [ ] **Step 5: Read the screenshots and run the full gates**
 
 Read each PNG: `/blog` lists the post with its date and summary, and the post reads cleanly in
-both schemes and on the phone, ending with the footer when it is `jev`. Stop the server, then:
+both schemes and on the phone, ending with the footer when it is `jev`. Then:
 
 ```bash
 pnpm check:allowbuilds
@@ -2974,22 +3411,26 @@ colour schemes) and twin-parity gates.
 
 - [ ] **Step 6: Commit and open the pull request**
 
+In `docs/plans/README.md`, set the status of the rows of the publishing design and this plan to
+`Shipped`. In this plan, tick this task's steps up to this one.
+
 ```bash
-git add apps/web/src/data/posts.ts apps/web/src/data/static-routes.ts
+git add apps/web/src/data/posts.ts apps/web/src/data/static-routes.ts docs/plans/README.md docs/plans/2026-10-06-blog-publishing-plan.md
 git commit -m "feat(blog): publish 01 <slug>"
 ```
 
 Follow `.claude/skills/open-pr/SKILL.md` with the title `feat(blog): publish 01 <slug>` (D10). Its
 body:
 
-- quotes `metaTitle`, if there is one;
+- quotes the front matter's `metaTitle` and `tags` beside the entry's, since the twin carries
+  neither and the check cannot compare them;
 - pastes the publish check's command and its exit 0;
 - pastes the gate output;
 - describes the screenshots.
 
 Only the owner merges it. If the merge falls on a later day than `publishedAt`, add a last commit
 first that moves `publishedAt`, `updatedAt` and `STATIC_ROUTE_UPDATED['/blog']` to the merge day
-(D9), and rerun the publish check.
+in UTC (D9), and run Step 4 again.
 
 - [ ] **Step 7: Check production after the deploy**
 
