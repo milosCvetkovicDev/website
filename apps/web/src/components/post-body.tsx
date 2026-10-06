@@ -95,7 +95,8 @@ function Block({ block }: { block: PostBlock }) {
       );
     case 'table':
       // `DataTable` gives the caption, the column and row headers, and the stacked layout a table
-      // of three or more columns takes on a phone (#226), as on every other page with a table.
+      // of three or more columns takes on a phone (#226), where its column headers are hidden from
+      // sight, as on every other page with a table.
       return (
         <div className="mb-6">
           <DataTable caption={block.caption} columns={block.columns} rows={block.rows} />

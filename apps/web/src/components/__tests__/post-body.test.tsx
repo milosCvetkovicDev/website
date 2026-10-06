@@ -141,13 +141,19 @@ describe('PostBody', () => {
         .getAllByRole('columnheader')
         .map((cell) => cell.textContent),
     ).toEqual(block.columns);
-    // Trimmed: a table of three or more columns ends each row header with a real space, so the
-    // stacked line copies as the header and its first cell (`data-table.tsx`).
+    // Trimmed at the end: a table of three or more columns ends each row header with a real space,
+    // so the stacked line copies as the header and its first cell (`data-table.tsx`).
     expect(
       within(table)
         .getAllByRole('rowheader')
-        .map((cell) => cell.textContent?.trim()),
+        .map((cell) => cell.textContent.trimEnd()),
     ).toEqual(block.rows.map(([header]) => header));
+    // Every other cell as written, in order: `|` and `*` stay text, and nothing is added to a cell.
+    expect(
+      within(table)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(block.rows.flatMap(([, ...cells]) => cells));
   });
 
   it('never dims text with opacity, and never uses --accent as a text colour', () => {

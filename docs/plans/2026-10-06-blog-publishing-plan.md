@@ -930,6 +930,21 @@ Add to `defects`:
     [withTable({ rows: [['First run', '1,234\n5', '$0.10']] })],
     /: block 1: row 1, column 2 holds a line break, a control or a direction character$/,
   ],
+  [
+    'a table row longer than its columns',
+    [withTable({ rows: [['First run', '1,234', '$0.10', 'Extra']] })],
+    /: block 1: row 1 has 4 cells for 3 columns$/,
+  ],
+  [
+    'a blank last cell in a table of three columns',
+    [withTable({ rows: [['First run', '1,234', '']] })],
+    /: block 1: row 1, column 3 is blank, and a table of three or more columns cannot show a blank cell on a phone$/,
+  ],
+  [
+    'a table cell that is not text',
+    [withTable({ rows: [['First run', 1234, '$0.10']] })],
+    /: block 1: row 1, column 2 is not text$/,
+  ],
 ```
 
 The defect `a block of no known kind` broke a block with `kind: 'table'`, which is now a known kind,
@@ -975,19 +990,30 @@ it('renders a table with its caption, its column headers and its row headers', (
       .getAllByRole('columnheader')
       .map((cell) => cell.textContent),
   ).toEqual(block.columns);
-  // Trimmed: a table of three or more columns ends each row header with a real space, so the
-  // stacked line copies as the header and its first cell (`data-table.tsx`).
+  // Trimmed at the end: a table of three or more columns ends each row header with a real space,
+  // so the stacked line copies as the header and its first cell (`data-table.tsx`).
   expect(
     within(table)
       .getAllByRole('rowheader')
-      .map((cell) => cell.textContent?.trim()),
+      .map((cell) => cell.textContent.trimEnd()),
   ).toEqual(block.rows.map(([header]) => header));
+  // Every other cell as written, in order: `|` and `*` stay text, and nothing is added to a cell.
+  expect(
+    within(table)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent),
+  ).toEqual(block.rows.flatMap(([, ...cells]) => cells));
 });
 ```
 
 In `post-page.test.tsx`, in the test `renders every block kind of the post, in its order`, append
-`'DIV'` to the expected list, and change its comment to
-`// One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote, a table.`
+`'DIV'` to the expected list, and change its comment to these two lines, since Prettier does not
+wrap a comment past 100 columns:
+
+```tsx
+// One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote,
+// a table.
+```
 
 - [x] **Step 3: Run them to see them fail**
 
@@ -1005,9 +1031,16 @@ In `apps/web/src/data/posts.ts`, after `QuoteBlock`:
 ```ts
 /**
  * A table of plain-text cells, rendered by `components/data-table.tsx` like the site's other
- * tables. The caption names it, and the first cell of each row is that row's header. A table of
- * three or more columns stacks into one card per row on a phone, so none of its cells may be blank:
- * the card would show a label with nothing beside it (ADR 0034).
+ * tables. The caption names it, and the first cell of each row is that row's header (ADR 0034).
+ *
+ * Below 640px a table of three or more columns stacks each row: its header and first cell on one
+ * line, then each other cell on a line of its own, with the column names hidden from sight
+ * (`data-table.tsx`, #226). A reader tells the values apart by their order alone, so:
+ *
+ * - no cell may be blank, which `posts.test.ts` checks;
+ * - each value says what it is without its column, by its unit or a word ("1,234 tokens", "$0.10",
+ *   "420 ms"). Where units cannot tell two columns apart, use two-column tables, which never stack
+ *   and keep their headers. No test can check this; whoever writes the table has to.
  */
 export interface TableBlock {
   readonly kind: 'table';
@@ -1028,9 +1061,13 @@ export type PostBlock =
 Add this bullet to the header comment, after the one Task 2 added:
 
 ```ts
- * - A table needs a caption, two columns or more, one cell per column in every row, a row header in
- *   each row, and no blank cell when it has three columns or more.
+ * - A table needs a caption, two columns or more with a name each, one row or more, one cell per
+ *   column in every row, a row header in each row, and no blank cell when it has three columns or
+ *   more. `TableBlock` says what such a table looks like on a phone, and what its cells must say.
 ```
+
+In the last bullet, which lists what `posts.test.ts` checks, name a table's caption, column names
+and row headers among the texts that have no spaces at either end or two in a row.
 
 - [x] **Step 5: Add the fixture table**
 
@@ -1054,7 +1091,10 @@ In the header comment, change `a code block with a language and one without,` to
 
 - [x] **Step 6: Add the table rules**
 
-In `blockProblems` in `posts.test.ts`, add before `default:`:
+In `posts.test.ts`, add `import { isWideTable } from '@/data/pages/table';` after the
+`@/data/case-studies` import, so the rule stacks exactly the tables a phone stacks, and name a
+table's caption, column names and row headers in `lineProblems`' doc. Then, in `blockProblems`, add
+before `default:`:
 
 ```ts
     case 'table': {
@@ -1073,8 +1113,12 @@ In `blockProblems` in `posts.test.ts`, add before `default:`:
       if (!Array.isArray(rows) || rows.length === 0) {
         return [...problems, `${where}: the table has no rows`];
       }
-      // A stacked card shows each cell beside its column's name, so a blank one points at nothing.
-      const stacks = columns.length >= 3;
+      // Below 640px a wide table draws no column names: each row is its header and first cell
+      // joined by a drawn " · ", then each other cell on a line of its own. A blank first cell
+      // leaves the dot pointing at nothing, and a blank later one an empty line that shifts which
+      // value a reader takes for which column. `stackable()` in `lib/serialise.ts` refuses the same
+      // in the site's own tables, and `isWideTable` is the predicate both the page and it use.
+      const stacks = isWideTable({ columns });
       rows.forEach((row: unknown, index) => {
         const at = `${where}: row ${index + 1}`;
         if (!Array.isArray(row) || row.length !== columns.length) {
@@ -1107,7 +1151,8 @@ the `@/lib/links` import, and before `default:` in `Block`:
 ```tsx
     case 'table':
       // `DataTable` gives the caption, the column and row headers, and the stacked layout a table
-      // of three or more columns takes on a phone (#226), as on every other page with a table.
+      // of three or more columns takes on a phone (#226), where its column headers are hidden from
+      // sight, as on every other page with a table.
       return (
         <div className="mb-6">
           <DataTable caption={block.caption} columns={block.columns} rows={block.rows} />

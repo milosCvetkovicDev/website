@@ -113,7 +113,8 @@ describe('the post page', () => {
   it('renders every block kind of the post, in its order', async () => {
     render(await PostPage(paramsOf(everyBlockPost.slug)));
     const body = document.querySelector('[data-post-body]')!;
-    // One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote, a table.
+    // One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote,
+    // a table.
     expect([...body.children].map((element) => element.tagName)).toEqual([
       'P',
       'H2',

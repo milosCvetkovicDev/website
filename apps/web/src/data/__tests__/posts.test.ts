@@ -13,6 +13,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
+import { isWideTable } from '@/data/pages/table';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { formatContentDate, isPublishableContentDate } from '@/lib/content-date';
 import { NO_PUBLISHED_POST_SLUG } from '@/lib/post-static-params';
@@ -78,7 +79,10 @@ const hasInvisible = (value: string) =>
   });
 const INVISIBLE_PROBLEM = 'holds a line break, a control or a direction character';
 
-/** Problems with one line of prose: a title, a summary, a heading or a tag. */
+/**
+ * Problems with one line of prose: a title, a summary, a heading, a tag, or a table's caption, a
+ * column name or a row header.
+ */
 function lineProblems(value: unknown, what: string): string[] {
   if (typeof value !== 'string' || !value.trim()) return [`${what} is empty`];
   if (hasInvisible(value)) return [`${what} ${INVISIBLE_PROBLEM}`];
@@ -196,8 +200,12 @@ function blockProblems(block: PostBlock, where: string, pages: ReadonlySet<strin
       if (!Array.isArray(rows) || rows.length === 0) {
         return [...problems, `${where}: the table has no rows`];
       }
-      // A stacked card shows each cell beside its column's name, so a blank one points at nothing.
-      const stacks = columns.length >= 3;
+      // Below 640px a wide table draws no column names: each row is its header and first cell
+      // joined by a drawn " · ", then each other cell on a line of its own. A blank first cell
+      // leaves the dot pointing at nothing, and a blank later one an empty line that shifts which
+      // value a reader takes for which column. `stackable()` in `lib/serialise.ts` refuses the same
+      // in the site's own tables, and `isWideTable` is the predicate both the page and it use.
+      const stacks = isWideTable({ columns });
       rows.forEach((row: unknown, index) => {
         const at = `${where}: row ${index + 1}`;
         if (!Array.isArray(row) || row.length !== columns.length) {
@@ -752,6 +760,21 @@ const defects: [string, Post[], RegExp][] = [
     'a table cell with a line break',
     [withTable({ rows: [['First run', '1,234\n5', '$0.10']] })],
     /: block 1: row 1, column 2 holds a line break, a control or a direction character$/,
+  ],
+  [
+    'a table row longer than its columns',
+    [withTable({ rows: [['First run', '1,234', '$0.10', 'Extra']] })],
+    /: block 1: row 1 has 4 cells for 3 columns$/,
+  ],
+  [
+    'a blank last cell in a table of three columns',
+    [withTable({ rows: [['First run', '1,234', '']] })],
+    /: block 1: row 1, column 3 is blank, and a table of three or more columns cannot show a blank cell on a phone$/,
+  ],
+  [
+    'a table cell that is not text',
+    [withTable({ rows: [['First run', 1234, '$0.10']] })],
+    /: block 1: row 1, column 2 is not text$/,
   ],
   [
     'an empty piece of inline code',
