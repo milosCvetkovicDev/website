@@ -166,19 +166,20 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * gate, exactly as Lighthouse scores it, so the hero island's alpha-dimmed accent text ships green
  * although it misses AA. It is `incomplete` — axe cannot resolve the background behind a
  * `backdrop-filter` over a gradient, and answers with messageKey `bgGradient` — and `incomplete` was
- * simply not counted. On `/` at rest that is 114 nodes in light and 113 in dark against 103 passing:
- * more than half the at-rest text on the page was unmeasured.
+ * simply not counted. On `/` at rest the audit counted 114 nodes in light and 113 in dark against
+ * 103 passing: more than half the at-rest text on the page was unmeasured.
  *
  * Turning those into failures is not this task's to do — the colours are #47's, and
  * `e2e/hero-contrast.spec.ts` decides them by computed style, which is the only instrument that can.
  * What this budget does is stop the undecidable region *growing*: a new blurred panel or a new gradient
  * behind text pushes a route over its number and fails here, so the unmeasured surface can only shrink.
- * #47's fix should let several of these drop.
+ * #47 was expected to let several of these drop; it has closed with the hero island's
+ * `backdrop-filter` in place (hero-content.tsx:128), and `/` still counts 112 (below).
  *
- * Measured on 2026-09-12, and this is the whole recorded baseline:
+ * Measured on 2026-09-12, the baseline this budget started from:
  *
  *   /       light 112   dark 111-112   the hero island, `backdrop-filter: blur(28px)` over a gradient
- *   /work   light  55   dark  55       the archive cards, `backdrop-blur-sm` (work/page.tsx:51)
+ *   /work   light  55   dark  55       the archive cards, `backdrop-blur-sm` (work/page.tsx:63)
  *   every other route: 0 in both schemes
  *
  * Re-measured on 2026-09-23 for #48, on production builds with the page at rest: `/` gave light
@@ -189,10 +190,10 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * Every route but `/` and `/work` has a budget of **zero**, which is the strongest form this can
  * take: on those pages axe decides every text node, and the first blurred panel or gradient put
  * behind text fails here. The two that are not zero are the two surfaces the audit already found,
- * and between them they account for every undecidable node on the site — 167 of them, against 103
- * and 8 decided.
+ * and between them they account for every undecidable node the at-rest passes find: 167 a scheme
+ * on 2026-09-12, against 103 and 8 decided, and 162 a scheme since 58a (#228).
  *
- * `/` gets a margin of a few nodes and the others do not. The reason this comment gave until #180 was
+ * `/` kept a margin of a few nodes on purpose. The reason this comment gave until #180 was
  * wrong: the tmux chrome's tab labels, pane titles and status lines are static, and its clock changes
  * its text, never its node count. The count varied because of the tmux background's log stream. Its
  * five panes start after an idle callback plus up to 2 s, then each adds a line about every 400-850
@@ -202,12 +203,19 @@ const AT_REST_CONTRAST_FLOOR: Record<string, number> = {
  * 119 and 120 in the runs that failed, CI's among them, and 128-140 after an extra 3 s. The at-rest
  * pass on `/` now leaves the stream out (`TMUX_LOG_STREAM`, below). Without it the count measured 112
  * in both schemes, six production-build runs a scheme on 2026-09-30, the same 112 nodes every run.
- * The margin over that, six nodes to the budget of 118, stays by the owner's decision on #180 of
- * 2026-09-30 until #47's slices 47c and 47e, #49's 49d and #58's 58a have all landed, so that none of
- * them has to raise a budget; a pull request of its own then lowers it to the re-measured constant.
- * `/work` and the zeroes are static and were identical across every run. Never widen a margin to
- * quieten a failure: read the nodes the message names first, because a genuinely new blurred surface
- * looks exactly like this.
+ * A margin of six nodes over that, to a budget of 118, stayed by the owner's decision on #180 of
+ * 2026-09-30 until #47's slices 47c and 47e, #49's 49d and #58's 58a had all landed, so that none
+ * of them had to raise a budget. Between then and 2026-10-06 the scroll indicator's label left the
+ * count, since #206 shows it only on viewports taller than this project's, and the h1 that 58a
+ * (#228) put above the hero's hook joined it, so `/` counted 112 again in both schemes: the same
+ * nodes in six production-build and six dev-server runs a scheme, and in all thirty runs of that
+ * morning's nightly flake hunt on the CI runner. The budget is now that constant, so a count of
+ * 113 fails. It bounds the count, not which nodes: a change that adds one and removes another
+ * passes. To re-measure, run the at-rest tests with `--repeat-each` and `--retries=0` and read the
+ * `axe-results` attachment each run writes; the flake hunt's reports keep it too.
+ * `/work` and the zeroes are static and were identical across the runs of each measurement. Never
+ * raise a budget to quieten a failure: read the nodes the message names first, because a genuinely
+ * new blurred surface looks exactly like this.
  *
  * The positive control at the bottom of this file proves the comparison can fail at all.
  */
@@ -216,10 +224,12 @@ const INCOMPLETE_CONTRAST_BUDGET: Record<string, { light: number; dark: number }
   // this one: plain text on the page background, no blur or gradient behind it, so zero.
   // Re-measure with the floor above when the first post lands.
   ...Object.fromEntries(POST_ROUTES.map((route) => [route, { light: 0, dark: 0 }])),
-  '/': { light: 118, dark: 118 },
+  '/': { light: 112, dark: 112 },
   '/about': { light: 0, dark: 0 },
-  // 55 until #58 dropped /work's "0 / Left Unfinished" stat, two nodes over the grid; 53 measured.
-  '/work': { light: 53, dark: 53 },
+  // 55 until #213 dropped /work's "0 / Left Unfinished" stat, two nodes over the grid; 53
+  // until 58a (#228) put the page header on the page's own background, where axe decides its text.
+  // 50 on 2026-10-06: the stats bar, the project cards and the closing call to action.
+  '/work': { light: 50, dark: 50 },
   '/skills': { light: 0, dark: 0 },
   '/blog': { light: 0, dark: 0 },
   '/contact': { light: 0, dark: 0 },
