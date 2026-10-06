@@ -43,7 +43,7 @@ perform an operation.
 | 0015 | [Case-study slugs are fixed at build time, so unknown ones 404 at the router](0015-static-case-study-params.md)                          | Accepted (corrected 2026-09-12)               | 2026-09-10 |
 | 0016 | [Dependabot branches never deploy, and commits that change nothing the site is built from never build](0016-vercel-deployment-budget.md) | Accepted                                      | 2026-09-12 |
 | 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)                                       | Accepted                                      | 2026-09-12 |
-| 0018 | [Dependency update policy](0018-dependency-update-policy.md)                                                                             | Accepted                                      | 2026-09-12 |
+| 0018 | [Dependency update policy](0018-dependency-update-policy.md)                                                                             | Accepted (corrected 2026-10-06)               | 2026-09-12 |
 | 0019 | [Next.js does not generate agent instruction files](0019-next-agent-rules-disabled.md)                                                   | Accepted                                      | 2026-09-27 |
 | 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)                                   | Superseded by ADR-0021                        | 2026-09-12 |
 | 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)                   | Accepted                                      | 2026-09-13 |
@@ -58,6 +58,7 @@ perform an operation.
 | 0030 | [Generated endpoints are static route handlers; pages negotiate twins by rewrite](0030-generated-endpoints-as-static-route-handlers.md)  | Accepted                                      | 2026-10-01 |
 | 0031 | [Structured data is one graph joined by @id, in separate blocks, asserting only what a page shows](0031-structured-data-graph.md)        | Accepted                                      | 2026-10-02 |
 | 0032 | [Playwright's Chromium keeps V8's garbage collector on the main thread](0032-e2e-chromium-single-threaded-gc.md)                         | Accepted                                      | 2026-10-05 |
+| 0033 | [Dependabot's catch-all groups exclude the packages that have groups of their own](0033-dependabot-group-exclusions.md)                  | Accepted                                      | 2026-10-06 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see

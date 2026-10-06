@@ -44,10 +44,11 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
   grouped into one `minor-and-patch` pull request, except those of the `vite` and `lighthouse`
-  groups below, a major outside those two groups arrives as a pull request of its own, and open npm
-  pull requests are capped at five; github-actions bumps are not grouped. Dependabot alerts and
-  automated security updates are both on. Security updates are triggered by alerts rather than the
-  Monday schedule, and a `security` group
+  groups below, a major outside those two groups arrives as a pull request of its own, though not
+  while a `minor-and-patch` pull request is open, which marks every package it covers as handled
+  (ADR 0033), and open npm pull requests are capped at five; github-actions bumps are not grouped.
+  Dependabot alerts and automated security updates are both on. Security updates are triggered by
+  alerts rather than the Monday schedule, and a `security` group
   (`applies-to: security-updates`, `patterns: ['*']`) batches the security updates of each run into
   one pull request so they cannot fill the five-slot cap. Three majors are ignored, each with the
   upstream event that reopens it: `eslint` and `@eslint/js` (eslint-config-next pulls an
@@ -56,9 +57,17 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   majors (they follow `.nvmrc` by hand). Adding one is a policy change, so read
   `docs/adr/0018-dependency-update-policy.md` first; deleting one without the trigger having fired
   puts the red pull request back. A `vite` group (`vite`, `@vitejs/*`, `vitest`, `@vitest/*`, majors
-  included) sits ahead of `minor-and-patch`, because Dependabot puts a dependency in the first group
-  that matches it, so a vite major arrives in one pull request with the `@vitejs/plugin-react` and
-  vitest releases that peer on it. The group relies on `apps/web` declaring `vite` directly (ADR
+  included) brings a vite major in one pull request with the `@vitejs/plugin-react` and vitest
+  releases that peer on it. The order of the groups does not, by itself, keep a package in its own
+  group (it decides only between two groups that both keep it, neither with an open pull request): a
+  group with no patterns, as `minor-and-patch` is, never gives a dependency up, even to a group that
+  names it exactly, and outranks a wildcard; a group with an open pull request claims its members
+  first; and a refresh of that pull request takes every member. So every package a group owns is
+  also in the `exclude-patterns` of the catch-all group with the same `applies-to`
+  (`minor-and-patch` for version updates, `security` for security updates), which Dependabot reads
+  before any pattern, and a new group adds its patterns there in the same change, if its
+  `update-types` include minor and patch (ADR 0033, #232). The group relies on `apps/web` declaring
+  `vite` directly (ADR
   0027): without that, a plugin-react major would arrive without the vite major it needs and fail
   as #9 did. Keep the declaration while the group exists. The major is not pinned by any decision:
   `scripts/vitest-coverage-pair.test.mjs` fails `pnpm test:scripts` when the installed vite's major
@@ -68,10 +77,10 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   means re-reading the audit ids and scoring rules `apps/web/e2e/lighthouse-audits.spec.ts` asserts
   and its docblock records for the version `LIGHTHOUSE_VERSION` names. The spec fails on any other version until `LIGHTHOUSE_VERSION`
   in `apps/web/e2e/support/lighthouse.ts` is updated, because a changed `notApplicable` or scoring
-  rule would not fail it by itself. So Dependabot raises lighthouse bumps alone: a `lighthouse`
-  group (`patterns: ['lighthouse']`, majors included) sits after `vite` and ahead of
-  `minor-and-patch`, and a `lighthouse-security` group (`applies-to: security-updates`) sits ahead
-  of `security`, so a red lighthouse pull request bumps no other direct dependency. The pattern
+  rule would not fail it by itself. So Dependabot raises lighthouse bumps alone, in a `lighthouse`
+  group (`patterns: ['lighthouse']`, majors included) or a `lighthouse-security` one for security
+  updates, and `minor-and-patch` and `security` both exclude it, so a red lighthouse pull request
+  bumps no other direct dependency. The pattern
   matches the exact name only; `lighthouse-logger` and the rest of its tree are transitive and
   change only when the new lighthouse requires it, which can include `@opentelemetry/api` below:
   check its version and the peer suffix on `next` in the lockfile diff. To land one, check out the
