@@ -26,6 +26,8 @@ import { PAGE_HEADINGS } from './support/page-headings';
 // #58's tables, counted from the data their records read (the last tests in this file).
 import { facts, timeline } from '../src/data/pages/about';
 import { skillCategories } from '../src/data/pages/skills';
+// The Person's visible facts (57b, the describe at the end of this file).
+import { servedText } from './support/served-text';
 
 /**
  * The head every crawler and link-preview bot reads.
@@ -544,7 +546,10 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
     for (const node of nodes) {
       for (const { at, ref } of referencesIn(node)) {
         const where = `${path}: ${String(node['@type'])}.${at}`;
-        if (!ids.has(String(ref['@id']))) {
+        // But one, by name (57b): the Person is the main entity of /about's ProfilePage, which
+        // only /about serves; the Person's own describe at the end of this file holds it there.
+        const crossRoute = node['@type'] === 'Person' && at === 'mainEntityOfPage';
+        if (!crossRoute && !ids.has(String(ref['@id']))) {
           problems.push(`${where} names ${String(ref['@id'])}, which this document does not serve`);
         }
         const extra = Object.keys(ref).filter((key) => key !== '@id');
@@ -1177,4 +1182,146 @@ test('every page serves one non-empty h1 of its own, and five name their subject
       `${route} serves its hook once, as a paragraph outside any heading`,
     ).toEqual([{ tag: 'p', inHeading: false }]);
   }
+});
+
+// #57 AC 6 (57b): the Person, which the layout serves on every route, asserts nothing a reader of
+// the site cannot see, the rule ADR 0031's Decision 5 holds every node to. Each fact it states is
+// found, case-insensitively, in the body text of at least one page as `support/served-text.ts`
+// extracts it (the one extractor the served-text specs share, so a phrase means the same here as
+// there), and each profile it names is the href of a link some page renders. Every string in the
+// Person is checked one of those two ways or is named in `NOT_PAGE_TEXT` with what holds it
+// instead, so a predicate added later is held to the rule by default.
+test.describe('the Person states only what the pages show (#57)', () => {
+  /** The Person's strings that are not facts to find in a page's text, each with what holds it. */
+  const NOT_PAGE_TEXT: Readonly<Record<string, string>> = {
+    '@context': 'vocabulary, not a fact',
+    '@type': 'vocabulary, not a fact',
+    credentialCategory: "vocabulary: schema.org's word for the kind of credential",
+    '@id': "an identifier on the site's origin, held by the graph test above",
+    url: "the site's origin, held by the graph test above",
+    sameAs: 'a profile: the href of a link some page renders, checked below',
+    alternateName: "a profile's handle: the last segment of a sameAs link, checked below",
+    description:
+      'a summary rather than one fact: its figure, the years, is held to the pages by the #49 test above',
+    jobTitle:
+      'older than 57b and not printed whole by any page (they print "Senior Full-Stack Engineer" ' +
+      'and "Full Stack Engineer & Architect"), so the owner settles its wording',
+  };
+
+  /** The facts #57 AC 6 names, so the walk cannot pass by finding none of them. */
+  const REQUIRED = [
+    'knowsAbout[0]',
+    'hasCredential.name',
+    'address.addressLocality',
+    'address.addressCountry',
+    'hasOccupation.name',
+    'hasOccupation.occupationLocation.name',
+  ];
+
+  /** Every string in a node, at any depth, with its path and the key it sits under. */
+  function stringsIn(
+    value: unknown,
+    at = '',
+    key = '',
+  ): { at: string; key: string; text: string }[] {
+    if (typeof value === 'string') return [{ at, key, text: value }];
+    if (Array.isArray(value)) {
+      return value.flatMap((entry, i) => stringsIn(entry, `${at}[${i}]`, key));
+    }
+    if (typeof value !== 'object' || value === null) return [];
+    return Object.entries(value).flatMap(([name, entry]) =>
+      stringsIn(entry, at === '' ? name : `${at}.${name}`, name),
+    );
+  }
+
+  test('every fact in the Person is in some page’s text, and every profile it names is a link', async ({
+    page,
+    request,
+  }) => {
+    type Served = { text: string; hrefs: string[]; nodes: Record<string, unknown>[] };
+    const served = new Map<string, Served>();
+    // The 404 serves the same Person but is no page of the site's: a fact only it showed would be
+    // a fact no route shows.
+    for (const path of PAGE_ROUTES.filter((route) => route !== NOT_FOUND_ROUTE)) {
+      const response = await request.get(path);
+      expect(response.status(), `GET ${path}`).toBe(200);
+      const html = await response.text();
+      const { hrefs, blocks } = await page.evaluate((markup) => {
+        const doc = new DOMParser().parseFromString(markup, 'text/html');
+        return {
+          hrefs: [...doc.body.querySelectorAll('a[href]')].map(
+            (link) => link.getAttribute('href') ?? '',
+          ),
+          blocks: [...doc.querySelectorAll('script[type="application/ld+json"]')].map(
+            (script) => script.textContent ?? '',
+          ),
+        };
+      }, html);
+      served.set(path, {
+        text: (await servedText(page, html, { root: 'body' })).toLowerCase(),
+        hrefs,
+        nodes: blocks.map((block) => JSON.parse(block) as Record<string, unknown>),
+      });
+    }
+
+    const problems: string[] = [];
+    const personOn = (path: string) => served.get(path)?.nodes.find((n) => n['@type'] === 'Person');
+    // One Person, the layout's, on every page, so the facts below are the facts of every page.
+    const people = new Set([...served.keys()].map((path) => JSON.stringify(personOn(path))));
+    if (people.size !== 1) problems.push(`the pages serve ${people.size} different Persons`);
+    const person = personOn('/about');
+    if (!person) throw new Error('/about serves no Person, so nothing below can be checked');
+
+    // The facts: each in the text of at least one page. `shownOn` goes into the report, so the
+    // pull request can list each fact beside the routes that show it.
+    const shownOn: Record<string, string[]> = {};
+    const facts = stringsIn(person).filter(({ key }) => !(key in NOT_PAGE_TEXT));
+    for (const { at, text } of facts) {
+      const routes = [...served].filter(([, { text: body }]) => body.includes(text.toLowerCase()));
+      shownOn[`${at}: ${text}`] = routes.map(([path]) => path);
+      if (routes.length === 0) problems.push(`${at} "${text}" is in the text of no page`);
+    }
+    for (const at of REQUIRED) {
+      if (!facts.some((fact) => fact.at === at)) problems.push(`the Person states no ${at}`);
+    }
+
+    // The profiles: each the href of a link some page renders.
+    const profiles = Array.isArray(person.sameAs) ? person.sameAs.map(String) : [];
+    if (profiles.length === 0) problems.push('the Person names no profile in sameAs');
+    for (const profile of profiles) {
+      const routes = [...served].filter(([, { hrefs }]) => hrefs.includes(profile));
+      shownOn[`sameAs: ${profile}`] = routes.map(([path]) => path);
+      if (routes.length === 0) problems.push(`sameAs ${profile} is the href of no rendered link`);
+    }
+
+    // The alias: the handle of one of those profiles, with or without the `@` it is written after.
+    const alias = typeof person.alternateName === 'string' ? person.alternateName : '';
+    const handle = alias.replace(/^@/, '');
+    const owner = profiles.find(
+      (profile) => new URL(profile).pathname.split('/').at(-1) === handle,
+    );
+    shownOn[`alternateName: ${alias}`] = owner ? shownOn[`sameAs: ${owner}`] : [];
+    if (handle === '' || !owner) {
+      problems.push(`alternateName "${alias}" is the handle of no profile in sameAs`);
+    }
+
+    // The page the Person is the main entity of is /about's ProfilePage: the one reference the
+    // graph test above lets name a node another route serves.
+    const profilePage = served.get('/about')?.nodes.find((n) => n['@type'] === 'ProfilePage');
+    if (
+      profilePage === undefined ||
+      JSON.stringify(person.mainEntityOfPage) !== JSON.stringify({ '@id': profilePage['@id'] })
+    ) {
+      problems.push(
+        `the Person's mainEntityOfPage is ${JSON.stringify(person.mainEntityOfPage)}, ` +
+          `not /about's ProfilePage ${String(profilePage?.['@id'])}`,
+      );
+    }
+
+    await test.info().attach('person-facts-by-route.json', {
+      body: JSON.stringify(shownOn, null, 2),
+      contentType: 'application/json',
+    });
+    expect(problems).toEqual([]);
+  });
 });

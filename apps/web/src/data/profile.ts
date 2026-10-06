@@ -11,6 +11,9 @@
  * compute it again in the visitor's browser, and a page built in December and hydrated in January
  * would then disagree with its own markup. `__tests__/profile.test.ts` fails when a client module
  * reaches it.
+ *
+ * The place, the certification and the occupation below are facts the Person JSON-LD asserts, so
+ * each is one a page shows (#57, ADR 0031).
  */
 import type { Fact } from './pages/about';
 
@@ -44,6 +47,26 @@ export function yearsOfExperience(asOf: Date = new Date()): number {
 export function experienceFigureSince(asOf: Date = new Date()): string {
   return `${CAREER_START_YEAR + yearsOfExperience(asOf)}-01-01`;
 }
+
+/**
+ * The certification `/about` lists under Credentials, and the Person JSON-LD's `hasCredential`
+ * (#57). The markup may assert only what a page shows, so both read it from here.
+ */
+export const CERTIFICATION = 'Angular Certified Architect';
+
+/**
+ * Where the person is based, as `/about` shows it ("Belgrade, Serbia" under Credentials, and the
+ * description's "Based in Belgrade."): the Person JSON-LD's `address` and the place of its
+ * occupation read the same two names (#57).
+ */
+export const LOCATION = { locality: 'Belgrade', country: 'Serbia' } as const;
+
+/**
+ * The occupation the Person JSON-LD's `hasOccupation` names (#57), as the pages print it: the
+ * eyebrows of /work, /skills and /contact, and the home page's `h1` in lower case. Those lines
+ * still write it themselves; `e2e/seo-surface.spec.ts` fails when no page shows it.
+ */
+export const OCCUPATION = 'Senior Full-Stack Engineer';
 
 /**
  * The `/about` quick fact that states the total, label and figure together. The row lives here

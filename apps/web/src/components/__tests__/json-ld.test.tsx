@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { caseStudies, caseStudyPageTitle } from '@/data/case-studies';
 import { pages } from '@/data/pages';
 import { yearsOfExperience } from '@/data/profile';
-import { socialProfiles } from '@/data/social';
+import { social, socialProfiles } from '@/data/social';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { yearsClausesAboutAi, yearsFigures } from '@/test/experience-claims';
 
@@ -45,7 +45,9 @@ vi.mock('@/components', () => ({ FeaturedWork: () => null, TechStack: () => null
  * Person reference each other by `@id`. The last describe holds the graph to that on every route,
  * rendering each page after the root layout's two blocks: every node has an `@id` of its own, every
  * reference names a node the same route serves and carries nothing but that `@id`, and the route's
- * types are pinned. `e2e/seo-surface.spec.ts` checks the same sets in the served HTML.
+ * types are pinned. One reference is let through by name (57b): the Person, rendered on every route,
+ * is the main entity of /about's ProfilePage, which only /about serves, so a row there holds it to
+ * that node instead. `e2e/seo-surface.spec.ts` checks the same sets in the served HTML.
  *
  * Typing, a convention that is not enforced yet: no payload in `lib/structured-data.ts` is typed
  * today, and nothing offline catches a misspelled predicate. Until 57c lands, the only vocabulary
@@ -217,9 +219,17 @@ function referencesOf(value: unknown, path = ''): { at: string; ref: Record<stri
 }
 
 /**
+ * The one reference allowed to name a node on another route, by where it sits (57b). The Person is
+ * rendered on every route and is the main entity of /about's ProfilePage, which only /about serves,
+ * as ADR 0031's Decision 7 asks. A row in the graph describe holds it to that node instead, and it
+ * still carries nothing but its `@id`.
+ */
+const CROSS_ROUTE_REFERENCES: ReadonlySet<string> = new Set(['Person.mainEntityOfPage']);
+
+/**
  * What is wrong with one route's graph: a node with no `@id`, two nodes with one `@id`, a reference
- * that names no node the route serves, and a reference that carries more than its `@id`, which
- * would restate a fact the node it names already owns.
+ * that names no node the route serves (but for `CROSS_ROUTE_REFERENCES`), and a reference that
+ * carries more than its `@id`, which would restate a fact the node it names already owns.
  */
 function graphProblems(nodes: JsonLdNode[]): string[] {
   const problems: string[] = [];
@@ -234,7 +244,7 @@ function graphProblems(nodes: JsonLdNode[]): string[] {
     for (const { at, ref } of referencesOf(node)) {
       const where = `${String(node['@type'])}.${at}`;
       const id = idOf(ref);
-      if (id === undefined || !ids.has(id)) {
+      if (id === undefined || (!ids.has(id) && !CROSS_ROUTE_REFERENCES.has(where))) {
         problems.push(`${where} names ${String(ref['@id'])}, which no node on the route has`);
       }
       const extra = Object.keys(ref).filter((key) => key !== '@id');
@@ -298,6 +308,60 @@ describe('the JSON-LD blocks', () => {
       'https://github.com/milosCvetkovicDev',
       'https://x.com/milos_dev',
     ]);
+  });
+
+  it('describes the Person with the facts /about shows, and nothing it does not (57b)', async () => {
+    // The whole node, so a predicate added or left behind fails here. Each fact is one the pages
+    // show (#57 AC 6): the handle of a profile the site links to, the locality, the country and the
+    // certification of /about's credentials, the occupation the page eyebrows name, and knowsAbout
+    // trimmed to entries some route's text carries; `e2e/seo-surface.spec.ts` finds each one in the
+    // served pages. The literals are the oracle, as for `sameAs` above: comparing the node with
+    // the modules it reads would pass with a fact typed wrong in them. No employer or school is
+    // asserted, because the /about timeline names neither (ADR 0031, Decision 6).
+    const { PersonJsonLd } = await importWithSiteUrl('https://example.test');
+    const { container } = render(<PersonJsonLd />);
+    const [person] = jsonLdBlocks(container).map(parseJsonLdBlock);
+    expect(person).toEqual({
+      '@context': 'https://schema.org',
+      '@type': 'Person',
+      '@id': 'https://example.test/#person',
+      name: 'Milos Cvetkovic',
+      alternateName: '@milos_dev',
+      url: 'https://example.test',
+      jobTitle: 'Senior Full Stack Engineer & Architect',
+      description: `Senior Full Stack Engineer & Architect with ${yearsOfExperience()} years of experience in software engineering, now building AI-native systems, self-healing agents, and cloud-native architecture.`,
+      address: { '@type': 'PostalAddress', addressLocality: 'Belgrade', addressCountry: 'Serbia' },
+      hasCredential: {
+        '@type': 'EducationalOccupationalCredential',
+        name: 'Angular Certified Architect',
+        credentialCategory: 'certification',
+      },
+      hasOccupation: {
+        '@type': 'Occupation',
+        name: 'Senior Full-Stack Engineer',
+        occupationLocation: { '@type': 'City', name: 'Belgrade' },
+      },
+      knowsAbout: [
+        'TypeScript',
+        'React',
+        'NestJS',
+        'Node.js',
+        'Azure',
+        'Terraform',
+        'Claude Code',
+        'DDD',
+        'Kubernetes',
+        'AI-Native Development',
+        'Clean Architecture',
+        'Legacy Modernization',
+        'DevOps',
+      ],
+      sameAs: socialProfiles.map(({ href }) => href),
+      mainEntityOfPage: { '@id': 'https://example.test/about#webpage' },
+    });
+    // The handle is the X profile's, read from the one social source, after an `@` as the Twitter
+    // card's creator writes it.
+    expect(person.alternateName).toBe(`@${social.x.handle}`);
   });
 
   it('describes the Person by the derived years of career experience, not as AI-native work (#49)', async () => {
@@ -758,12 +822,12 @@ describe('the offline structured-data gate (#55)', () => {
     const linked = {
       ...good,
       '@id': 'https://example.test/#person',
-      worksFor: [{ '@id': 'https://example.test/#org' }],
+      knows: [{ '@id': 'https://example.test/#friend' }],
     };
     expect(parseJsonLdBlock(JSON.stringify(linked))).toEqual(linked);
     expect(linksOf(linked)).toEqual([
       { at: '@id', link: 'https://example.test/#person' },
-      { at: 'worksFor[0].@id', link: 'https://example.test/#org' },
+      { at: 'knows[0].@id', link: 'https://example.test/#friend' },
     ]);
   });
 
@@ -987,6 +1051,19 @@ describe('the JSON-LD graph on every route (#57)', () => {
     }
   });
 
+  it('makes the Person on every route the main entity of /about’s ProfilePage (57b)', () => {
+    // The one reference `graphProblems` lets through by name: it names a node only /about serves,
+    // so it is held to that node here, the 404's Person included.
+    const about = routes.find((entry) => entry.route === '/about')!;
+    const profile = nodeOfType('/about', about.nodes, 'ProfilePage');
+    expect(profile['@id']).toBe('https://example.test/about#webpage');
+    for (const { route, nodes } of routes) {
+      expect(nodeOfType(route, nodes, 'Person').mainEntityOfPage, route).toEqual({
+        '@id': profile['@id'],
+      });
+    }
+  });
+
   it('dates /about’s ProfilePage with the day its "Last updated" line shows', () => {
     const { nodes, html } = routes.find((entry) => entry.route === '/about')!;
     const profile = nodeOfType('/about', nodes, 'ProfilePage');
@@ -1052,5 +1129,39 @@ describe('the JSON-LD graph on every route (#57)', () => {
     ).toEqual([
       'BreadcrumbList.about[1] names https://example.test/#x, which no node on the route has',
     ]);
+    // The cross-route exemption is by name (57b): the Person's mainEntityOfPage may name a page
+    // node this route does not serve, but the same predicate on another node, another predicate on
+    // the Person, an empty reference and a padded one are still refused.
+    const elsewhere = { '@id': 'https://example.test/about#webpage' };
+    const site = node('WebSite', 'https://example.test/#website');
+    expect(
+      graphProblems([
+        node('Person', 'https://example.test/#person', { mainEntityOfPage: elsewhere }),
+        site,
+      ]),
+    ).toEqual([]);
+    expect(
+      graphProblems([
+        node('Person', 'https://example.test/#person', { about: elsewhere }),
+        node('WebSite', 'https://example.test/#website', { mainEntityOfPage: elsewhere }),
+      ]),
+    ).toEqual([
+      'Person.about names https://example.test/about#webpage, which no node on the route has',
+      'WebSite.mainEntityOfPage names https://example.test/about#webpage, which no node on the route has',
+    ]);
+    expect(
+      graphProblems([
+        node('Person', 'https://example.test/#person', { mainEntityOfPage: { '@id': '' } }),
+        site,
+      ]),
+    ).toEqual(['Person.mainEntityOfPage names , which no node on the route has']);
+    expect(
+      graphProblems([
+        node('Person', 'https://example.test/#person', {
+          mainEntityOfPage: { ...elsewhere, '@type': 'ProfilePage' },
+        }),
+        site,
+      ]),
+    ).toEqual(['Person.mainEntityOfPage carries @type beside its @id']);
   });
 });

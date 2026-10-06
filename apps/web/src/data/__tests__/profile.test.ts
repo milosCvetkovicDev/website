@@ -14,9 +14,12 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { facts, timeline } from '../pages/about';
+import { aboutRecord, credentials, facts, timeline } from '../pages/about';
 import {
   CAREER_START_YEAR,
+  CERTIFICATION,
+  LOCATION,
+  OCCUPATION,
   experienceFact,
   experienceFigureSince,
   yearsOfExperience,
@@ -104,6 +107,36 @@ describe('the quick fact that states it', () => {
 
   it('is the fact the /about record lists, whole', () => {
     expect(facts).toContainEqual(experienceFact());
+  });
+});
+
+describe('the facts the Person JSON-LD asserts (57b)', () => {
+  // The Person may assert only what a page shows (#57 AC 6), so each fact it names is stated once,
+  // here, and /about reads it from here too: the page, its Markdown twin and the markup cannot
+  // disagree. The literals are the oracle: they are the strings /about printed before 57b, and the
+  // owner approves them in the pull request.
+  it('holds the certification, the place and the occupation as the pages print them', () => {
+    expect(CERTIFICATION).toBe('Angular Certified Architect');
+    expect(LOCATION).toEqual({ locality: 'Belgrade', country: 'Serbia' });
+    expect(OCCUPATION).toBe('Senior Full-Stack Engineer');
+  });
+
+  it('is what /about’s credentials and description show, read from here', () => {
+    const shown = credentials.map(({ text }) => text);
+    expect(shown).toContain(CERTIFICATION);
+    expect(shown).toContain(`${LOCATION.locality}, ${LOCATION.country}`);
+    expect(aboutRecord.summary).toMatch(new RegExp(`\\bBased in ${LOCATION.locality}\\.$`));
+  });
+
+  it('is written in this module only, not again in the /about record', () => {
+    // A string typed back into the record would print the same text today and drift tomorrow.
+    const record = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../pages/about.ts'),
+      'utf8',
+    );
+    for (const literal of [CERTIFICATION, LOCATION.locality, LOCATION.country]) {
+      expect(record, literal).not.toContain(literal);
+    }
   });
 });
 

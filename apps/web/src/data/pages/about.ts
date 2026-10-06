@@ -9,7 +9,7 @@
  * with their captions and column headers, and the twin writes with the same columns.
  */
 import { formatMetric, getCaseStudy } from '@/data/case-studies';
-import { experienceFact, yearsOfExperience } from '@/data/profile';
+import { CERTIFICATION, LOCATION, experienceFact, yearsOfExperience } from '@/data/profile';
 import { social } from '@/data/social';
 import type { PageRecord, PageSection, Paragraph, Table } from './types';
 
@@ -149,9 +149,11 @@ export const facts: readonly Fact[] = [
   { label: 'Morning coffee required', value: '2 cups' },
 ];
 
+// The certification and the place are facts the Person JSON-LD asserts too, so both come from the
+// profile, where the markup reads them (#57): the page, its twin and the markup cannot disagree.
 export const credentials: readonly Credential[] = [
-  { icon: '🎓', text: 'Angular Certified Architect' },
-  { icon: '📍', text: 'Belgrade, Serbia' },
+  { icon: '🎓', text: CERTIFICATION },
+  { icon: '📍', text: `${LOCATION.locality}, ${LOCATION.country}` },
   { icon: '🌍', text: 'Remote-first since 2020' },
 ];
 
@@ -288,6 +290,6 @@ const sections: readonly PageSection[] = [
 export const aboutRecord: PageRecord = {
   path: '/about',
   title: 'About — Senior Full-Stack Engineer',
-  summary: `I fix the systems everyone else gave up on: ${yearsOfExperience()} years rescuing legacy codebases, now building AI agents that fix their own bugs. Based in Belgrade.`,
+  summary: `I fix the systems everyone else gave up on: ${yearsOfExperience()} years rescuing legacy codebases, now building AI agents that fix their own bugs. Based in ${LOCATION.locality}.`,
   sections,
 };

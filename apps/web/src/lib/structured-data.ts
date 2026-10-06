@@ -1,6 +1,7 @@
+import { aboutRecord } from '@/data/pages/about';
 import type { PageRecord } from '@/data/pages/types';
-import { yearsOfExperience } from '@/data/profile';
-import { socialProfiles } from '@/data/social';
+import { CERTIFICATION, LOCATION, OCCUPATION, yearsOfExperience } from '@/data/profile';
+import { social, socialProfiles } from '@/data/social';
 import { formatContentDate } from './content-date';
 import { assertPathname } from './pathname';
 import { siteOrigin } from './site-origin';
@@ -73,17 +74,45 @@ function contentDate(date: string, node: string): string {
   return date;
 }
 
+/**
+ * The person the site is by and about, with only the facts its pages show (#57, ADR 0031's
+ * visible-facts rule): the X handle as an alias, the place and the certification /about lists, and
+ * the occupation the page eyebrows name, each read from the module that also feeds the page. No
+ * employer or school is asserted, because the /about timeline names neither. `knowsAbout` keeps the
+ * entries some route's text shows (57b dropped "Self-Healing Agents", which none did). The Person
+ * describe in `e2e/seo-surface.spec.ts` finds each string here in the served text of a page, and
+ * each profile as a rendered link, unless its `NOT_PAGE_TEXT` names what holds that key instead (the
+ * `jobTitle` and the `description` among them), so a fact added here that no page shows fails there.
+ */
 export function person() {
   return {
     '@context': CONTEXT,
     '@type': 'Person',
     '@id': PERSON_ID,
     name: NAME,
+    // The handle after an `@`, as the Twitter card's creator writes it; the X profile, whose URL
+    // ends with it, is among the `sameAs` below.
+    alternateName: `@${social.x.handle}`,
     url: siteUrl,
     jobTitle: 'Senior Full Stack Engineer & Architect',
     // The total is career experience, read from the profile; the AI-native work is the recent
     // part of it (the About timeline starts it in 2025), so the sentence keeps the two apart.
     description: `Senior Full Stack Engineer & Architect with ${yearsOfExperience()} years of experience in software engineering, now building AI-native systems, self-healing agents, and cloud-native architecture.`,
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: LOCATION.locality,
+      addressCountry: LOCATION.country,
+    },
+    hasCredential: {
+      '@type': 'EducationalOccupationalCredential',
+      name: CERTIFICATION,
+      credentialCategory: 'certification',
+    },
+    hasOccupation: {
+      '@type': 'Occupation',
+      name: OCCUPATION,
+      occupationLocation: { '@type': 'City', name: LOCATION.locality },
+    },
     knowsAbout: [
       'TypeScript',
       'React',
@@ -95,13 +124,16 @@ export function person() {
       'DDD',
       'Kubernetes',
       'AI-Native Development',
-      'Self-Healing Agents',
       'Clean Architecture',
       'Legacy Modernization',
       'DevOps',
     ],
     // The profiles the footer and the pages link to, from their one source (#49).
     sameAs: socialProfiles.map(({ href }) => href),
+    // The page about this person is /about's ProfilePage. The Person is served on every route and
+    // that node only on /about, so this is the one reference that names a node on another route;
+    // the graph tests let it through by name and hold it to /about's node instead (57b).
+    mainEntityOfPage: reference(webPageId(aboutRecord.path)),
   };
 }
 
