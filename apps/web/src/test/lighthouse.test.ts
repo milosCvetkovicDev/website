@@ -198,11 +198,31 @@ describe('versionProblem', () => {
     expect(versionProblem(report())).toBeUndefined();
   });
 
-  it('fails any other version, so a bump that keeps the ids still forces the re-read', () => {
-    expect(versionProblem(report({ lighthouseVersion: '13.5.0' }))).toMatch(
-      /^Lighthouse 13\.5\.0 ran, but the spec describes 13\.4\.1\. Re-read/,
-    );
-  });
+  // The pin's neighbours, derived from it so that a bump never edits this test: older and newer
+  // releases for a check that compares only part of the version or a range, and strings that
+  // start with the pin for a prefix check. A pin in any other form fails collection loudly.
+  const pinned = /^(\d+)\.(\d+)\.(\d+)$/.exec(LIGHTHOUSE_VERSION);
+  if (!pinned)
+    throw new Error(`LIGHTHOUSE_VERSION is not major.minor.patch: ${LIGHTHOUSE_VERSION}`);
+  const [major, minor, patch] = [pinned[1], pinned[2], pinned[3]].map(Number);
+  const others = [
+    `${major}.${minor}.${patch + 1}`,
+    `${major}.${minor + 1}.0`,
+    `${major + 1}.0.0`,
+    `${major - 1}.${minor}.${patch}`,
+    `${LIGHTHOUSE_VERSION}-beta.0`,
+    `${LIGHTHOUSE_VERSION}.1`,
+    '',
+  ];
+
+  it.each(others)(
+    "fails '%s' like any other version, so a bump that keeps the ids still forces the re-read",
+    (version) => {
+      const opening = `Lighthouse ${version} ran, but the spec describes ${LIGHTHOUSE_VERSION}. Re-read`;
+      const problem = versionProblem(report({ lighthouseVersion: version }));
+      expect(problem?.slice(0, opening.length)).toBe(opening);
+    },
+  );
 });
 
 describe('describeDetails and clip', () => {

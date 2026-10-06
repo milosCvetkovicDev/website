@@ -41,10 +41,14 @@ import {
  * builds (the dev server and the production one). The rules themselves live in
  * `e2e/support/lighthouse.ts`, pinned by `src/test/lighthouse.test.ts`.
  *
- * What Lighthouse 13.4.1 itself does, read in its source (`core/audits`,
- * `core/config/default-config.js`) on 2026-09-29. A version bump can change any of it, and the ids
- * with it, so a bump means re-reading this list (`.claude/rules/dependencies.md`), and each route's
- * first test fails on any other version until `LIGHTHOUSE_VERSION` is updated:
+ * What Lighthouse 13.5.0 itself does, read in its published source (`core/audits`,
+ * `core/config/default-config.js`). Its `agentic-browsing` category files `llms-txt` in an
+ * `agent-discoverability` group beside an `ard-schema` audit, which looks for
+ * `/.well-known/ai-catalog.json` and reports `notApplicable` when there is no catalog and no
+ * `ai-catalog` link, header or robots.txt `Agentmap:` line pointing at one (a pointer without a
+ * catalog fails it); the site has neither, so it is not asserted. A version bump can change any of
+ * it, and the ids with it, so a bump means re-reading this list (`.claude/rules/dependencies.md`),
+ * and each route's first test fails on any other version until `LIGHTHOUSE_VERSION` is updated:
  *
  * - `structured-data` is a manual audit (`scoreDisplayMode: 'manual'`, weight 0 in the SEO
  *   category), so Lighthouse checks no JSON-LD at all and it is not asserted here. Structured data

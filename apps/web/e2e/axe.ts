@@ -18,7 +18,7 @@ export type AxeRunOptions = Parameters<AxeBuilder['options']>[0];
 export type AxeResults = Awaited<ReturnType<AxeBuilder['analyze']>>;
 export type Violation = AxeResults['violations'][number];
 
-// https://github.com/GoogleChrome/lighthouse/blob/v13.4.1/core/gather/gatherers/accessibility.js
+// https://github.com/GoogleChrome/lighthouse/blob/v13.5.0/core/gather/gatherers/accessibility.js
 // Every id below exists in axe-core 4.13.0 (checked with `axe.getRules()`). axe throws
 // "unknown rule" for an id it does not know, which would fail every audit and the control at once,
 // so re-check the map after an axe-core or Lighthouse upgrade. The `enabled: false` entries are
