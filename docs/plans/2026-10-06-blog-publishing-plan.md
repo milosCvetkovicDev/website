@@ -412,6 +412,13 @@ Add to the end of `defects`:
         'body[0].content[1].text',
         'TypeSafe',
       ],
+      // The twin prints a link's URL after its text, so the URL is text the post shows too.
+      [
+        'a link target',
+        { body: [paragraph('See ', { text: 'the example page', href: 'https://example.com/TypeSafe' }, '.')] },
+        'body[0].content[1].href',
+        'TypeSafe',
+      ],
       [
         'inline code',
         { body: [paragraph('Run ', { code: 'TypeSafe.check()' }, '.')] },
@@ -456,16 +463,21 @@ Add to the end of `accepted`:
   // Not the names either: a letter, digit, underscore or combining mark against one edge.
   ...[
     ['a letter before Jev', 'ŠJev'],
+    ['a digit before Jev', '2Jev'],
+    ['an underscore before Jev', '_Jev'],
+    ['a combining acute accent before Jev', 'e\u0301Jev'],
     ['a letter before TypeSafe', 'MyTypeSafe'],
     ['a digit after Jev', 'Jev2'],
     ['an underscore after Jev', 'Jev_'],
     ['a combining acute accent after Jev', 'Jev\u0301'],
+    ['a digit after TypeSafe', 'TypeSafe2'],
+    ['an underscore after TypeSafe', 'TypeSafe_'],
   ].map(([edge, word]): [string, Post[]] => [
     `${edge} in an own post`,
     [withBody(paragraph(`A sentence with ${word} in it.`))],
   ]),
-  // A URL is not text the post shows; ADR 0034 checks the link's text.
-  ['an own post linking to a TypeSafe URL', [withLink('https://example.com/TypeSafe', 'the example page')]],
+  // The match is case-sensitive (ADR 0034), so a lowercase domain in a link's URL is not the name.
+  ['an own post linking to a lowercase typesafe domain', [withLink('https://typesafe.dev/docs', 'their docs')]],
 ```
 
 In `describe('the post fixtures')`, add:
@@ -511,7 +523,7 @@ In `apps/web/src/data/posts.ts`, add this bullet to the header comment, after th
 ```ts
  * - Every post, draft or published, has a `kind`: `jev` for an article that reviews TypeSafe's Jev
  *   model, `own` otherwise. `posts.test.ts` fails when a published post that is not `jev` names Jev
- *   or TypeSafe in any text it shows (ADR 0034).
+ *   or TypeSafe in any text it shows, matched case-sensitively and as a whole word (ADR 0034).
 ```
 
 Above `interface PostContent`:
@@ -536,14 +548,18 @@ After `export type Post = PublishedPost | DraftPost;`:
 ```ts
 /**
  * The lines a post of each kind ends with, in order (ADR 0034), in the owner's own words. The post
- * page renders them in a `<footer>`, last inside its `<article>`, and the twin writes them after a
- * `---` rule. The feed carries only summaries, so no line reaches it.
+ * page renders them in a `<footer>`, last inside its `<article>`, and ADR 0034 has the post's
+ * Markdown twin end with them after a `---` rule. The feed carries only summaries, so no line
+ * reaches it.
  */
 export const FOOTER_LINES: Readonly<Record<PostKind, readonly string[]>> = {
   own: [],
   jev: ['I have no relationship with TypeSafe.'],
 };
 ```
+
+In the doc comment of `posts`, replace `The owner writes them; see the top of this file.` with
+`The top of this file says how a post is drafted and added.`
 
 - [x] **Step 4: Give the fixtures their kinds**
 
@@ -569,14 +585,17 @@ const KINDS: readonly unknown[] = Object.keys(FOOTER_LINES);
  */
 const JEV_NAMES = /(?<![\p{L}\p{M}\p{N}_])(?:Jev|TypeSafe)(?![\p{L}\p{M}\p{N}_])/u;
 
-/** Fields whose values a reader is never shown: identifiers, dates, flags, a URL. */
+/**
+ * Fields whose values a reader is never shown as text: identifiers, dates, flags. A link's `href`
+ * is not one of them, because the Markdown twin prints a link's URL after its text. `slug` stays:
+ * `SLUG` allows lowercase letters, digits and hyphens only, so a slug can never hold either name.
+ */
 const NOT_SHOWN = new Set([
   'slug',
   'kind',
   'draft',
   'publishedAt',
   'updatedAt',
-  'href',
   'level',
   'ordered',
 ]);
@@ -697,9 +716,11 @@ it('ends a jev post with its footer lines, last inside the article, in --muted t
   expect([...footer.children].map((line) => [line.tagName, line.textContent])).toEqual(
     FOOTER_LINES.jev.map((line) => ['P', line]),
   );
+  expect(footer.className).toContain('border-t');
   expect(footer.className).toContain('text-[var(--muted)]');
+  // Neither an opacity step nor a text alpha, numeric (`/60`) or arbitrary (`/[0.6]`).
   for (const element of [footer, ...footer.children]) {
-    expect(element.className).not.toMatch(/opacity-|text-\S+\/\d/);
+    expect(element.className).not.toMatch(/opacity-|text-\S+\/[\d[]/);
   }
 });
 
@@ -749,7 +770,7 @@ In `apps/web/src/app/blog/[slug]/page.tsx`, import `FOOTER_LINES` beside `getPos
       every `<footer>`, as Readability and trafilatura do, drop them. `--muted` rather
       than an opacity step (ADR 0011). */}
   {footerLines.length > 0 ? (
-    <footer className="mt-12 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
+    <footer className="mt-12 space-y-2 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
       {footerLines.map((line) => (
         <p key={line}>{line}</p>
       ))}

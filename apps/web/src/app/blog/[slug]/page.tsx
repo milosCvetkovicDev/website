@@ -122,7 +122,7 @@ export default async function PostPage({ params }: PageProps) {
               every `<footer>`, as Readability and trafilatura do, drop them. `--muted` rather
               than an opacity step (ADR 0011). */}
           {footerLines.length > 0 ? (
-            <footer className="mt-12 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
+            <footer className="mt-12 space-y-2 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
               {footerLines.map((line) => (
                 <p key={line}>{line}</p>
               ))}

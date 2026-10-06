@@ -230,14 +230,17 @@ const KINDS: readonly unknown[] = Object.keys(FOOTER_LINES);
  */
 const JEV_NAMES = /(?<![\p{L}\p{M}\p{N}_])(?:Jev|TypeSafe)(?![\p{L}\p{M}\p{N}_])/u;
 
-/** Fields whose values a reader is never shown: identifiers, dates, flags, a URL. */
+/**
+ * Fields whose values a reader is never shown as text: identifiers, dates, flags. A link's `href`
+ * is not one of them, because the Markdown twin prints a link's URL after its text. `slug` stays:
+ * `SLUG` allows lowercase letters, digits and hyphens only, so a slug can never hold either name.
+ */
 const NOT_SHOWN = new Set([
   'slug',
   'kind',
   'draft',
   'publishedAt',
   'updatedAt',
-  'href',
   'level',
   'ordered',
 ]);
@@ -860,6 +863,21 @@ const defects: [string, Post[], RegExp][] = [
         'body[0].content[1].text',
         'TypeSafe',
       ],
+      // The twin prints a link's URL after its text, so the URL is text the post shows too.
+      [
+        'a link target',
+        {
+          body: [
+            paragraph(
+              'See ',
+              { text: 'the example page', href: 'https://example.com/TypeSafe' },
+              '.',
+            ),
+          ],
+        },
+        'body[0].content[1].href',
+        'TypeSafe',
+      ],
       [
         'inline code',
         { body: [paragraph('Run ', { code: 'TypeSafe.check()' }, '.')] },
@@ -958,18 +976,23 @@ const accepted: [string, Post[]][] = [
   // Not the names either: a letter, digit, underscore or combining mark against one edge.
   ...[
     ['a letter before Jev', 'ŠJev'],
+    ['a digit before Jev', '2Jev'],
+    ['an underscore before Jev', '_Jev'],
+    ['a combining acute accent before Jev', 'e\u0301Jev'],
     ['a letter before TypeSafe', 'MyTypeSafe'],
     ['a digit after Jev', 'Jev2'],
     ['an underscore after Jev', 'Jev_'],
     ['a combining acute accent after Jev', 'Jev\u0301'],
+    ['a digit after TypeSafe', 'TypeSafe2'],
+    ['an underscore after TypeSafe', 'TypeSafe_'],
   ].map(([edge, word]): [string, Post[]] => [
     `${edge} in an own post`,
     [withBody(paragraph(`A sentence with ${word} in it.`))],
   ]),
-  // A URL is not text the post shows; ADR 0034 checks the link's text.
+  // The match is case-sensitive (ADR 0034), so a lowercase domain in a link's URL is not the name.
   [
-    'an own post linking to a TypeSafe URL',
-    [withLink('https://example.com/TypeSafe', 'the example page')],
+    'an own post linking to a lowercase typesafe domain',
+    [withLink('https://typesafe.dev/docs', 'their docs')],
   ],
 ];
 

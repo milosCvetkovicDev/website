@@ -19,7 +19,7 @@
  *   site. Only a code block may hold a line break.
  * - Every post, draft or published, has a `kind`: `jev` for an article that reviews TypeSafe's Jev
  *   model, `own` otherwise. `posts.test.ts` fails when a published post that is not `jev` names Jev
- *   or TypeSafe in any text it shows (ADR 0034).
+ *   or TypeSafe in any text it shows, matched case-sensitively and as a whole word (ADR 0034).
  * - `src/data/__tests__/posts.test.ts` checks what a published post must hold: a unique slug of
  *   lowercase words and hyphens, real dates that are not in the future with `updatedAt` on or after
  *   `publishedAt`, a summary of 50 to 300 characters, a served title (`metaTitle` when set, then
@@ -129,8 +129,9 @@ export type Post = PublishedPost | DraftPost;
 
 /**
  * The lines a post of each kind ends with, in order (ADR 0034), in the owner's own words. The post
- * page renders them in a `<footer>`, last inside its `<article>`, and the twin writes them after a
- * `---` rule. The feed carries only summaries, so no line reaches it.
+ * page renders them in a `<footer>`, last inside its `<article>`, and ADR 0034 has the post's
+ * Markdown twin end with them after a `---` rule. The feed carries only summaries, so no line
+ * reaches it.
  */
 export const FOOTER_LINES: Readonly<Record<PostKind, readonly string[]>> = {
   own: [],
@@ -138,7 +139,8 @@ export const FOOTER_LINES: Readonly<Record<PostKind, readonly string[]>> = {
 };
 
 /**
- * Every post, drafts included, in any order. The owner writes them; see the top of this file.
+ * Every post, drafts included, in any order. The top of this file says how a post is drafted and
+ * added.
  * `posts.test.ts` fails when a source file other than a test imports `posts` rather than the index,
  * and when a client component imports this module at all, which would ship the drafts to the browser.
  */

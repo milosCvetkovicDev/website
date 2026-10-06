@@ -154,9 +154,11 @@ describe('the post page', () => {
     expect([...footer.children].map((line) => [line.tagName, line.textContent])).toEqual(
       FOOTER_LINES.jev.map((line) => ['P', line]),
     );
+    expect(footer.className).toContain('border-t');
     expect(footer.className).toContain('text-[var(--muted)]');
+    // Neither an opacity step nor a text alpha, numeric (`/60`) or arbitrary (`/[0.6]`).
     for (const element of [footer, ...footer.children]) {
-      expect(element.className).not.toMatch(/opacity-|text-\S+\/\d/);
+      expect(element.className).not.toMatch(/opacity-|text-\S+\/[\d[]/);
     }
   });
 
