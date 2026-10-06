@@ -19,6 +19,7 @@ import { NO_PUBLISHED_POST_SLUG } from '@/lib/post-static-params';
 import { draftPost, everyBlockPost, fixturePosts, hostileTitlePost } from '@/test/fixtures/posts';
 import {
   buildPostIndex,
+  FOOTER_LINES,
   getPost,
   hasPublishedPosts,
   posts,
@@ -26,6 +27,7 @@ import {
   type Inline,
   type Post,
   type PostBlock,
+  type PostKind,
   type PublishedPost,
 } from '../posts';
 
@@ -218,6 +220,66 @@ function dateProblems(post: Post, today: Date): string[] {
   return problems;
 }
 
+/** The kinds a post may have: the keys of `FOOTER_LINES`, which names every kind once. */
+const KINDS: readonly unknown[] = Object.keys(FOOTER_LINES);
+
+/**
+ * Jev or TypeSafe as their owners write them, as a whole word. No letter, mark, digit or underscore
+ * may stand on either side, in any script: an ASCII `\b` would take the `đ` of "Jevđević" for a
+ * word edge. So "Jevtić" and "TypeSafety" are not the names, and "Jev's" is.
+ */
+const JEV_NAMES = /(?<![\p{L}\p{M}\p{N}_])(?:Jev|TypeSafe)(?![\p{L}\p{M}\p{N}_])/u;
+
+/** Fields whose values a reader is never shown: identifiers, dates, flags, a URL, a language. */
+const NOT_SHOWN = new Set([
+  'slug',
+  'kind',
+  'draft',
+  'publishedAt',
+  'updatedAt',
+  'href',
+  'language',
+  'level',
+  'ordered',
+]);
+
+/**
+ * Every string a post shows, each with its path in the post (`body[2].content[1].text`). The walk is
+ * generic, so a block kind added later is covered without a change here.
+ */
+function shownTexts(value: unknown, path: string): [path: string, text: string][] {
+  if (typeof value === 'string') return [[path, value]];
+  if (Array.isArray(value)) {
+    return value.flatMap((item: unknown, index) => shownTexts(item, `${path}[${index}]`));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).flatMap(([key, item]) =>
+      NOT_SHOWN.has(key) ? [] : shownTexts(item, path ? `${path}.${key}` : key),
+    );
+  }
+  return [];
+}
+
+function kindProblems(post: Post): string[] {
+  const { kind }: { kind: unknown } = post;
+  return KINDS.includes(kind)
+    ? []
+    : [`${post.slug}: kind must be "own" or "jev", not ${JSON.stringify(kind)}`];
+}
+
+/** A published post that names Jev or TypeSafe must be `jev`, so that it carries the disclosure. */
+function namingProblems(post: PublishedPost): string[] {
+  if (post.kind === 'jev') return [];
+  return shownTexts(post, '').flatMap(([path, text]) => {
+    const name = JEV_NAMES.exec(text)?.[0];
+    return name
+      ? [
+          `${post.slug}: ${path} names "${name}", so its kind must be "jev", not ${JSON.stringify(post.kind)}`,
+        ]
+      : [];
+  });
+}
+
 /** What a published post must hold before anything renders it. */
 function contentProblems(post: PublishedPost, pages: ReadonlySet<string>): string[] {
   const problems: string[] = [];
@@ -302,11 +364,12 @@ function contentProblems(post: PublishedPost, pages: ReadonlySet<string>): strin
 }
 
 /**
- * Every problem with `list` as of `today`, one message each, or none. A slug is checked on every
- * post, since a draft keeps its slug when it is published. A draft is otherwise held only to the
- * dates it gives: it renders nowhere, so its title, summary and body are checked once it is
- * published, in the commit that sets `draft: false`. A link to this site has to name a static
- * route, a case study or a published post in `list`, so a link to a draft is refused too.
+ * Every problem with `list` as of `today`, one message each, or none. A kind is checked on every
+ * post, and the names only on a published one. A slug is checked on every post, since a draft
+ * keeps its slug when it is published. A draft is otherwise held only to the dates it gives: it
+ * renders nowhere, so its title, summary and body are checked once it is published, in the commit
+ * that sets `draft: false`. A link to this site has to name a static route, a case study or a
+ * published post in `list`, so a link to a draft is refused too.
  */
 function problemsIn(list: readonly Post[], today: Date): string[] {
   const problems: string[] = [];
@@ -326,8 +389,10 @@ function problemsIn(list: readonly Post[], today: Date): string[] {
     if (draft !== true && draft !== false) {
       problems.push(`${post.slug}: draft must be true or false, not ${JSON.stringify(draft)}`);
     }
+    problems.push(...kindProblems(post));
     problems.push(...dateProblems(post, today));
-    if (post.draft === false) problems.push(...contentProblems(post, pages));
+    if (post.draft === false)
+      problems.push(...contentProblems(post, pages), ...namingProblems(post));
   }
   return problems;
 }
@@ -456,6 +521,7 @@ const withCode = (language: unknown, code = 'const fixture = 1;') =>
 const withTitle = (title: string, metaTitle?: string) =>
   published(metaTitle === undefined ? { title } : { title, metaTitle });
 const summaryOf = (length: number) => published({ summary: 'x'.repeat(length) });
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const defects: [string, Post[], RegExp][] = [
   [
@@ -752,6 +818,62 @@ const defects: [string, Post[], RegExp][] = [
     /: block 1: the code language ".*" is not a plain name such as ts$/,
   ]),
   ['a body entry that is not a block', [withBody(null)], /: block 1 is not a block$/],
+  ...[undefined, 'Jev', 'typesafe', ''].map((kind): [string, Post[], RegExp] => [
+    `the kind ${JSON.stringify(kind)}`,
+    [published({ kind })],
+    /^fixture-every-block: kind must be "own" or "jev", not (?:undefined|".*")$/,
+  ]),
+  // Each place a post shows text. A name in any of them makes an `own` post a defect (ADR 0034).
+  ...(
+    [
+      ['the title', { title: 'Fixture: what TypeSafe measures' }, 'title', 'TypeSafe'],
+      [
+        'metaTitle',
+        { title: 'Fixture: a title', metaTitle: 'Fixture: Jev in short' },
+        'metaTitle',
+        'Jev',
+      ],
+      ['the summary', { summary: `${everyBlockPost.summary} It mentions Jev.` }, 'summary', 'Jev'],
+      ['a tag', { tags: ['Fixture', 'Jev'] }, 'tags[1]', 'Jev'],
+      ['a heading', { body: [heading(2, 'What Jev gets right')] }, 'body[0].text', 'Jev'],
+      ['a paragraph', { body: [paragraph("Jev's numbers.")] }, 'body[0].content[0]', 'Jev'],
+      [
+        'link text',
+        {
+          body: [
+            paragraph('See ', { text: 'the TypeSafe docs', href: 'https://example.com' }, '.'),
+          ],
+        },
+        'body[0].content[1].text',
+        'TypeSafe',
+      ],
+      [
+        'inline code',
+        { body: [paragraph('Run ', { code: 'TypeSafe.check()' }, '.')] },
+        'body[0].content[1].code',
+        'TypeSafe',
+      ],
+      [
+        'a list item',
+        { body: [{ kind: 'list', items: [['Ask Jev.']] }] },
+        'body[0].items[0][0]',
+        'Jev',
+      ],
+      ['a code block', { body: [{ kind: 'code', code: 'model = "Jev"' }] }, 'body[0].code', 'Jev'],
+      [
+        'a quote',
+        { body: [{ kind: 'quote', content: ['TypeSafe said so.'] }] },
+        'body[0].content[0]',
+        'TypeSafe',
+      ],
+    ] as const
+  ).map(([place, fields, path, name]): [string, Post[], RegExp] => [
+    `${name} named in ${place} of an own post`,
+    [published(fields)],
+    new RegExp(
+      `^fixture-every-block: ${escapeRegExp(path)} names "${name}", so its kind must be "jev", not "own"$`,
+    ),
+  ]),
 ];
 
 const accepted: [string, Post[]][] = [
@@ -797,6 +919,23 @@ const accepted: [string, Post[]][] = [
       withBody(heading(2, 'Results')),
       { ...hostileTitlePost, body: [{ kind: 'heading', level: 2, text: 'Results' }] },
     ],
+  ],
+  [
+    'a jev post that names TypeSafe and Jev',
+    [published({ kind: 'jev', title: 'Fixture: TypeSafe and Jev' })],
+  ],
+  ['a jev post that names neither', [published({ kind: 'jev' })]],
+  // Not the names: a surname that starts with them in either script, a longer word, other cases.
+  ...['Jevtić', 'Jevđević', 'Jevremović', 'TypeSafety', 'typesafe', 'type-safe', 'JEV'].map(
+    (word): [string, Post[]] => [
+      `${word} in an own post`,
+      [withBody(paragraph(`A sentence with ${word} in it.`))],
+    ],
+  ),
+  // A URL is not text the post shows; ADR 0034 checks the link's text.
+  [
+    'an own post linking to a TypeSafe URL',
+    [withLink('https://example.com/TypeSafe', 'the example page')],
   ],
 ];
 
@@ -933,6 +1072,12 @@ describe('the post fixtures', () => {
     const [older, newer] = publishedFixtures;
     expect(older.publishedAt < newer.publishedAt).toBe(true);
   });
+
+  it('hold a published post of each kind', () => {
+    // `satisfies` fails typecheck when a kind is added to PostKind without being added here.
+    const kinds = { own: true, jev: true } satisfies Record<PostKind, true>;
+    expect(new Set(publishedFixtures.map(({ kind }) => kind))).toEqual(new Set(Object.keys(kinds)));
+  });
 });
 
 describe('problemsIn', () => {
@@ -1051,5 +1196,17 @@ describe('imports of the posts module', () => {
     ['posts from another module', "import { posts } from '@/data/other-posts';"],
   ])('allows an import of %s', (_, source) => {
     expect(postsImportProblems(page, source)).toEqual([]);
+  });
+});
+
+describe('FOOTER_LINES', () => {
+  it("ends a jev post with the owner's disclosure, word for word, and an own post with nothing", () => {
+    expect(FOOTER_LINES).toEqual({ own: [], jev: ['I have no relationship with TypeSafe.'] });
+  });
+
+  it('holds lines the post checker accepts as text', () => {
+    for (const line of Object.values(FOOTER_LINES).flat()) {
+      expect(lineProblems(line, 'a footer line')).toEqual([]);
+    }
   });
 });

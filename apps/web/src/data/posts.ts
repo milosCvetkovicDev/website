@@ -17,6 +17,9 @@
  * - Every string is plain text and is shown as written: no Markdown, no HTML, no entities. Inline
  *   code and links are pieces of their own; a link goes to an `https://` URL or to a page on this
  *   site. Only a code block may hold a line break.
+ * - Every post, draft or published, has a `kind`: `jev` for an article that reviews TypeSafe's Jev
+ *   model, `own` otherwise. `posts.test.ts` fails when a published post that is not `jev` names Jev
+ *   or TypeSafe in any text it shows (ADR 0034).
  * - `src/data/__tests__/posts.test.ts` checks what a published post must hold: a unique slug of
  *   lowercase words and hyphens, real dates that are not in the future with `updatedAt` on or after
  *   `publishedAt`, a summary of 50 to 300 characters, a served title (`metaTitle` when set, then
@@ -83,6 +86,12 @@ export interface QuoteBlock {
 /** Every block a post's body is built from; a sixth kind needs a renderer wherever posts render. */
 export type PostBlock = HeadingBlock | ParagraphBlock | ListBlock | CodeBlock | QuoteBlock;
 
+/**
+ * Which kind of article a post is, as the writing room's tracker names it: `jev` for an article
+ * that reviews TypeSafe's Jev model, `own` for every other (ADR 0034).
+ */
+export type PostKind = 'own' | 'jev';
+
 interface PostContent {
   /** The `<slug>` in `/blog/<slug>`: lowercase words joined by hyphens. Never change a published one. */
   readonly slug: string;
@@ -93,6 +102,8 @@ interface PostContent {
   /** The post in a sentence or two, 50 to 300 characters, for wherever it is listed rather than read. */
   readonly summary: string;
   readonly tags: readonly string[];
+  /** `jev` when the post reviews TypeSafe's Jev model, so that it ends with `FOOTER_LINES.jev`. */
+  readonly kind: PostKind;
   readonly body: readonly PostBlock[];
 }
 
@@ -115,6 +126,16 @@ export interface DraftPost extends PostContent {
 
 /** Discriminated on `draft`, so nothing can read a post's dates without first ruling out a draft. */
 export type Post = PublishedPost | DraftPost;
+
+/**
+ * The lines a post of each kind ends with, in order (ADR 0034), in the owner's own words. The post
+ * page renders them in a `<footer>`, last inside its `<article>`, and the twin writes them after a
+ * `---` rule. The feed carries only summaries, so no line reaches it.
+ */
+export const FOOTER_LINES: Readonly<Record<PostKind, readonly string[]>> = {
+  own: [],
+  jev: ['I have no relationship with TypeSafe.'],
+};
 
 /**
  * Every post, drafts included, in any order. The owner writes them; see the top of this file.

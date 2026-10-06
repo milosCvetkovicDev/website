@@ -366,7 +366,7 @@ which sets both to `Shipped`.
 - Produces, in the fixtures: `everyBlockPost.kind === 'own'`, `hostileTitlePost.kind === 'jev'` and
   `draftPost.kind === 'own'`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `apps/web/src/data/__tests__/posts.test.ts`, add `FOOTER_LINES` and `type PostKind` to the
 existing import from `'../posts'`, and this helper beside the other test helpers:
@@ -459,7 +459,7 @@ describe('FOOTER_LINES', () => {
 });
 ```
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 ```bash
 pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts
@@ -468,7 +468,7 @@ pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts
 Expected: FAIL. The new defect rows report no problem (`expected [] to have a length of 1`), the
 fixtures have no `kind`, and `FOOTER_LINES` is undefined.
 
-- [ ] **Step 3: Add the kind and the footer lines to the model**
+- [x] **Step 3: Add the kind and the footer lines to the model**
 
 In `apps/web/src/data/posts.ts`, add this bullet to the header comment, after the bullet that begins
 `Every string is plain text`:
@@ -510,7 +510,7 @@ export const FOOTER_LINES: Readonly<Record<PostKind, readonly string[]>> = {
 };
 ```
 
-- [ ] **Step 4: Give the fixtures their kinds**
+- [x] **Step 4: Give the fixtures their kinds**
 
 In `apps/web/src/test/fixtures/posts.ts`:
 
@@ -519,7 +519,7 @@ In `apps/web/src/test/fixtures/posts.ts`:
 - in the header comment, change `a draft, and two published posts with different dates` to
   `a draft, and two published posts with different dates, one of each kind`.
 
-- [ ] **Step 5: Add the kind and naming rules to the checker**
+- [x] **Step 5: Add the kind and naming rules to the checker**
 
 In `posts.test.ts`, after `dateProblems`:
 
@@ -603,7 +603,7 @@ if (post.draft === false) problems.push(...contentProblems(post, pages), ...nami
 In the doc comment of `problemsIn`, add after its first sentence: `A kind is checked on every post,
 and the names only on a published one.`
 
-- [ ] **Step 6: Run the tests until they pass, then typecheck**
+- [x] **Step 6: Run the tests until they pass, then typecheck**
 
 ```bash
 pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts
@@ -613,7 +613,7 @@ pnpm typecheck
 Expected: PASS, and typecheck exits 0. If typecheck names another post literal without `kind`, give
 it `kind: 'own'`: every other test file spreads a fixture, so there should be none.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/web/src/data/posts.ts apps/web/src/test/fixtures/posts.ts apps/web/src/data/__tests__/posts.test.ts docs/plans/2026-10-06-blog-publishing-plan.md
