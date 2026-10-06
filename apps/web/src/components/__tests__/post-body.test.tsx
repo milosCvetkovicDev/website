@@ -41,6 +41,8 @@ describe('PostBody', () => {
           return 'FIGURE';
         case 'quote':
           return 'BLOCKQUOTE';
+        case 'table':
+          return 'DIV';
       }
     };
     const body = renderBody();
@@ -127,6 +129,31 @@ describe('PostBody', () => {
     const quote = body.querySelector('blockquote');
     expect(quote?.textContent).toBe('A quotation, with code and plain text in it.');
     expect(quote?.querySelector('code')?.textContent).toBe('code');
+  });
+
+  it('renders a table with its caption, its column headers and its row headers', () => {
+    renderBody();
+    const block = everyBlockPost.body.find((candidate) => candidate.kind === 'table');
+    if (block?.kind !== 'table') throw new Error('the every-block fixture has no table');
+    const table = screen.getByRole('table', { name: block.caption });
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(block.columns);
+    // Trimmed at the end: a table of three or more columns ends each row header with a real space,
+    // so the stacked line copies as the header and its first value (`data-table.tsx`).
+    expect(
+      within(table)
+        .getAllByRole('rowheader')
+        .map((cell) => cell.textContent.trimEnd()),
+    ).toEqual(block.rows.map(([header]) => header));
+    // Every other cell as written, in order: `|` and `*` stay text, and nothing is added to a cell.
+    expect(
+      within(table)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    ).toEqual(block.rows.flatMap(([, ...cells]) => cells));
   });
 
   it('never dims text with opacity, and never uses --accent as a text colour', () => {

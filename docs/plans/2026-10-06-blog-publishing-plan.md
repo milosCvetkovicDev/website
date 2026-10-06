@@ -892,7 +892,7 @@ Run `adversarial-reviewer` on `git diff origin/main...HEAD`. Then follow
 - Produces, in the fixtures: the last block of `everyBlockPost` is the table below. Task 6 asserts it
   verbatim.
 
-- [ ] **Step 1: Write the failing rule tests**
+- [x] **Step 1: Write the failing rule tests**
 
 In `posts.test.ts`, beside the other helpers:
 
@@ -930,14 +930,63 @@ Add to `defects`:
     [withTable({ rows: [['First run', '1,234\n5', '$0.10']] })],
     /: block 1: row 1, column 2 holds a line break, a control or a direction character$/,
   ],
+  [
+    'a table row longer than its columns',
+    [withTable({ rows: [['First run', '1,234', '$0.10', 'Extra']] })],
+    /: block 1: row 1 has 4 cells for 3 columns$/,
+  ],
+  [
+    'a blank last cell in a table of three columns',
+    [withTable({ rows: [['First run', '1,234', '']] })],
+    /: block 1: row 1, column 3 is blank, and a table of three or more columns cannot show a blank cell on a phone$/,
+  ],
+  [
+    'a table cell that is not text',
+    [withTable({ rows: [['First run', 1234, '$0.10']] })],
+    /: block 1: row 1, column 2 is not text$/,
+  ],
+  [
+    'a column name used twice, in another case',
+    [withTable({ columns: ['Run', 'Cost', 'cost'], rows: [['First run', '$0.10', '$0.20']] })],
+    /: block 1: column 3, "cost", repeats an earlier column name$/,
+  ],
+  [
+    'a row header used twice, in another case',
+    [
+      withTable({
+        rows: [
+          ['First run', '1,234', '$0.10'],
+          ['first run', '987', '$0.08'],
+        ],
+      }),
+    ],
+    /: block 1: row 2: the row header "first run" repeats an earlier row header$/,
+  ],
+  [
+    'a row header with two spaces in a row',
+    [withTable({ rows: [['First  run', '1,234', '$0.10']] })],
+    /: block 1: row 1: the row header has a space at an end or two in a row$/,
+  ],
 ```
 
-Add these three rows to the list of places in Task 2's naming defects, before its `] as const`:
+The defect `a block of no known kind` broke a block with `kind: 'table'`, which is now a known kind,
+so it takes a kind the model never will have, since a post holds no HTML:
+
+```ts
+  [
+    'a block of no known kind',
+    [withBody({ kind: 'html', content: '<p>Text.</p>' })],
+    /: block 1: unknown block kind "html"$/,
+  ],
+```
+
+Add these four rows to the list of places in Task 2's naming defects, before its `] as const`:
 
 ```ts
       ['a table caption', { body: [tableBlock({ caption: 'What Jev measured' })] }, 'body[0].caption', 'Jev'],
       ['a table column', { body: [tableBlock({ columns: ['Run', 'TypeSafe', 'Cost'] })] }, 'body[0].columns[1]', 'TypeSafe'],
       ['a table cell', { body: [tableBlock({ rows: [['First run', 'Jev', '$0.10']] })] }, 'body[0].rows[0][1]', 'Jev'],
+      ['a table row header', { body: [tableBlock({ rows: [['Jev run', '1,234', '$0.10']] })] }, 'body[0].rows[0][0]', 'Jev'],
 ```
 
 Add to `accepted`:
@@ -949,7 +998,7 @@ Add to `accepted`:
 
 In the test `hold every block kind, …`, add `table: true,` to `kinds`.
 
-- [ ] **Step 2: Write the failing render tests**
+- [x] **Step 2: Write the failing render tests**
 
 In `post-body.test.tsx`, add `case 'table': return 'DIV';` to `tagOf`, and add:
 
@@ -964,19 +1013,32 @@ it('renders a table with its caption, its column headers and its row headers', (
       .getAllByRole('columnheader')
       .map((cell) => cell.textContent),
   ).toEqual(block.columns);
+  // Trimmed at the end: a table of three or more columns ends each row header with a real space,
+  // so the stacked line copies as the header and its first value (`data-table.tsx`).
   expect(
     within(table)
       .getAllByRole('rowheader')
-      .map((cell) => cell.textContent),
+      .map((cell) => cell.textContent.trimEnd()),
   ).toEqual(block.rows.map(([header]) => header));
+  // Every other cell as written, in order: `|` and `*` stay text, and nothing is added to a cell.
+  expect(
+    within(table)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent),
+  ).toEqual(block.rows.flatMap(([, ...cells]) => cells));
 });
 ```
 
 In `post-page.test.tsx`, in the test `renders every block kind of the post, in its order`, append
-`'DIV'` to the expected list, and change its comment to
-`// One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote, a table.`
+`'DIV'` to the expected list, and change its comment to these two lines, since Prettier does not
+wrap a comment past 100 columns:
 
-- [ ] **Step 3: Run them to see them fail**
+```tsx
+// One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote,
+// a table.
+```
+
+- [x] **Step 3: Run them to see them fail**
 
 ```bash
 pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts src/components/__tests__/post-body.test.tsx src/app/blog/__tests__/post-page.test.tsx
@@ -985,16 +1047,23 @@ pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts src/component
 Expected: FAIL. The table defects are reported as `unknown block kind "table"`, the fixtures have no
 table, and no table renders.
 
-- [ ] **Step 4: Add the type**
+- [x] **Step 4: Add the type**
 
 In `apps/web/src/data/posts.ts`, after `QuoteBlock`:
 
 ```ts
 /**
  * A table of plain-text cells, rendered by `components/data-table.tsx` like the site's other
- * tables. The caption names it, and the first cell of each row is that row's header. A table of
- * three or more columns stacks into one card per row on a phone, so none of its cells may be blank:
- * the card would show a label with nothing beside it (ADR 0034).
+ * tables. The caption names it, and the first cell of each row is that row's header (ADR 0034).
+ *
+ * Below 640px a table of three or more columns stacks each row: its header and first value on one
+ * line, then each other value on a line of its own, with the column names hidden from sight
+ * (`data-table.tsx`, #226). A reader tells the values apart by their order alone, so:
+ *
+ * - no cell may be blank, which `posts.test.ts` checks;
+ * - each value says what it is without its column, by its unit or a word ("1,234 tokens", "$0.10",
+ *   "420 ms"). Where units cannot tell two columns apart, use two-column tables, which never stack
+ *   and keep their headers. No test can check this; whoever writes the table has to.
  */
 export interface TableBlock {
   readonly kind: 'table';
@@ -1015,11 +1084,16 @@ export type PostBlock =
 Add this bullet to the header comment, after the one Task 2 added:
 
 ```ts
- * - A table needs a caption, two columns or more, one cell per column in every row, a row header in
- *   each row, and no blank cell when it has three columns or more.
+ * - A table needs a caption, two columns or more with a name each and no name twice, one row or
+ *   more, one cell per column in every row, a row header in each row and no header twice, and no
+ *   blank cell when it has three columns or more. Names and headers are compared ignoring case.
+ *   `TableBlock` says what such a table looks like on a phone, and what its cells must say.
 ```
 
-- [ ] **Step 5: Add the fixture table**
+In the last bullet, which lists what `posts.test.ts` checks, name a table's caption, column names
+and row headers among the texts that have no spaces at either end or two in a row.
+
+- [x] **Step 5: Add the fixture table**
 
 In `apps/web/src/test/fixtures/posts.ts`, add as the last block of `everyBlockPost.body`, after the
 quote:
@@ -1039,9 +1113,12 @@ quote:
 In the header comment, change `a code block with a language and one without,` to
 `a code block with a language and one without, a table of three columns with | and * in a cell,`.
 
-- [ ] **Step 6: Add the table rules**
+- [x] **Step 6: Add the table rules**
 
-In `blockProblems` in `posts.test.ts`, add before `default:`:
+In `posts.test.ts`, add `import { isWideTable } from '@/data/pages/table';` after the
+`@/data/case-studies` import, so the rule stacks exactly the tables a phone stacks, and name a
+table's caption, column names and row headers in `lineProblems`' doc. Then, in `blockProblems`, add
+before `default:`:
 
 ```ts
     case 'table': {
@@ -1054,14 +1131,35 @@ In `blockProblems` in `posts.test.ts`, add before `default:`:
         );
         return problems;
       }
-      columns.forEach((column: unknown, index) =>
-        problems.push(...lineProblems(column, `${where}: column ${index + 1}`)),
-      );
+      // A reader moves between rows by their headers, and hears each cell with its column's name,
+      // so two rows or two columns with one name could not be told apart (`data-table.test.tsx`
+      // holds the site's own tables to unique row headers). Compared ignoring case, as headings and
+      // tags are, since a screen reader says both alike; a blank one is reported as blank only.
+      const names = new Set<string>();
+      columns.forEach((column: unknown, index) => {
+        const [problem] = lineProblems(column, `${where}: column ${index + 1}`);
+        if (problem) {
+          problems.push(problem);
+          return;
+        }
+        const key = String(column).toLowerCase();
+        if (names.has(key)) {
+          problems.push(
+            `${where}: column ${index + 1}, ${JSON.stringify(column)}, repeats an earlier column name`,
+          );
+        }
+        names.add(key);
+      });
       if (!Array.isArray(rows) || rows.length === 0) {
         return [...problems, `${where}: the table has no rows`];
       }
-      // A stacked card shows each cell beside its column's name, so a blank one points at nothing.
-      const stacks = columns.length >= 3;
+      // Below 640px a wide table draws no column names: each row is its header and first value
+      // joined by a drawn " · ", then each other value on a line of its own. A blank first value
+      // leaves the dot pointing at nothing, and a blank later one an empty line that shifts which
+      // value a reader takes for which column. `stackable()` in `lib/serialise.ts` refuses the same
+      // in the site's own tables, and `isWideTable` is the predicate both the page and it use.
+      const stacks = isWideTable({ columns });
+      const headers = new Set<string>();
       rows.forEach((row: unknown, index) => {
         const at = `${where}: row ${index + 1}`;
         if (!Array.isArray(row) || row.length !== columns.length) {
@@ -1070,7 +1168,17 @@ In `blockProblems` in `posts.test.ts`, add before `default:`:
           );
           return;
         }
-        problems.push(...lineProblems(row[0], `${at}: the row header`));
+        const [headerProblem] = lineProblems(row[0], `${at}: the row header`);
+        if (headerProblem) problems.push(headerProblem);
+        else {
+          const key = String(row[0]).toLowerCase();
+          if (headers.has(key)) {
+            problems.push(
+              `${at}: the row header ${JSON.stringify(row[0])} repeats an earlier row header`,
+            );
+          }
+          headers.add(key);
+        }
         row.slice(1).forEach((cell: unknown, offset) => {
           const cellAt = `${at}, column ${offset + 2}`;
           if (typeof cell !== 'string') problems.push(`${cellAt} is not text`);
@@ -1086,7 +1194,7 @@ In `blockProblems` in `posts.test.ts`, add before `default:`:
     }
 ```
 
-- [ ] **Step 7: Render the table**
+- [x] **Step 7: Render the table**
 
 In `apps/web/src/components/post-body.tsx`, add `import { DataTable } from './data-table';` after
 the `@/lib/links` import, and before `default:` in `Block`:
@@ -1094,7 +1202,8 @@ the `@/lib/links` import, and before `default:` in `Block`:
 ```tsx
     case 'table':
       // `DataTable` gives the caption, the column and row headers, and the stacked layout a table
-      // of three or more columns takes on a phone (#226), as on every other page with a table.
+      // of three or more columns takes on a phone (#226), where its column headers are hidden from
+      // sight, as on every other page with a table.
       return (
         <div className="mb-6">
           <DataTable caption={block.caption} columns={block.columns} rows={block.rows} />
@@ -1104,7 +1213,7 @@ the `@/lib/links` import, and before `default:` in `Block`:
 
 In the comment above `const unhandled: never = block;`, change `A sixth` to `A seventh`.
 
-- [ ] **Step 8: Run the tests until they pass, then typecheck**
+- [x] **Step 8: Run the tests until they pass, then typecheck**
 
 ```bash
 pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts src/components/__tests__/post-body.test.tsx src/app/blog/__tests__/post-page.test.tsx
@@ -1114,7 +1223,7 @@ pnpm typecheck
 Expected: PASS, and typecheck exits 0. `post-body.test.tsx`'s `tagOf` and `PostBody`'s
 `never` default are the switches that fail typecheck if they miss the new kind.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add apps/web/src/data/posts.ts apps/web/src/test/fixtures/posts.ts apps/web/src/data/__tests__/posts.test.ts apps/web/src/components/post-body.tsx apps/web/src/components/__tests__/post-body.test.tsx apps/web/src/app/blog/__tests__/post-page.test.tsx docs/plans/2026-10-06-blog-publishing-plan.md
@@ -1127,7 +1236,7 @@ git commit -m "feat(blog): add a table block to posts, rendered by DataTable"
 
 **Files:** none changed for good. The screenshots come from a scratch change.
 
-- [ ] **Step 1: Take the screenshots from a scratch change that is never committed**
+- [x] **Step 1: Take the screenshots from a scratch change that is never committed**
 
 No post is published, so for the screenshots the scratch post below is published in the working
 tree only. In `apps/web/src/data/posts.ts`, replace `export const posts: readonly Post[] = [];`
@@ -1187,7 +1296,7 @@ git restore apps/web/src/data/posts.ts
 git status --short    # clean
 ```
 
-- [ ] **Step 2: Review and run the gates**
+- [x] **Step 2: Review and run the gates**
 
 Run `ui-reviewer` on `apps/web/src/components/post-body.tsx`, then:
 
@@ -1201,7 +1310,7 @@ pnpm build
 
 Expected: exit 0 from each.
 
-- [ ] **Step 3: Open the pull request**
+- [x] **Step 3: Open the pull request**
 
 Tick this task's boxes in this plan and commit them on their own, since this task changes no code:
 
