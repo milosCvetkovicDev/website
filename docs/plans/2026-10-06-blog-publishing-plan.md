@@ -378,11 +378,25 @@ const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\
 Add to the end of `defects`:
 
 ```ts
-  ...[undefined, 'Jev', 'typesafe', ''].map((kind): [string, Post[], RegExp] => [
-    `the kind ${JSON.stringify(kind)}`,
+  // Each with the value the problem has to report, written out rather than computed.
+  ...(
+    [
+      [undefined, 'undefined'],
+      ['Jev', '"Jev"'],
+      ['typesafe', '"typesafe"'],
+      ['', '""'],
+    ] as const
+  ).map(([kind, reported]): [string, Post[], RegExp] => [
+    `the kind ${reported}`,
     [published({ kind })],
-    /^fixture-every-block: kind must be "own" or "jev", not (?:undefined|".*")$/,
+    new RegExp(`^fixture-every-block: kind must be "own" or "jev", not ${escapeRegExp(reported)}$`),
   ]),
+  // A draft's kind is checked too: it keeps its kind when it is published.
+  [
+    'the kind "x" on a draft',
+    [{ ...draftPost, kind: 'x' } as unknown as Post],
+    /^fixture-draft: kind must be "own" or "jev", not "x"$/,
+  ],
   // Each place a post shows text. A name in any of them makes an `own` post a defect (ADR 0034).
   ...(
     [
@@ -406,6 +420,13 @@ Add to the end of `defects`:
       ],
       ['a list item', { body: [{ kind: 'list', items: [['Ask Jev.']] }] }, 'body[0].items[0][0]', 'Jev'],
       ['a code block', { body: [{ kind: 'code', code: 'model = "Jev"' }] }, 'body[0].code', 'Jev'],
+      // The page names the code figure by its language, and the twin's fence carries it.
+      [
+        'a code language',
+        { body: [{ kind: 'code', language: 'TypeSafe', code: 'x' }] },
+        'body[0].language',
+        'TypeSafe',
+      ],
       ['a quote', { body: [{ kind: 'quote', content: ['TypeSafe said so.'] }] }, 'body[0].content[0]', 'TypeSafe'],
     ] as const
   ).map(([place, fields, path, name]): [string, Post[], RegExp] => [
@@ -422,13 +443,27 @@ Add to the end of `accepted`:
 ```ts
   ['a jev post that names TypeSafe and Jev', [published({ kind: 'jev', title: 'Fixture: TypeSafe and Jev' })]],
   ['a jev post that names neither', [published({ kind: 'jev' })]],
-  // Not the names: a surname that starts with them in either script, a longer word, other cases.
+  // A draft renders nowhere, so the names are checked once it is published.
+  ['a draft that names Jev', [{ ...draftPost, title: 'Fixture: Jev' }]],
+  // Not the names: a surname that starts with one, whether the letter after it is ASCII or not, a
+  // longer word, another case.
   ...['Jevtić', 'Jevđević', 'Jevremović', 'TypeSafety', 'typesafe', 'type-safe', 'JEV'].map(
     (word): [string, Post[]] => [
       `${word} in an own post`,
       [withBody(paragraph(`A sentence with ${word} in it.`))],
     ],
   ),
+  // Not the names either: a letter, digit, underscore or combining mark against one edge.
+  ...[
+    ['a letter before Jev', 'ŠJev'],
+    ['a letter before TypeSafe', 'MyTypeSafe'],
+    ['a digit after Jev', 'Jev2'],
+    ['an underscore after Jev', 'Jev_'],
+    ['a combining acute accent after Jev', 'Jev\u0301'],
+  ].map(([edge, word]): [string, Post[]] => [
+    `${edge} in an own post`,
+    [withBody(paragraph(`A sentence with ${word} in it.`))],
+  ]),
   // A URL is not text the post shows; ADR 0034 checks the link's text.
   ['an own post linking to a TypeSafe URL', [withLink('https://example.com/TypeSafe', 'the example page')]],
 ```
@@ -534,7 +569,7 @@ const KINDS: readonly unknown[] = Object.keys(FOOTER_LINES);
  */
 const JEV_NAMES = /(?<![\p{L}\p{M}\p{N}_])(?:Jev|TypeSafe)(?![\p{L}\p{M}\p{N}_])/u;
 
-/** Fields whose values a reader is never shown: identifiers, dates, flags, a URL, a language. */
+/** Fields whose values a reader is never shown: identifiers, dates, flags, a URL. */
 const NOT_SHOWN = new Set([
   'slug',
   'kind',
@@ -542,14 +577,13 @@ const NOT_SHOWN = new Set([
   'publishedAt',
   'updatedAt',
   'href',
-  'language',
   'level',
   'ordered',
 ]);
 
 /**
- * Every string a post shows, each with its path in the post (`body[2].content[1].text`). The walk is
- * generic, so a block kind added later is covered without a change here.
+ * Every string a post shows, each with its path in the post (`body[2].content[1].text`). The walk
+ * is generic, so a block kind added later is covered without a change here.
  */
 function shownTexts(value: unknown, path: string): [path: string, text: string][] {
   if (typeof value === 'string') return [[path, value]];
@@ -566,9 +600,9 @@ function shownTexts(value: unknown, path: string): [path: string, text: string][
 
 function kindProblems(post: Post): string[] {
   const { kind }: { kind: unknown } = post;
-  return KINDS.includes(kind)
-    ? []
-    : [`${post.slug}: kind must be "own" or "jev", not ${JSON.stringify(kind)}`];
+  if (KINDS.includes(kind)) return [];
+  const known = KINDS.map((each) => JSON.stringify(each)).join(' or ');
+  return [`${post.slug}: kind must be ${known}, not ${JSON.stringify(kind)}`];
 }
 
 /** A published post that names Jev or TypeSafe must be `jev`, so that it carries the disclosure. */
