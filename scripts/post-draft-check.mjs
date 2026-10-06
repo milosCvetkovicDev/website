@@ -319,6 +319,8 @@ const isTable = (lines) =>
 
 /**
  * A pipe table row with its cells trimmed and in canonical form, or the delimiter row as `---`s.
+ * Every backslash and pipe in a cell is escaped, so a row reads back as exactly its cells; a
+ * backslash that canonical text has already escaped shows doubled, on both sides alike.
  * @param {string} line
  * @param {boolean} delimiter
  * @param {string} origin
@@ -330,7 +332,7 @@ function tableRow(line, delimiter, origin) {
   const cells = row.split(/(?<!\\)\|/).map((cell) => cell.trim());
   const shown = delimiter
     ? cells.map(() => '---')
-    : cells.map((cell) => canonicalInline(cell, origin).replace(/\|/g, '\\|'));
+    : cells.map((cell) => canonicalInline(cell, origin).replace(/[\\|]/g, '\\$&'));
   return `| ${shown.join(' | ')} |`;
 }
 

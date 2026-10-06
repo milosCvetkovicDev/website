@@ -795,6 +795,32 @@ describe('the publish check', () => {
       });
     }
 
+    /**
+     * The body's diff for a table whose last row the draft writes as `draftRow` and the twin
+     * serves as `twinRow`.
+     * @param {string} draftRow @param {string} twinRow
+     */
+    const tableDiff = (draftRow, twinRow) => {
+      const head = ['| Path | Size |', '| --- | --- |'];
+      const problems = differences(
+        draft([...BODY, '', ...head, draftRow]),
+        twin({ body: [...SERVED, '', ...head, twinRow] }),
+        'own',
+      );
+      return problems.find((problem) => problem.startsWith('the body differs')) ?? '';
+    };
+
+    it("escapes a backslash in a table row's code, as it escapes a pipe there", () => {
+      const body = tableDiff('| `C:\\dir` | 1 |', '| C:\\\\dir | 2 |');
+      assert.match(body, /^- \| `C:\\\\dir` \| 1 \|$/m);
+    });
+
+    it("escapes a table row's text backslash again, after canonical text's escape", () => {
+      const body = tableDiff('| C:\\dir | 1 |', '| C:\\\\dir | 2 |');
+      assert.match(body, /^- \| C:\\\\\\\\dir \| 1 \|$/m);
+      assert.match(body, /^\+ \| C:\\\\\\\\dir \| 2 \|$/m);
+    });
+
     it('reports a code fence that is never closed by the line it opened on', () => {
       const problems = differences(
         draft([...BODY, '', 'One.', '', '~~~~ts', 'const a = 1;']),
