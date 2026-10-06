@@ -4661,7 +4661,7 @@ node scripts/check-docs-drift.ts --skip-requires admin
 Expected: `0 drift, 0 uncatalogued`. Give any new link an entry in `docs/drift-manifest.json`: `method` `file-line`, `evaluation`
 `live`, `covers` naming the link token, and `check.path` the file it resolves to.
 
-- [ ] **Step 7: Run every gate, one at a time**
+- [x] **Step 7: Run every gate, one at a time**
 
 ```bash
 pnpm check:allowbuilds
@@ -4677,7 +4677,11 @@ pnpm --filter web build && CI=true pnpm --filter web test:e2e
 Expected: exit 0 from each. The e2e run covers the twins of the static routes and the case studies.
 No post is published, so it checks no post twin yet.
 
-- [ ] **Step 8: Commit, review and open the pull request**
+(Done 2026-10-06: every gate exited 0, one at a time. The e2e run went from the main shell on
+the tree before the review fixes, which changed no route's output: 487 passed, 2 skipped. The
+reviews' findings and their triage are in #241.)
+
+- [x] **Step 8: Commit, review and open the pull request**
 
 ```bash
 git add .prettierignore apps/web/src/test/fixtures/post-draft.md apps/web/src/lib/__tests__/post-draft.test.ts .claude/rules/app-router-and-content.md .claude/rules/ci-and-scripts.md docs/plans/2026-09-28-blog-engine-plan.md docs/plans/2026-10-06-blog-publishing-plan.md docs/plans/README.md docs/drift-manifest.json
