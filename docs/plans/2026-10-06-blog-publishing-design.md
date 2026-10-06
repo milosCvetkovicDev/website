@@ -113,12 +113,16 @@ this site names a page that exists. The first column of a table is its row heade
 Not allowed, and caught by the check when present: bold or italics, images, raw HTML or HTML
 comments, entity references such as `&amp;`, footnotes, `#` or `####` and deeper headings, setext
 headings, code or links in a heading, a table caption or a table cell, code or a link in a link's
-text, nested lists, a heading, list, quote, table, code block or rule inside a list item or quote
-(such as `> ## Results`), an ordered list that does not start at 1, a list item or quote of more
-than one paragraph, hard line breaks, reference-style links, autolinks and bare `http://`,
-`https://` or `www.` addresses, a line indented with a tab, a block that does not start after a
-blank line, and a `---` rule inside the body. The disclosure line is not written in `draft.md`:
-the site adds it (D3).
+text, a link with a title or spaces around its destination, nested lists, a task list item such as
+`- [ ]`, a heading, list, quote, table, code block or rule inside a list item or quote (such as
+`> ## Results`), an ordered list that does not start at 1, a list item or quote of more than one
+paragraph, hard line breaks, reference-style links, autolinks (`<…@…>` included), bare `http://`,
+`https://` or `www.` addresses and bare email addresses, a tab anywhere outside a code fence (the
+front matter included), a block that does not start after a blank line, and a `---` rule inside the
+body. The disclosure line is not written in `draft.md`: the site adds it (D3). Corrected
+2026-10-06: the publish check's review in Task 8 widened this list from a line indented with a tab
+to any tab outside a code fence, and added email addresses, link titles and spaced destinations,
+and task list items.
 
 ## The publish check
 

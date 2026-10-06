@@ -2449,6 +2449,29 @@ describe('the publish check', () => {
       assert.deepEqual(differences(approved, served, 'own'), []);
     });
 
+    /** @type {[string, string[], string[], RegExp][]} */
+    const interrupted = [
+      ['a list item', ['- It was', '  01. b'], ['- It was 01. b'], /^line 30: a nested list$/m],
+      ['a quote', ['> It was', '> 01. b'], ['> It was 01. b'], /^line 30: a list inside a quote$/m],
+      [
+        'a paragraph',
+        ['It was', '01. b'],
+        ['It was 01. b'],
+        /^line 30: start each block after a blank line$/m,
+      ],
+    ];
+    for (const [where, approved, served, pattern] of interrupted) {
+      it(`reads 01. in ${where} as CommonMark does: an item from 1, which interrupts it`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', ...approved]),
+          'twin.md': twin({ body: [...SERVED, '', ...served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, pattern);
+      });
+    }
+
     it('reports a whole-line --- rule once, as a rule, not as a list item holding one', () => {
       const problems = differences(draft([...BODY, '', '- ---']), twin(), 'own');
       assert.deepEqual(
@@ -2589,6 +2612,51 @@ describe('the publish check', () => {
       assert.deepEqual(differences(approved, served, 'own'), []);
     });
 
+    for (const [form, approved, served] of [
+      [
+        'a title',
+        'See [the docs](/work "Work page") now.',
+        'See \\[the docs\\](/work "Work page") now.',
+      ],
+      [
+        'spaces around its destination',
+        'See [the docs]( /work ) now.',
+        'See \\[the docs\\]( /work ) now.',
+      ],
+    ]) {
+      it(`reports a link with ${form}, which the twin serves as text`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', approved]),
+          'twin.md': twin({ body: [...SERVED, '', served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, /^line 29: a link title or spaces around a link's destination; /m);
+      });
+    }
+
+    for (const [approved, served] of [
+      ['- [ ] write the post', '- \\[ \\] write the post'],
+      ['- [x] done', '- \\[x\\] done'],
+      ['1. [X] done', '1. \\[X\\] done'],
+    ]) {
+      it(`reports a task list item, which GFM renders as a checkbox: ${approved}`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', approved]),
+          'twin.md': twin({ body: [...SERVED, '', served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, /^line 29: a task list item, which GFM renders as a checkbox; /m);
+      });
+    }
+
+    it('accepts escaped brackets before a parenthesis, which make no link', () => {
+      const line = 'Brackets \\[like these\\](/work "Work page") stay text.';
+      const served = twin({ body: [...SERVED, '', line] });
+      assert.deepEqual(differences(draft([...BODY, '', line]), served, 'own'), []);
+    });
+
     it('reports an email autolink once, whatever its address starts with', () => {
       for (const address of ['name@example.com', '2026@example.com']) {
         const problems = differences(draft([...BODY, '', `Write to <${address}>.`]), twin(), 'own');
@@ -2613,6 +2681,22 @@ describe('the publish check', () => {
         problems.some((problem) => /^line 2: a tab in the front matter; /.test(problem)),
         problems.join('\n'),
       );
+    });
+
+    it('reports a blank line that holds a tab, as it does in the front matter', () => {
+      const files = {
+        'draft.md': draft([...BODY, '', 'One.', ' \t', 'Two.']),
+        'twin.md': twin({ body: [...SERVED, '', 'One.', '', 'Two.'] }),
+      };
+      const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+      assert.equal(status, 1);
+      assert.match(output, /^line 30: a tab on a blank line; /m);
+    });
+
+    it('accepts a blank line that holds a tab inside a code fence', () => {
+      const code = ['```make', 'all:', '\t', '\tnode build.mjs', '```'];
+      const served = twin({ body: [...SERVED, '', ...code] });
+      assert.deepEqual(differences(draft([...BODY, '', ...code]), served, 'own'), []);
     });
 
     it('accepts a tab inside a code fence, where it is code', () => {
@@ -3100,15 +3184,20 @@ function itemIndent(line) {
 /**
  * Whether a later line of a list starts an item, as CommonMark reads it. A line indented to the
  * current item's text is inside that item, where it continues the paragraph unless it can interrupt
- * one: a bullet with text, or an ordered item from 1 with text, either of which nests a list. So
- * `  1995. It was` there continues the item. A line indented less leaves the item, and starts the
- * next one at any list marker, whatever its number; without a marker it is a lazy continuation.
+ * one: a bullet with text, or an ordered item from 1 (`1.`, `01.`) with text, either of which nests
+ * a list. So `  1995. It was` there continues the item. A line indented less leaves the item and
+ * starts an item at any list marker, whatever its number; without a marker it is a lazy
+ * continuation. After an ordered item, a number with the same `.` or `)` starts the next item of
+ * the same list. A marker of the other kind, such as a number after a bullet item, starts a new
+ * list in CommonMark, which this check keeps in the same block; that fails safe, since
+ * `canonicalList()` keeps each item's kind, so no twin's list equals it. A change of bullet
+ * character, or from `.` to `)`, starts a new list as well, which this check does not see.
  * @param {string} line
  * @param {number} indent the column where the current item's text starts
  */
 function startsItem(line, indent) {
   if (line.length - line.replace(/^ +/, '').length < indent) return LIST_ITEM.test(line);
-  return /^ {0,3}(?:[-*+]|1[.)]) +\S/.test(line.slice(indent));
+  return /^ {0,3}(?:[-*+]|0*1[.)]) +\S/.test(line.slice(indent));
 }
 
 /**
@@ -3276,11 +3365,11 @@ const REFUSED_LINES = [
     'a reference-style link definition or a footnote',
   ],
   // Only a line that can interrupt the item's paragraph nests a list: see `startsItem()`.
-  [/^ {2,}(?:[-*+]|1[.)]) +\S/, 'a nested list'],
+  [/^ {2,}(?:[-*+]|0*1[.)]) +\S/, 'a nested list'],
   [/^ {0,3}> *$/, 'an empty quote line, which makes a quote of more than one paragraph'],
   [/^ *\t/, 'a line indented with a tab; indent with spaces'],
-  // A tab anywhere else: CommonMark reads `-\tItem` as a list item and keeps a tab in a code span,
-  // where the comparison, which collapses it to a space, cannot see it. A fence keeps its tabs.
+  // A tab anywhere else: CommonMark reads `-\tItem` as a list item, and the diff would show a
+  // tab in a code span as a space. A fence keeps its tabs.
   [/^ *[^ \t].*\t/, 'a tab; write a space, or put the text in a code fence'],
 ];
 
@@ -3328,7 +3417,7 @@ function blockKind(line, next) {
 function continues(block, line) {
   if (block === 'heading' || block === 'code' || opensFence(line)) return false;
   if (HEADING.test(line)) return false;
-  if (/^ {0,3}(?:[-*+]|1[.)]) +\S/.test(line)) return block === 'list';
+  if (/^ {0,3}(?:[-*+]|0*1[.)]) +\S/.test(line)) return block === 'list';
   if (/^ {0,3}>/.test(line)) return block === 'quote';
   if (/^ {0,3}\|/.test(line) || (line.includes('|') && DELIMITER_ROW.test(line))) {
     return block === 'table' || block === 'caption';
@@ -3342,8 +3431,8 @@ function continues(block, line) {
  * holds such syntax as text and the twin escapes its first mark, so the two bodies agree and only
  * this refusal catches it. A quote's later lines continue its paragraph, as CommonMark has it: a
  * `---` or `===` line makes the paragraph a setext heading, a delimiter row makes its last line a
- * table's header (GFM), and only a bullet or a `1.` item with text starts a list, so
- * `> 1995. It was` stays text there.
+ * table's header (GFM), and only a bullet or an item from 1 (`1.`, `01.`) with text starts a list,
+ * so `> 1995. It was` stays text there.
  * @param {string} content
  * @param {boolean} first whether `content` starts the item or quote
  * @returns {string | null}
@@ -3358,7 +3447,7 @@ function nestedBlock(content, first) {
   if (
     first
       ? /^ {0,3}(?:[-*+]|\d{1,9}[.)])(?: |$)/.test(content)
-      : /^ {0,3}(?:[-*+]|1[.)]) +\S/.test(content)
+      : /^ {0,3}(?:[-*+]|0*1[.)]) +\S/.test(content)
   ) {
     return 'a list';
   }
@@ -3384,11 +3473,12 @@ function prose(tokens, labels) {
 }
 
 /**
- * A link's label as written, its escapes kept and each code span a space, for reading it again for
- * a link inside it. `prose()` drops each escape whole, which would read `[b]\!(c)` as a link.
- * @param {Token[]} label
+ * Running text or a link's label as written, its escapes kept and each code span or link a space,
+ * for reading it again for links. `prose()` drops each escape whole, which would read `[b]\!(c)` as
+ * a link.
+ * @param {Token[]} tokens
  */
-const labelSource = (label) => label.map((token) => ('text' in token ? token.text : ' ')).join('');
+const written = (tokens) => tokens.map((token) => ('text' in token ? token.text : ' ')).join('');
 
 /**
  * The refused inline syntax in one run of text: a heading, a table row or caption, or the lines of a
@@ -3413,8 +3503,17 @@ function refusedInline(source, at, block) {
   if (labels.some((label) => label.some((token) => 'code' in token))) {
     problems.push(`${at}: link text is plain text: no code`);
   }
-  if (labels.some((label) => inlineTokens(labelSource(label)).some((token) => 'label' in token))) {
+  // Each label read again with links allowed, so a link inside it is a link token.
+  const reread = labels.map((label) => inlineTokens(written(label)));
+  if (reread.some((label) => label.some((token) => 'label' in token))) {
     problems.push(`${at}: a link inside a link's text`);
+  }
+  // A `](` that `linkAt()` did not take, as with a title or a space around the destination, stays
+  // text on both sides, while CommonMark makes it a link. An escaped `\]` is text.
+  if ([tokens, ...reread].some((run) => /(?<!\\)(?:\\\\)*\]\(/.test(written(run)))) {
+    problems.push(
+      `${at}: a link title or spaces around a link's destination; the post format has neither`,
+    );
   }
   const text = prose(tokens, true);
   for (const [pattern, what] of REFUSED_INLINE) {
@@ -3470,6 +3569,8 @@ export function refusedSyntax(body, firstLine = 1) {
       return;
     }
     if (!line.trim()) {
+      // A blank line is read before `REFUSED_LINES`: refuse its tab here, as the front matter does.
+      if (line.includes('\t')) problems.push(`${at}: a tab on a blank line; leave the line empty`);
       endRun();
       block = null;
       return;
@@ -3516,6 +3617,12 @@ export function refusedSyntax(body, firstLine = 1) {
     const item =
       block === 'list' && (opening || startsItem(line, indent)) ? LIST_ITEM.exec(line) : null;
     if (item) indent = itemIndent(line);
+    // GFM renders an item opening with `[ ]`, `[x]` or `[X]` as a checkbox, which a post has not.
+    if (item && /^\[[ xX]\](?: |$)/.test(item[2])) {
+      problems.push(
+        `${at}: a task list item, which GFM renders as a checkbox; escape the bracket as \\[`,
+      );
+    }
     if (item || (block === 'quote' && /^ {0,3}>/.test(line))) {
       if (item || opening) nested = false;
       // A whole line of `- ---` is a rule, reported above, rather than a list item holding one.

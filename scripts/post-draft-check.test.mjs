@@ -492,6 +492,29 @@ describe('the publish check', () => {
       assert.deepEqual(differences(approved, served, 'own'), []);
     });
 
+    /** @type {[string, string[], string[], RegExp][]} */
+    const interrupted = [
+      ['a list item', ['- It was', '  01. b'], ['- It was 01. b'], /^line 30: a nested list$/m],
+      ['a quote', ['> It was', '> 01. b'], ['> It was 01. b'], /^line 30: a list inside a quote$/m],
+      [
+        'a paragraph',
+        ['It was', '01. b'],
+        ['It was 01. b'],
+        /^line 30: start each block after a blank line$/m,
+      ],
+    ];
+    for (const [where, approved, served, pattern] of interrupted) {
+      it(`reads 01. in ${where} as CommonMark does: an item from 1, which interrupts it`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', ...approved]),
+          'twin.md': twin({ body: [...SERVED, '', ...served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, pattern);
+      });
+    }
+
     it('reports a whole-line --- rule once, as a rule, not as a list item holding one', () => {
       const problems = differences(draft([...BODY, '', '- ---']), twin(), 'own');
       assert.deepEqual(
@@ -632,6 +655,51 @@ describe('the publish check', () => {
       assert.deepEqual(differences(approved, served, 'own'), []);
     });
 
+    for (const [form, approved, served] of [
+      [
+        'a title',
+        'See [the docs](/work "Work page") now.',
+        'See \\[the docs\\](/work "Work page") now.',
+      ],
+      [
+        'spaces around its destination',
+        'See [the docs]( /work ) now.',
+        'See \\[the docs\\]( /work ) now.',
+      ],
+    ]) {
+      it(`reports a link with ${form}, which the twin serves as text`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', approved]),
+          'twin.md': twin({ body: [...SERVED, '', served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, /^line 29: a link title or spaces around a link's destination; /m);
+      });
+    }
+
+    for (const [approved, served] of [
+      ['- [ ] write the post', '- \\[ \\] write the post'],
+      ['- [x] done', '- \\[x\\] done'],
+      ['1. [X] done', '1. \\[X\\] done'],
+    ]) {
+      it(`reports a task list item, which GFM renders as a checkbox: ${approved}`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', approved]),
+          'twin.md': twin({ body: [...SERVED, '', served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, /^line 29: a task list item, which GFM renders as a checkbox; /m);
+      });
+    }
+
+    it('accepts escaped brackets before a parenthesis, which make no link', () => {
+      const line = 'Brackets \\[like these\\](/work "Work page") stay text.';
+      const served = twin({ body: [...SERVED, '', line] });
+      assert.deepEqual(differences(draft([...BODY, '', line]), served, 'own'), []);
+    });
+
     it('reports an email autolink once, whatever its address starts with', () => {
       for (const address of ['name@example.com', '2026@example.com']) {
         const problems = differences(draft([...BODY, '', `Write to <${address}>.`]), twin(), 'own');
@@ -656,6 +724,22 @@ describe('the publish check', () => {
         problems.some((problem) => /^line 2: a tab in the front matter; /.test(problem)),
         problems.join('\n'),
       );
+    });
+
+    it('reports a blank line that holds a tab, as it does in the front matter', () => {
+      const files = {
+        'draft.md': draft([...BODY, '', 'One.', ' \t', 'Two.']),
+        'twin.md': twin({ body: [...SERVED, '', 'One.', '', 'Two.'] }),
+      };
+      const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+      assert.equal(status, 1);
+      assert.match(output, /^line 30: a tab on a blank line; /m);
+    });
+
+    it('accepts a blank line that holds a tab inside a code fence', () => {
+      const code = ['```make', 'all:', '\t', '\tnode build.mjs', '```'];
+      const served = twin({ body: [...SERVED, '', ...code] });
+      assert.deepEqual(differences(draft([...BODY, '', ...code]), served, 'own'), []);
     });
 
     it('accepts a tab inside a code fence, where it is code', () => {
