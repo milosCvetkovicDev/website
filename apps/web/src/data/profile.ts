@@ -62,9 +62,10 @@ export const CERTIFICATION = 'Angular Certified Architect';
 export const LOCATION = { locality: 'Belgrade', country: 'Serbia' } as const;
 
 /**
- * The occupation the Person JSON-LD's `hasOccupation` names (#57), as the pages print it: the
- * eyebrows of /work, /skills and /contact, and the home page's `h1` in lower case. Those lines
- * still write it themselves; `e2e/seo-surface.spec.ts` fails when no page shows it.
+ * The occupation the Person JSON-LD's `hasOccupation` and `jobTitle` name and its description opens
+ * with (#57), as the pages print it: the eyebrows of /work, /skills and /contact read it from here.
+ * The home page's `h1` says it in lower case inside its own sentence, so it writes it itself;
+ * `e2e/seo-surface.spec.ts` fails when no page shows it.
  */
 export const OCCUPATION = 'Senior Full-Stack Engineer';
 

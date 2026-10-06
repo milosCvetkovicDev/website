@@ -4,7 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { caseStudies, caseStudyPageTitle } from '@/data/case-studies';
 import { pages } from '@/data/pages';
 import { yearsOfExperience } from '@/data/profile';
-import { social, socialProfiles } from '@/data/social';
+import { socialProfiles } from '@/data/social';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { yearsClausesAboutAi, yearsFigures } from '@/test/experience-claims';
 
@@ -313,10 +313,11 @@ describe('the JSON-LD blocks', () => {
   it('describes the Person with the facts /about shows, and nothing it does not (57b)', async () => {
     // The whole node, so a predicate added or left behind fails here. Each fact is one the pages
     // show (#57 AC 6): the handle of a profile the site links to, the locality, the country and the
-    // certification of /about's credentials, the occupation the page eyebrows name, and knowsAbout
-    // trimmed to entries some route's text carries; `e2e/seo-surface.spec.ts` finds each one in the
-    // served pages. The literals are the oracle, as for `sameAs` above: comparing the node with
-    // the modules it reads would pass with a fact typed wrong in them. No employer or school is
+    // certification of /about's credentials, the occupation the page eyebrows name (the job title
+    // too), a description whose every clause but the years a page prints, and knowsAbout trimmed
+    // to entries some route's text carries; `e2e/seo-surface.spec.ts` finds each one in the served
+    // pages. The literals are the oracle, as for `sameAs` above: comparing the node with the
+    // modules it reads would pass with a fact typed wrong in them. No employer or school is
     // asserted, because the /about timeline names neither (ADR 0031, Decision 6).
     const { PersonJsonLd } = await importWithSiteUrl('https://example.test');
     const { container } = render(<PersonJsonLd />);
@@ -328,8 +329,8 @@ describe('the JSON-LD blocks', () => {
       name: 'Milos Cvetkovic',
       alternateName: '@milos_dev',
       url: 'https://example.test',
-      jobTitle: 'Senior Full Stack Engineer & Architect',
-      description: `Senior Full Stack Engineer & Architect with ${yearsOfExperience()} years of experience in software engineering, now building AI-native systems, self-healing agents, and cloud-native architecture.`,
+      jobTitle: 'Senior Full-Stack Engineer',
+      description: `Senior Full-Stack Engineer with ${yearsOfExperience()} years of experience in software engineering, now building AI-native systems.`,
       address: { '@type': 'PostalAddress', addressLocality: 'Belgrade', addressCountry: 'Serbia' },
       hasCredential: {
         '@type': 'EducationalOccupationalCredential',
@@ -356,12 +357,30 @@ describe('the JSON-LD blocks', () => {
         'Legacy Modernization',
         'DevOps',
       ],
-      sameAs: socialProfiles.map(({ href }) => href),
+      sameAs: [
+        'https://www.linkedin.com/in/milos-cvetkovic-dev',
+        'https://github.com/milosCvetkovicDev',
+        'https://x.com/milos_dev',
+      ],
       mainEntityOfPage: { '@id': 'https://example.test/about#webpage' },
     });
-    // The handle is the X profile's, read from the one social source, after an `@` as the Twitter
-    // card's creator writes it.
-    expect(person.alternateName).toBe(`@${social.x.handle}`);
+  });
+
+  it('builds the Person without loading /about’s page record (57b)', async () => {
+    // The root layout renders the Person on every route, the 404 included. /about's record throws
+    // when it loads if a case study it reads is missing, which may break /about but must not take
+    // the Person, and with it every route's JSON-LD, down too.
+    vi.doMock('@/data/pages/about', () => {
+      throw new Error('the /about record failed to load');
+    });
+    try {
+      const { PersonJsonLd } = await importWithSiteUrl('https://example.test');
+      const { container } = render(<PersonJsonLd />);
+      const [person] = jsonLdBlocks(container).map(parseJsonLdBlock);
+      expect(person.mainEntityOfPage).toEqual({ '@id': 'https://example.test/about#webpage' });
+    } finally {
+      vi.doUnmock('@/data/pages/about');
+    }
   });
 
   it('describes the Person by the derived years of career experience, not as AI-native work (#49)', async () => {

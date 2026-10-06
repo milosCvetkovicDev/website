@@ -137,13 +137,22 @@ WebSite on every route, the 404 included; each static route and case study rende
 `ProfilePageJsonLd` is dated with the day its "Last updated" line shows, and a case study adds its
 TechArticle and BreadcrumbList (a post page has none yet). A node names another by `{ '@id': … }`
 alone. A new route renders its page node, and `components/__tests__/json-ld.test.tsx` and
-`e2e/seo-surface.spec.ts` pin each route's types. The Person asserts only what a page shows (57b):
-its place and certification come from `data/profile.ts`, which /about's record reads too, its
-occupation from the same module (the page eyebrows that print it still write it themselves), its
-profiles and its handle from `data/social.ts`, and the Person describe at the end of
-`e2e/seo-surface.spec.ts` fails on any string in it that no page's body text shows (for a profile,
-no rendered link), outside the reasons its `NOT_PAGE_TEXT` names. Its `mainEntityOfPage` names
-/about's ProfilePage, the one reference both graph tests let resolve on another route.
+`e2e/seo-surface.spec.ts` pin each route's types.
+
+The Person asserts only what a page shows (57b):
+
+- Sources: its place and certification come from `data/profile.ts`, which /about's record reads
+  too; its occupation (`hasOccupation`, `jobTitle` and the description's opening) from the same
+  module, which the /work, /skills and /contact eyebrows read; its profiles and handle from
+  `data/social.ts`.
+- The check: the Person describe at the end of `e2e/seo-surface.spec.ts` fails on any string in it
+  that no page's body text shows as a whole word, on any description clause but the years that no
+  page shows, and on a profile no page renders as a link.
+- Exempt by path in its `NOT_PAGE_TEXT`, each checked another way: `@id`, `url`, `sameAs`,
+  `alternateName`, `description`, `hasCredential.credentialCategory` and `mainEntityOfPage.@id`;
+  `@context` and `@type` are vocabulary at any depth.
+- Its `mainEntityOfPage` names /about's ProfilePage, the one reference both graph tests let resolve
+  on another route.
 
 ## Owner placeholders
 

@@ -1,4 +1,5 @@
 import { caseStudies, formatMetric } from '@/data/case-studies';
+import { OCCUPATION } from '@/data/profile';
 import { social } from '@/data/social';
 import { productionFigure } from '@/data/work-stats';
 import type { InlineLink, PageRecord, ProseSection } from './types';
@@ -20,7 +21,7 @@ export interface WorkStat {
 
 /** The copy the page renders around its `h1`, the hook under it and its cards, in page order. */
 export const workCopy = {
-  eyebrow: 'Case studies · Milos Cvetkovic, Senior Full-Stack Engineer',
+  eyebrow: `Case studies · Milos Cvetkovic, ${OCCUPATION}`,
   intro:
     'Real projects with real constraints: AI agents, legacy modernization and developer tooling. Each one pushed boundaries—and delivered results.',
   // Both figures are counted from `caseStudies` when the page is built, never written down (#58).

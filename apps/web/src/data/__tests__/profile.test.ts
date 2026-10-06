@@ -125,18 +125,35 @@ describe('the facts the Person JSON-LD asserts (57b)', () => {
     const shown = credentials.map(({ text }) => text);
     expect(shown).toContain(CERTIFICATION);
     expect(shown).toContain(`${LOCATION.locality}, ${LOCATION.country}`);
-    expect(aboutRecord.summary).toMatch(new RegExp(`\\bBased in ${LOCATION.locality}\\.$`));
+    expect(aboutRecord.summary.endsWith(` Based in ${LOCATION.locality}.`)).toBe(true);
   });
 
-  it('is written in this module only, not again in the /about record', () => {
-    // A string typed back into the record would print the same text today and drift tomorrow.
-    const record = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '../pages/about.ts'),
-      'utf8',
-    );
+  it('is written in this module only, in no other source file', () => {
+    // A string typed back into a page record or a component would print the same text today and
+    // drift tomorrow. Comments may name the facts; code may not. Tests are left out: they hold the
+    // literals as their oracle.
+    const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+    const sources = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) {
+          return name === '__tests__' || path === join(SRC, 'test') ? [] : sources(path);
+        }
+        return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
+      });
+    // Block comments, and line comments that do not follow a `:` (a URL's `//` is not one).
+    const code = (source: string) =>
+      source.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, (_, before = '') => before);
+    const files = sources(SRC).filter((path) => path !== join(SRC, 'data/profile.ts'));
+    expect(files).toContain(join(SRC, 'data/pages/about.ts'));
     for (const literal of [CERTIFICATION, LOCATION.locality, LOCATION.country]) {
-      expect(record, literal).not.toContain(literal);
+      const pattern = new RegExp(`\\b${literal}\\b`);
+      const typed = files.filter((path) => pattern.test(code(readFileSync(path, 'utf8'))));
+      expect(typed, literal).toEqual([]);
     }
+    // The comment stripper keeps code: a literal after a URL on the same line is still found.
+    expect(code("const a = 'https://x.test'; const b = 'Serbia';")).toContain('Serbia');
+    expect(code('/* Serbia */ const a = 1; // Belgrade')).not.toMatch(/Serbia|Belgrade/);
   });
 });
 

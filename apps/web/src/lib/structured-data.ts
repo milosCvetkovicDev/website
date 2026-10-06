@@ -1,7 +1,7 @@
-import { aboutRecord } from '@/data/pages/about';
 import type { PageRecord } from '@/data/pages/types';
 import { CERTIFICATION, LOCATION, OCCUPATION, yearsOfExperience } from '@/data/profile';
 import { social, socialProfiles } from '@/data/social';
+import type { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { formatContentDate } from './content-date';
 import { assertPathname } from './pathname';
 import { siteOrigin } from './site-origin';
@@ -58,6 +58,14 @@ function routeNodeId(path: string, role: 'webpage' | 'article' | 'breadcrumb'): 
 /** The `@id` of a route's page node: its WebPage, or /about's ProfilePage. */
 export const webPageId = (path: string) => routeNodeId(path, 'webpage');
 
+/**
+ * The route whose ProfilePage the Person is the main entity of. A literal, held to the static
+ * routes by its type, rather than /about's page record: the root layout renders the Person on every
+ * route, the 404 included, and that record runs code when it loads (it throws when a case study it
+ * reads is missing), which would take every route's Person down with /about (57b).
+ */
+const ABOUT_PATH = '/about' satisfies keyof typeof STATIC_ROUTE_UPDATED;
+
 /** The text of a route's title, as `buildMetadata()` gets it: a plain or an absolute title. */
 function titleText(title: PageRecord['title']): string {
   const text = typeof title === 'string' ? title : title.absolute;
@@ -77,12 +85,15 @@ function contentDate(date: string, node: string): string {
 /**
  * The person the site is by and about, with only the facts its pages show (#57, ADR 0031's
  * visible-facts rule): the X handle as an alias, the place and the certification /about lists, and
- * the occupation the page eyebrows name, each read from the module that also feeds the page. No
- * employer or school is asserted, because the /about timeline names neither. `knowsAbout` keeps the
- * entries some route's text shows (57b dropped "Self-Healing Agents", which none did). The Person
- * describe in `e2e/seo-surface.spec.ts` finds each string here in the served text of a page, and
- * each profile as a rendered link, unless its `NOT_PAGE_TEXT` names what holds that key instead (the
- * `jobTitle` and the `description` among them), so a fact added here that no page shows fails there.
+ * the occupation the page eyebrows name, as the occupation and the job title, each read from the
+ * module that also feeds the page. No employer or school is asserted, because the /about timeline
+ * names neither. `knowsAbout` keeps the entries some route's text shows (57b dropped "Self-Healing
+ * Agents", which none did), and the description states only what pages print, besides the years
+ * (57b dropped "self-healing agents", which the pages call retired, and "cloud-native
+ * architecture", which no page says). The Person describe in `e2e/seo-surface.spec.ts` finds each
+ * string here, and each clause of the description, in the served text of a page as a whole word,
+ * and each profile as a rendered link, unless its `NOT_PAGE_TEXT` names what holds that path
+ * instead, so a fact added here that no page shows fails there.
  */
 export function person() {
   return {
@@ -94,10 +105,10 @@ export function person() {
     // ends with it, is among the `sameAs` below.
     alternateName: `@${social.x.handle}`,
     url: siteUrl,
-    jobTitle: 'Senior Full Stack Engineer & Architect',
+    jobTitle: OCCUPATION,
     // The total is career experience, read from the profile; the AI-native work is the recent
     // part of it (the About timeline starts it in 2025), so the sentence keeps the two apart.
-    description: `Senior Full Stack Engineer & Architect with ${yearsOfExperience()} years of experience in software engineering, now building AI-native systems, self-healing agents, and cloud-native architecture.`,
+    description: `${OCCUPATION} with ${yearsOfExperience()} years of experience in software engineering, now building AI-native systems.`,
     address: {
       '@type': 'PostalAddress',
       addressLocality: LOCATION.locality,
@@ -133,7 +144,7 @@ export function person() {
     // The page about this person is /about's ProfilePage. The Person is served on every route and
     // that node only on /about, so this is the one reference that names a node on another route;
     // the graph tests let it through by name and hold it to /about's node instead (57b).
-    mainEntityOfPage: reference(webPageId(aboutRecord.path)),
+    mainEntityOfPage: reference(webPageId(ABOUT_PATH)),
   };
 }
 

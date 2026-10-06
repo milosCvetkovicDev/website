@@ -4,6 +4,7 @@
  * keys by the link's `name`, and maps over what is here, so a page and its twin cannot disagree.
  * Every string is text the page already showed.
  */
+import { OCCUPATION } from '@/data/profile';
 import { social } from '@/data/social';
 import type { PageRecord, PageSection } from './types';
 
@@ -53,7 +54,7 @@ export type SocialLinkName = (typeof socialLinks)[number]['name'];
  */
 export const contactCopy = {
   socialTitle: 'Contact Milos Cvetkovic',
-  eyebrow: 'Contact · Milos Cvetkovic, Senior Full-Stack Engineer',
+  eyebrow: `Contact · Milos Cvetkovic, ${OCCUPATION}`,
   intro:
     "I share what I'm building, lessons from production, and engineering insights. Pick your preferred platform and say hi.",
   closing: {
