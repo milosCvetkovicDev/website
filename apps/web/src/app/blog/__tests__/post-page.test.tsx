@@ -29,7 +29,13 @@ vi.mock('@/data/posts', async (importOriginal) => {
     metaTitle: 'Fixture: a shorter title',
   };
   const list = [...fixturePosts, withMetaTitle];
-  return { ...actual, posts: list, ...actual.buildPostIndex(list) };
+  // Two closing lines rather than the real one, so that the footer test can tell one paragraph per
+  // line from the lines joined into one; `posts.test.ts` pins the real lines.
+  const FOOTER_LINES: typeof actual.FOOTER_LINES = {
+    own: [],
+    jev: ['Fixture: the first closing line.', 'Fixture: the second closing line.'],
+  };
+  return { ...actual, FOOTER_LINES, posts: list, ...actual.buildPostIndex(list) };
 });
 
 // The card is a PNG drawn by `next/og`; what this file checks is what the handler asks it to draw.
@@ -140,6 +146,8 @@ describe('the post page', () => {
   });
 
   it('ends a jev post with its footer lines, last inside the article, in --muted text', async () => {
+    // The control: with one line, a footer that joined its lines into one paragraph would pass.
+    expect(FOOTER_LINES.jev.length).toBeGreaterThan(1);
     render(await PostPage(paramsOf(hostileTitlePost.slug)));
     const footer = document.querySelector('article')!.lastElementChild!;
     expect(footer.tagName).toBe('FOOTER');
@@ -147,7 +155,9 @@ describe('the post page', () => {
       FOOTER_LINES.jev.map((line) => ['P', line]),
     );
     expect(footer.className).toContain('text-[var(--muted)]');
-    expect(footer.className).not.toMatch(/opacity-|text-\S+\/\d/);
+    for (const element of [footer, ...footer.children]) {
+      expect(element.className).not.toMatch(/opacity-|text-\S+\/\d/);
+    }
   });
 
   it('gives an own post no footer', async () => {

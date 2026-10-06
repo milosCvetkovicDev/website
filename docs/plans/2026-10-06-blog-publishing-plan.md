@@ -670,11 +670,27 @@ git commit -m "feat(blog): give every post a kind and check that a jev post is m
 
 - [x] **Step 1: Write the failing tests**
 
-In `post-page.test.tsx`, add `FOOTER_LINES` to the import from `'@/data/posts'`, and add after the
-test `keeps the way back out of the article, …`:
+In `post-page.test.tsx`, add `FOOTER_LINES` to the import from `'@/data/posts'`. In the file's
+`vi.mock` of `'@/data/posts'`, which spreads `actual`, override `FOOTER_LINES` with two fixture
+lines, so that the test below proves one paragraph per line (`posts.test.ts` pins the real lines):
+
+```ts
+const list = [...fixturePosts, withMetaTitle];
+// Two closing lines rather than the real one, so that the footer test can tell one paragraph per
+// line from the lines joined into one; `posts.test.ts` pins the real lines.
+const FOOTER_LINES: typeof actual.FOOTER_LINES = {
+  own: [],
+  jev: ['Fixture: the first closing line.', 'Fixture: the second closing line.'],
+};
+return { ...actual, FOOTER_LINES, posts: list, ...actual.buildPostIndex(list) };
+```
+
+Then add after the test `keeps the way back out of the article, …`:
 
 ```tsx
 it('ends a jev post with its footer lines, last inside the article, in --muted text', async () => {
+  // The control: with one line, a footer that joined its lines into one paragraph would pass.
+  expect(FOOTER_LINES.jev.length).toBeGreaterThan(1);
   render(await PostPage(paramsOf(hostileTitlePost.slug)));
   const footer = document.querySelector('article')!.lastElementChild!;
   expect(footer.tagName).toBe('FOOTER');
@@ -682,7 +698,9 @@ it('ends a jev post with its footer lines, last inside the article, in --muted t
     FOOTER_LINES.jev.map((line) => ['P', line]),
   );
   expect(footer.className).toContain('text-[var(--muted)]');
-  expect(footer.className).not.toMatch(/opacity-|text-\S+\/\d/);
+  for (const element of [footer, ...footer.children]) {
+    expect(element.className).not.toMatch(/opacity-|text-\S+\/\d/);
+  }
 });
 
 it('gives an own post no footer', async () => {
@@ -701,9 +719,10 @@ Expected: FAIL. The article's last child is the post body's `DIV`, not a `FOOTER
 
 - [x] **Step 3: Render the footer**
 
-In `apps/web/src/app/blog/[slug]/page.tsx`, import `FOOTER_LINES` beside `getPost`. Then add the
-footer as the last child of `<article>`, after `<PostBody blocks={post.body} />`, so that the
-`<article>` element reads:
+In `apps/web/src/app/blog/[slug]/page.tsx`, import `FOOTER_LINES` beside `getPost`, and bind
+`const footerLines = FOOTER_LINES[post.kind];` once in the component body, after `published` and
+`updated`. Then add the footer as the last child of `<article>`, after
+`<PostBody blocks={post.body} />`, so that the `<article>` element reads:
 
 ```tsx
 <article>
@@ -726,11 +745,12 @@ footer as the last child of `<article>`, after `<PostBody blocks={post.body} />`
   </header>
 
   <PostBody blocks={post.body} />
-  {/* The kind's closing lines, inside the article so that an extractor reading the article
-      keeps them (ADR 0034); `--muted` rather than an opacity step (ADR 0011). */}
-  {FOOTER_LINES[post.kind].length > 0 ? (
+  {/* The kind's closing lines, last inside the article (ADR 0034). Readers that strip
+      every `<footer>`, as Readability and trafilatura do, drop them. `--muted` rather
+      than an opacity step (ADR 0011). */}
+  {footerLines.length > 0 ? (
     <footer className="mt-12 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
-      {FOOTER_LINES[post.kind].map((line) => (
+      {footerLines.map((line) => (
         <p key={line}>{line}</p>
       ))}
     </footer>
