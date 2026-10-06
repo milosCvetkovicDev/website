@@ -515,6 +515,39 @@ describe('the publish check', () => {
       });
     }
 
+    for (const [approved, served] of [
+      [
+        ['- It was', '* b'],
+        ['- It was', '- b'],
+      ],
+      [
+        ['1. It was', '2) b'],
+        ['1. It was', '2. b'],
+      ],
+    ]) {
+      it(`reports a list that changes its bullet or delimiter: ${approved.join(' / ')}`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', ...approved]),
+          'twin.md': twin({ body: [...SERVED, '', ...served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, /^line 30: a change of bullet or delimiter starts a new list /m);
+      });
+    }
+
+    it('accepts a list that uses * throughout', () => {
+      const approved = draft([...BODY, '', '* It was', '* b']);
+      const served = twin({ body: [...SERVED, '', '- It was', '- b'] });
+      assert.deepEqual(differences(approved, served, 'own'), []);
+    });
+
+    it('accepts a numbered list and a bulleted list with a paragraph between them', () => {
+      const lines = ['1. One', '2. Two', '', 'Between them.', '', '- Three'];
+      const served = twin({ body: [...SERVED, '', ...lines] });
+      assert.deepEqual(differences(draft([...BODY, '', ...lines]), served, 'own'), []);
+    });
+
     it('reports a whole-line --- rule once, as a rule, not as a list item holding one', () => {
       const problems = differences(draft([...BODY, '', '- ---']), twin(), 'own');
       assert.deepEqual(

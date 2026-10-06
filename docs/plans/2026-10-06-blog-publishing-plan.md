@@ -2472,6 +2472,39 @@ describe('the publish check', () => {
       });
     }
 
+    for (const [approved, served] of [
+      [
+        ['- It was', '* b'],
+        ['- It was', '- b'],
+      ],
+      [
+        ['1. It was', '2) b'],
+        ['1. It was', '2. b'],
+      ],
+    ]) {
+      it(`reports a list that changes its bullet or delimiter: ${approved.join(' / ')}`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', ...approved]),
+          'twin.md': twin({ body: [...SERVED, '', ...served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, /^line 30: a change of bullet or delimiter starts a new list /m);
+      });
+    }
+
+    it('accepts a list that uses * throughout', () => {
+      const approved = draft([...BODY, '', '* It was', '* b']);
+      const served = twin({ body: [...SERVED, '', '- It was', '- b'] });
+      assert.deepEqual(differences(approved, served, 'own'), []);
+    });
+
+    it('accepts a numbered list and a bulleted list with a paragraph between them', () => {
+      const lines = ['1. One', '2. Two', '', 'Between them.', '', '- Three'];
+      const served = twin({ body: [...SERVED, '', ...lines] });
+      assert.deepEqual(differences(draft([...BODY, '', ...lines]), served, 'own'), []);
+    });
+
     it('reports a whole-line --- rule once, as a rule, not as a list item holding one', () => {
       const problems = differences(draft([...BODY, '', '- ---']), twin(), 'own');
       assert.deepEqual(
@@ -3170,6 +3203,13 @@ function canonicalTable(lines, caption, origin) {
 }
 
 /**
+ * How many spaces a line starts with. A list item's line with fewer than the item's text column
+ * leaves that item.
+ * @param {string} line
+ */
+const leadingSpaces = (line) => line.length - line.replace(/^ +/, '').length;
+
+/**
  * The column where a list item's text starts: after its marker and the spaces that follow it, or
  * one space after the marker when five or more follow, which make the text indented code.
  * @param {string} line a list item's first line
@@ -3191,12 +3231,13 @@ function itemIndent(line) {
  * the same list. A marker of the other kind, such as a number after a bullet item, starts a new
  * list in CommonMark, which this check keeps in the same block; that fails safe, since
  * `canonicalList()` keeps each item's kind, so no twin's list equals it. A change of bullet
- * character, or from `.` to `)`, starts a new list as well, which this check does not see.
+ * character, or from `.` to `)`, starts a new list of the same kind, which a post cannot hold
+ * beside another, so `refusedSyntax()` refuses it.
  * @param {string} line
  * @param {number} indent the column where the current item's text starts
  */
 function startsItem(line, indent) {
-  if (line.length - line.replace(/^ +/, '').length < indent) return LIST_ITEM.test(line);
+  if (leadingSpaces(line) < indent) return LIST_ITEM.test(line);
   return /^ {0,3}(?:[-*+]|0*1[.)]) +\S/.test(line.slice(indent));
 }
 
@@ -3551,6 +3592,8 @@ export function refusedSyntax(body, firstLine = 1) {
   let nested = false;
   /** the column where the current list item's text starts, for `startsItem()` */
   let indent = 0;
+  /** the last character of the current list's marker: its bullet, or its `.` or `)` */
+  let marker = '';
   const endRun = () => {
     if (run) {
       const [from, to] = [firstLine + run.from, firstLine + run.to];
@@ -3616,7 +3659,23 @@ export function refusedSyntax(body, firstLine = 1) {
     if (/(?: {2,}|\\)$/.test(line) && next.trim()) problems.push(`${at}: a hard line break`);
     const item =
       block === 'list' && (opening || startsItem(line, indent)) ? LIST_ITEM.exec(line) : null;
-    if (item) indent = itemIndent(line);
+    if (item) {
+      // An item left of the last one's text stays in its list only with the same bullet, or the
+      // same `.` or `)`; one of its kind starts a new list beside it, which a post cannot hold.
+      const mark = item[1].slice(-1);
+      if (opening) {
+        marker = mark;
+      } else if (leadingSpaces(line) < indent) {
+        if (mark !== marker && /[-*+]/.test(mark) === /[-*+]/.test(marker)) {
+          problems.push(
+            `${at}: a change of bullet or delimiter starts a new list in Markdown, ` +
+              'which a post cannot hold next to another list of its kind',
+          );
+        }
+        marker = mark;
+      }
+      indent = itemIndent(line);
+    }
     // GFM renders an item opening with `[ ]`, `[x]` or `[X]` as a checkbox, which a post has not.
     if (item && /^\[[ xX]\](?: |$)/.test(item[2])) {
       problems.push(
