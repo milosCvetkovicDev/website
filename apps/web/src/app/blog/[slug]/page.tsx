@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { PostBody } from '@/components/post-body';
-import { getPost, publishedPosts } from '@/data/posts';
+import { FOOTER_LINES, getPost, publishedPosts } from '@/data/posts';
 import { formatContentDates } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
 import { cardAlt } from '@/lib/og-image';
@@ -69,6 +69,7 @@ export default async function PostPage({ params }: PageProps) {
     post.publishedAt,
     post.updatedAt,
   );
+  const footerLines = FOOTER_LINES[post.kind];
 
   return (
     <div className="py-16 md:py-24">
@@ -117,6 +118,16 @@ export default async function PostPage({ params }: PageProps) {
           </header>
 
           <PostBody blocks={post.body} />
+          {/* The kind's closing lines, last inside the article (ADR 0034). Readers that strip
+              every `<footer>`, as Readability and trafilatura do, drop them. `--muted` rather
+              than an opacity step (ADR 0011). */}
+          {footerLines.length > 0 ? (
+            <footer className="mt-12 space-y-2 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
+              {footerLines.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </footer>
+          ) : null}
         </article>
       </div>
     </div>

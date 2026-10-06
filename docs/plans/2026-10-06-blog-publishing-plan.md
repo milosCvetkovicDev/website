@@ -366,7 +366,7 @@ which sets both to `Shipped`.
 - Produces, in the fixtures: `everyBlockPost.kind === 'own'`, `hostileTitlePost.kind === 'jev'` and
   `draftPost.kind === 'own'`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `apps/web/src/data/__tests__/posts.test.ts`, add `FOOTER_LINES` and `type PostKind` to the
 existing import from `'../posts'`, and this helper beside the other test helpers:
@@ -378,11 +378,25 @@ const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\
 Add to the end of `defects`:
 
 ```ts
-  ...[undefined, 'Jev', 'typesafe', ''].map((kind): [string, Post[], RegExp] => [
-    `the kind ${JSON.stringify(kind)}`,
+  // Each with the value the problem has to report, written out rather than computed.
+  ...(
+    [
+      [undefined, 'undefined'],
+      ['Jev', '"Jev"'],
+      ['typesafe', '"typesafe"'],
+      ['', '""'],
+    ] as const
+  ).map(([kind, reported]): [string, Post[], RegExp] => [
+    `the kind ${reported}`,
     [published({ kind })],
-    /^fixture-every-block: kind must be "own" or "jev", not (?:undefined|".*")$/,
+    new RegExp(`^fixture-every-block: kind must be "own" or "jev", not ${escapeRegExp(reported)}$`),
   ]),
+  // A draft's kind is checked too: it keeps its kind when it is published.
+  [
+    'the kind "x" on a draft',
+    [{ ...draftPost, kind: 'x' } as unknown as Post],
+    /^fixture-draft: kind must be "own" or "jev", not "x"$/,
+  ],
   // Each place a post shows text. A name in any of them makes an `own` post a defect (ADR 0034).
   ...(
     [
@@ -398,6 +412,13 @@ Add to the end of `defects`:
         'body[0].content[1].text',
         'TypeSafe',
       ],
+      // The twin prints a link's URL after its text, so the URL is text the post shows too.
+      [
+        'a link target',
+        { body: [paragraph('See ', { text: 'the example page', href: 'https://example.com/TypeSafe' }, '.')] },
+        'body[0].content[1].href',
+        'TypeSafe',
+      ],
       [
         'inline code',
         { body: [paragraph('Run ', { code: 'TypeSafe.check()' }, '.')] },
@@ -406,6 +427,13 @@ Add to the end of `defects`:
       ],
       ['a list item', { body: [{ kind: 'list', items: [['Ask Jev.']] }] }, 'body[0].items[0][0]', 'Jev'],
       ['a code block', { body: [{ kind: 'code', code: 'model = "Jev"' }] }, 'body[0].code', 'Jev'],
+      // The page names the code figure by its language, and the twin's fence carries it.
+      [
+        'a code language',
+        { body: [{ kind: 'code', language: 'TypeSafe', code: 'x' }] },
+        'body[0].language',
+        'TypeSafe',
+      ],
       ['a quote', { body: [{ kind: 'quote', content: ['TypeSafe said so.'] }] }, 'body[0].content[0]', 'TypeSafe'],
     ] as const
   ).map(([place, fields, path, name]): [string, Post[], RegExp] => [
@@ -422,15 +450,34 @@ Add to the end of `accepted`:
 ```ts
   ['a jev post that names TypeSafe and Jev', [published({ kind: 'jev', title: 'Fixture: TypeSafe and Jev' })]],
   ['a jev post that names neither', [published({ kind: 'jev' })]],
-  // Not the names: a surname that starts with them in either script, a longer word, other cases.
+  // A draft renders nowhere, so the names are checked once it is published.
+  ['a draft that names Jev', [{ ...draftPost, title: 'Fixture: Jev' }]],
+  // Not the names: a surname that starts with one, whether the letter after it is ASCII or not, a
+  // longer word, another case.
   ...['Jevtić', 'Jevđević', 'Jevremović', 'TypeSafety', 'typesafe', 'type-safe', 'JEV'].map(
     (word): [string, Post[]] => [
       `${word} in an own post`,
       [withBody(paragraph(`A sentence with ${word} in it.`))],
     ],
   ),
-  // A URL is not text the post shows; ADR 0034 checks the link's text.
-  ['an own post linking to a TypeSafe URL', [withLink('https://example.com/TypeSafe', 'the example page')]],
+  // Not the names either: a letter, digit, underscore or combining mark against one edge.
+  ...[
+    ['a letter before Jev', 'ŠJev'],
+    ['a digit before Jev', '2Jev'],
+    ['an underscore before Jev', '_Jev'],
+    ['a combining acute accent before Jev', 'e\u0301Jev'],
+    ['a letter before TypeSafe', 'MyTypeSafe'],
+    ['a digit after Jev', 'Jev2'],
+    ['an underscore after Jev', 'Jev_'],
+    ['a combining acute accent after Jev', 'Jev\u0301'],
+    ['a digit after TypeSafe', 'TypeSafe2'],
+    ['an underscore after TypeSafe', 'TypeSafe_'],
+  ].map(([edge, word]): [string, Post[]] => [
+    `${edge} in an own post`,
+    [withBody(paragraph(`A sentence with ${word} in it.`))],
+  ]),
+  // The match is case-sensitive (ADR 0034), so a lowercase domain in a link's URL is not the name.
+  ['an own post linking to a lowercase typesafe domain', [withLink('https://typesafe.dev/docs', 'their docs')]],
 ```
 
 In `describe('the post fixtures')`, add:
@@ -459,7 +506,7 @@ describe('FOOTER_LINES', () => {
 });
 ```
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 ```bash
 pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts
@@ -468,7 +515,7 @@ pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts
 Expected: FAIL. The new defect rows report no problem (`expected [] to have a length of 1`), the
 fixtures have no `kind`, and `FOOTER_LINES` is undefined.
 
-- [ ] **Step 3: Add the kind and the footer lines to the model**
+- [x] **Step 3: Add the kind and the footer lines to the model**
 
 In `apps/web/src/data/posts.ts`, add this bullet to the header comment, after the bullet that begins
 `Every string is plain text`:
@@ -476,7 +523,7 @@ In `apps/web/src/data/posts.ts`, add this bullet to the header comment, after th
 ```ts
  * - Every post, draft or published, has a `kind`: `jev` for an article that reviews TypeSafe's Jev
  *   model, `own` otherwise. `posts.test.ts` fails when a published post that is not `jev` names Jev
- *   or TypeSafe in any text it shows (ADR 0034).
+ *   or TypeSafe in any text it shows, matched case-sensitively and as a whole word (ADR 0034).
 ```
 
 Above `interface PostContent`:
@@ -501,8 +548,9 @@ After `export type Post = PublishedPost | DraftPost;`:
 ```ts
 /**
  * The lines a post of each kind ends with, in order (ADR 0034), in the owner's own words. The post
- * page renders them in a `<footer>`, last inside its `<article>`, and the twin writes them after a
- * `---` rule. The feed carries only summaries, so no line reaches it.
+ * page renders them in a `<footer>`, last inside its `<article>`, and ADR 0034 has the post's
+ * Markdown twin end with them after a `---` rule. The feed carries only summaries, so no line
+ * reaches it.
  */
 export const FOOTER_LINES: Readonly<Record<PostKind, readonly string[]>> = {
   own: [],
@@ -510,7 +558,10 @@ export const FOOTER_LINES: Readonly<Record<PostKind, readonly string[]>> = {
 };
 ```
 
-- [ ] **Step 4: Give the fixtures their kinds**
+In the doc comment of `posts`, replace `The owner writes them; see the top of this file.` with
+`The top of this file says how a post is drafted and added.`
+
+- [x] **Step 4: Give the fixtures their kinds**
 
 In `apps/web/src/test/fixtures/posts.ts`:
 
@@ -519,7 +570,7 @@ In `apps/web/src/test/fixtures/posts.ts`:
 - in the header comment, change `a draft, and two published posts with different dates` to
   `a draft, and two published posts with different dates, one of each kind`.
 
-- [ ] **Step 5: Add the kind and naming rules to the checker**
+- [x] **Step 5: Add the kind and naming rules to the checker**
 
 In `posts.test.ts`, after `dateProblems`:
 
@@ -534,22 +585,24 @@ const KINDS: readonly unknown[] = Object.keys(FOOTER_LINES);
  */
 const JEV_NAMES = /(?<![\p{L}\p{M}\p{N}_])(?:Jev|TypeSafe)(?![\p{L}\p{M}\p{N}_])/u;
 
-/** Fields whose values a reader is never shown: identifiers, dates, flags, a URL, a language. */
+/**
+ * Fields whose values a reader is never shown as text: identifiers, dates, flags. A link's `href`
+ * is not one of them, because the Markdown twin prints a link's URL after its text. `slug` stays:
+ * `SLUG` allows lowercase letters, digits and hyphens only, so a slug can never hold either name.
+ */
 const NOT_SHOWN = new Set([
   'slug',
   'kind',
   'draft',
   'publishedAt',
   'updatedAt',
-  'href',
-  'language',
   'level',
   'ordered',
 ]);
 
 /**
- * Every string a post shows, each with its path in the post (`body[2].content[1].text`). The walk is
- * generic, so a block kind added later is covered without a change here.
+ * Every string a post shows, each with its path in the post (`body[2].content[1].text`). The walk
+ * is generic, so a block kind added later is covered without a change here.
  */
 function shownTexts(value: unknown, path: string): [path: string, text: string][] {
   if (typeof value === 'string') return [[path, value]];
@@ -566,9 +619,9 @@ function shownTexts(value: unknown, path: string): [path: string, text: string][
 
 function kindProblems(post: Post): string[] {
   const { kind }: { kind: unknown } = post;
-  return KINDS.includes(kind)
-    ? []
-    : [`${post.slug}: kind must be "own" or "jev", not ${JSON.stringify(kind)}`];
+  if (KINDS.includes(kind)) return [];
+  const known = KINDS.map((each) => JSON.stringify(each)).join(' or ');
+  return [`${post.slug}: kind must be ${known}, not ${JSON.stringify(kind)}`];
 }
 
 /** A published post that names Jev or TypeSafe must be `jev`, so that it carries the disclosure. */
@@ -603,7 +656,7 @@ if (post.draft === false) problems.push(...contentProblems(post, pages), ...nami
 In the doc comment of `problemsIn`, add after its first sentence: `A kind is checked on every post,
 and the names only on a published one.`
 
-- [ ] **Step 6: Run the tests until they pass, then typecheck**
+- [x] **Step 6: Run the tests until they pass, then typecheck**
 
 ```bash
 pnpm --filter web exec vitest run src/data/__tests__/posts.test.ts
@@ -613,7 +666,7 @@ pnpm typecheck
 Expected: PASS, and typecheck exits 0. If typecheck names another post literal without `kind`, give
 it `kind: 'own'`: every other test file spreads a fixture, so there should be none.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/web/src/data/posts.ts apps/web/src/test/fixtures/posts.ts apps/web/src/data/__tests__/posts.test.ts docs/plans/2026-10-06-blog-publishing-plan.md
@@ -634,21 +687,41 @@ git commit -m "feat(blog): give every post a kind and check that a jev post is m
 - Produces: `<footer>` as the last child of the post page's `<article>` for a kind with lines, with
   one `<p>` per line.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
-In `post-page.test.tsx`, add `FOOTER_LINES` to the import from `'@/data/posts'`, and add after the
-test `keeps the way back out of the article, …`:
+In `post-page.test.tsx`, add `FOOTER_LINES` to the import from `'@/data/posts'`. In the file's
+`vi.mock` of `'@/data/posts'`, which spreads `actual`, override `FOOTER_LINES` with two fixture
+lines, so that the test below proves one paragraph per line (`posts.test.ts` pins the real lines):
+
+```ts
+const list = [...fixturePosts, withMetaTitle];
+// Two closing lines rather than the real one, so that the footer test can tell one paragraph per
+// line from the lines joined into one; `posts.test.ts` pins the real lines.
+const FOOTER_LINES: typeof actual.FOOTER_LINES = {
+  own: [],
+  jev: ['Fixture: the first closing line.', 'Fixture: the second closing line.'],
+};
+return { ...actual, FOOTER_LINES, posts: list, ...actual.buildPostIndex(list) };
+```
+
+Then add after the test `keeps the way back out of the article, …`:
 
 ```tsx
 it('ends a jev post with its footer lines, last inside the article, in --muted text', async () => {
+  // The control: with one line, a footer that joined its lines into one paragraph would pass.
+  expect(FOOTER_LINES.jev.length).toBeGreaterThan(1);
   render(await PostPage(paramsOf(hostileTitlePost.slug)));
   const footer = document.querySelector('article')!.lastElementChild!;
   expect(footer.tagName).toBe('FOOTER');
   expect([...footer.children].map((line) => [line.tagName, line.textContent])).toEqual(
     FOOTER_LINES.jev.map((line) => ['P', line]),
   );
+  expect(footer.className).toContain('border-t');
   expect(footer.className).toContain('text-[var(--muted)]');
-  expect(footer.className).not.toMatch(/opacity-|text-\S+\/\d/);
+  // Neither an opacity step nor a text alpha, numeric (`/60`) or arbitrary (`/[0.6]`).
+  for (const element of [footer, ...footer.children]) {
+    expect(element.className).not.toMatch(/opacity-|text-\S+\/[\d[]/);
+  }
 });
 
 it('gives an own post no footer', async () => {
@@ -657,7 +730,7 @@ it('gives an own post no footer', async () => {
 });
 ```
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 ```bash
 pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx
@@ -665,11 +738,12 @@ pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx
 
 Expected: FAIL. The article's last child is the post body's `DIV`, not a `FOOTER`.
 
-- [ ] **Step 3: Render the footer**
+- [x] **Step 3: Render the footer**
 
-In `apps/web/src/app/blog/[slug]/page.tsx`, import `FOOTER_LINES` beside `getPost`. Then add the
-footer as the last child of `<article>`, after `<PostBody blocks={post.body} />`, so that the
-`<article>` element reads:
+In `apps/web/src/app/blog/[slug]/page.tsx`, import `FOOTER_LINES` beside `getPost`, and bind
+`const footerLines = FOOTER_LINES[post.kind];` once in the component body, after `published` and
+`updated`. Then add the footer as the last child of `<article>`, after
+`<PostBody blocks={post.body} />`, so that the `<article>` element reads:
 
 ```tsx
 <article>
@@ -692,11 +766,12 @@ footer as the last child of `<article>`, after `<PostBody blocks={post.body} />`
   </header>
 
   <PostBody blocks={post.body} />
-  {/* The kind's closing lines, inside the article so that an extractor reading the article
-      keeps them (ADR 0034); `--muted` rather than an opacity step (ADR 0011). */}
-  {FOOTER_LINES[post.kind].length > 0 ? (
-    <footer className="mt-12 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
-      {FOOTER_LINES[post.kind].map((line) => (
+  {/* The kind's closing lines, last inside the article (ADR 0034). Readers that strip
+      every `<footer>`, as Readability and trafilatura do, drop them. `--muted` rather
+      than an opacity step (ADR 0011). */}
+  {footerLines.length > 0 ? (
+    <footer className="mt-12 space-y-2 border-t border-[var(--border)] pt-6 text-[var(--muted)]">
+      {footerLines.map((line) => (
         <p key={line}>{line}</p>
       ))}
     </footer>
@@ -704,7 +779,7 @@ footer as the last child of `<article>`, after `<PostBody blocks={post.body} />`
 </article>
 ```
 
-- [ ] **Step 4: Run the tests until they pass**
+- [x] **Step 4: Run the tests until they pass**
 
 ```bash
 pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx
@@ -712,7 +787,7 @@ pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 5: Take the screenshots from a scratch change that is never committed**
+- [x] **Step 5: Take the screenshots from a scratch change that is never committed**
 
 No post is published, so for the screenshots the scratch post below is published in the working
 tree only. In `apps/web/src/data/posts.ts`, replace `export const posts: readonly Post[] = [];`
@@ -755,7 +830,7 @@ git restore apps/web/src/data/posts.ts
 git status --short    # clean
 ```
 
-- [ ] **Step 6: Review the change and run the gates**
+- [x] **Step 6: Review the change and run the gates**
 
 Run `ui-reviewer` on `apps/web/src/app/blog/[slug]/page.tsx`, naming the file. Then run, one at a
 time:
@@ -770,7 +845,7 @@ pnpm build
 
 Expected: exit 0 from each.
 
-- [ ] **Step 7: Commit and open the pull request**
+- [x] **Step 7: Commit and open the pull request**
 
 ```bash
 git add 'apps/web/src/app/blog/[slug]/page.tsx' apps/web/src/app/blog/__tests__/post-page.test.tsx docs/plans/2026-10-06-blog-publishing-plan.md

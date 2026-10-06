@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { publishedPosts } from '@/data/posts';
+import { FOOTER_LINES, publishedPosts } from '@/data/posts';
 import { formatContentDate } from '@/lib/content-date';
 import { draftPost, everyBlockPost, hostileTitlePost } from '@/test/fixtures/posts';
 import PostPage, { dynamicParams, generateMetadata, generateStaticParams } from '../[slug]/page';
@@ -29,7 +29,13 @@ vi.mock('@/data/posts', async (importOriginal) => {
     metaTitle: 'Fixture: a shorter title',
   };
   const list = [...fixturePosts, withMetaTitle];
-  return { ...actual, posts: list, ...actual.buildPostIndex(list) };
+  // Two closing lines rather than the real one, so that the footer test can tell one paragraph per
+  // line from the lines joined into one; `posts.test.ts` pins the real lines.
+  const FOOTER_LINES: typeof actual.FOOTER_LINES = {
+    own: [],
+    jev: ['Fixture: the first closing line.', 'Fixture: the second closing line.'],
+  };
+  return { ...actual, FOOTER_LINES, posts: list, ...actual.buildPostIndex(list) };
 });
 
 // The card is a PNG drawn by `next/og`; what this file checks is what the handler asks it to draw.
@@ -137,6 +143,28 @@ describe('the post page', () => {
     const back = screen.getByRole('link', { name: 'Back to Writing' });
     expect(back).toHaveAttribute('href', '/blog');
     expect(article.contains(back)).toBe(false);
+  });
+
+  it('ends a jev post with its footer lines, last inside the article, in --muted text', async () => {
+    // The control: with one line, a footer that joined its lines into one paragraph would pass.
+    expect(FOOTER_LINES.jev.length).toBeGreaterThan(1);
+    render(await PostPage(paramsOf(hostileTitlePost.slug)));
+    const footer = document.querySelector('article')!.lastElementChild!;
+    expect(footer.tagName).toBe('FOOTER');
+    expect([...footer.children].map((line) => [line.tagName, line.textContent])).toEqual(
+      FOOTER_LINES.jev.map((line) => ['P', line]),
+    );
+    expect(footer.className).toContain('border-t');
+    expect(footer.className).toContain('text-[var(--muted)]');
+    // Neither an opacity step nor a text alpha, numeric (`/60`) or arbitrary (`/[0.6]`).
+    for (const element of [footer, ...footer.children]) {
+      expect(element.className).not.toMatch(/opacity-|text-\S+\/[\d[]/);
+    }
+  });
+
+  it('gives an own post no footer', async () => {
+    render(await PostPage(paramsOf(everyBlockPost.slug)));
+    expect(document.querySelector('article footer')).toBeNull();
   });
 
   it('puts no text under aria-hidden, which the axe gate would measure anyway', async () => {
