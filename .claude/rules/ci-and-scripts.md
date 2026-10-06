@@ -20,9 +20,11 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   (`pnpm check:build-output`, that `/mcp` is the build's one function), `vercel-ignore-build.mjs`
   (Vercel's ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log
   check), `post-draft-check.mjs` (the publish check for a blog post, run by hand when a post is
-  published, not in CI), `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22
-  runs directly),
-  `docs-drift-patch.mjs` (the docs drift workflow's check on what its agent changed),
+  published; CI runs only its tests. `web#test` hashes only files under `apps/web`, so after
+  editing the check run `pnpm --filter web exec vitest run src/lib/__tests__/post-draft.test.ts`,
+  or `pnpm test --force`: a plain local `pnpm test` replays a cached green, which CI, with no turbo
+  cache, never does), `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22 runs
+  directly), `docs-drift-patch.mjs` (the docs drift workflow's check on what its agent changed),
   `agent-resume.sh` (the briefing for agent checkpoints, under Working with this repo in Claude
   Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates),
   `flake-sweep.sh` (`pnpm test:e2e:sweep`, see `e2e-tests.md`), `verify-flake.sh` (runs one e2e spec N
@@ -57,7 +59,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `pnpm check:adrs`                                                        | Checks each ADR's status, H1 title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules; exit 1 on a disagreement, 2 if it could not run                         |
 | `pnpm check:build-output [<distDir>]`                                    | After `pnpm --filter web build`: every route, and each one in `REQUIRED_ROUTES`, is prerendered with its body file, none a function outside `ALLOWED_FUNCTIONS`; exit 1 on a finding, 2 if it could not run |
 | `pnpm check:docs-drift`                                                  | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                                         |
-| `node scripts/post-draft-check.mjs --kind own\|jev <draft.md> <twin.md>` | Compares an approved draft with the post's served twin: 0 equal, 1 differences, 2 could not run                                                                                                             |
+| `node scripts/post-draft-check.mjs --kind own\|jev <draft.md> <twin.md>` | Compares an approved draft with the post's served twin: 0 equal, 1 differences or refused syntax, 2 could not run                                                                                           |
 | `pnpm test:scripts`                                                      | `node:test` tests for the root `scripts/`                                                                                                                                                                   |
 | `scripts/flake-hunt.sh [runs]`                                           | Runs the whole e2e suite N times (30 by default) and ranks specs by failure rate in `flake-hunt/flake-report.json`                                                                                          |
 | `pnpm clean`                                                             | `turbo clean` in `apps/web`, then `rm -rf node_modules` at the root                                                                                                                                         |

@@ -41,9 +41,9 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   it every `/blog/<slug>` page served Next's recovery shell (ADR 0015) and every card answered 500.
 - The Markdown twins (#59): an `index.md/route.ts` in each static route's folder
   (`app/index.md/route.ts` for `/`), `work/[slug]/index.md/route.ts` for the case studies and
-  `blog/[slug]/index.md/route.ts` for the published posts (61e), each with its own
-  `generateStaticParams` and `dynamicParams = false`. Each is three lines that hand a record from
-  `pages` in `src/data/pages/index.ts`, a study or a post, to the serialiser below.
+  `blog/[slug]/index.md/route.ts` for the published posts (61e), the two dynamic ones each with its
+  own `generateStaticParams` and `dynamicParams = false`. Each is three lines that hand a record
+  from `pages` in `src/data/pages/index.ts`, a study or a post, to the serialiser below.
 - The case studies as JSON (#60), `application/json` and outside `/api/` on purpose:
   `case-studies.json/route.ts` serves every study as one array at `/case-studies.json`, and
   `work/[slug]/index.json/route.ts` one study at `/work/<slug>/index.json`, with its own
@@ -79,7 +79,10 @@ kind's `FOOTER_LINES` when it has any (`own` has none). `/blog`'s twin is writte
 draft must follow, and the publish check (`scripts/post-draft-check.mjs`) that compares the draft
 with the served twin, are in `docs/plans/2026-10-06-blog-publishing-design.md`. That document is the
 contract the writing room's publish mode reads (its D7, under ADR 0034). A change to how a post
-block is written there must keep `src/lib/__tests__/post-draft.test.ts` green.
+block is written there must keep `src/lib/__tests__/post-draft.test.ts` green. The check's `--kind`
+is the kind the writing room's tracker gives the article (the design's D2), never read back from
+`posts.ts`, with D4's naming check in `posts.test.ts` as the backstop for a Jev post marked `own`;
+the dates are not compared, because D9 sets them.
 
 A post table of three or more columns stacks each row below 640px and hides its column names from
 sight (`DataTable`, #226), so each value says what it is by its unit or a word ("1,234 tokens",
@@ -118,11 +121,11 @@ handlers and the feed above) or prerendered no path for one, or other slugs for
 `feed.xml/route.ts` and `lib/site-origin.ts` (for `lib/structured-data.ts` and `lib/serialise.ts`,
 which refuses a value that is not an http(s) origin) each read `NEXT_PUBLIC_SITE_URL`, falling back
 to `https://miloscvetkovic.dev`. There is no middleware.
-`src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
-page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own
-(#59). It writes the case-study JSON too, with `jsonResponse()` as the one place that sets its
-content type (#60). `lib/__tests__/serialise.test.ts` fails when a file under `src/app` writes
-`text/markdown`.
+`src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies, the
+page records typed in `src/data/pages/types.ts`, the posts and `/blog`'s list of them, and no route
+handler builds Markdown of its own (#59). It writes the case-study JSON too, with `jsonResponse()`
+as the one place that sets its content type (#60). `lib/__tests__/serialise.test.ts` fails when a
+file under `src/app` writes `text/markdown`.
 The security headers come from one static `headers()` entry in `apps/web/next.config.ts` whose
 source, `/:path*`, matches every path, `/_next/static` assets and the 404s included:
 `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a Content-Security-Policy, a

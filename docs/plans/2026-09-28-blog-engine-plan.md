@@ -144,13 +144,16 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
 - [x] **Step 1:** Serialiser tests: every block and inline kind of every fixture post appears in its
       Markdown, which opens with `# <title>`; the route exports `force-static`. A fixture code
       block and an inline code piece hold a run of backticks, and the fence and the code span are
-      longer than the run. They fail.
+      longer than the run. They fail. (The backtick runs are built in
+      `apps/web/src/lib/__tests__/serialise.test.ts`, in the test "fences code longer than its
+      longest backtick run…", not in the fixture posts.)
 - [x] **Step 2:** `postToMarkdown`, the twin route over `publishedPosts` (D10), and the `/blog` twin
       listing the published posts.
 - [x] **Step 3:** `blog.spec.ts` checks each twin and the post page's one Markdown alternate. This
-      task lands before the first published post. (Met by `e2e/markdown-twins.spec.ts` rather than
-      `blog.spec.ts`: `MARKDOWN_TWINS` now has an entry for each published post, so each post page
-      must advertise exactly one Markdown twin, served as Markdown.)
+      task lands before the first published post. (Met by `apps/web/e2e/markdown-twins.spec.ts`
+      rather than `blog.spec.ts`: `MARKDOWN_TWINS` has an entry for each published post, so once a
+      post is published the spec checks that its page advertises exactly one Markdown twin, served
+      as Markdown. While none is, it checks no post twin.)
 
 ### Task 6: Post JSON-LD (61f)
 

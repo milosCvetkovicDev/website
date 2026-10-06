@@ -4459,7 +4459,8 @@ git commit -m "feat(scripts): compare an approved blog draft with its served twi
 
 **Files:**
 
-- Create: `apps/web/src/test/fixtures/post-draft.md`, `apps/web/src/lib/__tests__/post-draft.test.ts`
+- Create: `apps/web/src/test/fixtures/post-draft.md`,
+  `apps/web/src/lib/__tests__/post-draft.test.ts`, `apps/web/.prettierignore`
 - Modify: `.prettierignore`, `.claude/rules/app-router-and-content.md`,
   `.claude/rules/ci-and-scripts.md`, `docs/plans/2026-09-28-blog-engine-plan.md` (61e's boxes),
   `docs/plans/README.md`, `docs/plans/2026-10-06-blog-publishing-plan.md` (this plan's boxes)
@@ -4472,11 +4473,22 @@ git commit -m "feat(scripts): compare an approved blog draft with its served twi
 
 The fixture deliberately uses the variant syntax that the check canonicalises: `*` markers, `1.` for
 every item, a `~~~` fence, a wrapped paragraph, a padded table and alignment colons. Prettier would
-rewrite all of it. Before creating the file, add this to `.prettierignore` under `# Generated`:
+rewrite all of it. Before creating the file, give it an entry in two ignore files, because Prettier
+reads `.prettierignore` only from the directory it runs in. Add this to the root `.prettierignore`,
+which the repository-wide format check reads, under `# Generated`:
 
 ```
 # Written in variant Markdown on purpose: the publish check's round-trip test reads it as it is.
 apps/web/src/test/fixtures/post-draft.md
+```
+
+Then create `apps/web/.prettierignore`. On commit, lint-staged runs `apps/web`'s tasks from
+`apps/web`, so its `prettier --write` does not see the root file:
+
+```
+# lint-staged runs Prettier from this directory, where the root .prettierignore does not apply.
+# Written in variant Markdown on purpose: the publish check's round-trip test reads it as it is.
+src/test/fixtures/post-draft.md
 ```
 
 - [x] **Step 2: Write the fixture draft**
@@ -4532,7 +4544,9 @@ grep -c '^\* \|^~~~\|^1\. ' apps/web/src/test/fixtures/post-draft.md
 ```
 
 Expected: `7` (three `*` bullets, two `~~~` lines and two `1.` items). A lower count means Prettier
-rewrote the file: check the `.prettierignore` entry from Step 1, then write the file again.
+rewrote the file: check both entries from Step 1, in `.prettierignore` and in
+`apps/web/.prettierignore` (the commit hook's Prettier reads only the second), then write the file
+again.
 
 - [x] **Step 3: Write the round-trip test**
 
@@ -4543,9 +4557,13 @@ Create `apps/web/src/lib/__tests__/post-draft.test.ts`:
  * @vitest-environment node
  *
  * The publish check against the serialiser it reads (ADR 0034). The fixture draft is the approved
- * draft the every-block fixture would come from, written in the variant Markdown a draft may use. A
- * change to how `postToMarkdown` escapes or lays out a block fails here, in CI, rather than at the
- * next publish.
+ * draft the every-block fixture would come from, written in the variant Markdown a draft may use.
+ * The check removes backslash escapes and the layout it canonicalises (bullet markers, fence
+ * lengths) from both sides, so what fails here, in CI rather than at the next publish, is a change
+ * to the block structure `postToMarkdown` writes (a block's kind, order or bounds, such as a lost
+ * blank line that lets a quote swallow the next line), to its footer, or to an escape whose loss
+ * changes what a Markdown reader sees in the fixture, such as `\|` in a table cell. The
+ * serialiser's escapes are pinned byte for byte in `serialise.test.ts`.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -4597,24 +4615,36 @@ the fixture to match a serialiser bug.
 
 In `.claude/rules/app-router-and-content.md`, in the bullet on the Markdown twins (#59), change
 ``and `work/[slug]/index.md/route.ts` for the case studies`` to
-`` `work/[slug]/index.md/route.ts` for the case studies and `blog/[slug]/index.md/route.ts` for the published posts (61e) ``.
-Add this paragraph after that bullet list:
+`` `work/[slug]/index.md/route.ts` for the case studies and `blog/[slug]/index.md/route.ts` for the published posts (61e) ``,
+and the `with its own` after it to `the two dynamic ones each with its own`, since the static twins
+export neither. Add these paragraphs after that bullet list:
 
 ```markdown
 A post's twin is written by `postToMarkdown()`: the opening, the dates, the body, then `---` and the
-kind's `FOOTER_LINES`. `/blog`'s twin is written by `blogToMarkdown()`, which lists the published
-posts once there are any. The post format an approved draft must follow, and the publish check
-(`scripts/post-draft-check.mjs`) that compares the draft with the served twin, are in
-`docs/plans/2026-10-06-blog-publishing-design.md`. That document is the contract the writing room's
-publish mode reads (ADR 0034). A change to how a post block is written there must keep
-`src/lib/__tests__/post-draft.test.ts` green.
+kind's `FOOTER_LINES` when it has any (`own` has none). `/blog`'s twin is written by
+`blogToMarkdown()`, which lists the published posts once there are any. The post format an approved
+draft must follow, and the publish check (`scripts/post-draft-check.mjs`) that compares the draft
+with the served twin, are in `docs/plans/2026-10-06-blog-publishing-design.md`. That document is the
+contract the writing room's publish mode reads (its D7, under ADR 0034). A change to how a post
+block is written there must keep `src/lib/__tests__/post-draft.test.ts` green. The check's `--kind`
+is the kind the writing room's tracker gives the article (the design's D2), never read back from
+`posts.ts`, with D4's naming check in `posts.test.ts` as the backstop for a Jev post marked `own`;
+the dates are not compared, because D9 sets them.
+
+A post table of three or more columns stacks each row below 640px and hides its column names from
+sight (`DataTable`, #226), so each value says what it is by its unit or a word ("1,234 tokens",
+"420 ms"), or the table keeps to two columns, which never stack. `posts.test.ts` refuses a blank
+cell there, but only whoever approves the draft can check the rest (`TableBlock` in
+`src/data/posts.ts`).
 ```
 
 In `.claude/rules/ci-and-scripts.md`, in the list of `scripts/` sources, add after
 `` `check-webserver-log.mjs` (the `e2e` job's server-log check), ``:
-`` `post-draft-check.mjs` (the publish check for a blog post, run by hand when a post is published, not in CI), ``.
+`` `post-draft-check.mjs` (the publish check for a blog post, run by hand when a post is published; CI runs only its tests. ``,
+then a note that `web#test` hashes only files under `apps/web`, so a local test run after editing
+the check must bypass turbo's cache (the rule names the commands), and close the parenthesis.
 Add a row to its command table, in the shape of its neighbours:
-`` `node scripts/post-draft-check.mjs --kind own\|jev <draft.md> <twin.md>` `` | `Compares an approved draft with the post's served twin: 0 equal, 1 differences, 2 could not run`.
+`` `node scripts/post-draft-check.mjs --kind own\|jev <draft.md> <twin.md>` `` | `Compares an approved draft with the post's served twin: 0 equal, 1 differences or refused syntax, 2 could not run`.
 
 - [x] **Step 6: Tick the boxes and update the index**
 

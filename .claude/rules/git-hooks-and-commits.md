@@ -17,7 +17,12 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   `pnpm exec commitlint --edit "$1"`. Both source `~/.nvm/nvm.sh` if pnpm is missing and abort with a
   message if it is still not on PATH.
 - lint-staged has a config per package. The root one only runs `prettier --write`; `apps/web` runs
-  `eslint --fix --max-warnings 0` then `prettier --write` on TS/JS files.
+  `eslint --fix --max-warnings 0` then `prettier --write` on TS/JS files, and `prettier --write`
+  alone on its JSON, Markdown, CSS and YAML. lint-staged runs each config's tasks from that config's
+  directory, and Prettier reads `.prettierignore` from the directory it runs in, so the root file
+  does not apply under `apps/web`: a file there that must skip Prettier needs an entry in
+  `apps/web/.prettierignore` as well as in the root `.prettierignore`, which `pnpm format:check`
+  reads.
 - Commit messages are checked in CI as well as on commit, because the squash commit GitHub writes to
   `main` never passes through the local hook. `.github/workflows/commitlint.yml`, job
   `Commit messages`, lints three things. The pull request title, twice: as written and with the

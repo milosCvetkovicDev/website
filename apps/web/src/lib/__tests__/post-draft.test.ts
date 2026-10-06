@@ -2,9 +2,13 @@
  * @vitest-environment node
  *
  * The publish check against the serialiser it reads (ADR 0034). The fixture draft is the approved
- * draft the every-block fixture would come from, written in the variant Markdown a draft may use. A
- * change to how `postToMarkdown` escapes or lays out a block fails here, in CI, rather than at the
- * next publish.
+ * draft the every-block fixture would come from, written in the variant Markdown a draft may use.
+ * The check removes backslash escapes and the layout it canonicalises (bullet markers, fence
+ * lengths) from both sides, so what fails here, in CI rather than at the next publish, is a change
+ * to the block structure `postToMarkdown` writes (a block's kind, order or bounds, such as a lost
+ * blank line that lets a quote swallow the next line), to its footer, or to an escape whose loss
+ * changes what a Markdown reader sees in the fixture, such as `\|` in a table cell. The
+ * serialiser's escapes are pinned byte for byte in `serialise.test.ts`.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

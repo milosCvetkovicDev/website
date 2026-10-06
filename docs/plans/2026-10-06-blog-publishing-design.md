@@ -73,19 +73,19 @@ This is what an approved `draft.md` may hold, and where each part goes.
 ### Front matter
 
 Flat `key: value` lines between two lines of exactly `---`; `tags` is a list in brackets, `[a, b]`.
-A value may be double-quoted, with `\"` and `\\` its only escapes; an unquoted value holds no ` #`,
-which YAML reads as the start of a comment. No comment lines, block lists (`tags:` then `  - a`),
-or folded or literal values (`>`, `>-`, `|`).
+A value may be double-quoted, with `\"` and `\\` its only escapes, or single-quoted, with `''` for a
+quote; an unquoted value holds no ` #`, which YAML reads as the start of a comment. No comment
+lines, block lists (`tags:` then `  - a`), or folded or literal values (`>`, `>-`, `|`).
 
-| `draft.md`    | `posts.ts`  | Rule                                                                                                                                                   |
-| ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `title`       | `title`     | The page's `h1`.                                                                                                                                       |
-| `metaTitle`   | `metaTitle` | Required when `title` plus ` \| Milos Cvetkovic` would pass 60 characters. The writer leaves it out otherwise; nothing in this repository checks that. |
-| `slug`        | `slug`      | Lowercase words joined by hyphens. Never changes once published. The check compares it with the last path segment of the twin's `Source:` URL.         |
-| `description` | `summary`   | 50 to 300 characters.                                                                                                                                  |
-| `tags`        | `tags`      | Optional; none blank, none repeated. The twin does not carry them, so the publish pull request quotes them beside the entry's.                         |
-| `date`        | (none)      | Not used: the dates follow D9.                                                                                                                         |
-| (tracker)     | `kind`      | Read from the writing room's tracker, not from the front matter (D2).                                                                                  |
+| `draft.md`    | `posts.ts`  | Rule                                                                                                                                                                 |
+| ------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | `title`     | The page's `h1`.                                                                                                                                                     |
+| `metaTitle`   | `metaTitle` | Required when `title` plus ` \| Milos Cvetkovic` would pass 60 characters. The writer leaves it out otherwise; nothing in this repository checks that.               |
+| `slug`        | `slug`      | Lowercase words joined by hyphens. Never changes once published. The check compares it with the slug in the twin's `Source:` URL, whose path must be `/blog/<slug>`. |
+| `description` | `summary`   | 50 to 300 characters.                                                                                                                                                |
+| `tags`        | `tags`      | Optional; none blank, none repeated. The twin does not carry them, so the publish pull request quotes them beside the entry's.                                       |
+| `date`        | (none)      | Not used: the dates follow D9.                                                                                                                                       |
+| (tracker)     | `kind`      | Read from the writing room's tracker, not from the front matter (D2).                                                                                                |
 
 The owner approves the front matter with the article. The check compares the slug, the title and
 the summary as well as the body. `metaTitle` and `tags`, which the twin does not carry, are copied
@@ -129,7 +129,10 @@ publish check's review in Task 8 widened this list from a line indented with a t
 outside a code fence, and added email addresses, link titles and spaced destinations, task list
 items, a list that changes its bullet or delimiter, a blank line between two items of one kind,
 and a line that only looks blank; and the front matter's forms above were spelled out to match
-what the check reads.
+what the check reads. P4's review then added single-quoted values to those forms, held the twin's
+`Source:` path to exactly `/blog/<slug>` where the check compares the slug (an earlier text took
+the URL's last path segment), and made exit 1 cover refused syntax as well as differences, as the
+publish check below now says.
 
 ## The publish check
 
@@ -141,8 +144,9 @@ serialised as `\*\*bold\*\*`, which canonicalises to the draft's own `**bold**`,
 entry holds the text `## Results` is served as `> \## Results`, which canonicalises to the draft's
 `> ## Results`, a heading inside a quote. It then compares:
 
-1. the draft's `slug` with the last path segment of the twin's `Source:` URL, its `title` with the
-   twin's `#` line, and its `description` with the twin's summary;
+1. the draft's `slug` with the `<slug>` of the twin's `Source:` URL, whose path must be exactly
+   `/blog/<slug>` (any other path exits 2), its `title` with the twin's `#` line, and its
+   `description` with the twin's summary;
 2. the draft's body with the twin's body, which runs from after the opening and the dates to the
    footer rule;
 3. the twin's footer with the kind passed on the command line (`--kind own|jev`).
@@ -167,9 +171,9 @@ above, which is why the check refuses it in the draft. Anything else that differ
 a changed word or number, a dropped or added block, a moved link, a slug that is not the page's.
 
 Exit codes follow the repository's checks: 0 when the two agree, quietly; 1 with a line diff of
-each difference, and for nothing else; 2 when the check could not run, whatever stopped it: a
-missing or unreadable file, no front matter, an opening it cannot find, or an error in the check
-itself.
+each difference and the refused syntax it finds, by line, and for nothing else; 2 when the check
+could not run, whatever stopped it: a missing or unreadable file, no front matter, an opening it
+cannot find, a `Source:` path other than `/blog/<slug>`, or an error in the check itself.
 
 At publish time the twin is the served file: `pnpm --filter web build`, then `next start` on a free
 port, then the twin at `/blog/<slug>/index.md`. The check runs against what will deploy.
