@@ -122,6 +122,33 @@ describe('the publish check', () => {
     assert.deepEqual(differences(draft(), twin({ kind: 'jev' }), 'jev'), []);
   });
 
+  /** @type {[string, string, string][]} */
+  const quoted = [
+    ['a quoted title holding " #"', 'title: "Week 1 #notes"', 'Week 1 #notes'],
+    ['an unquoted title holding # inside a word', 'title: Tokens in C# code', 'Tokens in C# code'],
+    [
+      'a title with \\" and \\\\ escapes',
+      'title: "A \\"quoted\\" C:\\\\temp"',
+      'A "quoted" C:\\temp',
+    ],
+    ['a list written [a, b]', 'tags: [tokens, cost]', TITLE],
+  ];
+  for (const [name, line, title] of quoted) {
+    it(`finds nothing for front matter with ${name}`, () => {
+      const front = line.startsWith('tags:')
+        ? replace(FRONT, 4, FRONT[4], line)
+        : replace(FRONT, 1, line);
+      assert.deepEqual(differences(draft(BODY, front), twin({ title }), 'own'), []);
+    });
+  }
+
+  it('finds nothing in a twin served on another origin, as a preview serves it', () => {
+    assert.deepEqual(
+      differences(draft(), twin().replaceAll(ORIGIN, 'http://localhost:3211'), 'own'),
+      [],
+    );
+  });
+
   describe('compares as equal what the serialiser changes on purpose', () => {
     /** @type {[string, string, string][]} */
     const cases = [
@@ -177,12 +204,16 @@ describe('the publish check', () => {
         draft(replace(replace(BODY, 13, '````yaml'), 17, '````')),
         twin(),
       ],
-      ['CRLF line endings and a byte-order mark', `﻿${draft().replace(/\n/g, '\r\n')}`, twin()],
+      [
+        'CRLF line endings and a byte-order mark',
+        `\uFEFF${draft().replace(/\n/g, '\r\n')}`,
+        twin(),
+      ],
       ["an absolute link on the twin's origin", draft(replace(BODY, 0, SERVED[0])), twin()],
       [
         'a no-break space on both sides',
-        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234 tokens'))),
-        twin({ body: replace(SERVED, 0, SERVED[0].replace('1,234 tokens', '1,234 tokens')) }),
+        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234\u00A0tokens'))),
+        twin({ body: replace(SERVED, 0, SERVED[0].replace('1,234 tokens', '1,234\u00A0tokens')) }),
       ],
       [
         'a single-quoted title with a doubled quote, as Prettier writes YAML',
@@ -243,10 +274,10 @@ describe('the publish check', () => {
       ],
       [
         'a no-break space in the draft where the twin has a plain space',
-        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234 tokens'))),
+        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234\u00A0tokens'))),
         twin(),
         'own',
-        /^- A paragraph .* 1,234 tokens\.$/m,
+        /^- A paragraph .* 1,234\u00A0tokens\.$/m,
       ],
       [
         'a no-break space in the body, pointed at under its line',
@@ -306,6 +337,20 @@ describe('the publish check', () => {
         twin({ kind: 'jev' }),
         'own',
         /^the footer is \["I have/m,
+      ],
+      [
+        'an own twin that ends with a --- rule and nothing after it',
+        draft(),
+        `${twin()}\n---\n`,
+        'own',
+        /^the footer is a --- rule with nothing after it, but a post of kind own has no footer$/m,
+      ],
+      [
+        'a jev twin that ends with a --- rule and nothing after it',
+        draft(),
+        `${twin()}\n---\n`,
+        'jev',
+        /^the footer is a --- rule with nothing after it, but a post of kind jev ends with \["I/m,
       ],
     ];
     for (const [name, approved, served, kind, pattern] of cases) {
@@ -548,6 +593,45 @@ describe('the publish check', () => {
       assert.deepEqual(differences(draft([...BODY, '', ...lines]), served, 'own'), []);
     });
 
+    /** @type {[string[], string[], number][]} */
+    const loose = [
+      [['1. First', '', '2. Second'], ['1. First', '2. Second'], 31],
+      [['- a', '', '- b'], ['- a', '- b'], 31],
+      [['- a', '', '* b'], ['- a', '- b'], 31],
+      [['1. a', '', '2) b'], ['1. a', '2. b'], 31],
+      [['- a', '', '', '- b'], ['- a', '- b'], 32],
+      [['- a', 'continued', '', '- b'], ['- a continued', '- b'], 32],
+    ];
+    for (const [approved, served, line] of loose) {
+      it(`reports a blank line between list items: ${JSON.stringify(approved)}`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', ...approved]),
+          'twin.md': twin({ body: [...SERVED, '', ...served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(
+          output,
+          new RegExp(
+            `^line ${line}: a blank line between list items makes one loose list in Markdown, ` +
+              'or two lists when the marker changes, and a post holds neither; ' +
+              'remove the blank line$',
+            'm',
+          ),
+        );
+      });
+    }
+
+    for (const lines of [
+      ['- a', '', '1. b'],
+      ['1. a', '', '- b'],
+    ]) {
+      it(`accepts lists of two kinds with a blank line between them: ${lines.join(' / ')}`, () => {
+        const served = twin({ body: [...SERVED, '', ...lines] });
+        assert.deepEqual(differences(draft([...BODY, '', ...lines]), served, 'own'), []);
+      });
+    }
+
     it('reports a whole-line --- rule once, as a rule, not as a list item holding one', () => {
       const problems = differences(draft([...BODY, '', '- ---']), twin(), 'own');
       assert.deepEqual(
@@ -670,6 +754,59 @@ describe('the publish check', () => {
       });
     }
 
+    /** @type {[string, string[]][]} */
+    const notBreaks = [
+      ['trailing spaces before a blank line', ['The end of a paragraph.  ', '', 'The next one.']],
+      ['trailing spaces before the next item', ['- An item  ', '- The next item']],
+      ['trailing spaces before the next numbered item', ['1. An item  ', '2. The next item']],
+      [
+        'trailing spaces before the next row',
+        ['| Day | Tokens |  ', '| --- | --- |  ', '| Monday | 1,234 |'],
+      ],
+      [
+        'trailing spaces after a caption',
+        ['Table: Tokens  ', '| Day | Tokens |', '| --- | --- |', '| Monday | 1,234 |'],
+      ],
+      ['an escaped backslash', ['A folder named C:\\\\', 'and more text.']],
+      ['two escaped backslashes', ['A share named \\\\\\\\', 'and more text.']],
+    ];
+    for (const [name, lines] of notBreaks) {
+      it(`accepts ${name}, which makes no hard line break`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.deepEqual(
+          problems.filter((problem) => problem.includes('hard line break')),
+          [],
+        );
+      });
+    }
+
+    /** @type {[string, string[]][]} */
+    const breaks = [
+      ['a trailing backslash', ['A line that breaks\\', 'here.']],
+      ['three trailing backslashes', ['A folder named C:\\\\\\', 'here.']],
+      ['trailing spaces in a list item', ['- An item that breaks  ', '  here.']],
+      ['trailing spaces before a lazy line of an item', ['- An item that breaks  ', 'here.']],
+      ['trailing spaces in a quote', ['> A quote that breaks  ', '> here.']],
+    ];
+    for (const [name, lines] of breaks) {
+      it(`reports a hard line break: ${name}`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.ok(problems.includes('line 29: a hard line break'), problems.join('\n'));
+      });
+    }
+
+    it('reports a code fence that is never closed by the line it opened on', () => {
+      const problems = differences(
+        draft([...BODY, '', 'One.', '', '~~~~ts', 'const a = 1;']),
+        twin(),
+        'own',
+      );
+      assert.ok(
+        problems.includes('line 31: the code fence opened with ~~~~ is never closed'),
+        problems.join('\n'),
+      );
+    });
+
     it('accepts the same characters escaped, inside code, or inside a word', () => {
       const approved = draft([
         ...BODY,
@@ -769,6 +906,28 @@ describe('the publish check', () => {
       assert.match(output, /^line 30: a tab on a blank line; /m);
     });
 
+    /** @type {[string, string, string][]} */
+    const unicodeBlanks = [
+      ['a no-break space', '\u00A0', 'U+00A0'],
+      ['an ideographic space between spaces', ' \u3000 ', 'U+3000'],
+      ['a no-break space and a form feed', '\u00A0\f\u00A0', 'U+00A0 and U+000C'],
+    ];
+    for (const [name, blank, named] of unicodeBlanks) {
+      it(`reports a line that only looks blank: ${name}`, () => {
+        const approved = draft([...BODY, '', 'One.', blank, 'Two.']);
+        const served = twin({ body: [...SERVED, '', 'One.', '', 'Two.'] });
+        assert.deepEqual(differences(approved, served, 'own'), [
+          `line 30: a line of ${named} looks blank but is text to Markdown; leave it empty`,
+        ]);
+      });
+    }
+
+    it('accepts a line of no-break spaces inside a code fence', () => {
+      const code = ['```text', 'One.', '\u00A0\u00A0', 'Two.', '```'];
+      const served = twin({ body: [...SERVED, '', ...code] });
+      assert.deepEqual(differences(draft([...BODY, '', ...code]), served, 'own'), []);
+    });
+
     it('accepts a blank line that holds a tab inside a code fence', () => {
       const code = ['```make', 'all:', '\t', '\tnode build.mjs', '```'];
       const served = twin({ body: [...SERVED, '', ...code] });
@@ -791,6 +950,13 @@ describe('lineDiff()', () => {
     );
   });
 
+  it('points at format characters, which print as nothing, and names them', () => {
+    assert.equal(
+      lineDiff(['co\u00ADop\u200Bx\u2060y'], ['coopxy']),
+      ['- co\u00ADop\u200Bx\u2060y', '?   ^  ^ ^ U+00AD, U+200B, U+2060', '+ coopxy'].join('\n'),
+    );
+  });
+
   it('keeps a tab in its guide line, so the mark stays under its character', () => {
     assert.equal(
       lineDiff(['\tx\u2009y\u00A0z'], ['\tx y z']),
@@ -801,6 +967,16 @@ describe('lineDiff()', () => {
 
 describe('check()', () => {
   const files = { 'draft.md': draft(), 'twin.md': twin({ kind: 'jev' }) };
+  /**
+   * The files with the front matter's line at `index` replaced by `lines`.
+   * @param {number} index @param {...string} lines
+   */
+  const withFront = (index, ...lines) => ({
+    ...files,
+    'draft.md': draft(BODY, replace(FRONT, index, ...lines)),
+  });
+  const TAKES = 'the front matter takes key: value lines, and lists written \\[a, b\\]';
+  const ARGV = ['--kind', 'own', 'draft.md', 'twin.md'];
 
   it('exits 0 quietly when the two agree', () => {
     assert.deepEqual(check(['--kind', 'jev', 'draft.md', 'twin.md'], reader(files)), {
@@ -837,13 +1013,149 @@ describe('check()', () => {
           FRONT.filter((line) => !line.startsWith('description:')),
         ),
       },
-      /needs a title, a slug and a description/,
+      /^post-draft-check: the front matter's description is missing or blank$/m,
     ],
     [
       'a twin that does not open with its title',
       ['--kind', 'own', 'draft.md', 'twin.md'],
       { ...files, 'twin.md': md(SERVED) },
       /does not open with a # title/,
+    ],
+    [
+      'a Source URL on another path than /blog/<slug>',
+      ['--kind', 'own', 'draft.md', 'twin.md'],
+      { ...files, 'twin.md': twin().replace(`${ORIGIN}/blog/`, `${ORIGIN}/work/`) },
+      new RegExp(
+        "^post-draft-check: the twin's Source URL is not /blog/<slug>: " +
+          `${ORIGIN.replaceAll('.', '\\.')}/work/where-the-tokens-go$`,
+        'm',
+      ),
+    ],
+    [
+      'a Source URL one folder deeper than /blog/<slug>',
+      ['--kind', 'own', 'draft.md', 'twin.md'],
+      { ...files, 'twin.md': twin().replace(`${ORIGIN}/blog/`, `${ORIGIN}/blog/2026/`) },
+      /^post-draft-check: the twin's Source URL is not \/blog\/<slug>: \S+\/blog\/2026\/\S+$/m,
+    ],
+    [
+      'an opening fence with a space after it',
+      ARGV,
+      withFront(0, '--- '),
+      /^post-draft-check: line 1: a front matter fence is "--- "; write exactly ---$/m,
+    ],
+    [
+      'an opening fence with a space after it and no closing fence',
+      ARGV,
+      { ...files, 'draft.md': md(['--- ', FRONT[1], '', 'One paragraph.']) },
+      /^post-draft-check: line 1: a front matter fence is "--- "; write exactly ---$/m,
+    ],
+    [
+      'a closing fence of four dashes',
+      ARGV,
+      withFront(5, '----'),
+      /^post-draft-check: line 6: a front matter fence is "----"; write exactly ---$/m,
+    ],
+    [
+      'a YAML block list',
+      ARGV,
+      withFront(4, 'date: 2026-10-06', 'tags:', '  - tokens'),
+      new RegExp(`^post-draft-check: line 7: a YAML block list item; ${TAKES}$`, 'm'),
+    ],
+    ...['>', '>-', '|'].map(
+      (indicator) =>
+        /** @type {[string, string[], Record<string, string>, RegExp]} */ ([
+          `a folded or literal value written ${indicator}`,
+          ARGV,
+          withFront(3, `description: ${indicator}`, `  ${SUMMARY}`),
+          new RegExp(
+            `^post-draft-check: line 4: a folded or literal value \\(\\${indicator}\\); ${TAKES}$`,
+            'm',
+          ),
+        ]),
+    ),
+    [
+      'a comment line',
+      ARGV,
+      withFront(4, '# the dates follow D9', 'date: 2026-10-06'),
+      new RegExp(`^post-draft-check: line 5: a comment; ${TAKES}$`, 'm'),
+    ],
+    [
+      'an unquoted value holding " #", which YAML reads as a comment',
+      ARGV,
+      withFront(3, `description: ${SUMMARY} #draft`),
+      new RegExp(
+        '^post-draft-check: line 4: " #" starts a YAML comment in an unquoted value; ' +
+          'quote it or drop the comment$',
+        'm',
+      ),
+    ],
+    [
+      'an unquoted value that opens with #',
+      ARGV,
+      withFront(1, 'title: #1 where the tokens go'),
+      /^post-draft-check: line 2: " #" starts a YAML comment in an unquoted value; /m,
+    ],
+    ...[
+      ['\\t', 'title: "Where the tokens go:\\tone week"'],
+      ['\\u', 'title: "Where the tokens go: caf\\u00e9"'],
+      ['\\/', 'title: "Where the tokens go: in\\/out"'],
+    ].map(
+      ([escape, line]) =>
+        /** @type {[string, string[], Record<string, string>, RegExp]} */ ([
+          `the escape ${escape} in a double-quoted value`,
+          ARGV,
+          withFront(1, line),
+          new RegExp(
+            `^post-draft-check: line 2: the escape \\${escape} in a double-quoted value; ` +
+              'write the character itself, as only \\\\" and \\\\\\\\ are read$',
+            'm',
+          ),
+        ]),
+    ),
+    [
+      'a key given twice',
+      ARGV,
+      withFront(4, 'date: 2026-10-06', 'title: "Another title"'),
+      /^post-draft-check: line 6: the key title appears twice in the front matter$/m,
+    ],
+    [
+      'a draft with no body',
+      ARGV,
+      { ...files, 'draft.md': draft([]) },
+      /^post-draft-check: the draft has no body after its front matter$/m,
+    ],
+    [
+      'a twin with no body',
+      ARGV,
+      { ...files, 'twin.md': twin({ body: [] }) },
+      /^post-draft-check: the twin has no body after its Published and Updated lines$/m,
+    ],
+    [
+      'a jev twin with a footer and no body',
+      ['--kind', 'jev', 'draft.md', 'twin.md'],
+      { ...files, 'twin.md': twin({ body: [], kind: 'jev' }) },
+      /^post-draft-check: the twin has no body after its Published and Updated lines$/m,
+    ],
+    [
+      'front matter without a title',
+      ARGV,
+      withFront(1),
+      /^post-draft-check: the front matter's title is missing or blank$/m,
+    ],
+    [
+      'a slug of spaces',
+      ARGV,
+      withFront(2, 'slug: "   "'),
+      /^post-draft-check: the front matter's slug is missing or blank$/m,
+    ],
+    [
+      'an empty description and no title',
+      ARGV,
+      {
+        ...files,
+        'draft.md': draft(BODY, [FRONT[0], FRONT[2], 'description:', ...FRONT.slice(4)]),
+      },
+      /^post-draft-check: the front matter's title and description are missing or blank$/m,
     ],
   ];
   for (const [name, argv, given, pattern] of cannotRun) {
@@ -867,7 +1179,79 @@ describe('check()', () => {
   });
 });
 
+describe('check() on a file it cannot read, or a fault in itself', () => {
+  it('names the path of a directory given as the draft, in one line', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'post-draft-check-'));
+    try {
+      writeFileSync(join(dir, 'twin.md'), twin());
+      const { status, output } = check(['--kind', 'own', dir, join(dir, 'twin.md')]);
+      assert.equal(status, 2);
+      assert.match(output, /^post-draft-check: EISDIR: /);
+      assert.ok(output.endsWith(` '${dir}'\n`), output);
+      assert.equal(output.split('\n').length, 2, output);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('names the path of a missing twin once, as Node already does', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'post-draft-check-'));
+    try {
+      writeFileSync(join(dir, 'draft.md'), draft());
+      const gone = join(dir, 'gone.md');
+      const { status, output } = check(['--kind', 'own', join(dir, 'draft.md'), gone]);
+      assert.equal(status, 2);
+      assert.match(output, /^post-draft-check: ENOENT: /);
+      assert.equal(output.split(gone).length, 2, output);
+      assert.equal(output.split('\n').length, 2, output);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('exits 2 with the message and the stack of an error the check did not expect', () => {
+    const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], () => {
+      throw new TypeError('a fault in the check');
+    });
+    assert.equal(status, 2);
+    assert.match(
+      output,
+      /^post-draft-check: a fault in the check\nTypeError: a fault in the check\n +at /,
+    );
+  });
+
+  it('keeps the message of a check that could not run to one line, without a stack', () => {
+    const files = { 'draft.md': md(BODY), 'twin.md': twin() };
+    assert.deepEqual(check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files)), {
+      status: 2,
+      output: 'post-draft-check: the draft does not open with front matter between two --- lines\n',
+    });
+  });
+});
+
 describe('the command', () => {
+  it('exits 2, not 1, with a stack when realpathSync throws as the script loads', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'post-draft-check-'));
+    try {
+      const script = new URL('./post-draft-check.mjs', import.meta.url).href;
+      // With -e, process.argv[1] is the first argument: a path that does not exist.
+      const { status, stderr } = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `await import(${JSON.stringify(script)});`,
+          join(dir, 'gone.md'),
+        ],
+        { encoding: 'utf8' },
+      );
+      assert.equal(status, 2, stderr);
+      assert.match(stderr, /^post-draft-check: ENOENT: [^\n]*\nError: ENOENT: [^\n]*\n +at /);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("exits with check()'s status when run with node", () => {
     const dir = mkdtempSync(join(tmpdir(), 'post-draft-check-'));
     try {

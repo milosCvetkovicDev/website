@@ -39,7 +39,9 @@
  *   the twin, and a Markdown draft, would read either pair as one list. Titles, the summary,
  *   headings, tags, and a table's caption, column names and row headers have no spaces at either
  *   end or two in a row; no text outside a code block holds a line break, a control or a direction
- *   character; a link's text says where it goes; and a link to this site names a page that exists.
+ *   character; inline code holds more than whitespace, and no two pieces of it stand side by side,
+ *   which the twin would write as one; a link's text says where it goes; and a link to this site
+ *   names a page that exists.
  */
 
 /**

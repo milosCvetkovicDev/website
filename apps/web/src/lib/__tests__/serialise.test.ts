@@ -997,6 +997,26 @@ describe('postToMarkdown()', () => {
     );
   });
 
+  it('escapes a ! that ends text before a link, which would make the link an image', () => {
+    expect(
+      postBodyToMarkdown(
+        [
+          {
+            kind: 'paragraph',
+            content: [
+              'Look!',
+              { text: 'the work page', href: '/work' },
+              ' Run!',
+              { code: 'x' },
+              '!',
+            ],
+          },
+        ],
+        'fixture',
+      ),
+    ).toBe(`Look\\![the work page](${ORIGIN}/work) Run!\`x\`!`);
+  });
+
   it('refuses a table the page could not draw, as it refuses a page table', () => {
     expect(() =>
       postBodyToMarkdown(

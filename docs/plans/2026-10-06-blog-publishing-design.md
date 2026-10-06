@@ -72,8 +72,10 @@ This is what an approved `draft.md` may hold, and where each part goes.
 
 ### Front matter
 
-Flat `key: value` lines between two `---` lines; a value may be double-quoted; `tags` is a list in
-brackets, `[a, b]`.
+Flat `key: value` lines between two lines of exactly `---`; `tags` is a list in brackets, `[a, b]`.
+A value may be double-quoted, with `\"` and `\\` its only escapes; an unquoted value holds no ` #`,
+which YAML reads as the start of a comment. No comment lines, block lists (`tags:` then `  - a`),
+or folded or literal values (`>`, `>-`, `|`).
 
 | `draft.md`    | `posts.ts`  | Rule                                                                                                                                                   |
 | ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -116,14 +118,18 @@ headings, code or links in a heading, a table caption or a table cell, code or a
 text, a link with a title or spaces around its destination, nested lists, a task list item such as
 `- [ ]`, a heading, list, quote, table, code block or rule inside a list item or quote (such as
 `> ## Results`), an ordered list that does not start at 1, a list that changes its bullet or its
-`.` or `)` between items, a list item or quote of more than one paragraph, hard line breaks,
-reference-style links, autolinks (`<…@…>` included), bare `http://`, `https://` or `www.`
+`.` or `)` between items, a blank line between two items of one kind (one loose list in Markdown,
+or two lists when the marker changes), a list item or quote of more than one paragraph, hard line
+breaks, reference-style links, autolinks (`<…@…>` included), bare `http://`, `https://` or `www.`
 addresses and bare email addresses, a tab anywhere outside a code fence (the front matter
-included), a block that does not start after a blank line, and a `---` rule inside the body. The
-disclosure line is not written in `draft.md`: the site adds it (D3). Corrected 2026-10-06: the
+included), a line that looks blank but holds a space other than a space or a tab (such as a
+no-break space), a block that does not start after a blank line, and a `---` rule inside the body.
+The disclosure line is not written in `draft.md`: the site adds it (D3). Corrected 2026-10-06: the
 publish check's review in Task 8 widened this list from a line indented with a tab to any tab
 outside a code fence, and added email addresses, link titles and spaced destinations, task list
-items, and a list that changes its bullet or delimiter.
+items, a list that changes its bullet or delimiter, a blank line between two items of one kind,
+and a line that only looks blank; and the front matter's forms above were spelled out to match
+what the check reads.
 
 ## The publish check
 

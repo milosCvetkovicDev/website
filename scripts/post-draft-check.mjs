@@ -11,8 +11,12 @@
 // Then it compares the slug, the title, the summary, the body and the footer, after undoing on both
 // sides only what the serialiser does on purpose. The canonical form keeps every block's kind, and
 // keeps text apart from code spans and links, so a block kind changed or a link or code span the
-// entry flattened into plain text is a difference. Exit 0 when they agree, quietly; 1 with each
-// difference; 2 when the check could not run, whatever stopped it. Plain Node, no dependencies.
+// entry flattened into plain text is a difference. Exit 0 when they agree, quietly; 1 with the
+// differences or refused syntax; 2 when the check could not run, whatever stopped it.
+//
+// The dates are not compared: D9 sets them on the day the pull request opens. `--kind` is the
+// writing room tracker's kind (D2), never read back from `posts.ts`; D4's naming check in
+// `posts.test.ts` is the backstop for a Jev post marked `own`. Plain Node, no dependencies.
 
 import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +32,7 @@ export const FOOTER_LINES = Object.freeze({
   jev: Object.freeze(['I have no relationship with TypeSafe.']),
 });
 
-/** The check could not run (exit 2), as opposed to finding a difference (exit 1). */
+/** The check could not run (exit 2), not differences or refused syntax (exit 1). */
 export class CannotRun extends Error {}
 
 /** A backslash escape of ASCII punctuation, which CommonMark reads as the character itself. */
@@ -465,43 +469,87 @@ export function canonicalise(blocks, origin) {
 
 /**
  * A front-matter value without its YAML quotes: `"…"` with its `\"` and `\\` escapes, or `'…'`
- * with its `''`. Prettier writes the single-quoted form, the writing room may write either.
+ * with its `''`. Prettier writes the single-quoted form, the writing room may write either. YAML
+ * reads more than this: a ` #` that starts a comment in an unquoted value, and escapes such as `\t`
+ * or `\u00e9` in a double-quoted one. Each of those is refused, so the value is never misread.
  * @param {string} value
+ * @param {string} at the value's line, for a message
  */
-function unquote(value) {
-  if (/^".*"$/.test(value)) return value.slice(1, -1).replace(/\\(["\\])/g, '$1');
+function unquote(value, at) {
+  if (/^".*"$/.test(value)) {
+    for (const [escape, char] of value.slice(1, -1).matchAll(/\\([\s\S]?)/g)) {
+      if (char !== '"' && char !== '\\') {
+        throw new CannotRun(
+          `${at}: the escape ${escape} in a double-quoted value; ` +
+            'write the character itself, as only \\" and \\\\ are read',
+        );
+      }
+    }
+    return value.slice(1, -1).replace(/\\(["\\])/g, '$1');
+  }
   if (/^'.*'$/.test(value)) return value.slice(1, -1).replace(/''/g, "'");
+  if (/(?:^|[ \t])#/.test(value)) {
+    throw new CannotRun(
+      `${at}: " #" starts a YAML comment in an unquoted value; quote it or drop the comment`,
+    );
+  }
   return value;
 }
 
+/** A line of three or more dashes, perhaps with spaces or tabs after them: meant as a fence. */
+const FENCE_LIKE = /^-{3,}[ \t]*$/;
+
+/** What a front-matter line may be, for a message that refuses one. */
+const TAKES = 'the front matter takes key: value lines, and lists written [a, b]';
+
 /**
- * The draft's front matter and body. Front matter is flat `key: value` lines between two `---`
- * lines, the first of them the file's first line. A value may be quoted as YAML quotes it.
+ * The draft's front matter and body. Front matter is flat `key: value` lines between two lines of
+ * exactly `---`, the first of them the file's first line; a list is written `[a, b]` on its key's
+ * line, and a value may be quoted as YAML quotes it. No key comes twice, and the body is not empty.
  * @param {string} source
  * @returns {{ front: Map<string, string>, body: string, firstBodyLine: number }}
  */
 export function parseDraft(source) {
-  const text = normalise(source);
-  const match = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(text);
-  if (!match)
+  const lines = normalise(source).split('\n');
+  const close = lines.findIndex((line, index) => index > 0 && FENCE_LIKE.test(line));
+  for (const index of [0, close]) {
+    const line = index === -1 ? '' : lines[index];
+    if (FENCE_LIKE.test(line) && line !== '---') {
+      throw new CannotRun(
+        `line ${index + 1}: a front matter fence is ${JSON.stringify(line)}; write exactly ---`,
+      );
+    }
+  }
+  if (lines[0] !== '---' || close === -1) {
     throw new CannotRun('the draft does not open with front matter between two --- lines');
+  }
   /** @type {Map<string, string>} */
   const front = new Map();
-  for (const line of match[1].split('\n')) {
-    if (!line.trim()) continue;
+  lines.slice(1, close).forEach((line, index) => {
+    const at = `line ${index + 2}`;
+    if (!line.trim()) return;
+    if (/^\s*#/.test(line)) throw new CannotRun(`${at}: a comment; ${TAKES}`);
+    if (/^\s*-(?:\s|$)/.test(line)) throw new CannotRun(`${at}: a YAML block list item; ${TAKES}`);
     const pair = /^([A-Za-z][\w-]*): *(.*)$/.exec(line);
-    if (!pair)
-      throw new CannotRun(`the front matter line ${JSON.stringify(line)} is not key: value`);
-    front.set(pair[1], unquote(pair[2].trim()));
-  }
-  return { front, body: text.slice(match[0].length), firstBodyLine: match[0].split('\n').length };
+    if (!pair) throw new CannotRun(`${at}: ${JSON.stringify(line)} is not key: value; ${TAKES}`);
+    const [key, value] = [pair[1], pair[2].trim()];
+    if (/^[|>][-+0-9]*$/.test(value)) {
+      throw new CannotRun(`${at}: a folded or literal value (${value}); ${TAKES}`);
+    }
+    if (front.has(key))
+      throw new CannotRun(`${at}: the key ${key} appears twice in the front matter`);
+    front.set(key, unquote(value, at));
+  });
+  const body = lines.slice(close + 1).join('\n');
+  if (!body.trim()) throw new CannotRun('the draft has no body after its front matter');
+  return { front, body, firstBodyLine: close + 2 };
 }
 
 /**
  * The served twin's parts, as `postToMarkdown` writes them: the `#` title, the summary, the
- * `Source:` line (on-site links are written on its origin, and its last path segment is the slug),
- * the Published and Updated lines, the body, and the footer lines that follow the last `---` rule
- * outside a code block.
+ * `Source:` line (on-site links are written on its origin, and its path is `/blog/<slug>`),
+ * the Published and Updated lines, the body, whether a `---` rule outside a code block ends it, and
+ * the footer lines that follow the last such rule.
  * @param {string} source
  */
 export function parseTwin(source) {
@@ -524,13 +572,21 @@ export function parseTwin(source) {
   } catch {
     throw new CannotRun(`the twin's Source line names no URL: ${url[1]}`);
   }
+  // Any origin, since a preview or a local server serves twins too, but only a post's own path.
+  const path = /^\/blog\/([^/]+)$/.exec(page.pathname);
+  if (!path) throw new CannotRun(`the twin's Source URL is not /blog/<slug>: ${url[1]}`);
   const rule = rest.map((block) => block.length === 1 && block[0] === '---').lastIndexOf(true);
+  const body = rule === -1 ? rest : rest.slice(0, rule);
+  if (body.length === 0) {
+    throw new CannotRun('the twin has no body after its Published and Updated lines');
+  }
   return {
     origin: page.origin,
-    slug: page.pathname.slice(page.pathname.lastIndexOf('/') + 1),
+    slug: path[1],
     title: heading[1],
     summary: summary.join('\n'),
-    body: rule === -1 ? rest : rest.slice(0, rule),
+    body,
+    ruled: rule !== -1,
     footer: rule === -1 ? [] : rest.slice(rule + 1).map((block) => block.join('\n')),
   };
 }
@@ -724,6 +780,8 @@ export function refusedSyntax(body, firstLine = 1) {
   const lines = body.split('\n');
   /** @type {string | null} */
   let fence = null;
+  /** the line the open code fence started on, for a fence that is never closed */
+  let fenceAt = '';
   /** @type {BlockKind | null} the block the line above belongs to; null after a blank line */
   let block = null;
   /** @type {{ kind: BlockKind, from: number, to: number, text: string[] } | null} */
@@ -734,6 +792,8 @@ export function refusedSyntax(body, firstLine = 1) {
   let indent = 0;
   /** the last character of the current list's marker: its bullet, or its `.` or `)` */
   let marker = '';
+  /** the marker of the list that the blank lines above this line end, if they end one */
+  let ended = '';
   const endRun = () => {
     if (run) {
       const [from, to] = [firstLine + run.from, firstLine + run.to];
@@ -754,10 +814,21 @@ export function refusedSyntax(body, firstLine = 1) {
     if (!line.trim()) {
       // A blank line is read before `REFUSED_LINES`: refuse its tab here, as the front matter does.
       if (line.includes('\t')) problems.push(`${at}: a tab on a blank line; leave the line empty`);
+      // `trim()` strips any Unicode space; a CommonMark blank line holds only spaces and tabs.
+      const other = [...new Set(line.match(/[^ \t]/gu))].map(codePoint);
+      if (other.length > 0) {
+        problems.push(
+          `${at}: a line of ${other.join(' and ')} looks blank ` +
+            'but is text to Markdown; leave it empty',
+        );
+      }
       endRun();
+      if (block === 'list') ended = marker;
       block = null;
       return;
     }
+    const after = ended;
+    ended = '';
     const previous = lines[index - 1] ?? '';
     const next = lines[index + 1] ?? '';
     if (block !== null && !continues(block, line)) {
@@ -768,12 +839,22 @@ export function refusedSyntax(body, firstLine = 1) {
     if (opened) {
       endRun();
       fence = opened.run;
+      fenceAt = at;
       return;
     }
     const opening = block === null;
     if (block === null) {
       endRun();
       block = blockKind(line, next);
+      // An item of the same kind after a blank line joins the list above as a loose one, or starts
+      // a list beside it when the marker changes; a post holds neither.
+      const mark = block === 'list' ? (LIST_ITEM.exec(line)?.[1].slice(-1) ?? '') : '';
+      if (mark && after && /[-*+]/.test(mark) === /[-*+]/.test(after)) {
+        problems.push(
+          `${at}: a blank line between list items makes one loose list in Markdown, ` +
+            'or two lists when the marker changes, and a post holds neither; remove the blank line',
+        );
+      }
       const start = /^ {0,3}(\d{1,9})[.)] /.exec(line)?.[1];
       if (block === 'list' && start !== undefined && Number(start) !== 1) {
         problems.push(`${at}: an ordered list that starts at ${start}; the page numbers it from 1`);
@@ -796,7 +877,6 @@ export function refusedSyntax(body, firstLine = 1) {
         `${at}: an indented block: a second paragraph in a list item, or code without a fence`,
       );
     }
-    if (/(?: {2,}|\\)$/.test(line) && next.trim()) problems.push(`${at}: a hard line break`);
     const item =
       block === 'list' && (opening || startsItem(line, indent)) ? LIST_ITEM.exec(line) : null;
     if (item) {
@@ -815,6 +895,18 @@ export function refusedSyntax(body, firstLine = 1) {
         marker = mark;
       }
       indent = itemIndent(line);
+    }
+    // Two spaces or an unescaped backslash end a line in a hard break only when the next line goes
+    // on with the same paragraph, item or quote; before a blank line, an item or a row they do not.
+    const backslashes = /\\*$/.exec(line)?.[0].length ?? 0;
+    if (
+      (/ {2,}$/.test(line) || backslashes % 2 === 1) &&
+      (block === 'paragraph' || block === 'list' || block === 'quote') &&
+      next.trim() &&
+      continues(block, next) &&
+      !(block === 'list' && startsItem(next, indent))
+    ) {
+      problems.push(`${at}: a hard line break`);
     }
     // GFM renders an item opening with `[ ]`, `[x]` or `[X]` as a checkbox, which a post has not.
     if (item && /^\[[ xX]\](?: |$)/.test(item[2])) {
@@ -846,18 +938,24 @@ export function refusedSyntax(body, firstLine = 1) {
     if (block === 'heading' || block === 'caption' || block === 'table') endRun();
   });
   endRun();
-  if (fence !== null) problems.push(`the code fence opened with ${fence} is never closed`);
+  if (fence !== null)
+    problems.push(`${fenceAt}: the code fence opened with ${fence} is never closed`);
   return problems;
 }
 
 /** A character that prints as a space and is not one, such as a no-break space or a thin space. */
-const SPACE_LIKE = /(?! )\p{Zs}/u;
+/**
+ * A character that prints as a space and is not one (`\p{Zs}`), or prints as nothing at all
+ * (`\p{Cf}`: a soft hyphen, a zero-width space, a word joiner).
+ */
+const SPACE_LIKE = /(?! )[\p{Zs}\p{Cf}]/u;
 
 /**
  * The `?` line that goes under a changed line holding a character that prints as a space and is
- * not one, as Python's difflib marks a line: a `^` under each such character, a tab kept as a tab
- * so the marks stay in their columns, then the characters' code points. Null for a line without
- * one. Without it, a no-break space against a space shows as two identical lines.
+ * not one, or prints as nothing, as Python's difflib marks a line: a `^` under each such character,
+ * a tab kept as a tab so the marks stay in their columns, then the characters' code points. Null
+ * for a line without one. Without it, a no-break space against a space, or a word with a
+ * zero-width space against the same word without, shows as two identical lines.
  * @param {string} line
  * @returns {string | null}
  */
@@ -869,10 +967,15 @@ function spaceGuide(line) {
     if (char === '\t') return '\t';
     return SPACE_LIKE.test(char) ? '^' : ' ';
   });
-  const names = marked.map(
-    (char) => `U+${(char.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`,
-  );
-  return `? ${guide.join('').trimEnd()} ${names.join(', ')}`;
+  return `? ${guide.join('').trimEnd()} ${marked.map(codePoint).join(', ')}`;
+}
+
+/**
+ * A character's code point as Unicode writes it, `U+00A0`.
+ * @param {string} char
+ */
+function codePoint(char) {
+  return `U+${(char.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`;
 }
 
 /**
@@ -920,6 +1023,9 @@ export function lineDiff(a, b) {
     .join('\n');
 }
 
+/** The front-matter keys every draft gives, each with more than spaces in it. */
+const REQUIRED = ['title', 'slug', 'description'];
+
 /**
  * Every way the twin differs from the approved draft, and every use of refused syntax in the draft.
  * None when the twin serves the approved words. Front-matter values are plain text, as the entry's
@@ -932,11 +1038,13 @@ export function lineDiff(a, b) {
 export function differences(draftSource, twinSource, kind) {
   const draft = parseDraft(draftSource);
   const twin = parseTwin(twinSource);
-  const [title, slug, description] = ['title', 'slug', 'description'].map((key) =>
-    draft.front.get(key),
-  );
-  if (!title || !slug || !description) {
-    throw new CannotRun('the front matter needs a title, a slug and a description');
+  const [title = '', slug = '', description = ''] = REQUIRED.map((key) => draft.front.get(key));
+  const missing = REQUIRED.filter((key) => !draft.front.get(key)?.trim());
+  if (missing.length > 0) {
+    const names = missing.join(', ').replace(/, (?=[^,]*$)/, ' and ');
+    throw new CannotRun(
+      `the front matter's ${names} ${missing.length === 1 ? 'is' : 'are'} missing or blank`,
+    );
   }
   const problems = normalise(draftSource)
     .split('\n')
@@ -965,7 +1073,13 @@ export function differences(draftSource, twinSource, kind) {
   if (body) problems.push(`the body differs (- draft, + twin):\n${body}`);
   const footer = twin.footer.map((line) => canonicalInline(line, twin.origin));
   const expected = FOOTER_LINES[kind];
-  if (JSON.stringify(footer) !== JSON.stringify(expected.map(plain))) {
+  if (twin.ruled && footer.length === 0) {
+    // The serialiser writes the rule only before a kind's lines, so a bare rule is a difference.
+    const ends = expected.length === 0 ? 'has no footer' : `ends with ${JSON.stringify(expected)}`;
+    problems.push(
+      `the footer is a --- rule with nothing after it, but a post of kind ${kind} ${ends}`,
+    );
+  } else if (JSON.stringify(footer) !== JSON.stringify(expected.map(plain))) {
     problems.push(
       `the footer is ${JSON.stringify(footer)}, but a post of kind ${kind} ends with ${JSON.stringify(expected)}`,
     );
@@ -974,8 +1088,9 @@ export function differences(draftSource, twinSource, kind) {
 }
 
 /**
- * The check as a command: its exit status and what it prints. Exit 1 means differences and nothing
- * else, so every error, an unreadable file as much as a bug, exits 2 with its message.
+ * The check as a command: its exit status and what it prints. Exit 1 means differences or refused
+ * syntax and nothing else, so every error, an unreadable file as much as a bug, exits 2 with its
+ * message, and a bug with its stack too.
  * @param {string[]} argv the arguments after the script's path
  * @param {(path: string) => string} [read]
  * @returns {{ status: 0 | 1 | 2, output: string }}
@@ -986,14 +1101,41 @@ export function check(argv, read = (path) => readFileSync(path, 'utf8')) {
   const files = at === -1 ? argv : argv.filter((_, index) => index !== at && index !== at + 1);
   if ((kind !== 'own' && kind !== 'jev') || files.length !== 2) return { status: 2, output: USAGE };
   try {
-    const problems = differences(read(files[0]), read(files[1]), kind);
+    const [draftSource, twinSource] = files.map((path) => readNamed(read, path));
+    const problems = differences(draftSource, twinSource, kind);
     return problems.length === 0
       ? { status: 0, output: '' }
       : { status: 1, output: `${problems.join('\n\n')}\n` };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { status: 2, output: `post-draft-check: ${message}\n` };
+    return { status: 2, output: `post-draft-check: ${failure(error)}\n` };
   }
+}
+
+/**
+ * The file at `path`, or a `CannotRun` that names it when the system refuses it: Node's message
+ * for a directory read as a file says `EISDIR` and not which file.
+ * @param {(path: string) => string} read
+ * @param {string} path
+ */
+function readNamed(read, path) {
+  try {
+    return read(path);
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && typeof error.code === 'string')) throw error;
+    const named = error.message.includes(`'${path}'`) ? '' : ` '${path}'`;
+    throw new CannotRun(`${error.message}${named}`);
+  }
+}
+
+/**
+ * What follows `post-draft-check:` for an error: a `CannotRun`'s message alone, as it names its
+ * cause; for anything else, a fault in the check, the message and then the stack.
+ * @param {unknown} error
+ */
+function failure(error) {
+  if (error instanceof CannotRun) return error.message;
+  if (error instanceof Error) return `${error.message}\n${error.stack ?? ''}`.trimEnd();
+  return String(error);
 }
 
 function main() {
@@ -1006,7 +1148,8 @@ function main() {
  * True when Node started this file, not when a test imported it. `realpathSync` for the reason
  * check-allowbuilds-drift.mjs documents: Node resolves `import.meta.url` and leaves
  * `process.argv[1]` as typed, so a path through a symlinked directory would otherwise skip `main()`
- * and exit 0 in silence. Nothing catches what `realpathSync` throws, for the same reason.
+ * and exit 0 in silence. What `realpathSync` throws is not swallowed, for the same reason: the call
+ * below reports it with its stack and exits 2, as for any fault, rather than Node's uncaught 1.
  *
  * @returns {boolean}
  */
@@ -1015,4 +1158,9 @@ function startedAsCommand() {
   return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
 }
 
-if (startedAsCommand()) main();
+try {
+  if (startedAsCommand()) main();
+} catch (error) {
+  process.stderr.write(`post-draft-check: ${failure(error)}\n`);
+  process.exitCode = 2;
+}

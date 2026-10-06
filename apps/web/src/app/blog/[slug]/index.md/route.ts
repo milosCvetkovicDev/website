@@ -17,8 +17,10 @@ export function generateStaticParams() {
 export async function GET(_request: Request, { params }: RouteContext<'/blog/[slug]/index.md'>) {
   const { slug } = await params;
   const post = getPost(slug);
-  // Unreachable while `generateStaticParams` and `getPost` read one index: `dynamicParams` 404s any
-  // other slug first. If they ever drift, the prerender fails naming the slug.
+  // Unreachable in a build while `generateStaticParams` and `getPost` read one index:
+  // `dynamicParams` 404s any other slug first, and if they ever drift, the prerender fails naming
+  // the slug. Reached under `next dev` while nothing is published: `postStaticParams` adds a
+  // placeholder slug there that `getPost` cannot find, so requesting it throws here.
   if (!post) throw new Error(`index.md: unknown post ${JSON.stringify(slug)}`);
   return markdownResponse(postToMarkdown(post));
 }

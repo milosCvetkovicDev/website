@@ -106,9 +106,13 @@ function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<strin
   if (!Array.isArray(pieces) || pieces.length === 0) return [`${where} is empty`];
   const problems: string[] = [];
   let text = '';
+  // Whether the last piece that was not empty text is inline code: the twin writes two such pieces
+  // as one span (`a``b` is the code a``b), where the page draws two.
+  let afterCode = false;
   pieces.forEach((piece: unknown, index) => {
     const at = `${where}, piece ${index + 1}`;
     if (typeof piece === 'string') {
+      if (piece !== '') afterCode = false;
       if (hasInvisible(piece)) problems.push(`${at} ${INVISIBLE_PROBLEM}`);
       else text += piece;
     } else if (piece && typeof piece === 'object' && 'code' in piece) {
@@ -116,15 +120,24 @@ function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<strin
       // a link this checker read as code.
       if ('text' in piece || 'href' in piece) {
         problems.push(`${at} is both inline code and a link`);
+        afterCode = false;
         return;
       }
+      if (afterCode) {
+        problems.push(`${at}: two pieces of inline code side by side; join them into one piece`);
+      }
+      afterCode = true;
       const { code } = piece as { code: unknown };
-      if (typeof code !== 'string' || !code.trim()) {
+      if (typeof code !== 'string' || !code) {
         problems.push(`${at}: the inline code is empty`);
+      } else if (!code.trim()) {
+        // CommonMark keeps every space of a span made only of spaces, so the twin and page differ.
+        problems.push(`${at}: the inline code is only whitespace`);
       } else if (hasInvisible(code)) {
         problems.push(`${at}: the inline code ${INVISIBLE_PROBLEM}`);
       } else text += code;
     } else if (piece && typeof piece === 'object' && 'href' in piece) {
+      afterCode = false;
       const { text: label, href } = piece as { text: unknown; href: unknown };
       if (typeof label !== 'string' || !label.trim()) {
         problems.push(`${at}: the link has no text`);
@@ -143,6 +156,7 @@ function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<strin
         );
       }
     } else {
+      afterCode = false;
       problems.push(`${at} is not text, code or a link`);
     }
   });
@@ -881,6 +895,27 @@ const defects: [string, Post[], RegExp][] = [
     'an empty piece of inline code',
     [withBody(paragraph('Run ', { code: '' }, '.'))],
     /: block 1 \(paragraph\), piece 2: the inline code is empty$/,
+  ],
+  [
+    'inline code that is only whitespace',
+    [withBody(paragraph('Indent with ', { code: '   ' }, '.'))],
+    /: block 1 \(paragraph\), piece 2: the inline code is only whitespace$/,
+  ],
+  [
+    'two pieces of inline code side by side',
+    [withBody(paragraph('Run ', { code: 'make' }, { code: 'all' }, '.'))],
+    /: block 1 \(paragraph\), piece 3: two pieces of inline code side by side; join them into one piece$/,
+  ],
+  [
+    'two pieces of inline code with empty text between them',
+    [
+      withBody({
+        kind: 'list',
+        ordered: true,
+        items: [['Run ', { code: 'make' }, '', { code: 'all' }]],
+      }),
+    ],
+    /: block 1 \(list item 1\), piece 4: two pieces of inline code side by side; join them into one piece$/,
   ],
   [
     'a link with no text',
