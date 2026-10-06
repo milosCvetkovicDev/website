@@ -7141,11 +7141,11 @@
       "anchor": "| 0028 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0028's record carries the status line \"Accepted\".",
+      "claim": "ADR 0028's record carries the status line \"Superseded by ADR-0034\".",
       "check": {
         "file": "docs/adr/0028-blog-posts-as-typed-data.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0034"
       }
     },
     {
@@ -7154,11 +7154,11 @@
       "anchor": "| 0028 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0028 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0028 gives the record's status line, \"Superseded by ADR-0034\" (ADR 0012: the status in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0028 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0034"
       }
     },
     {
@@ -7228,6 +7228,23 @@
       ],
       "check": {
         "path": "docs/plans/2026-09-28-blog-engine-design.md"
+      }
+    },
+    {
+      "id": "adr-0028-link-0034-blog-posts-drafted-with-claude",
+      "doc": "docs/adr/0028-blog-posts-as-typed-data.md",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to 0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
       }
     },
     {
@@ -7726,6 +7743,23 @@
       }
     },
     {
+      "id": "adr-readme-link-0034-blog-posts-drafted-with-claude",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to 0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
       "id": "adr-index-0031-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0031 |",
@@ -7879,6 +7913,84 @@
         "file": "docs/adr/README.md",
         "regex": "^\\| 0032 \\| \\[(.+?)\\]\\(0032-",
         "equals": "Playwright's Chromium keeps V8's garbage collector on the main thread"
+      }
+    },
+    {
+      "id": "adr-index-0034-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0034's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0034-blog-posts-drafted-with-claude.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0034-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0034 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0034 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0034-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0034's record carries the Date \"2026-10-06\".",
+      "check": {
+        "file": "docs/adr/0034-blog-posts-drafted-with-claude.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-06"
+      }
+    },
+    {
+      "id": "adr-index-0034-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0034 gives the record's Date, \"2026-10-06\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0034 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-06"
+      }
+    },
+    {
+      "id": "adr-index-0034-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0034's record carries the H1 title \"Blog posts are drafted with Claude and approved by the owner, line by line\".",
+      "check": {
+        "file": "docs/adr/0034-blog-posts-drafted-with-claude.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Blog posts are drafted with Claude and approved by the owner, line by line"
+      }
+    },
+    {
+      "id": "adr-index-0034-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0034 gives the record's H1 title, \"Blog posts are drafted with Claude and approved by the owner, line by line\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0034 \\| \\[(.+?)\\]\\(0034-",
+        "equals": "Blog posts are drafted with Claude and approved by the owner, line by line"
       }
     },
     {
@@ -8133,6 +8245,40 @@
         "package": ".",
         "script": "check:docs-drift",
         "runs": "scripts/check-docs-drift.ts"
+      }
+    },
+    {
+      "id": "adr-0034-link-0028-blog-posts-as-typed-data",
+      "doc": "docs/adr/0034-blog-posts-drafted-with-claude.md",
+      "anchor": "](0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to 0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "adr-0034-link-plans-2026-10-06-blog-publishing-design",
+      "doc": "docs/adr/0034-blog-posts-drafted-with-claude.md",
+      "anchor": "](../plans/2026-10-06-blog-publishing-design.md)",
+      "claim": "The link to ../plans/2026-10-06-blog-publishing-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../plans/2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
       }
     },
     {
@@ -10106,6 +10252,40 @@
       }
     },
     {
+      "id": "plan-blog-engine-design-link-adr-0034-blog-posts-drafted-with-claude",
+      "doc": "docs/plans/2026-09-28-blog-engine-design.md",
+      "anchor": "](../adr/0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to ../adr/0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "plan-blog-engine-design-link-2026-10-06-blog-publishing-design",
+      "doc": "docs/plans/2026-09-28-blog-engine-design.md",
+      "anchor": "](2026-10-06-blog-publishing-design.md)",
+      "claim": "The link to 2026-10-06-blog-publishing-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
       "id": "plan-blog-engine-plan-link-2026-09-28-blog-engine-design",
       "doc": "docs/plans/2026-09-28-blog-engine-plan.md",
       "anchor": "](2026-09-28-blog-engine-design.md)",
@@ -10241,6 +10421,333 @@
         "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
         "regex": "^\\| Squash commit message \\(`squash_merge_commit_message`\\)\\s+\\| (\\S+)",
         "equals": "`BLANK`:"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-adr-0028",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](../adr/0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to ../adr/0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-adr-0034",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](../adr/0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to ../adr/0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-blog-engine-design",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](2026-09-28-blog-engine-design.md)",
+      "claim": "The link to 2026-09-28-blog-engine-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-28-blog-engine-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-design.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-blog-engine-plan",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](2026-09-28-blog-engine-plan.md)",
+      "claim": "The link to 2026-09-28-blog-engine-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-28-blog-engine-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-plan.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-script-web-build",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "`pnpm --filter web build`",
+      "claim": "`pnpm --filter web build` is a script in apps/web/package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "web build"
+        }
+      ],
+      "check": {
+        "package": "apps/web",
+        "script": "build"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-design",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](2026-10-06-blog-publishing-design.md)",
+      "claim": "The link to 2026-10-06-blog-publishing-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-adr-0028",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](0028-blog-posts-as-typed-data.md)",
+      "claim": "The ADR 0034 text that Task 1 quotes links ADR 0028 relative to docs/adr, where the record is.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-design-from-adr",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](../plans/2026-10-06-blog-publishing-design.md)",
+      "claim": "The ADR 0034 text that Task 1 quotes links the publishing design relative to docs/adr, and the design exists.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../plans/2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-adr-0034",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The ADR 0028 pointer and the index row that Task 1 quotes link ADR 0034 relative to docs/adr, and the link resolves to the record, docs/adr/0034-blog-posts-drafted-with-claude.md.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-adr-0034-from-plans",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](../adr/0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The dated note and the Related link that Task 1 quotes link ADR 0034 relative to docs/plans, and the link resolves to the record, docs/adr/0034-blog-posts-drafted-with-claude.md.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-origin-work",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](${ORIGIN}/work)",
+      "claim": "The expected twin lines link the work page on the site origin, and the /work route exists.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "${ORIGIN}/work"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/app/work/page.tsx"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-origin-blog",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](${ORIGIN}/blog)",
+      "claim": "The expected twin lines link /blog on the site origin, and the /blog route exists.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "${ORIGIN}/blog"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/app/blog/page.tsx"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-work",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](/work)",
+      "claim": "The quoted draft and test inputs link the on-site path /work, and the route exists.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "/work"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/app/work/page.tsx"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-blog",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](/blog)",
+      "claim": "The quoted fixture draft links the on-site path /blog, and the route exists.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "/blog"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/app/blog/page.tsx"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-hostile-nowhere",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](/nowhere)",
+      "claim": "Not a link: the plan quotes the hostile fixture paragraph, whose [not a link](/nowhere) is text the serialiser escapes; the fixture holds it.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "/nowhere"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/test/fixtures/posts.ts",
+        "contains": "[not a link](/nowhere)"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-script-lint-fix",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "`pnpm lint:fix`",
+      "claim": "`pnpm lint:fix` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "lint:fix"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "lint:fix"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-script-lint",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "`pnpm lint`.",
+      "claim": "`pnpm lint` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "lint"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "lint"
+      }
+    },
+    {
+      "id": "plans-readme-link-2026-10-06-blog-publishing-design",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-10-06-blog-publishing-design.md)",
+      "claim": "The link to 2026-10-06-blog-publishing-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
+      "id": "plans-readme-link-2026-10-06-blog-publishing-plan",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-10-06-blog-publishing-plan.md)",
+      "claim": "The link to 2026-10-06-blog-publishing-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-06-blog-publishing-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-plan.md"
       }
     }
   ]
