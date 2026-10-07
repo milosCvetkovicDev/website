@@ -795,6 +795,57 @@ describe('the publish check', () => {
       });
     }
 
+    const TILDES =
+      'two or more ~, which GFM can pair as strikethrough; write \\~ for the character';
+
+    /** @type {[string, string[], string][]} */
+    const pairedTildes = [
+      ['a pair around a word', ['A ~fast~ run.'], 'line 29'],
+      ['tildes between digits', ['From 3~5 runs and 7~9 more.'], 'line 29'],
+      ['a pair across the lines of a paragraph', ['A ~fast', 'run~ here.'], 'lines 29-30'],
+      ['a pair in a list item', ['- A ~fast~ run'], 'line 29'],
+      ['a pair in a quote', ['> A ~fast~ run.'], 'line 29'],
+      ['a pair in a heading', ['## A ~fast~ run'], 'line 29'],
+      [
+        'a pair in a table cell',
+        ['| Day | Note |', '| --- | --- |', '| Monday | ~b~ |'],
+        'line 31',
+      ],
+    ];
+    for (const [name, lines, at] of pairedTildes) {
+      it(`reports two ~ that GFM can pair as strikethrough: ${name}`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.ok(problems.includes(`${at}: ${TILDES}`), problems.join('\n'));
+      });
+    }
+
+    it('reports ~~a~~ once, by the same message as a single pair', () => {
+      const problems = differences(draft([...BODY, '', 'Some ~~struck~~ text.']), twin(), 'own');
+      assert.deepEqual(
+        problems.filter((problem) => problem.includes('strikethrough')),
+        [`line 29: ${TILDES}`],
+      );
+    });
+
+    /** @type {[string, string[]][]} */
+    const loneTildes = [
+      ['a single ~', ['About ~5 minutes.']],
+      ['tildes in code', ['Run `ls ~a~` now.']],
+      ['escaped tildes', ['A \\~fast\\~ run.']],
+      ['tildes in a link destination', ['See [the folder](/~a/~b).']],
+      ['one ~ in each of two cells', ['| From | To |', '| --- | --- |', '| ~5 | ~9 |']],
+      ['one ~ in each of two items', ['- About ~5 minutes', '- About ~9 minutes']],
+    ];
+    for (const [name, lines] of loneTildes) {
+      it(`accepts ${name}, which GFM cannot pair as strikethrough`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.deepEqual(
+          problems.filter((problem) => problem.includes('strikethrough')),
+          [],
+        );
+      });
+    }
+
     /**
      * The body's diff for a table whose last row the draft writes as `draftRow` and the twin
      * serves as `twinRow`.

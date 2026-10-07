@@ -112,7 +112,9 @@ The rules `posts.test.ts` holds a post to apply to the draft as written: heading
 no level 3 before the first level 2, no heading twice; a link's text says where it goes; a link on
 this site names a page that exists. The first column of a table is its row headers.
 
-Not allowed, and caught by the check when present: bold or italics, images, raw HTML or HTML
+Not allowed, and caught by the check when present: bold or italics, strikethrough (two or more
+`~` in one paragraph, item, quote, heading or table cell, as GFM pairs `~a~` as well as `~~a~~`; a
+lone `~` is text), images, raw HTML or HTML
 comments, entity references such as `&amp;`, footnotes, `#` or `####` and deeper headings, setext
 headings, code or links in a heading, a table caption or a table cell, code or a link in a link's
 text, a link with a title or spaces around its destination, nested lists, a task list item such as
@@ -135,7 +137,8 @@ the URL's last path segment), and made exit 1 cover refused syntax as well as di
 publish check below now says. Corrected 2026-10-07: the final review of P1-P4 held `description` to
 155 characters, not 300, because the post's page uses it as its meta description, which
 `page-metadata.test.ts` caps at 155. `posts.test.ts` now refuses a longer summary on the published
-index; its 300 cap is only the shape rule its fixtures exercise.
+index; its 300 cap is only the shape rule its fixtures exercise. The same review added
+strikethrough to the list above.
 
 ## The publish check
 

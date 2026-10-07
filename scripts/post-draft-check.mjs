@@ -318,6 +318,18 @@ const isTable = (lines) =>
   DELIMITER_ROW.test(lines[1]);
 
 /**
+ * A pipe table row's cells as written, trimmed. GFM splits a row at each unescaped `|` before it
+ * reads any inline syntax, so nothing in one cell pairs with anything in the next.
+ * @param {string} line
+ */
+function tableCells(line) {
+  let row = line.trim();
+  if (row.startsWith('|')) row = row.slice(1);
+  if (row.endsWith('|') && !row.endsWith('\\|')) row = row.slice(0, -1);
+  return row.split(/(?<!\\)\|/).map((cell) => cell.trim());
+}
+
+/**
  * A pipe table row with its cells trimmed and in canonical form, or the delimiter row as `---`s.
  * Every backslash and pipe in a cell is escaped, so a row reads back as exactly its cells; a
  * backslash that canonical text has already escaped shows doubled, on both sides alike.
@@ -326,10 +338,7 @@ const isTable = (lines) =>
  * @param {string} origin
  */
 function tableRow(line, delimiter, origin) {
-  let row = line.trim();
-  if (row.startsWith('|')) row = row.slice(1);
-  if (row.endsWith('|') && !row.endsWith('\\|')) row = row.slice(0, -1);
-  const cells = row.split(/(?<!\\)\|/).map((cell) => cell.trim());
+  const cells = tableCells(line);
   const shown = delimiter
     ? cells.map(() => '---')
     : cells.map((cell) => canonicalInline(cell, origin).replace(/[\\|]/g, '\\$&'));
@@ -621,7 +630,6 @@ const REFUSED_INLINE = [
   [/\]\[/, 'a reference-style link'],
   [/\*/, 'an emphasis marker *; write \\* for the character'],
   [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/u, 'an emphasis marker _; write \\_ for the character'],
-  [/~~/, 'strikethrough'],
   [
     /&(?:#\d+|#[Xx][\dA-Fa-f]+|[A-Za-z][\dA-Za-z]*);/,
     'an entity reference; write the character itself, or \\& for an ampersand',
@@ -757,6 +765,16 @@ function refusedInline(source, at, block) {
   const text = prose(tokens, true);
   for (const [pattern, what] of REFUSED_INLINE) {
     if (pattern.test(text)) problems.push(`${at}: ${what}`);
+  }
+  // GFM pairs one or two `~` on each side as strikethrough, `~a~` as well as `~~a~~`, inside one
+  // paragraph, item, quote, heading or table cell, where the page shows the tildes. A lone `~`
+  // stays text, so only a second one is refused.
+  const spans =
+    block === 'table' ? tableCells(source).map((cell) => prose(inlineTokens(cell), true)) : [text];
+  if (spans.some((span) => (span.match(/~/g) ?? []).length > 1)) {
+    problems.push(
+      `${at}: two or more ~, which GFM can pair as strikethrough; write \\~ for the character`,
+    );
   }
   // GFM links a bare `www.` address too, after a space, `(`, a bracket or an emphasis mark.
   if (/https?:\/\/|(?:^|[\s*_~([\]])www\.[\p{L}\p{N}_-]/iu.test(prose(tokens, false))) {
