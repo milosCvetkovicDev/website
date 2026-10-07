@@ -897,57 +897,92 @@ describe('the publish check', () => {
       assert.match(tableDiff('| Disk | 1 | 2 |', '| Disk | 1 |'), /^- \| Disk \| 1 \| 2 \|$/m);
     });
 
-    const FENCE_AT_MARGIN = 'start the fence at the margin';
+    /** @param {number} spaces */
+    const unindent = (spaces) => {
+      const unit = spaces === 1 ? 'space' : 'spaces';
+      return (
+        `a code fence indented by ${spaces} ${unit}; ` +
+        `remove the ${spaces} ${unit} from the fence and from each of its lines`
+      );
+    };
+    const FENCE_ADVICE = 'from the fence and from each of its lines';
 
     /** @type {[string, string[], string][]} */
     const indentedFences = [
-      [
-        'two spaces',
-        ['  ```js', '  const a = 1;', '  ```'],
-        'line 29: a code fence indented by 2 spaces',
-      ],
-      [
-        'one space, with tildes',
-        [' ~~~', 'const a = 1;', '~~~'],
-        'line 29: a code fence indented by 1 space',
-      ],
-      [
-        'three spaces',
-        ['   ```', 'const a = 1;', '```'],
-        'line 29: a code fence indented by 3 spaces',
-      ],
+      ['two spaces', ['  ```js', '  const a = 1;', '  ```'], `line 29: ${unindent(2)}`],
+      ['one space, with tildes', [' ~~~', 'const a = 1;', '~~~'], `line 29: ${unindent(1)}`],
+      ['three spaces', ['   ```', 'const a = 1;', '```'], `line 29: ${unindent(3)}`],
       [
         'one space after a list item, left of its text',
         ['- An item', '', ' ```js', 'const a = 1;', '```'],
-        'line 31: a code fence indented by 1 space',
+        `line 31: ${unindent(1)}`,
       ],
     ];
     for (const [name, lines, message] of indentedFences) {
       it(`reports a code fence indented by ${name}`, () => {
         const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
-        assert.ok(problems.includes(`${message}; ${FENCE_AT_MARGIN}`), problems.join('\n'));
+        assert.ok(problems.includes(message), problems.join('\n'));
       });
     }
 
-    /** @type {[string, string[]][]} */
+    /** @type {[string, string[], string][]} */
     const fencesInItems = [
-      ['a fence that opens a list item', ['- ```js', '  const a = 1;', '  ```']],
-      ['a fence on the line after an item', ['- An item', '  ```js', '  const a = 1;', '  ```']],
+      [
+        'a fence that opens a list item',
+        ['- ```js', '  const a = 1;', '  ```'],
+        'line 29: a code fence inside a list item',
+      ],
+      [
+        'a fence on the line after an item',
+        ['- An item', '  ```js', '  const a = 1;', '  ```'],
+        'line 30: start each block after a blank line',
+      ],
       [
         "a fence at an item's text after a blank line",
         ['- An item', '', '  ```js', '  a', '  ```'],
+        'line 31: a code fence inside a list item',
       ],
-      ['a fence at the margin', ['```js', 'const a = 1;', '```']],
+      // CommonMark closes the item's fence, empty, at the `a` below it, makes `a` a paragraph and
+      // opens a fence at the last line that is never closed.
+      [
+        "a fence at an item's text after a blank line, its lines at the margin",
+        ['- An item', '', '  ```js', 'a', '```'],
+        'line 31: a code fence inside a list item',
+      ],
     ];
-    for (const [name, lines] of fencesInItems) {
-      it(`leaves ${name} to the rules for list items`, () => {
+    for (const [name, lines, message] of fencesInItems) {
+      it(`reports ${name} by the rules for list items, not the margin's`, () => {
         const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.ok(problems.includes(message), problems.join('\n'));
         assert.deepEqual(
-          problems.filter((problem) => problem.includes(FENCE_AT_MARGIN)),
+          problems.filter((problem) => problem.includes(FENCE_ADVICE)),
           [],
         );
       });
     }
+
+    it('accepts a code fence at the margin, as the twin writes it', () => {
+      const fence = ['```js', 'const a = 1;', '```'];
+      assert.deepEqual(
+        differences(
+          draft([...BODY, '', ...fence]),
+          twin({ body: [...SERVED, '', ...fence] }),
+          'own',
+        ),
+        [],
+      );
+    });
+
+    it("reports a fence at an item's text that the twin serves after the item", () => {
+      const approved = ['- An item', '', '  ```js', 'a', '```'];
+      const served = ['- An item', '', '```js', 'a', '```'];
+      const problems = differences(
+        draft([...BODY, '', ...approved]),
+        twin({ body: [...SERVED, '', ...served] }),
+        'own',
+      );
+      assert.deepEqual(problems, ['line 31: a code fence inside a list item']);
+    });
 
     it('reports a code fence that is never closed by the line it opened on', () => {
       const problems = differences(

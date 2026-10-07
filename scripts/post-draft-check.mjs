@@ -946,13 +946,18 @@ export function refusedSyntax(body, firstLine = 1) {
     if (opened) {
       // CommonMark strips as many spaces from each line of a fence indented by one to three as the
       // fence has, which the twin's fence at the margin does not. A fence at a list item's text
-      // belongs to the item, where the rules for list items report it.
+      // belongs to the item: on the item's next line the rule for a block without a blank line
+      // above reports it, and after a blank line it is a code block inside the item, whose lines
+      // at the margin would close it and leave the item.
       const spaces = leadingSpaces(line);
       const inItem = (above === 'list' || after !== '') && spaces >= indent;
-      if (spaces > 0 && !inItem) {
+      if (inItem && above !== 'list') {
+        problems.push(`${at}: a code fence inside a list item`);
+      } else if (spaces > 0 && !inItem) {
+        const unit = spaces === 1 ? 'space' : 'spaces';
         problems.push(
-          `${at}: a code fence indented by ${spaces} ${spaces === 1 ? 'space' : 'spaces'}; ` +
-            'start the fence at the margin',
+          `${at}: a code fence indented by ${spaces} ${unit}; ` +
+            `remove the ${spaces} ${unit} from the fence and from each of its lines`,
         );
       }
       endRun();
