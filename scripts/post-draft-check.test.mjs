@@ -1062,7 +1062,7 @@ describe('the publish check', () => {
       });
     }
 
-    const STRAY = 'a `](` with no `[` before it: escape the `]` as `\\]`';
+    const STRAY = 'a `](` with no open `[` before it: escape the `]` as `\\]`';
     for (const [name, approved] of [
       ['an escaped bracket before it', 'Write \\[text](url) for a link.'],
       ['no bracket before it', 'The list ends](here) mid-sentence.'],

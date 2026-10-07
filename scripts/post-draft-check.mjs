@@ -834,7 +834,7 @@ function refusedInline(source, at, block) {
   }
   // A `](` that `linkAt()` did not take stays text on both sides. After an unescaped `[` that no
   // `]` has closed, CommonMark can still read it as the end of a link that `linkAt()` does not,
-  // one with a title or spaces around its destination. With no such `[` before it, CommonMark
+  // one with a title or spaces around its destination. With no open `[` before it, CommonMark
   // leaves it text as well; it is refused anyway, by its own message, as escaping the `]` costs
   // nothing. An escaped `\]` is text.
   const closes = [tokens, ...reread].map((run) => linkCloses(written(run)));
@@ -844,7 +844,7 @@ function refusedInline(source, at, block) {
     );
   }
   if (closes.some(({ stray }) => stray)) {
-    problems.push(`${at}: a \`](\` with no \`[\` before it: escape the \`]\` as \`\\]\``);
+    problems.push(`${at}: a \`](\` with no open \`[\` before it: escape the \`]\` as \`\\]\``);
   }
   const text = prose(tokens, true);
   for (const [pattern, what] of REFUSED_INLINE) {

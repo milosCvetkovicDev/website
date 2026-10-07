@@ -121,7 +121,7 @@ a run of three stay text), images, raw HTML or HTML
 comments, entity references such as `&amp;`, footnotes, `#` or `####` and deeper headings, setext
 headings, code or links in a heading, a table caption or a table cell, code or a link in a link's
 text, a link with a title or spaces around its destination, a `]` straight before a `(` with no
-`[` before them (escape the `]` as `\]`), nested lists, a task list item such as
+open `[` before them (escape the `]` as `\]`), nested lists, a task list item such as
 `- [ ]`, a heading, list, quote, table, code block or rule inside a list item or quote (such as
 `> ## Results`), an ordered list that does not start at 1, a list that changes its bullet or its
 `.` or `)` between items, a blank line between two items of one kind (one loose list in Markdown,
