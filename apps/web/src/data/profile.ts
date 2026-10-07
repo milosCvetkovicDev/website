@@ -70,10 +70,15 @@ export const LOCATION = { locality: 'Belgrade', country: 'Serbia' } as const;
 export const OCCUPATION = 'Senior Full-Stack Engineer';
 
 /**
- * The `/about` quick fact that states the total, label and figure together. The row lives here
- * whole rather than in the page record, so no copy module spells out a years figure of its own
- * (`single-source-metrics.test.ts`, R34).
+ * The `/about` quick fact that states the total, label, figure and basis together. The row lives
+ * here whole rather than in the page record, so no copy module spells out a years figure of its own
+ * (`single-source-metrics.test.ts`, R34). Its basis names the year the count starts from (#58),
+ * which the timeline printed under the quick facts shows as its first role.
  */
 export function experienceFact(asOf?: Date): Fact {
-  return { label: 'Years shipping code', value: String(yearsOfExperience(asOf)) };
+  return {
+    label: 'Years shipping code',
+    value: String(yearsOfExperience(asOf)),
+    basis: `Counted from the first role in the timeline below, ${CAREER_START_YEAR}.`,
+  };
 }

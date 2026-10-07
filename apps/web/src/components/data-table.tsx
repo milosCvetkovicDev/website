@@ -12,21 +12,21 @@ import type { DecoratedCell, Table, TableCell } from '@/data/pages/types';
  * one comma-separated list, a lead is set on a line of its own, and an icon is drawn but hidden
  * from assistive technology.
  *
- * A table of more than two columns (`isWideTable()`, the timeline and the toolkit) is a grid from
- * Tailwind's `sm` (640px) up and below it stacks each row into a block, as the owner chose on #226
- * (2026-10-03): the row header and the first cell after it on one line, joined by a drawn " · ",
- * then each remaining cell on a line of its own, and the column header row hidden from sight but
- * not from assistive technology. The grid has no minimum width, so it fits its box at every width
- * it is drawn at: its narrowest is about 440px, and `/about` and `/skills` give it 590px at 640px
- * (`e2e/table-layout.spec.ts`). A two-column table wraps inside the page at every width and never
- * stacks. Its column headers keep to one line from `sm` up; below it they wrap, and a word too long
- * for the line breaks anywhere, since a post may name its columns at any length: on one line, two
- * names of 29 characters between them pushed a 320px page sideways (measured once, 2026-10-07;
- * `e2e/mobile/tables.spec.ts` fails on any overflow). Stacked, a word too long for its line breaks
- * anywhere rather than push the page sideways; the grids keep the browser's own breaking, since
- * letting a word break there would change how their columns share the width. A wide table's first
- * cell must be text that can run on after the header, and none of its cells may be blank, which
- * `serialise.ts` checks of every table the site renders.
+ * A table of more than two columns (`isWideTable()`: the quick facts, the timeline and the toolkit)
+ * is a grid from Tailwind's `sm` (640px) up and below it stacks each row into a block, as the owner
+ * chose on #226 (2026-10-03): the row header and the first cell after it on one line, joined by a
+ * drawn " · ", then each remaining cell on a line of its own, and the column header row hidden from
+ * sight but not from assistive technology. The grid has no minimum width, so it fits its box at
+ * every width it is drawn at: the timeline's narrowest is about 440px, and `/about` and `/skills`
+ * give a table 590px at 640px (`e2e/table-layout.spec.ts`). A two-column table wraps inside the
+ * page at every width and never stacks. Its column headers keep to one line from `sm` up; below it
+ * they wrap, and a word too long for the line breaks anywhere, since a post may name its columns at
+ * any length: on one line, two names of 29 characters between them pushed a 320px page sideways
+ * (measured once, 2026-10-07; `e2e/mobile/tables.spec.ts` fails on any overflow). Stacked, a word
+ * too long for its line breaks anywhere rather than push the page sideways; the grids keep the
+ * browser's own breaking, since letting a word break there would change how their columns share the
+ * width. A wide table's first cell must be text that can run on after the header, and none of its
+ * cells may be blank, which `serialise.ts` checks of every table the site renders.
  *
  * Changing the `display` of table elements drops their table semantics in WebKit, so every element
  * carries its role explicitly (`table`, `rowgroup`, `row`, `columnheader`, `rowheader`, `cell`), and
