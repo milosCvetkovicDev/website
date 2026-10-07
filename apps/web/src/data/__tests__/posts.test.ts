@@ -61,8 +61,9 @@ const HREF = new RegExp(
   'i',
 );
 /**
- * This site's own hosts. A link to one is written as a path, which the page-exists check covers; a
- * full URL on them would skip it.
+ * This site's own hosts. A link to one, on any port, is written as a path, which the page-exists
+ * check covers; a full URL on them would skip it. The URL parser lowercases a host and keeps the
+ * port out of `hostname`.
  */
 const OWN_HOST = new URL(PRODUCTION_ORIGIN).hostname;
 const OWN_HOSTS = new Set([OWN_HOST, `www.${OWN_HOST}`]);
@@ -183,9 +184,12 @@ function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<strin
         if (url === null) {
           problems.push(elsewhere);
         } else if (OWN_HOSTS.has(url.hostname)) {
+          // In one problem with the page-exists check's finding, so the writer who swaps the URL
+          // for its path is not sent to a second failure.
+          const missing = pages.has(url.pathname) ? '' : ', which is no page on this site';
           problems.push(
-            `${at}: the link goes to ${JSON.stringify(href)} on this site's own origin; ` +
-              `write its path, ${JSON.stringify(url.pathname + url.search + url.hash)}`,
+            `${at}: the link goes to ${JSON.stringify(href)}, which names this site's own host; ` +
+              `write its path, ${JSON.stringify(url.pathname + url.search + url.hash)}${missing}`,
           );
         }
       }
@@ -1029,18 +1033,24 @@ const defects: [string, Post[], RegExp][] = [
     [withLink('/blog/fixture-draft'), draftPost],
     /, piece 2: the link goes to "\/blog\/fixture-draft", which is no page on this site$/,
   ],
-  // A link to this site's own origin skips the page-exists check above, so it is written as a path.
-  ...[
-    ['https://miloscvetkovic.dev/wrok', '/wrok'],
-    ['https://www.miloscvetkovic.dev/work?view=all#top', '/work?view=all#top'],
-    ['https://MilosCvetkovic.dev', '/'],
-    ['https://miloscvetkovic.dev:443/blog', '/blog'],
-  ].map(([href, path]): [string, Post[], RegExp] => [
-    `a link to ${href}, on this site's own origin`,
+  // A link that names this site's own host, on any port, is written as a path, which the
+  // page-exists check covers; a path that names no page is reported in the same problem.
+  ...(
+    [
+      ['https://miloscvetkovic.dev/wrok', '/wrok', 'missing'],
+      ['https://www.miloscvetkovic.dev/work?view=all#top', '/work?view=all#top', 'page'],
+      ['https://MilosCvetkovic.dev', '/', 'page'],
+      ['https://miloscvetkovic.dev:443/blog', '/blog', 'page'],
+      ['https://miloscvetkovic.dev:8443/work', '/work', 'page'],
+      ['https://WWW.miloscvetkovic.dev/work', '/work', 'page'],
+    ] as const
+  ).map(([href, path, target]): [string, Post[], RegExp] => [
+    `a link to ${href}, which names this site's own host`,
     [withLink(href)],
     new RegExp(
-      `, piece 2: the link goes to ${escapeRegExp(JSON.stringify(href))} on this site's own ` +
-        `origin; write its path, ${escapeRegExp(JSON.stringify(path))}$`,
+      `, piece 2: the link goes to ${escapeRegExp(JSON.stringify(href))}, which names this ` +
+        `site's own host; write its path, ${escapeRegExp(JSON.stringify(path))}` +
+        `${target === 'missing' ? ', which is no page on this site' : ''}$`,
     ),
   ]),
   [
