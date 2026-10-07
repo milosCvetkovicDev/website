@@ -7707,6 +7707,30 @@
       }
     },
     {
+      "id": "adr-0030-correction-cache-control-rules",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "The rules are `apps/web/e2e/support/cache-control.ts`",
+      "claim": "The live negotiation spec takes its revalidation rules from e2e/support/cache-control.ts, which counts no-store and refuses stale-while-revalidate and stale-if-error.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e/support/cache-control.ts",
+        "contains": "directives.has('stale-while-revalidate') || directives.has('stale-if-error')"
+      }
+    },
+    {
+      "id": "adr-0030-correction-live-spec-uses-rules",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "The rules are `apps/web/e2e/support/cache-control.ts`",
+      "claim": "The live negotiation spec imports its cache bound, entity tag and Vary rules from e2e/support/cache-control.ts.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e-live/markdown-negotiation.spec.ts",
+        "contains": "import { cacheBound, entityTag, variesOnAccept } from '../e2e/support/cache-control';"
+      }
+    },
+    {
       "id": "adr-0030-relative-import",
       "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
       "anchor": "`content-date.ts` by relative path",

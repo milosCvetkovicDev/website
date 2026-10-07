@@ -175,14 +175,18 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   `navigator.webdriver` is true. `markdown-negotiation.spec.ts` checks that the CDN keys on
   `Accept` (ADR 0030): on every route with a Markdown twin, a Markdown request then a browser's,
   and the reverse, with no cache-busting query, the browser must get `text/html` and the agent
-  `text/markdown; charset=utf-8`. Then a cache downstream must be unable to mix the two up: the
-  Markdown answer lists `accept` in `Vary`, or, as on Vercel, which drops it there (#217), its
-  `Cache-Control` makes every cache revalidate (`no-cache`, or `max-age=0` with `must-revalidate`,
-  and no `s-maxage` or `stale-*`), its ETag differs from the page's, and a request with the other
-  representation's ETag in `If-None-Match` gets `200` and the type it asked for, in both
-  directions. A failed deployment or scheduled run opens the issue "Live check failed on the
-  production site", or comments on the open one, and never closes one; the job holds
-  `issues: write` for that step alone.
+  `text/markdown; charset=utf-8`. A third test per route checks that a cache downstream cannot
+  hand the twin to a browser: the Markdown answer's `Vary` lists `accept` or is `*`, or, as on
+  Vercel, which drops `accept` there (#217), its caching fields (`Cache-Control`, and any
+  `CDN-Cache-Control` or `Surrogate-Control`) forbid storing it or make every cache revalidate it
+  (`no-cache`, or `max-age=0` with `must-revalidate`, and no `s-maxage` above 0 or `stale-*`), its
+  one ETag differs from the page's, each representation's own ETag in `If-None-Match` gets a `304`,
+  and the other's gets `200` with the type asked for. The rules live in
+  `e2e/support/cache-control.ts`, unit-tested in `src/test/cache-control.test.ts`, and fail closed
+  on a field that does not parse. A cache may still hand the page to an agent (ADR 0030). A failed
+  deployment or scheduled run opens the issue "Live check failed on the production site", or
+  comments on the open one, and never closes one; the job holds `issues: write` for that step
+  alone.
   Locally: `pnpm --filter web exec playwright test --config playwright.live.config.ts`, with
   `LIVE_URL` for another target.
 - `.github/workflows/flake-hunt.yml` hunts flaky e2e tests every night at 02:17 UTC and on manual

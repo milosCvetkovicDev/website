@@ -206,15 +206,22 @@ the site. The rest of the bullet is unchanged, though rewrapped.
 What keeps a cache downstream of Vercel from handing the twin to a browser instead, measured on the
 apex on 2026-10-07: the negotiated answer carries
 `Cache-Control: public, max-age=0, must-revalidate`, so a cache that follows RFC 9111 revalidates it
-before each reuse, and a strong ETag that differs from the page's at the same URL. A request with a
-browser's `Accept` and the twin's ETag in `If-None-Match` is answered `200 text/html`, not `304`,
-and a request for Markdown with the page's ETag is answered `200` Markdown. Since #217 the live
-check holds that bound where the Markdown answer's `Vary` lacks `accept`:
-`apps/web/e2e-live/markdown-negotiation.spec.ts` passes on `accept` in that `Vary`, or on all three
-of these: a `Cache-Control` of `no-cache`, or of `max-age=0` with `must-revalidate`, with no
-`s-maxage`, `stale-while-revalidate` or `stale-if-error`; an ETag that differs from the page's; and
-those revalidations answered with the representation asked for, in both directions. A cache that
-ignores `must-revalidate` breaks RFC 9111 and is outside what it checks.
+before each reuse, and a strong ETag that differs from the page's at the same URL. That
+`Cache-Control` is Vercel's default for prerendered output; nothing in `next.config.ts` sets it. A
+request with a browser's `Accept` and the twin's ETag in `If-None-Match` is answered
+`200 text/html`, not `304`, and a request for Markdown with the page's ETag is answered `200`
+Markdown. Since #217 the live check holds that bound where the Markdown answer's `Vary` lists
+neither `accept` nor `*`: `apps/web/e2e-live/markdown-negotiation.spec.ts` passes on such a `Vary`,
+or on caching fields that forbid storing the answer, or on all of these: caching fields
+(`Cache-Control`, and any `CDN-Cache-Control` or `Surrogate-Control`) of `no-cache`, or of
+`max-age=0` with `must-revalidate`, with no `s-maxage` above 0, `stale-while-revalidate` or
+`stale-if-error`; one well-formed ETag on each answer, the two different and the Markdown one stable
+across the test; each representation's own ETag answered `304`; and the other's answered `200` with
+the representation asked for, alone or beside the own one. The rules are
+`apps/web/e2e/support/cache-control.ts`, which fails closed on a field that does not parse. A cache
+that ignores `must-revalidate` breaks RFC 9111 and is outside what it checks. So is the agent's
+side: the page's answer lacks `Accept` in its `Vary` on both servers, and a cache may hand it to an
+agent, as `### Trade-offs` already accepts; the check does not read the page's `Cache-Control`.
 
 Evidence:
 
@@ -231,7 +238,9 @@ Evidence:
   `cache-control: public, max-age=0, must-revalidate`, `etag: "d3f5b3507e24a0214cacc669c54f6641"`,
   `x-vercel-cache: HIT`, `x-content-type-options: nosniff`, `x-frame-options: DENY` and the CSP.
   With Chromium's `Accept` for a navigation the same URL printed
-  `content-type: text/html; charset=utf-8` and `etag: "0fac66c0b05a9ee915c174613f987e34"`. With
+  `content-type: text/html; charset=utf-8`, `etag: "0fac66c0b05a9ee915c174613f987e34"`, the same
+  `cache-control` and the same `vary`,
+  `rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch`. With
   Chromium's `Accept` and `If-None-Match: "d3f5b3507e24a0214cacc669c54f6641"` it answered
   `200 text/html; charset=utf-8`, and with `Accept: text/markdown, */*` and
   `If-None-Match: "0fac66c0b05a9ee915c174613f987e34"` it answered

@@ -213,9 +213,10 @@ export function markdownRewrites() {
  * ADR 0023's and ADR 0025's entries do not set. On an HTML page Next replaces this `Vary` with its
  * own after `headers()` has run (ADR 0030). On Vercel the negotiated Markdown answer loses it too,
  * while the other `headers()` entries arrive: the platform sends the prerendered answer's own
- * `Vary`, Next's (measured 2026-10-07, ADR 0030's correction of that date). There
- * `Cache-Control: public, max-age=0, must-revalidate` and a different ETag per representation keep
- * a downstream cache from mixing them up, which `e2e-live/markdown-negotiation.spec.ts` checks.
+ * `Vary`, Next's (measured 2026-10-07, ADR 0030's correction of that date). There Vercel's
+ * default `Cache-Control: public, max-age=0, must-revalidate`, which nothing here sets, and a
+ * different ETag per representation keep a downstream cache from handing the twin to a browser,
+ * which `e2e-live/markdown-negotiation.spec.ts` checks after every production deployment.
  */
 export function varyOnAccept() {
   return MARKDOWN_ROUTES.map((source) => ({

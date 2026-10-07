@@ -48,15 +48,16 @@ path, before the rewrite, so under `next start` a negotiated Markdown answer car
 negotiated Markdown answer loses `Accept` too: the platform sends the prerendered answer's own
 `Vary`, Next's, while the other `headers()` entries arrive (measured 2026-10-07, #217, ADR 0030's
 correction of that date). There `Cache-Control: public, max-age=0, must-revalidate` and a different
-ETag per representation keep a downstream cache from mixing the two up.
+ETag per representation keep a downstream cache from handing the twin to a browser. That
+`Cache-Control` is Vercel's default for prerendered output, not a value `headers()` sets.
 `src/test/next-config.test.ts` pins the rules through `unstable_getResponseFromNextConfig` and
 fails when the negotiated routes and the twin handlers under `src/app` differ;
 `e2e/markdown-negotiation.spec.ts` checks them on the wire, `Vary: Accept` included, and
 `e2e-live/markdown-negotiation.spec.ts`, run by the live check after every production deployment
-and daily, checks that Vercel's CDN keeps the two apart and that a cache downstream could not mix
-them up: `Accept` in the Markdown answer's `Vary`, or forced revalidation under an ETag of its own
-that the site answers with the other representation (`.github/workflows/live-check.yml`,
-`ci-and-scripts.md`).
+and daily, checks that Vercel's CDN keeps the two apart and that a cache downstream could not hand
+the twin to a browser: `Accept` in the Markdown answer's `Vary`, or forced revalidation under an
+ETag of its own that the site answers with the other representation
+(`.github/workflows/live-check.yml`, `ci-and-scripts.md`).
 
 ## Gotchas
 
