@@ -7525,11 +7525,11 @@
       "anchor": "| 0030 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0030's record carries the status line \"Accepted\".",
+      "claim": "ADR 0030's record carries the status line \"Accepted (corrected 2026-10-07)\".",
       "check": {
         "file": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-10-07)"
       }
     },
     {
@@ -7538,11 +7538,11 @@
       "anchor": "| 0030 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0030 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0030 gives the record's status line, \"Accepted (corrected 2026-10-07)\" (ADR 0012: the status in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0030 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-10-07)"
       }
     },
     {
@@ -7646,6 +7646,16 @@
       "evaluation": "live",
       "covers": [{ "kind": "link", "token": "0026-vercel-web-analytics.md" }],
       "check": { "path": "docs/adr/0026-vercel-web-analytics.md" }
+    },
+    {
+      "id": "adr-0030-link-0012-correcting-accepted-records",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0012-correcting-accepted-records.md)",
+      "claim": "The link to 0012-correcting-accepted-records.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0012-correcting-accepted-records.md" }],
+      "check": { "path": "docs/adr/0012-correcting-accepted-records.md" }
     },
     {
       "id": "adr-0030-script-check-build-output",

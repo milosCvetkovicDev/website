@@ -207,11 +207,15 @@ export function markdownRewrites() {
 /**
  * `Vary: Accept` on each route that negotiates, so a shared or browser cache keeps the two
  * representations of one URL apart. Next matches `headers()` against the requested path, before
- * the rewrite, so the negotiated Markdown answer carries it. The twin's own URL is left out: it
- * serves one representation whatever the request accepts, and varying it would only split caches
- * by `Accept` string. Its own entries, over exactly these paths: the key is one ADR 0023's and
- * ADR 0025's entries do not set. On an HTML page Next replaces this `Vary` with its own after
- * `headers()` has run (ADR 0030).
+ * the rewrite, so under `next start` the negotiated Markdown answer carries it. The twin's own URL
+ * is left out: it serves one representation whatever the request accepts, and varying it would
+ * only split caches by `Accept` string. Its own entries, over exactly these paths: the key is one
+ * ADR 0023's and ADR 0025's entries do not set. On an HTML page Next replaces this `Vary` with its
+ * own after `headers()` has run (ADR 0030). On Vercel the negotiated Markdown answer loses it too,
+ * while the other `headers()` entries arrive: the platform sends the prerendered answer's own
+ * `Vary`, Next's (measured 2026-10-07, ADR 0030's correction of that date). There
+ * `Cache-Control: public, max-age=0, must-revalidate` and a different ETag per representation keep
+ * a downstream cache from mixing them up, which `e2e-live/markdown-negotiation.spec.ts` checks.
  */
 export function varyOnAccept() {
   return MARKDOWN_ROUTES.map((source) => ({

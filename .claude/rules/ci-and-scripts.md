@@ -175,9 +175,14 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   `navigator.webdriver` is true. `markdown-negotiation.spec.ts` checks that the CDN keys on
   `Accept` (ADR 0030): on every route with a Markdown twin, a Markdown request then a browser's,
   and the reverse, with no cache-busting query, the browser must get `text/html` and the agent
-  `text/markdown; charset=utf-8` with `accept` in `Vary`. A failed deployment or scheduled run
-  opens the issue "Live check failed on the production site", or comments on the open one; the job
-  holds `issues: write` for that step alone.
+  `text/markdown; charset=utf-8`. Then a cache downstream must be unable to mix the two up: the
+  Markdown answer lists `accept` in `Vary`, or, as on Vercel, which drops it there (#217), its
+  `Cache-Control` makes every cache revalidate (`no-cache`, or `max-age=0` with `must-revalidate`,
+  and no `s-maxage` or `stale-*`), its ETag differs from the page's, and a request with the other
+  representation's ETag in `If-None-Match` gets `200` and the type it asked for, in both
+  directions. A failed deployment or scheduled run opens the issue "Live check failed on the
+  production site", or comments on the open one, and never closes one; the job holds
+  `issues: write` for that step alone.
   Locally: `pnpm --filter web exec playwright test --config playwright.live.config.ts`, with
   `LIVE_URL` for another target.
 - `.github/workflows/flake-hunt.yml` hunts flaky e2e tests every night at 02:17 UTC and on manual
