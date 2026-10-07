@@ -41,7 +41,8 @@
  *   names and row headers have no spaces at either end or two in a row; no text outside a code
  *   block holds a line break, a control or a direction character; inline code holds more than
  *   whitespace, and no two pieces of it stand side by side, which the twin would write as one; a
- *   link's text says where it goes; and a link to this site names a page that exists.
+ *   link's text says where it goes; and a link to this site is written as a path, not as a URL on
+ *   the site's own origin, and names a page that exists.
  */
 
 /**

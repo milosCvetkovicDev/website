@@ -17,6 +17,7 @@ import { isWideTable } from '@/data/pages/table';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { formatContentDate, isPublishableContentDate } from '@/lib/content-date';
 import { NO_PUBLISHED_POST_SLUG } from '@/lib/post-static-params';
+import { PRODUCTION_ORIGIN } from '@/lib/site-origin';
 import { draftPost, everyBlockPost, fixturePosts, hostileTitlePost } from '@/test/fixtures/posts';
 import {
   buildPostIndex,
@@ -59,6 +60,12 @@ const HREF = new RegExp(
   String.raw`^(?:https://[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d{1,5})?(?:[/?#]${URL_CHARACTER}*)?|/(?!/)${URL_CHARACTER}*)$`,
   'i',
 );
+/**
+ * This site's own hosts. A link to one is written as a path, which the page-exists check covers; a
+ * full URL on them would skip it.
+ */
+const OWN_HOST = new URL(PRODUCTION_ORIGIN).hostname;
+const OWN_HOSTS = new Set([OWN_HOST, `www.${OWN_HOST}`]);
 /** Link text that says nothing of where the link goes, as a screen reader's list of links reads it. */
 const VAGUE_LINK_TEXT = /^(?:here|click here|this|that|link|this link|more|read more)[.!:]?$/i;
 /** A code block's language as a Markdown fence's info string and a `language-*` class can carry it. */
@@ -153,10 +160,20 @@ function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<strin
         problems.push(
           `${at}: the link goes to ${JSON.stringify(href)}, which is neither an https URL nor a path on this site`,
         );
-      } else if (href.startsWith('/') && !pages.has(href.split(/[?#]/)[0])) {
-        problems.push(
-          `${at}: the link goes to ${JSON.stringify(href)}, which is no page on this site`,
-        );
+      } else if (href.startsWith('/')) {
+        if (!pages.has(href.split(/[?#]/)[0])) {
+          problems.push(
+            `${at}: the link goes to ${JSON.stringify(href)}, which is no page on this site`,
+          );
+        }
+      } else {
+        const url = new URL(href);
+        if (OWN_HOSTS.has(url.hostname)) {
+          problems.push(
+            `${at}: the link goes to ${JSON.stringify(href)} on this site's own origin; ` +
+              `write its path, ${JSON.stringify(url.pathname + url.search + url.hash)}`,
+          );
+        }
       }
     } else {
       afterCode = false;
@@ -994,6 +1011,20 @@ const defects: [string, Post[], RegExp][] = [
     [withLink('/blog/fixture-draft'), draftPost],
     /, piece 2: the link goes to "\/blog\/fixture-draft", which is no page on this site$/,
   ],
+  // A link to this site's own origin skips the page-exists check above, so it is written as a path.
+  ...[
+    ['https://miloscvetkovic.dev/wrok', '/wrok'],
+    ['https://www.miloscvetkovic.dev/work?view=all#top', '/work?view=all#top'],
+    ['https://MilosCvetkovic.dev', '/'],
+    ['https://miloscvetkovic.dev:443/blog', '/blog'],
+  ].map(([href, path]): [string, Post[], RegExp] => [
+    `a link to ${href}, on this site's own origin`,
+    [withLink(href)],
+    new RegExp(
+      `, piece 2: the link goes to ${escapeRegExp(JSON.stringify(href))} on this site's own ` +
+        `origin; write its path, ${escapeRegExp(JSON.stringify(path))}$`,
+    ),
+  ]),
   [
     'a piece that is both inline code and a link',
     [withBody(paragraph('See ', { code: 'x', text: 'y', href: 'javascript:alert(1)' }, '.'))],
@@ -1227,6 +1258,9 @@ const accepted: [string, Post[]][] = [
     '/work?view=all#top',
     'https://example.com:8443/wiki/A_(b)',
     'https://example.com/%E2%9C%93',
+    'https://miloscvetkovic.dev.example.com/work',
+    'https://blog.miloscvetkovic.dev/work',
+    'https://example.com/miloscvetkovic.dev',
   ].map((href): [string, Post[]] => [`a link to ${href}`, [withLink(href)]]),
   ['a link to a published post', [withLink('/blog/fixture-hostile-title'), hostileTitlePost]],
   [
