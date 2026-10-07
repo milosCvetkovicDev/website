@@ -6,6 +6,7 @@ import { DataTable } from '@/components/data-table';
 import {
   adjacentCaseStudies,
   caseStudies,
+  caseStudyMetricScope,
   caseStudyPageTitle,
   formatMetric,
   getCaseStudy,
@@ -73,6 +74,10 @@ export default async function CaseStudyPage({ params }: PageProps) {
     caseStudy.updatedAt,
   );
   const { metric } = caseStudy.highlight;
+  // What the figure counted, then, once the owner has defined it, when and how it was measured:
+  // one sentence from one producer, which the twin's Basis line writes too (#58). A study with no
+  // basis to state throws here, as its twin does, and fails the prerender.
+  const scope = caseStudyMetricScope(caseStudy);
 
   return (
     <div className="py-16 md:py-24">
@@ -140,7 +145,8 @@ export default async function CaseStudyPage({ params }: PageProps) {
         </header>
 
         {/* The headline figure the study's cards on / and /work advertise, printed as they print it,
-            with the basis that says what it counted (#49). A named region rather than a heading:
+            with its scope: the basis that says what it counted (#49), and the window and method
+            once the owner has defined them (#58). A named region rather than a heading:
             landmark navigation reaches it, and markdown-twins.spec.ts, which requires every h2 and
             h3 in main to be a section of the twin, is not asked to find one. */}
         <section
@@ -155,7 +161,7 @@ export default async function CaseStudyPage({ params }: PageProps) {
               {metric.label}
             </span>
           </p>
-          <p className="mt-4 leading-relaxed text-[var(--muted)]">{metric.basis}</p>
+          <p className="mt-4 leading-relaxed text-[var(--muted)]">{scope}</p>
         </section>
 
         {/* The Challenge */}
