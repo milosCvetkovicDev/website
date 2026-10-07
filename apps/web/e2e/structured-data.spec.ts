@@ -1,10 +1,10 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { CASE_STUDY_ROUTES } from './routes';
+import { jsonLdScripts } from './support/json-ld';
 import {
   clip,
   describeErrors,
   jsonLdOpenTagCount,
-  jsonLdScripts,
   readVerdict,
   type Verdict,
 } from './support/schema-validator';

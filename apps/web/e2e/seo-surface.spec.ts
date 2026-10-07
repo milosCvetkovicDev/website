@@ -29,6 +29,7 @@ import { facts, shownFacts, timeline } from '../src/data/pages/about';
 import { skillCategories } from '../src/data/pages/skills';
 // The Person's visible facts (57b, the describe at the end of this file).
 import { servedText } from './support/served-text';
+import { jsonLdNodes, jsonLdSources } from './support/json-ld';
 // The scope every figure states (58e, the describe before the Person's).
 import { visible } from '../src/test/markdown';
 import {
@@ -425,46 +426,32 @@ test('no route, nor the sitemap, robots.txt or the manifest, serves an owner pla
 });
 
 /**
- * A route's JSON-LD nodes, its canonical links and its "Last updated" lines, as served. The browser's
- * `DOMParser` reads the response, as `servedCaseStudy()` below does: the canonical comes from the
- * parsed `<head>`, never from the copy of the head in the RSC flight payload, and only real `<time>`
- * elements count.
+ * A route's JSON-LD nodes, its canonical links and its "Last updated" lines, as served. The nodes
+ * come from `jsonLdNodes` in `support/json-ld.ts`, as every spec's do. The browser's `DOMParser`
+ * reads the rest, as `servedCaseStudy()` below does: the canonical comes from the parsed `<head>`,
+ * never from the copy of the head in the RSC flight payload, and only real `<time>` elements count.
  */
 async function servedGraph(request: APIRequestContext, page: Page, path: string) {
   const response = await request.get(path);
   expect(response.status(), `GET ${path}`).toBe(expectedStatus(path));
-  const { sources, canonicals, lastUpdated, title, lang } = await page.evaluate(
-    (markup) => {
-      const doc = new DOMParser().parseFromString(markup, 'text/html');
-      return {
-        title: doc.head.querySelector('title')?.textContent ?? null,
-        lang: doc.documentElement.getAttribute('lang'),
-        sources: [...doc.querySelectorAll('script[type="application/ld+json"]')].map(
-          (script) => script.textContent ?? '',
-        ),
-        canonicals: [...doc.head.querySelectorAll('link[rel="canonical"]')].map(
-          (link) => link.getAttribute('href') ?? '',
-        ),
-        lastUpdated: [...doc.body.querySelectorAll('p')]
-          .filter((p) => (p.textContent ?? '').trim().startsWith('Last updated'))
-          .map((p) => ({
-            text: (p.textContent ?? '').trim(),
-            datetimes: [...p.querySelectorAll('time')].map((time) => time.getAttribute('datetime')),
-          })),
-      };
-    },
-    await response.text(),
-  );
-  const nodes = sources.map((source, index) => {
-    try {
-      return JSON.parse(source) as Record<string, unknown>;
-    } catch (error) {
-      throw new Error(
-        `${path}: JSON-LD block ${index} does not parse (${String(error)}): ${source}`,
-      );
-    }
-  });
-  return { nodes, canonicals, lastUpdated, title, lang };
+  const html = await response.text();
+  const { canonicals, lastUpdated, title, lang } = await page.evaluate((markup) => {
+    const doc = new DOMParser().parseFromString(markup, 'text/html');
+    return {
+      title: doc.head.querySelector('title')?.textContent ?? null,
+      lang: doc.documentElement.getAttribute('lang'),
+      canonicals: [...doc.head.querySelectorAll('link[rel="canonical"]')].map(
+        (link) => link.getAttribute('href') ?? '',
+      ),
+      lastUpdated: [...doc.body.querySelectorAll('p')]
+        .filter((p) => (p.textContent ?? '').trim().startsWith('Last updated'))
+        .map((p) => ({
+          text: (p.textContent ?? '').trim(),
+          datetimes: [...p.querySelectorAll('time')].map((time) => time.getAttribute('datetime')),
+        })),
+    };
+  }, html);
+  return { nodes: jsonLdNodes(html, path), canonicals, lastUpdated, title, lang };
 }
 
 /** Every string under a key that holds a link, at any depth, with where it sits. */
@@ -713,21 +700,13 @@ test('the Person schema, the hero and the /about description carry one derived y
   const home = await request.get('/');
   expect(home.status(), 'GET /').toBe(200);
   const homeHtml = await home.text();
-  const blocks = [
-    ...homeHtml.matchAll(/<script type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi),
-  ].map(([, body], index) => {
-    try {
-      return JSON.parse(body) as { '@type': string; description?: string };
-    } catch (error) {
-      throw new Error(`JSON-LD block ${index} on / does not parse: ${String(error)}\n${body}`);
-    }
-  });
-  const person = blocks.find((block) => block['@type'] === 'Person');
+  const person = jsonLdNodes(homeHtml, '/').find((node) => node['@type'] === 'Person');
   const about = await fetchHead(request, '/about');
   expect(about.status, 'GET /about').toBe(200);
 
   const surfaces = {
-    'the Person JSON-LD description on /': person?.description ?? '',
+    'the Person JSON-LD description on /':
+      typeof person?.description === 'string' ? person.description : '',
     'the /about meta description': first(about.meta, 'description') ?? '',
     'the /about og:description': first(about.meta, 'og:description') ?? '',
     // The player card's XP row, as served: a crawler reads it without running the hero.
@@ -831,56 +810,42 @@ interface ServedDate {
 
 /**
  * A case study as served: how many `<time>` elements its body has, the labelled dates among them,
- * and its JSON-LD blocks. The browser's `DOMParser` reads the response, as `served-html.spec.ts` and
- * `hydration-marker.spec.ts` do, and not a regular expression: the RSC flight payload repeats the
- * dates and both labels, and the JSON-LD's `datePublished` contains one of them, all inside scripts
- * where no reader sees them. Parsed, a script's text is never an element, so only real `<time>`
- * elements count, and a document made by `DOMParser` runs none of its scripts. A label is read by
- * structure, a `<dt>` whose next sibling is a `<dd>` holding only the `<time>`, so a separator or
- * hidden text added next to one reads as a changed line, not as a wrong date.
+ * and its JSON-LD blocks (through `jsonLdNodes`). The browser's `DOMParser` reads the dates, as
+ * `served-html.spec.ts` and `hydration-marker.spec.ts` do, and not a regular expression: the RSC
+ * flight payload repeats the dates and both labels, and the JSON-LD's `datePublished` contains one
+ * of them, all inside scripts where no reader sees them. Parsed, a script's text is never an
+ * element, so only real `<time>` elements count, and a document made by `DOMParser` runs none
+ * of its scripts. A label is read by structure, a `<dt>` whose next sibling is a `<dd>` holding
+ * only the `<time>`, so a separator or hidden text added next to one reads as a changed line, not
+ * as a wrong date.
  */
 async function servedCaseStudy(request: APIRequestContext, page: Page, path: string) {
   const response = await request.get(path);
   expect(response.status(), `${path} should answer 200`).toBe(200);
-  const { timeCount, dates, jsonLdSources } = await page.evaluate(
-    (markup) => {
-      const doc = new DOMParser().parseFromString(markup, 'text/html');
-      const labelled: ServedDate[] = [];
-      for (const dt of doc.body.querySelectorAll('dt')) {
-        const dd = dt.nextElementSibling;
-        const time = dd?.firstElementChild;
-        if (dt.children.length > 0 || dd?.localName !== 'dd' || time?.localName !== 'time')
-          continue;
-        const onlyTheTime = [...dd.childNodes].every(
-          (node) => node === time || (node instanceof Text && node.data.trim() === ''),
-        );
-        if (!onlyTheTime || time.children.length > 0) continue;
-        labelled.push({
-          label: (dt.textContent ?? '').trim(),
-          datetime: time.getAttribute('datetime') ?? '',
-          text: time.textContent ?? '',
-        });
-      }
-      return {
-        timeCount: doc.body.querySelectorAll('time').length,
-        dates: labelled,
-        jsonLdSources: [...doc.querySelectorAll('script[type="application/ld+json"]')].map(
-          (script) => script.textContent ?? '',
-        ),
-      };
-    },
-    await response.text(),
-  );
-  const jsonLd = jsonLdSources.map((block, index) => {
-    try {
-      return JSON.parse(block) as Record<string, unknown>;
-    } catch (error) {
-      throw new Error(
-        `${path}: JSON-LD block ${index} does not parse (${String(error)}): ${block}`,
+  const html = await response.text();
+  const { timeCount, dates } = await page.evaluate((markup) => {
+    const doc = new DOMParser().parseFromString(markup, 'text/html');
+    const labelled: ServedDate[] = [];
+    for (const dt of doc.body.querySelectorAll('dt')) {
+      const dd = dt.nextElementSibling;
+      const time = dd?.firstElementChild;
+      if (dt.children.length > 0 || dd?.localName !== 'dd' || time?.localName !== 'time') continue;
+      const onlyTheTime = [...dd.childNodes].every(
+        (node) => node === time || (node instanceof Text && node.data.trim() === ''),
       );
+      if (!onlyTheTime || time.children.length > 0) continue;
+      labelled.push({
+        label: (dt.textContent ?? '').trim(),
+        datetime: time.getAttribute('datetime') ?? '',
+        text: time.textContent ?? '',
+      });
     }
-  });
-  return { timeCount, dates, jsonLd };
+    return {
+      timeCount: doc.body.querySelectorAll('time').length,
+      dates: labelled,
+    };
+  }, html);
+  return { timeCount, dates, jsonLd: jsonLdNodes(html, path) };
 }
 
 /**
@@ -1552,19 +1517,14 @@ test.describe('the Person states only what the pages show (#57)', () => {
       const response = await request.get(path);
       expect(response.status(), `GET ${path}`).toBe(expectedStatus(path));
       const html = await response.text();
-      const { hrefs, blocks } = await page.evaluate((markup) => {
+      const hrefs = await page.evaluate((markup) => {
         const doc = new DOMParser().parseFromString(markup, 'text/html');
-        return {
-          hrefs: [...doc.body.querySelectorAll('a[href]')].map(
-            (link) => link.getAttribute('href') ?? '',
-          ),
-          blocks: [...doc.querySelectorAll('script[type="application/ld+json"]')].map(
-            (script) => script.textContent ?? '',
-          ),
-        };
+        return [...doc.body.querySelectorAll('a[href]')].map(
+          (link) => link.getAttribute('href') ?? '',
+        );
       }, html);
       const nodes: Record<string, unknown>[] = [];
-      blocks.forEach((block, index) => {
+      jsonLdSources(html).forEach((block, index) => {
         let parsed: unknown;
         try {
           parsed = JSON.parse(block);

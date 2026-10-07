@@ -35,6 +35,15 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   GSAP tween reads its start value through `getComputedStyle`, which jsdom answers by matching its
   user-agent stylesheet against the element, so a mount that builds a timeline is expensive:
   prefer walking one mount through a lifecycle over re-mounting per assertion.
+- A test about one GSAP tween picks it through
+  `src/components/animated-hero/__tests__/gsap-tweens.ts`, never by indexing a GSAP spy's
+  `mock.calls` or `mock.results`: `calls[0]` is whichever tween the component happened to create
+  first, and the next tween added ahead of it silently becomes the subject. `pickTween` reads a spy
+  on `gsap.to` and `pickFromToTween` one on `gsap.fromTo`, each with a query that says what the tween
+  is (`progressDriver(seconds)`, `fromToOf(element, what)`, or a predicate of your own); both throw
+  when no call or several calls match, listing every call the spy saw. Tweens built on a timeline
+  never reach either spy. Find the target through the data hook the component puts on it
+  (`data-loop`, `data-reveal`), as `loop-phase.test.tsx` and `gauntlet-phase.test.tsx` do.
 - `testTimeout` stays at the 5s default. A test that genuinely needs longer takes an explicit
   timeout as `it`'s third argument, with a comment saying why, as the phase lifecycle test in
   `src/components/animated-hero/__tests__/story-phases.test.tsx` does. Raising the global default

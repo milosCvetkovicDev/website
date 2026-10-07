@@ -28,19 +28,12 @@ export interface ValidatorReport {
 
 export type Verdict = { reached: true; report: ValidatorReport } | { reached: false; why: string };
 
-/** Every ld+json script element, whatever the order and quoting of its attributes. */
-const LD_JSON_ELEMENT =
-  /<script\b[^>]*\btype\s*=\s*["']?application\/ld\+json["']?[^>]*>[\s\S]*?<\/script>/gi;
-
 /**
- * Every ld+json script element in a served document, verbatim. A pattern is enough here: the blocks
- * are written through `serializeJsonLd`, which escapes every `<`, so none can contain `</script>`;
- * and Next's flight payload further down describes each one as a React element in escaped JSON
- * (`\"type\":\"application/ld+json\"`), which is not inside a script tag, so nothing is sent twice.
+ * The extractor is the one every spec reads JSON-LD with, in `json-ld.ts`; it is re-exported here
+ * so `src/test/schema-validator.test.ts` pins it beside `jsonLdOpenTagCount`, which must agree
+ * with it.
  */
-export function jsonLdScripts(html: string): string[] {
-  return [...html.matchAll(LD_JSON_ELEMENT)].map(([element]) => element);
-}
+export { jsonLdScripts } from './json-ld';
 
 /**
  * The script open tags that mention `application/ld+json` anywhere in their attributes, counted

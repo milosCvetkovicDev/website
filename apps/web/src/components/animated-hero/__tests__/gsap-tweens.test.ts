@@ -7,12 +7,25 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { gsap } from '../gsap-runtime';
-import { countTweens, pickTween, progressDriver } from './gsap-tweens';
+import {
+  countTweens,
+  fromToOf,
+  type FromToCall,
+  pickFromToTween,
+  pickTween,
+  progressDriver,
+} from './gsap-tweens';
 
 /** A `gsap.to` stand-in that records its calls and returns a distinct token for each. */
 function toSpy() {
   let made = 0;
   return vi.fn<typeof gsap.to>(() => ({ made: ++made }) as unknown as gsap.core.Tween);
+}
+
+/** A `gsap.fromTo` stand-in, the same way. */
+function fromToSpy() {
+  let made = 0;
+  return vi.fn<FromToCall>(() => ({ made: ++made }) as unknown as gsap.core.Tween);
 }
 
 const onUpdate = () => {};
@@ -153,6 +166,82 @@ describe('pickTween', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('pickFromToTween', () => {
+  it('returns the target and tween of the call on that element, wherever it falls', () => {
+    const fromTo = fromToSpy();
+    const toast = new (class Toast {})();
+    const alert = new (class Alert {})();
+    fromTo(toast, { opacity: 0 }, { opacity: 1 });
+    const revealed = fromTo(alert, { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1 });
+    fromTo(toast, { y: 20 }, { y: 0 });
+
+    const picked = pickFromToTween(fromTo, fromToOf(alert, 'the alert reveal'));
+
+    expect(picked.target).toBe(alert);
+    expect(picked.tween).toBe(revealed);
+  });
+
+  it('fails, naming the method and both vars of every call, when no call matches', () => {
+    const fromTo = fromToSpy();
+    fromTo({}, { opacity: 0, scale: 0.9 }, { opacity: 1, duration: 0.3 });
+
+    expect(() => pickFromToTween(fromTo, fromToOf({}, 'the alert reveal'))).toThrow(
+      'No gsap.fromTo call is the alert reveal. The spy saw 1 call: ' +
+        '#0 a plain object { opacity: 0, scale: 0.9 } -> { opacity: 1, duration: 0.3 }.',
+    );
+  });
+
+  it('refuses several matches unless asked for the latest, and then returns the last', () => {
+    const fromTo = fromToSpy();
+    const alert = {};
+    fromTo(alert, { opacity: 0 }, { opacity: 1 });
+    const again = fromTo(alert, { opacity: 0 }, { opacity: 1 });
+
+    expect(() => pickFromToTween(fromTo, fromToOf(alert, 'the alert reveal'))).toThrow(
+      /2 gsap\.fromTo calls \(#0, #1\) are the alert reveal; pass \{ latest: true \}/,
+    );
+    expect(
+      pickFromToTween(fromTo, fromToOf(alert, 'the alert reveal'), { latest: true }).tween,
+    ).toBe(again);
+  });
+
+  it('passes the target and both vars to the query', () => {
+    const fromTo = fromToSpy();
+    fromTo('.a', { opacity: 0 }, { opacity: 1, duration: 0.5 });
+    const slow = fromTo('.a', { opacity: 0 }, { opacity: 1, duration: 2 });
+
+    const picked = pickFromToTween(fromTo, {
+      what: 'the slow fade of .a',
+      matches: (target, from, to) => target === '.a' && from.opacity === 0 && to.duration === 2,
+    });
+
+    expect(picked.tween).toBe(slow);
+  });
+
+  it('fails when the matching call threw instead of returning a tween', () => {
+    const fromTo = fromToSpy();
+    fromTo.mockImplementationOnce(() => {
+      throw new Error('bad target');
+    });
+    const alert = {};
+    expect(() => fromTo(alert, {}, {})).toThrow('bad target');
+
+    expect(() => pickFromToTween(fromTo, fromToOf(alert, 'the alert reveal'))).toThrow(
+      'gsap.fromTo call #0, the alert reveal, threw instead of returning a tween.',
+    );
+  });
+});
+
+describe('fromToOf', () => {
+  it('matches the very target it was given, not an equal one', () => {
+    const element = {};
+    const { matches } = fromToOf(element, 'it');
+    expect(matches(element, {}, {})).toBe(true);
+    expect(matches({}, {}, {})).toBe(false);
+    expect(matches([element], {}, {})).toBe(false);
   });
 });
 
