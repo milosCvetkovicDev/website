@@ -38,9 +38,9 @@ const TITLE_SUFFIX = ' | Milos Cvetkovic';
 /** Google cuts a title at about 600 px, some 60 characters, as page-metadata.test.ts holds. */
 const TITLE_MAX = 60;
 /**
- * #61's bounds for a summary's shape, which the fixtures exercise. A published post's summary is
- * also its meta description (61b), so `descriptionProblems` holds the published index to
- * `DESCRIPTION_MAX` as well.
+ * #61's bounds for every entry's summary, a draft's included. A published post's summary is also
+ * its meta description (61b), so `descriptionProblems` holds the published index to
+ * `DESCRIPTION_MAX`: a draft entry is held to 300 characters and a published post to 155.
  */
 const SUMMARY_MIN = 50;
 const SUMMARY_MAX = 300;
