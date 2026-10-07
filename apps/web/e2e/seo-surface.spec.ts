@@ -29,7 +29,7 @@ import { facts, shownFacts, timeline } from '../src/data/pages/about';
 import { skillCategories } from '../src/data/pages/skills';
 // The Person's visible facts (57b, the describe at the end of this file).
 import { servedText } from './support/served-text';
-import { jsonLdNodes, jsonLdSources } from './support/json-ld';
+import { jsonLdNodes } from './support/json-ld';
 // The scope every figure states (58e, the describe before the Person's).
 import { visible } from '../src/test/markdown';
 import {
@@ -427,9 +427,10 @@ test('no route, nor the sitemap, robots.txt or the manifest, serves an owner pla
 
 /**
  * A route's JSON-LD nodes, its canonical links and its "Last updated" lines, as served. The nodes
- * come from `jsonLdNodes` in `support/json-ld.ts`, as every spec's do. The browser's `DOMParser`
- * reads the rest, as `servedCaseStudy()` below does: the canonical comes from the parsed `<head>`,
- * never from the copy of the head in the RSC flight payload, and only real `<time>` elements count.
+ * come from `jsonLdNodes` in `support/json-ld.ts`, the module every spec reads JSON-LD through. The
+ * browser's `DOMParser` reads the rest, as `servedCaseStudy()` below does: the canonical comes from
+ * the parsed `<head>`, never from the copy of the head in the RSC flight payload, and only real
+ * `<time>` elements count.
  */
 async function servedGraph(request: APIRequestContext, page: Page, path: string) {
   const response = await request.get(path);
@@ -701,6 +702,9 @@ test('the Person schema, the hero and the /about description carry one derived y
   expect(home.status(), 'GET /').toBe(200);
   const homeHtml = await home.text();
   const person = jsonLdNodes(homeHtml, '/').find((node) => node['@type'] === 'Person');
+  // Without these, a missing Person or description would read as copy that lacks the phrase.
+  expect(person, 'the layout serves a Person on /').toBeDefined();
+  expect(typeof person?.description, 'the Person on / has a description').toBe('string');
   const about = await fetchHead(request, '/about');
   expect(about.status, 'GET /about').toBe(200);
 
@@ -1523,21 +1527,7 @@ test.describe('the Person states only what the pages show (#57)', () => {
           (link) => link.getAttribute('href') ?? '',
         );
       }, html);
-      const nodes: Record<string, unknown>[] = [];
-      jsonLdSources(html).forEach((block, index) => {
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(block);
-        } catch (error) {
-          problems.push(`${path}: JSON-LD block ${index} does not parse: ${String(error)}`);
-          return;
-        }
-        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-          problems.push(`${path}: JSON-LD block ${index} is not one node`);
-          return;
-        }
-        nodes.push(parsed as Record<string, unknown>);
-      });
+      const nodes = jsonLdNodes(html, path);
       served.set(path, {
         text: [
           (await servedText(page, html, { root: 'body' })).toLowerCase(),

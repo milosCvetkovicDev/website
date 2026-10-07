@@ -1,13 +1,7 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { CASE_STUDY_ROUTES } from './routes';
-import { jsonLdScripts } from './support/json-ld';
-import {
-  clip,
-  describeErrors,
-  jsonLdOpenTagCount,
-  readVerdict,
-  type Verdict,
-} from './support/schema-validator';
+import { jsonLdOpenTagCount, jsonLdScripts } from './support/json-ld';
+import { clip, describeErrors, readVerdict, type Verdict } from './support/schema-validator';
 
 /**
  * The served JSON-LD, read by schema.org's own validator. Advisory: it fails open.

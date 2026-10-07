@@ -1,8 +1,8 @@
 /**
- * The pure half of `e2e/structured-data.spec.ts`: finding the ld+json elements in a served document,
- * and deciding whether validator.schema.org's answer is a verdict. No network and no Playwright, so
- * `src/test/schema-validator.test.ts` pins every branch that decides whether the advisory check can
- * fail, the way `src/test/playwright-config.test.ts` pins the config's parsing.
+ * The pure half of `e2e/structured-data.spec.ts`: deciding whether validator.schema.org's answer is
+ * a verdict (`support/json-ld.ts` finds the ld+json elements it posts). No network and no
+ * Playwright, so `src/test/schema-validator.test.ts` pins every branch that decides whether the
+ * advisory check can fail, the way `src/test/playwright-config.test.ts` pins the config's parsing.
  */
 
 /** What the validator prefixes every JSON answer with, so that the answer cannot run as a script. */
@@ -27,24 +27,6 @@ export interface ValidatorReport {
 }
 
 export type Verdict = { reached: true; report: ValidatorReport } | { reached: false; why: string };
-
-/**
- * The extractor is the one every spec reads JSON-LD with, in `json-ld.ts`; it is re-exported here
- * so `src/test/schema-validator.test.ts` pins it beside `jsonLdOpenTagCount`, which must agree
- * with it.
- */
-export { jsonLdScripts } from './json-ld';
-
-/**
- * The script open tags that mention `application/ld+json` anywhere in their attributes, counted
- * independently of `jsonLdScripts`, so a block the element pattern misses is a count mismatch the
- * spec fails on rather than a block that silently never reaches the validator.
- */
-export function jsonLdOpenTagCount(html: string): number {
-  return [...html.matchAll(/<script\b[^>]*>/gi)].filter(([tag]) =>
-    /application\/ld\+json/i.test(tag),
-  ).length;
-}
 
 /**
  * Up to `max` characters of text from a third party, safe to print: every control character (the
