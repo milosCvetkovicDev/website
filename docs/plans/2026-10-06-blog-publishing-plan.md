@@ -366,6 +366,10 @@ which sets both to `Shipped`.
 - Produces, in the fixtures: `everyBlockPost.kind === 'own'`, `hostileTitlePost.kind === 'jev'` and
   `draftPost.kind === 'own'`.
 
+(2026-10-07: the fences show the code as #241 shipped it; the final review's fixes in
+`fix/blog-publish-seams` changed `posts.test.ts` to refuse a published summary over 155 characters
+and a link to this site's own origin, and the `posts.ts` comments to match.)
+
 - [x] **Step 1: Write the failing tests**
 
 In `apps/web/src/data/__tests__/posts.test.ts`, add `FOOTER_LINES` and `type PostKind` to the
@@ -1971,6 +1975,11 @@ git commit -m "feat(web): serve each post's Markdown twin and list the posts in 
     `inlineTokens`, `refusedSyntax` and `lineDiff`.
 
   The command is `node scripts/post-draft-check.mjs --kind own|jev <draft.md> <twin.md>`.
+
+(2026-10-07: the fences show the code as #241 shipped it; the final review's fixes in
+`fix/blog-publish-seams` changed the check to refuse two or more `~` that GFM can pair as
+strikethrough and a code fence indented outside a list item, to pad a short table row to the
+delimiter row's width, and to give a stray `]` before a `(` its own message.)
 
 - [x] **Step 1: Write the failing tests**
 
