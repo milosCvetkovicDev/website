@@ -4,7 +4,7 @@ import type { InlineLink, PageRecord, Table } from './types';
 
 /**
  * /skills: the copy `app/skills/page.tsx` renders, and the record its Markdown twin reads (#59).
- * The `h1` and the hook under it stay in the page (#58).
+ * The page renders its `h1` from the record's `heading` (#58); the hook under it stays in the page.
  */
 
 /** A primary skill with its depth: the badge's years, the bar's level, and a line of context. */
@@ -221,6 +221,7 @@ export const toolkitTable: Table = {
 export const skillsRecord: PageRecord = {
   path: '/skills',
   title: 'Skills — TypeScript, React, NestJS, Azure',
+  heading: 'Skills: full-stack TypeScript, Azure infrastructure, and production AI agents',
   summary:
     'Full-stack TypeScript, AI agents, legacy rescue, cloud infrastructure. The tools I use to ship production systems.',
   sections: [

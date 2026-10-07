@@ -1,7 +1,8 @@
 /**
  * The copy `/contact` renders, and the page record its Markdown twin reads (#59). The page keeps
- * the layout, the classes, its `h1` and the hook under it (#58), and each profile's icon, which it
- * keys by the link's `name`, and maps over what is here, so a page and its twin cannot disagree.
+ * the layout, the classes, the hook under its `h1` (#58), and each profile's icon, which it keys by
+ * the link's `name`, and maps over what is here, `h1` included, so a page and its twin cannot
+ * disagree.
  * Every string is text the page already showed.
  */
 import { OCCUPATION } from '@/data/profile';
@@ -49,8 +50,8 @@ export const socialLinks = [
 export type SocialLinkName = (typeof socialLinks)[number]['name'];
 
 /**
- * The rest of what `/contact` renders in its main element, in page order, less the `h1` and the
- * hook under it (#58's).
+ * The rest of what `/contact` renders in its main element, in page order, less the `h1`, which is
+ * the record's `heading`, and the hook under it (#58's).
  */
 export const contactCopy = {
   socialTitle: 'Contact Milos Cvetkovic',
@@ -81,6 +82,7 @@ const sections: readonly PageSection[] = [
 export const contactRecord: PageRecord = {
   path: '/contact',
   title: 'Contact',
+  heading: 'Contact Milos Cvetkovic on LinkedIn, GitHub or X',
   summary:
     'Connect with Milos Cvetkovic on LinkedIn, GitHub, and X. Follow along for engineering insights and project updates.',
   sections,

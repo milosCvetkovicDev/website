@@ -1,6 +1,7 @@
 // NO 'use client' directive — this is a server component
 // All SEO-critical hero content is rendered as static HTML on the server
 
+import { homePage } from '@/data/pages/home';
 import { yearsOfExperience } from '@/data/profile';
 
 const SKILL_TAGS = [
@@ -142,7 +143,7 @@ export function HeroContent() {
           className="mb-2 font-semibold text-balance text-[var(--foreground)]"
           style={{ fontSize: 'clamp(15px, 1.6vw, 17px)', lineHeight: 1.35 }}
         >
-          Milos Cvetkovic — senior full-stack engineer and architect building AI-native systems
+          {homePage.heading}
         </h1>
         <p
           className="mb-3.5 font-extrabold text-balance text-[var(--foreground)]"

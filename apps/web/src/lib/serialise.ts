@@ -31,8 +31,9 @@ import { siteOrigin } from './site-origin';
  * route handler builds Markdown of its own. Every string it is handed is plain text: it escapes
  * whatever Markdown would read as syntax, so the text a reader sees is the text in the module.
  *
- * Each document opens the same way: `# <title>`, the summary paragraph, then `Source:` and the
- * absolute canonical URL of the HTML page it mirrors. A server module like `metadata.ts`.
+ * Each document opens the same way: `# <h1>`, the heading the HTML page opens with, then the summary
+ * paragraph, then `Source:` and the absolute canonical URL of that page. A server module like
+ * `metadata.ts`.
  */
 
 // RFC 7763 registers text/markdown with a required charset. Written here and nowhere else, so no
@@ -162,7 +163,7 @@ function paragraph(value: Paragraph, what: string): string {
   return block(nonEmpty(inline(value), what));
 }
 
-/** A heading; `what` names it in an error, as in `postToMarkdown: the title of /blog/<slug>`. */
+/** A heading; `what` names it in an error, as in `postToMarkdown: the heading of /blog/<slug>`. */
 function heading(level: 1 | 2 | 3, value: string, what = `a level-${level} heading`): string {
   const title = nonEmpty(inline(value), what);
   // A run of `#` after a space ends an ATX heading's text and is dropped as its closing sequence.
@@ -298,11 +299,14 @@ function document(parts: readonly string[]): string {
   return `${blocks(parts)}\n`;
 }
 
-/** The opening every twin shares: its title, its summary and the page it mirrors. */
-function opening(title: string, summary: string, path: string, caller: string): string {
+/**
+ * The opening every twin shares: the page's `h1`, its summary and the page it mirrors. A case
+ * study's and a post's `h1` is its title; a static route's is its record's `heading`.
+ */
+function opening(h1: string, summary: string, path: string, caller: string): string {
   assertPathname(path, caller);
   return blocks([
-    heading(1, title, `${caller}: the title of ${path}`),
+    heading(1, h1, `${caller}: the heading of ${path}`),
     paragraph(summary, `${caller}: the summary of ${path}`),
     `Source: ${absoluteUrl(path)}`,
   ]);
@@ -314,25 +318,14 @@ export function renderSections(sections: readonly PageSection[]): string {
 }
 
 /**
- * A record's own title: the string, or the `absolute` one a record sets to skip the template.
- * `caller` names the twin's writer in an error.
- */
-function titleOf(page: PageRecord, caller: string): string {
-  const title = typeof page.title === 'string' ? page.title : page.title?.absolute;
-  if (typeof title !== 'string') {
-    throw new Error(`${caller}: the record for ${page.path} has no title`);
-  }
-  return title;
-}
-
-/**
- * A static route's twin, from its page record. The H1 is the route's own title, without the
- * layout's `%s | Milos Cvetkovic` template: that suffix names the site in a browser tab, and the
- * twin names the site on its Source line instead.
+ * A static route's twin, from its page record. It opens with the page's `h1`, the record's
+ * `heading` (#58), so a reader of either meets the same first line; the meta title, with the
+ * layout's `%s | Milos Cvetkovic` template, names the page in a browser tab instead, and the twin
+ * names the site on its Source line.
  */
 export function pageToMarkdown(page: PageRecord): string {
   const markdown = document([
-    opening(titleOf(page, 'pageToMarkdown'), page.summary, page.path, 'pageToMarkdown'),
+    opening(page.heading, page.summary, page.path, 'pageToMarkdown'),
     renderSections(page.sections),
   ]);
   // A record's copy is served as written, so an `ownerTodo()` marker left anywhere in it but where
@@ -529,7 +522,7 @@ export function postToMarkdown(post: PublishedPost): string {
 export function blogToMarkdown(page: PageRecord, list: readonly PublishedPost[]): string {
   if (list.length === 0) return pageToMarkdown(page);
   return document([
-    opening(titleOf(page, 'blogToMarkdown'), page.summary, page.path, 'blogToMarkdown'),
+    opening(page.heading, page.summary, page.path, 'blogToMarkdown'),
     ...list.flatMap((post) => [
       heading(2, post.title, `blogToMarkdown: the title of ${post.slug}`),
       `- Published: ${post.publishedAt}\n- URL: ${absoluteUrl(`/blog/${post.slug}`)}`,

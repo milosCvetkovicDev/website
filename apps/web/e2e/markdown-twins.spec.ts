@@ -13,7 +13,7 @@ import { alternates, attributeText, fetchHead, first } from './support/served-he
  *
  * Everything here reads served bytes through `request`, as an agent's fetch tool does: the head as
  * `support/served-head.ts` parses it, and the twin as the text it is. The one browser use is the
- * parity test at the end, which parses a served page with `DOMParser` (scripting off, nothing
+ * two parity tests at the end, which parse a served page with `DOMParser` (scripting off, nothing
  * navigated) because a heading's text is only what a parser says it is.
  *
  * The routes and their twin paths come from `endpoints.ts` and `routes.ts`, so a new static route
@@ -199,6 +199,36 @@ async function pageLandmarks(page: Page, html: string): Promise<string[]> {
         .map(text),
     ].filter(Boolean);
   }, html);
+}
+
+/**
+ * The text of every `h1` in a served page, read as `pageLandmarks` reads `main`, but over the whole
+ * document: an `h1` moved outside `main` would still be the page's first heading.
+ */
+async function pageH1s(page: Page, html: string): Promise<string[]> {
+  return page.evaluate(
+    (markup) =>
+      [...new DOMParser().parseFromString(markup, 'text/html').querySelectorAll('h1')].map((h1) =>
+        (h1.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      ),
+    html,
+  );
+}
+
+// The parity of the first line (#58): every page, `/` included, since the hero's `h1` is plain
+// text. A static route renders its `h1` from its record's `heading`, a case study and a post from
+// their title, and the twin opens with the same field, so a page that writes its `h1` any other way
+// fails here as soon as the two read differently.
+for (const { route, twin } of MARKDOWN_TWINS) {
+  test(`${route} serves one h1, and ${twin} opens with it`, async ({ page, request }) => {
+    const response = await request.get(route);
+    expect(response.status()).toBe(200);
+    const h1s = await pageH1s(page, await response.text());
+    expect(h1s, `${route} should serve exactly one h1`).toHaveLength(1);
+
+    const [opening] = visible(await fetchTwin(request, twin)).split('\n');
+    expect(opening, `${twin} should open with the page's h1`).toBe(`# ${h1s[0]}`);
+  });
 }
 
 // Every page but `/`, whose story headings are rendered one `<span>` per character, so their parsed

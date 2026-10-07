@@ -20,7 +20,7 @@ export default function BlogPage() {
     <div className="py-16 md:py-24">
       <WebPageJsonLd path={blogRecord.path} name={blogRecord.title} />
       <div className="mx-auto max-w-3xl px-6">
-        <h1 className="mb-6 text-4xl font-bold md:text-5xl">Writing</h1>
+        <h1 className="mb-6 text-4xl font-bold md:text-5xl">{blogRecord.heading}</h1>
         <p className="mb-12 text-xl text-[var(--muted)]">{blogCopy.intro}</p>
 
         {hasPublishedPosts ? <PostList posts={publishedPosts} /> : <ComingSoon />}

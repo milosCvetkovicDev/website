@@ -42,7 +42,7 @@ export default function ContactPage() {
         {/* The h1 names the person and what the page offers; the hook under it stays the largest
             line (#58). */}
         <h1 className="mb-3 text-lg leading-snug font-semibold text-balance md:text-xl">
-          Contact Milos Cvetkovic on LinkedIn, GitHub or X
+          {contactRecord.heading}
         </h1>
         <p className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">Let&apos;s connect.</p>
         <p className="mb-12 text-xl text-[var(--muted)]">{contactCopy.intro}</p>
