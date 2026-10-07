@@ -21,12 +21,12 @@ import type { DecoratedCell, Table, TableCell } from '@/data/pages/types';
  * (`e2e/table-layout.spec.ts`). A two-column table wraps inside the page at every width and never
  * stacks. Its column headers keep to one line from `sm` up; below it they wrap, and a word too long
  * for the line breaks anywhere, since a post may name its columns at any length: on one line, two
- * names of 29 characters between them pushed a 320px page sideways (measured 2026-10-07,
- * `e2e/mobile/tables.spec.ts`). Stacked, a word too long for its line breaks anywhere rather than
- * push the page sideways; the grids keep the browser's own breaking, since letting a word break
- * there would change how their columns share the width. A wide table's first cell must be text
- * that can run on after the header, and none of its cells may be blank, which `serialise.ts`
- * checks of every table the site renders.
+ * names of 29 characters between them pushed a 320px page sideways (measured once, 2026-10-07;
+ * `e2e/mobile/tables.spec.ts` fails on any overflow). Stacked, a word too long for its line breaks
+ * anywhere rather than push the page sideways; the grids keep the browser's own breaking, since
+ * letting a word break there would change how their columns share the width. A wide table's first
+ * cell must be text that can run on after the header, and none of its cells may be blank, which
+ * `serialise.ts` checks of every table the site renders.
  *
  * Changing the `display` of table elements drops their table semantics in WebKit, so every element
  * carries its role explicitly (`table`, `rowgroup`, `row`, `columnheader`, `rowheader`, `cell`), and
@@ -40,7 +40,10 @@ export function DataTable({ caption, columns, rows }: Table) {
   const captionId = useId();
   const wide = isWideTable({ columns });
   // Each element's classes are whole strings, one for each layout, so the `max-sm:` variants
-  // that stack a wide table are absent from a narrow one, and the class sorter can sort each.
+  // that stack a wide table are absent from a narrow one, and the class sorter can sort each. A
+  // narrow table's only `max-sm:` variants let its column headers wrap; a wide table's stay on one
+  // line, as `sr-only` keeps text it hides, since a screen reader may read wrapped hidden text a
+  // piece at a time.
   return (
     <div className="relative rounded-xl border border-[var(--border)] bg-[var(--card)]">
       <table
@@ -72,7 +75,11 @@ export function DataTable({ caption, columns, rows }: Table) {
                 key={index}
                 scope="col"
                 role="columnheader"
-                className="px-5 py-3 font-mono text-xs font-medium tracking-wider whitespace-nowrap text-[var(--muted)] uppercase max-sm:wrap-anywhere max-sm:whitespace-normal"
+                className={
+                  wide
+                    ? 'px-5 py-3 font-mono text-xs font-medium tracking-wider whitespace-nowrap text-[var(--muted)] uppercase'
+                    : 'px-5 py-3 font-mono text-xs font-medium tracking-wider whitespace-nowrap text-[var(--muted)] uppercase max-sm:wrap-anywhere max-sm:whitespace-normal'
+                }
               >
                 {column}
               </th>

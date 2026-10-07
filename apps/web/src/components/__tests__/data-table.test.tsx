@@ -167,18 +167,22 @@ describe('DataTable', () => {
       for (const cell of rest) expect(classes(cell)).toContain('max-sm:block');
     }
 
+    // Hidden there, a wide table's column headers stay on one line, as `sr-only` keeps hidden text.
+    for (const header of table.tHead!.rows[0]!.cells) {
+      expect(classes(header).filter((name) => name.startsWith('max-sm:'))).toEqual([]);
+    }
+
     rerender(<DataTable {...NARROW} />);
     // A narrow table never stacks: below 640px only its column headers change, wrapping their names
-    // and breaking a word too long for the line, as a wide table's (hidden there) do too.
+    // and breaking a word too long for the line. With those two taken away, nothing is left.
     const columnHeaders = [...container.querySelectorAll('th[scope="col"]')];
-    for (const header of columnHeaders) {
-      expect(classes(header).filter((name) => name.startsWith('max-sm:'))).toEqual([
-        'max-sm:wrap-anywhere',
-        'max-sm:whitespace-normal',
-      ]);
-      header.remove();
-    }
     expect(columnHeaders).toHaveLength(NARROW.columns.length);
+    for (const header of columnHeaders) {
+      expect(classes(header)).toEqual(
+        expect.arrayContaining(['max-sm:whitespace-normal', 'max-sm:wrap-anywhere']),
+      );
+      header.classList.remove('max-sm:whitespace-normal', 'max-sm:wrap-anywhere');
+    }
     expect(container.innerHTML).not.toContain('max-sm:');
   });
 

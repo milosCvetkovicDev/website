@@ -224,22 +224,27 @@ test('a word too long for a stacked line breaks inside the row, not past the pag
             };
           });
         expect.soft(overflow.card, `${table.caption}: the long word overflows its card`).toBe(0);
-        expect.soft(overflow.page, `${table.caption}: the page scrolls sideways`).toBe(0);
+        expect
+          .soft(overflow.page, `${table.caption} at ${width}px: the page scrolls sideways`)
+          .toBe(0);
       }
     });
   }
 });
 
-test("a two-column table's long column headers wrap inside its card, not past the page", async ({
+test("a two-column table's long column headers fit inside its card, not past the page", async ({
   page,
 }) => {
   // Today's column names are one or two short words; a post's may be longer. Kept on one line,
   // "Failure mode" and "What the agent did instead" pushed a 320px page 81px sideways, and a pair
-  // of 29 characters already 11px (measured 2026-10-07). These stand in for a post's: words that
-  // wrap, and one word too long for any line.
-  await narrowTo(page, 320);
-  for (const route of NARROW_ROUTES) {
-    await test.step(route, async () => {
+  // of 29 characters already 11px (measured once, 2026-10-07). These stand in for a post's: words
+  // that wrap, and one word too long for any line. The narrowest phone, and a Pixel 7's width,
+  // where the same names still ran past the card.
+  for (const [route, width] of NARROW_ROUTES.flatMap((route) =>
+    [320, 414].map((width) => [route, width] as const),
+  )) {
+    await test.step(`${route} at ${width}px`, async () => {
+      await narrowTo(page, width);
       await gotoHydrated(page, route);
       for (const { table } of NARROW.filter((narrow) => narrow.route === route)) {
         const overflow = await page
@@ -254,8 +259,12 @@ test("a two-column table's long column headers wrap inside its card, not past th
               card: card.scrollWidth - card.clientWidth,
             };
           });
-        expect.soft(overflow.card, `${table.caption}: a column header overflows its card`).toBe(0);
-        expect.soft(overflow.page, `${table.caption}: the page scrolls sideways`).toBe(0);
+        expect
+          .soft(overflow.card, `${table.caption} at ${width}px: a column header overflows its card`)
+          .toBe(0);
+        expect
+          .soft(overflow.page, `${table.caption} at ${width}px: the page scrolls sideways`)
+          .toBe(0);
       }
     });
   }
