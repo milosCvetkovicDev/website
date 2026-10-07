@@ -14,8 +14,14 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { caseStudies, formatMetric, formatMetricScope, type CaseStudy } from '@/data/case-studies';
-import { OWNER_TODO } from '@/data/owner-todo';
+import {
+  caseStudies,
+  caseStudyMetricScope,
+  formatMetric,
+  formatMetricScope,
+  type CaseStudy,
+} from '@/data/case-studies';
+import { OWNER_TODO, ownerTodo } from '@/data/owner-todo';
 import { pages } from '@/data/pages';
 import type { PageRecord, PageSection, Paragraph, TableSection } from '@/data/pages/types';
 import { buildPostIndex, type PostBlock } from '@/data/posts';
@@ -151,10 +157,9 @@ function missingFrom(study: CaseStudy, twin: string): string[] {
         !SCOPE_FIELDS.some((field) => path === field || path.startsWith(`${field}.`)),
     ),
     { path: 'highlight.metric', text: `${formatMetric(metric)} ${metric.label}` },
-    {
-      path: 'metricDefinition',
-      text: formatMetricScope(metric.basis, study.metricDefinition) ?? '',
-    },
+    // The scope sentence, from the producer the page reads too; a study with no basis to state
+    // throws here, so a missing scope fails the check rather than look for an empty string.
+    { path: 'metricDefinition', text: caseStudyMetricScope(study) },
   ];
   return expected
     .filter(({ path, text }) => !region(shown, path).includes(text))
@@ -314,6 +319,17 @@ const FIXTURE: PageRecord = {
 };
 
 describe('pageToMarkdown() and renderSections()', () => {
+  it("refuses a record that still holds an owner's placeholder anywhere, rather than serve it", () => {
+    // The quick facts leave out a fact whose basis is a placeholder; a marker anywhere else in a
+    // record (a label, a figure, a paragraph) has no renderer to leave it out, so the twin refuses.
+    const marker = ownerTodo('a fixture hint');
+    const withMarker: PageRecord = { ...FIXTURE, summary: `${FIXTURE.summary} ${marker}` };
+    expect(() => pageToMarkdown(withMarker)).toThrow(
+      `pageToMarkdown(/about): a field still holds ${OWNER_TODO}, never served`,
+    );
+    expect(pageToMarkdown(FIXTURE)).not.toContain(OWNER_TODO);
+  });
+
   it('renders the title, summary and source, then every section variant', () => {
     expect(pageToMarkdown(FIXTURE)).toBe(
       [
@@ -789,7 +805,24 @@ describe('caseStudyToMarkdown()', () => {
       highlight: { ...STUDY.highlight, metric: { ...STUDY.highlight.metric, basis: ' ' } },
       metricDefinition: { state: OWNER_TODO },
     };
-    expect(() => caseStudyToMarkdown(blank)).toThrow(/the Basis of nx-remote-cache is empty/);
+    expect(() => caseStudyToMarkdown(blank)).toThrow(
+      /caseStudyMetricScope\(nx-remote-cache\): the headline figure has no basis to state/,
+    );
+  });
+
+  it('refuses a study with a window and method but no basis, which would not say what it counted', () => {
+    // formatMetricScope() alone would state the window and method; a study's scope opens with what
+    // the figure counted, so the twin refuses it, as the page does, rather than serve the rest.
+    expect(STUDY.metricDefinition.state).toBe('defined');
+    for (const basis of ['', ' ', '—.']) {
+      const unstated: CaseStudy = {
+        ...STUDY,
+        highlight: { ...STUDY.highlight, metric: { ...STUDY.highlight.metric, basis } },
+      };
+      expect(() => caseStudyToMarkdown(unstated), JSON.stringify(basis)).toThrow(
+        /caseStudyMetricScope\(nx-remote-cache\)/,
+      );
+    }
   });
 
   it('escapes Markdown in the basis, which is free prose, and still shows it whole', () => {
@@ -895,8 +928,8 @@ describe('caseStudyToMarkdown()', () => {
 
     it('renders its metric through formatMetric(), and its scope once, on the next line', () => {
       const { metric } = study.highlight;
-      const scope = formatMetricScope(metric.basis, study.metricDefinition);
-      expect(scope, 'every study states a scope').not.toBeNull();
+      const scope = caseStudyMetricScope(study);
+      expect(scope.startsWith(metric.basis), 'the scope opens with the basis').toBe(true);
       expect(visible(twin)).toContain(
         `- Metric: ${formatMetric(metric)} ${metric.label}\n- Basis: ${scope}\n`,
       );

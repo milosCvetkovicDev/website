@@ -1,5 +1,6 @@
 import {
   caseStudies,
+  caseStudyMetricScope,
   formatMetric,
   formatMetricScope,
   oneLine,
@@ -330,10 +331,19 @@ function titleOf(page: PageRecord, caller: string): string {
  * twin names the site on its Source line instead.
  */
 export function pageToMarkdown(page: PageRecord): string {
-  return document([
+  const markdown = document([
     opening(titleOf(page, 'pageToMarkdown'), page.summary, page.path, 'pageToMarkdown'),
     renderSections(page.sections),
   ]);
+  // A record's copy is served as written, so an `ownerTodo()` marker left anywhere in it but where
+  // its renderer leaves the row out (the quick facts' bases, `shownFacts`) would reach the twin:
+  // the prerender fails rather than publish it, as `caseStudyToJson()` does (`data/owner-todo.ts`).
+  if (markdown.includes(OWNER_TODO)) {
+    throw new Error(
+      `pageToMarkdown(${page.path}): a field still holds ${OWNER_TODO}, never served`,
+    );
+  }
+  return markdown;
 }
 
 // The section headings `app/work/[slug]/page.tsx` renders, so the twin reads like the page.
@@ -353,9 +363,10 @@ const CASE_STUDY_HEADINGS = {
  * `formatMetric()`, the function the cards use, so the twin cannot render a figure differently, and
  * its scope follows on the Basis line, as the page's metric panel prints it under the figure: the
  * one sentence `formatMetricScope()` makes of the basis and, once the owner has defined it, the
- * metric definition's window and method (#58). A study whose scope cannot be stated at all is
- * refused rather than written without one. `lib/__tests__/serialise.test.ts` fails when a study
- * holds a value the twin does not show.
+ * metric definition's window and method (#58), read through `caseStudyMetricScope()`, which the
+ * page reads too and which throws, naming the study, when the basis has nothing to state, so the
+ * twin is refused rather than written without one. `lib/__tests__/serialise.test.ts` fails when a
+ * study holds a value the twin does not show.
  */
 export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
   const { highlight, howItWorks, lessons, slug } = caseStudy;
@@ -365,7 +376,7 @@ export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
     ['Category', highlight.category],
     ['Status', highlight.status],
     ['Metric', `${formatMetric(highlight.metric)} ${highlight.metric.label}`],
-    ['Basis', formatMetricScope(highlight.metric.basis, caseStudy.metricDefinition) ?? ''],
+    ['Basis', caseStudyMetricScope(caseStudy)],
     ['Tags', commaList(caseStudy.tags, where('the tags'))],
     ['Published', caseStudy.publishedAt],
     ['Updated', caseStudy.updatedAt],

@@ -34,6 +34,8 @@ import {
 const RENDERS_ONLY: Record<string, string> = {
   'data/__tests__/case-studies.test.ts':
     'a unit test: builds unfilled fixtures to prove formatMetricScope leaves them out, and ships nowhere',
+  'data/__tests__/pages.test.ts':
+    'a unit test: reads the marker and the register to pin which quick facts /about leaves out, and ships nowhere',
   'lib/serialise.ts':
     'a renderer: serves an unfilled metric definition as null and fails the prerender on any other marker',
   'lib/__tests__/serialise.test.ts':

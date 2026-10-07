@@ -67,9 +67,9 @@ describe('/about', () => {
     }
 
     // A quick fact whose basis the owner has not supplied yet is left out whole, label and figure
-    // with it, rather than shown without its basis (#58).
+    // with it, rather than shown without its basis (#58). Which facts those are is pinned in
+    // data/__tests__/pages.test.ts, against the marker and the register.
     const hidden = facts.filter((fact) => !shownFacts.includes(fact));
-    expect(shownFacts.length + hidden.length).toBe(facts.length);
     for (const { label } of hidden) {
       expect(main, `/about must not render "${label}" before its basis is filled`).not.toContain(
         label,
@@ -129,6 +129,15 @@ describe('/about', () => {
       expect(factsHeading.nextElementSibling?.textContent).toContain(value);
       expect(factsHeading.nextElementSibling?.textContent).toContain(basis);
     }
+    // The years' basis counts "from the first role in the timeline below": the timeline follows.
+    const timelineHeading = headings.find(
+      (heading) => heading.textContent === aboutCopy.timelineHeading,
+    );
+    if (!timelineHeading) throw new Error('the timeline has an h2');
+    expect(
+      factsHeading.compareDocumentPosition(timelineHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the timeline comes after the quick facts',
+    ).toBeTruthy();
   });
 
   it('renders two emphasised runs with the same text in one paragraph without a key clash', async () => {

@@ -139,6 +139,26 @@ export function formatMetricScope(
   return statedBasis === null ? measured : `${asSentence(statedBasis)} ${measured}`;
 }
 
+/**
+ * A study's metric scope as its page's metric panel prints it and its twin's `- Basis:` line writes
+ * it: `formatMetricScope()`'s sentence of the study's basis and definition. The page and the twin
+ * both read it here, so they cannot treat a missing scope differently. A study's sentence must open
+ * with its basis, what the figure counted, so a basis with nothing statable in it throws, naming
+ * the study, even when the window and method could be stated: the prerender of the page and of the
+ * twin fails rather than serve a headline figure that says when it was measured but not what it
+ * counted. `data/__tests__/case-studies.test.ts` fails such a data edit first.
+ */
+export function caseStudyMetricScope({ slug, highlight, metricDefinition }: CaseStudy): string {
+  const { basis } = highlight.metric;
+  const scope = formatMetricScope(basis, metricDefinition);
+  if (scope === null || formatMetricScope(basis, { state: OWNER_TODO }) === null) {
+    throw new Error(
+      `caseStudyMetricScope(${slug}): the headline figure has no basis to state, so it cannot say what it counted`,
+    );
+  }
+  return scope;
+}
+
 export interface CaseStudy {
   slug: string;
   title: string;

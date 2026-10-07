@@ -10,9 +10,11 @@ import { isPublishableContentDate } from '@/lib/content-date';
 import {
   adjacentCaseStudies,
   caseStudies,
+  caseStudyMetricScope,
   formatMetric,
   formatMetricScope,
   getCaseStudy,
+  oneLine,
   type MetricDefinition,
 } from '../case-studies';
 import { OWNER_TODO, ownerTodo, unfilledOwnerFields } from '../owner-todo';
@@ -174,6 +176,23 @@ describe('caseStudies', () => {
       // "Against what baseline" is half of the contract: a basis names the whole it is a fraction
       // of ("out of") or the state it is compared with ("against"), or it is only a description.
       expect(basis, slug).toMatch(/\b(?:against|out of)\b/);
+      // The scope sentence opens with the basis verbatim, which the page and twin specs search for:
+      // a finished sentence on one line with no run of spaces, so neither formatMetricScope's full
+      // stop (which replaces a trailing comma, semicolon or colon) nor its whitespace collapse
+      // rewrites it once the owner defines the window and method.
+      expect(basis, slug).toBe(oneLine(basis));
+      expect(basis, slug).toMatch(new RegExp(`[.!?…]${CLOSERS}*$`));
+    }
+  });
+
+  it('states every headline figure with a scope that opens with its basis, the one the page and twin print', () => {
+    for (const study of caseStudies) {
+      const { basis } = study.highlight.metric;
+      const scope = caseStudyMetricScope(study);
+      expect(scope.startsWith(basis), study.slug).toBe(true);
+      // And it would still open with it verbatim once the owner defines the window and method.
+      const defined = caseStudyMetricScope({ ...study, metricDefinition: DEFINED });
+      expect(defined, study.slug).toBe(`${basis} ${WINDOW_SENTENCE} ${METHOD}.`);
     }
   });
 
@@ -428,6 +447,34 @@ describe('formatMetricScope', () => {
     };
     expect(read(DEFINED)).toEqual(['2025-03-01', '2025-08-31', METHOD]);
     expect(read(UNFILLED)).toEqual([undefined, undefined]);
+  });
+});
+
+describe('caseStudyMetricScope', () => {
+  const [study] = caseStudies;
+  if (!study) throw new Error('there is a case study to build fixtures from');
+  const withBasis = (basis: string, metricDefinition: MetricDefinition) => ({
+    ...study,
+    highlight: { ...study.highlight, metric: { ...study.highlight.metric, basis } },
+    metricDefinition,
+  });
+
+  it("is formatMetricScope's sentence of the study's basis and definition", () => {
+    expect(caseStudyMetricScope(withBasis(BASIS, UNFILLED))).toBe(BASIS);
+    expect(caseStudyMetricScope(withBasis(BASIS, DEFINED))).toBe(
+      `${BASIS}. ${WINDOW_SENTENCE} ${METHOD}.`,
+    );
+  });
+
+  it('throws, naming the study, when the basis has nothing to state, even with a defined window', () => {
+    for (const definition of [UNFILLED, DEFINED]) {
+      for (const basis of ['', '   ', '—.', ownerTodo('the basis')]) {
+        expect(
+          () => caseStudyMetricScope(withBasis(basis, definition)),
+          `${JSON.stringify(basis)} with ${definition.state}`,
+        ).toThrow(`caseStudyMetricScope(${study.slug}): the headline figure has no basis to state`);
+      }
+    }
   });
 });
 

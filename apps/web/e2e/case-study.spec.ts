@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { caseStudies, formatMetric, formatMetricScope } from '../src/data/case-studies';
+import { caseStudies, caseStudyMetricScope, formatMetric } from '../src/data/case-studies';
 import { gotoHydrated } from './support/hydration';
 import { warmRoutes } from './support/warm-routes';
 
@@ -16,7 +16,8 @@ import { warmRoutes } from './support/warm-routes';
  * `highlight` at all, so the one page a visitor lands on to see that claim substantiated was the only
  * one that did not state it. #49 gave it a metric panel with the figure, its label and its basis,
  * and #58 printed the basis there as the start of the metric's scope sentence (`formatMetricScope`),
- * which carries the window and method too once the owner has defined them.
+ * which carries the window and method too once the owner has defined them. `caseStudyMetricScope`
+ * throws, naming the study, when there is no basis to state, as the page and its twin do.
  * Asserted through `formatMetric` rather than against a literal, so a data edit moves the test with
  * the data and cannot be satisfied by typing the number into the page.
  */
@@ -109,7 +110,7 @@ test('every case study states the headline metric its cards advertise, and its b
     const parts = [
       ['value', value],
       ['label', metric.label],
-      ['scope', formatMetricScope(metric.basis, study.metricDefinition) ?? metric.basis],
+      ['scope', caseStudyMetricScope(study)],
     ] as const;
     for (const [part, text] of parts) {
       const shown = panel.getByText(text, { exact: true });

@@ -13,7 +13,7 @@ import {
   expectedStatus,
   postRoute,
 } from './routes';
-import { caseStudies, formatMetricScope } from '../src/data/case-studies';
+import { caseStudies, caseStudyMetricScope } from '../src/data/case-studies';
 import { questions } from '../src/data/pages/about';
 import { coreSkills, skillsCopy } from '../src/data/pages/skills';
 import { workCopy } from '../src/data/pages/work';
@@ -25,13 +25,19 @@ import { fetchHead, first } from './support/served-head';
 import { TABLES, expectedTable, servedTables } from './support/tables';
 import { PAGE_HEADINGS } from './support/page-headings';
 // #58's tables, counted from the data their records read (the last tests in this file).
-import { facts, timeline } from '../src/data/pages/about';
+import { facts, shownFacts, timeline } from '../src/data/pages/about';
 import { skillCategories } from '../src/data/pages/skills';
 // The Person's visible facts (57b, the describe at the end of this file).
 import { servedText } from './support/served-text';
 // The scope every figure states (58e, the describe before the Person's).
 import { visible } from '../src/test/markdown';
-import { MARKDOWN_TWINS, markdownTwinPath } from './endpoints';
+import {
+  CASE_STUDIES_JSON,
+  CASE_STUDY_ENDPOINTS,
+  FEED,
+  MARKDOWN_TWINS,
+  markdownTwinPath,
+} from './endpoints';
 
 /**
  * The head every crawler and link-preview bot reads.
@@ -1067,9 +1073,10 @@ for (const [route, tables] of Object.entries(TABLES)) {
 test('the table rows are counted from the data the records read (#58)', () => {
   // The expectations above come from the records; this pins the records to their data, so a record
   // that dropped a row would not set its own, shorter, expectation.
-  // A quick fact whose basis still holds the owner's placeholder is left out of the table (58e).
+  // A quick fact whose basis still holds the owner's placeholder is left out of the table (58e):
+  // `shownFacts`, whose rule data/__tests__/pages.test.ts pins.
   expect(TABLES['/about']?.map(({ caption, rows }) => [caption, rows.length])).toEqual([
-    ['Quick facts', facts.filter(({ basis }) => !basis.includes(OWNER_TODO)).length],
+    ['Quick facts', shownFacts.length],
     ['Career timeline', timeline.length],
   ]);
   expect(TABLES['/skills']?.map(({ caption, rows }) => [caption, rows.length])).toEqual([
@@ -1222,9 +1229,8 @@ test.describe('every figure states its scope, and no placeholder stands in for o
       request,
     }) => {
       const { basis } = study.highlight.metric;
-      const scope = formatMetricScope(basis, study.metricDefinition);
-      expect(scope, `${study.slug} has a scope to state, its basis at least`).not.toBeNull();
-      if (scope === null) return;
+      // Throws, naming the study, when there is no basis to state, as the page and twin do.
+      const scope = caseStudyMetricScope(study);
 
       const response = await request.get(path);
       expect(response.status(), `GET ${path}`).toBe(200);
@@ -1254,8 +1260,9 @@ test.describe('every figure states its scope, and no placeholder stands in for o
     page,
     request,
   }) => {
-    const stated = facts.filter(({ basis }) => !basis.includes(OWNER_TODO));
-    const unstated = facts.filter(({ basis }) => basis.includes(OWNER_TODO));
+    // The rule that picks them is shownFacts', pinned in data/__tests__/pages.test.ts.
+    const stated = shownFacts;
+    const unstated = facts.filter((fact) => !shownFacts.includes(fact));
     expect(stated.length, 'some quick fact has a basis to show').toBeGreaterThan(0);
 
     const response = await request.get('/about');
@@ -1295,19 +1302,60 @@ test.describe('every figure states its scope, and no placeholder stands in for o
     }
   });
 
-  test('no Markdown twin serves an owner placeholder', async ({ request }) => {
-    // The twins' half of the placeholder test above, which covers the pages, the sitemap,
-    // robots.txt and the manifest: every twin, the static routes', the case studies' and any
-    // published post's, from the one list of them.
+  test("no route, twin, case-study JSON or feed states a quick fact whose basis is the owner's", async ({
+    request,
+  }) => {
+    // A hidden fact's claim stays unpublished everywhere until its basis arrives, not only in
+    // /about's table: its label, as any page, head, JSON-LD block, twin or endpoint would phrase it.
+    const unstated = facts.filter((fact) => !shownFacts.includes(fact));
+    const paths = [
+      ...routes.map(({ path }) => path),
+      ...MARKDOWN_TWINS.map(({ twin }) => twin),
+      CASE_STUDIES_JSON,
+      ...CASE_STUDY_ENDPOINTS.map(({ json }) => json),
+      FEED,
+    ];
+    const served = await Promise.all(
+      paths.map(async (path) => ({
+        path,
+        body: (await (await request.get(path)).text()).toLowerCase(),
+      })),
+    );
+    const problems = served.flatMap(({ path, body }) =>
+      unstated
+        .filter(({ label }) => body.includes(label.toLowerCase()))
+        .map(({ label }) => `${path} states "${label}"`),
+    );
+    expect(problems, 'a fact the owner has yet to give a basis is served').toEqual([]);
+  });
+
+  test('no Markdown twin, case-study JSON or feed serves an owner placeholder', async ({
+    request,
+  }) => {
+    // The machine-readable half of the placeholder test above, which covers the pages (their
+    // JSON-LD and meta descriptions inside them), the sitemap, robots.txt and the manifest: every
+    // twin, the static routes', the case studies' and any published post's, from the one list of
+    // them, then the case-study JSON and the Atom feed. /llms.txt joins when #60 serves it. Fetched
+    // together, so the run does not grow one request at a time with the post list.
     expect(MARKDOWN_TWINS.length, 'there are twins to read').toBeGreaterThan(0);
+    const paths = [
+      ...MARKDOWN_TWINS.map(({ twin }) => twin),
+      CASE_STUDIES_JSON,
+      ...CASE_STUDY_ENDPOINTS.map(({ json }) => json),
+      FEED,
+    ];
+    const served = await Promise.all(
+      paths.map(async (path) => {
+        const response = await request.get(path);
+        return { path, status: response.status(), body: await response.text() };
+      }),
+    );
     const problems: string[] = [];
-    for (const { twin } of MARKDOWN_TWINS) {
-      const response = await request.get(twin);
-      const body = await response.text();
-      expect.soft(response.status(), twin).toBe(200);
-      expect.soft(body.length, `${twin} must serve a body`).toBeGreaterThan(0);
+    for (const { path, status, body } of served) {
+      expect.soft(status, path).toBe(200);
+      expect.soft(body.length, `${path} must serve a body`).toBeGreaterThan(0);
       const at = body.indexOf(OWNER_TODO);
-      if (at !== -1) problems.push(`${twin} serves "${body.slice(Math.max(0, at - 40), at + 60)}"`);
+      if (at !== -1) problems.push(`${path} serves "${body.slice(Math.max(0, at - 40), at + 60)}"`);
     }
     expect(
       problems,
