@@ -163,7 +163,12 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
   test, `apps/web/src/app/blog/[slug]/page.tsx`, `apps/web/src/app/blog/__tests__/post-page.test.tsx`,
   `apps/web/e2e/seo-surface.spec.ts`
 
-- [ ] **Step 1:** Tests: each block parses, the fixture title stays inside its script, the dates
+- [x] **Step 1:** Tests: each block parses, the fixture title stays inside its script, the dates
       equal the post's. They fail.
-- [ ] **Step 2:** Post TechArticle and BreadcrumbList builders on #57's graph, rendered from the post
-      page (D11), and the served type set checked on the post routes.
+- [x] **Step 2:** Post TechArticle and BreadcrumbList builders on #57's graph, rendered from the post
+      page (D11), and the served type set checked on the post routes. (#57's own `techArticle()`
+      and `breadcrumbList()` build them, through `PostArticleJsonLd` and `PostBreadcrumbJsonLd` in
+      `json-ld.tsx`, beside the post's `PostWebPageJsonLd`. The article leaves out `description` and
+      `keywords`, because the post page prints neither its summary nor its tags (ADR 0031's fifth
+      decision). With no post published, the served check covers no post route and says so in its
+      report.)

@@ -3,10 +3,12 @@ import type { ReactElement, ReactNode } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, caseStudyPageTitle } from '@/data/case-studies';
 import { pages } from '@/data/pages';
+import { publishedPosts } from '@/data/posts';
 import { yearsOfExperience } from '@/data/profile';
 import { socialProfiles } from '@/data/social';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { yearsClausesAboutAi, yearsFigures } from '@/test/experience-claims';
+import { hostileTitlePost } from '@/test/fixtures/posts';
 
 // The home page's story, its featured work and its tech stack are client components with nothing
 // to say about JSON-LD and a costly mount; the graph rows below render the page around them.
@@ -15,6 +17,15 @@ vi.mock('@/components/animated-hero', () => ({
 }));
 vi.mock('@/components/animated-hero/hero-content', () => ({ HeroContent: () => null }));
 vi.mock('@/components', () => ({ FeaturedWork: () => null, TechStack: () => null }));
+
+// No post is published yet, so the real index is empty and every post row below would hold over
+// nothing. The file swaps it for an index built over the fixtures by `buildPostIndex`, the code the
+// real exports come from, as `post-page.test.tsx` does (#61, 61f).
+vi.mock('@/data/posts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/data/posts')>();
+  const { fixturePosts } = await import('@/test/fixtures/posts');
+  return { ...actual, posts: fixturePosts, ...actual.buildPostIndex(fixturePosts) };
+});
 
 /**
  * The JSON-LD blocks.
@@ -35,7 +46,8 @@ vi.mock('@/components', () => ({ FeaturedWork: () => null, TechStack: () => null
  * The offline structured-data gate (#55, FR-4). A describe below renders every block the site
  * serves, the Person and the WebSite from the root layout, a WebPage for every static route but
  * /about, /about's ProfilePage, and a WebPage, a TechArticle and a BreadcrumbList for every case
- * study, and runs each payload through `parseJsonLdBlock`: valid JSON, one object, an `@context` of
+ * study and every published post (the fixtures, through the mock above), and runs each payload
+ * through `parseJsonLdBlock`: valid JSON, one object, an `@context` of
  * `https://schema.org` and a non-empty `@type`. It needs no network, so it is the hard gate;
  * `e2e/structured-data.spec.ts` asks validator.schema.org about the vocabulary as well, and fails
  * open, because that endpoint is undocumented.
@@ -439,8 +451,12 @@ describe('the JSON-LD blocks', () => {
         WebPageJsonLd,
         TechArticleJsonLd,
         BreadcrumbListJsonLd,
+        PostWebPageJsonLd,
+        PostArticleJsonLd,
+        PostBreadcrumbJsonLd,
       } = await importWithSiteUrl('https://example.test');
       const study = { ...caseStudies[0], title: hostile, description: hostile, tags: [hostile] };
+      const post = { ...hostileTitlePost, title: hostile, summary: hostile, tags: [hostile] };
       const { container } = render(
         <>
           <PersonJsonLd />
@@ -448,13 +464,16 @@ describe('the JSON-LD blocks', () => {
           <WebPageJsonLd path="/skills" name={hostile} />
           <TechArticleJsonLd caseStudy={study} />
           <BreadcrumbListJsonLd caseStudy={study} />
+          <PostWebPageJsonLd post={post} />
+          <PostArticleJsonLd post={post} />
+          <PostBreadcrumbJsonLd post={post} />
         </>,
       );
 
       const blocks = jsonLdBlocks(container);
-      expect(blocks).toHaveLength(5);
-      // The hostile text did reach the Person, the page, the article and the trail.
-      expect(blocks.filter((body) => body.includes('\\u003c/script>'))).toHaveLength(4);
+      expect(blocks).toHaveLength(8);
+      // The hostile text did reach the Person, both pages, both articles and both trails.
+      expect(blocks.filter((body) => body.includes('\\u003c/script>'))).toHaveLength(7);
       const offenders = blocks
         .map((body, index) => ({ index, body }))
         .filter(({ body }) => body.toLowerCase().includes('</script'))
@@ -629,6 +648,81 @@ describe('the case-study JSON-LD blocks', () => {
   });
 });
 
+describe('the post JSON-LD blocks (#61, 61f)', () => {
+  it('has published fixtures to describe', () => {
+    // The control: every row below walks `publishedPosts`, so an empty list would pass them all.
+    expect(publishedPosts.length).toBeGreaterThan(0);
+  });
+
+  it('describe each published post as a TechArticle by the site’s Person, with its own dates', async () => {
+    const { PostArticleJsonLd } = await importWithSiteUrl('https://example.test');
+    for (const post of publishedPosts) {
+      const { container, unmount } = render(<PostArticleJsonLd post={post} />);
+      const [article] = jsonLdBlocks(container).map(parseJsonLdBlock);
+      const url = `https://example.test/blog/${post.slug}`;
+      // The whole node, so a predicate added or left behind fails here. The case study's node, less
+      // what a post page does not show (ADR 0031's fifth decision): no `description`, since the
+      // summary is only the page's meta description, and no `keywords`, since a post's tags are
+      // drawn on its card alone. No new node type either, not even BlogPosting (#61).
+      expect(article, post.slug).toEqual({
+        '@context': 'https://schema.org',
+        '@type': 'TechArticle',
+        '@id': `${url}#article`,
+        headline: post.title,
+        image: `${url}/og-image.png`,
+        author: { '@id': 'https://example.test/#person' },
+        mainEntityOfPage: { '@id': `${url}#webpage` },
+        isPartOf: { '@id': 'https://example.test/#website' },
+        datePublished: post.publishedAt,
+        dateModified: post.updatedAt,
+      });
+      unmount();
+    }
+  });
+
+  it('give each post a Home > Writing > post breadcrumb, Writing being /blog’s own title', async () => {
+    const { PostBreadcrumbJsonLd } = await importWithSiteUrl('https://example.test');
+    expect(pages['/blog'].title).toBe('Writing');
+    for (const post of publishedPosts) {
+      const { container, unmount } = render(<PostBreadcrumbJsonLd post={post} />);
+      const [crumbs] = jsonLdBlocks(container).map(parseJsonLdBlock);
+      const url = `https://example.test/blog/${post.slug}`;
+      expect(crumbs, post.slug).toEqual({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        '@id': `${url}#breadcrumb`,
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://example.test' },
+          { '@type': 'ListItem', position: 2, name: 'Writing', item: 'https://example.test/blog' },
+          { '@type': 'ListItem', position: 3, name: post.title, item: url },
+        ],
+      });
+      unmount();
+    }
+  });
+
+  it('keeps the hostile fixture title inside its scripts, and reads it back as written', async () => {
+    const { PostArticleJsonLd, PostBreadcrumbJsonLd } =
+      await importWithSiteUrl('https://example.test');
+    // The control: the fixture's title carries a `<`, the character the escape exists for, so
+    // the `not.toContain('<')` below proves it was escaped rather than never there.
+    expect(hostileTitlePost.title).toContain('<');
+    const { container } = render(
+      <>
+        <PostArticleJsonLd post={hostileTitlePost} />
+        <PostBreadcrumbJsonLd post={hostileTitlePost} />
+      </>,
+    );
+    const blocks = jsonLdBlocks(container);
+    expect(blocks).toHaveLength(2);
+    expect(container.children).toHaveLength(2);
+    for (const body of blocks) expect(body).not.toContain('<');
+    const [article, crumbs] = blocks.map(parseJsonLdBlock);
+    expect(article.headline).toBe(hostileTitlePost.title);
+    expect((crumbs.itemListElement as { name: string }[])[2].name).toBe(hostileTitlePost.title);
+  });
+});
+
 /** The static routes but /about, which renders a ProfilePage rather than a WebPage. */
 const WEB_PAGE_ROUTES = (Object.keys(pages) as (keyof typeof pages)[]).filter(
   (path) => path !== '/about',
@@ -671,7 +765,7 @@ describe('the builders refuse a node they cannot mark up truthfully (57a)', () =
       expect(() => profilePage({ path: '/about', dateModified: date }), date).toThrow(
         /profilePage: .* is not a YYYY-MM-DD day/,
       );
-      const article = { path: '/work/x', headline: 'X', description: 'X', keywords: [] };
+      const article = { path: '/work/x', headline: 'X', description: 'X', keywords: ['X'] };
       expect(
         () => techArticle({ ...article, datePublished: date, dateModified: '2026-10-02' }),
         date,
@@ -685,14 +779,41 @@ describe('the builders refuse a node they cannot mark up truthfully (57a)', () =
       expect(() => webPage({ path: '/skills', name }), JSON.stringify(name)).toThrow(/blank/);
     }
   });
+
+  it('refuses an article with a blank headline or an empty description or keywords (61f)', async () => {
+    const { techArticle } = await builders();
+    const article = {
+      path: '/work/x',
+      headline: 'X',
+      description: 'X',
+      datePublished: '2026-10-02',
+      dateModified: '2026-10-02',
+      keywords: ['X'],
+    };
+    // The control: the same input with each predicate given, or left out with `undefined`, builds.
+    expect(techArticle(article)).toMatchObject({ description: 'X', keywords: ['X'] });
+    const bare = techArticle({ ...article, description: undefined, keywords: undefined });
+    expect(bare).not.toHaveProperty('description');
+    expect(bare).not.toHaveProperty('keywords');
+    for (const headline of ['', '  ']) {
+      expect(() => techArticle({ ...article, headline }), JSON.stringify(headline)).toThrow(
+        /techArticle: an article needs a headline/,
+      );
+    }
+    for (const empty of [{ description: '' }, { description: ' ' }, { keywords: [] }]) {
+      expect(() => techArticle({ ...article, ...empty }), JSON.stringify(empty)).toThrow(
+        /techArticle: an empty description or keywords list/,
+      );
+    }
+  });
 });
 
 /**
  * Every block the site serves, each component rendered on its own: the layout's two, a WebPage for
- * each static route but /about, /about's ProfilePage, then each case study's three in data order.
- * One render per component means a block is named by the render that produced it, never by its
- * position among the others, so a component that renders two blocks or none cannot shift the blame
- * onto its neighbours.
+ * each static route but /about, /about's ProfilePage, then each case study's three in data order,
+ * then each published post's three, newest first. One render per component means a block is named
+ * by the render that produced it, never by its position among the others, so a component that
+ * renders two blocks or none cannot shift the blame onto its neighbours.
  */
 async function renderEveryBlock(): Promise<{ source: string; blocks: string[] }[]> {
   const {
@@ -702,6 +823,9 @@ async function renderEveryBlock(): Promise<{ source: string; blocks: string[] }[
     ProfilePageJsonLd,
     TechArticleJsonLd,
     BreadcrumbListJsonLd,
+    PostWebPageJsonLd,
+    PostArticleJsonLd,
+    PostBreadcrumbJsonLd,
   } = await importWithSiteUrl('https://example.test');
   const elements: [string, ReactElement][] = [
     ['PersonJsonLd', <PersonJsonLd key="person" />],
@@ -734,6 +858,11 @@ async function renderEveryBlock(): Promise<{ source: string; blocks: string[] }[
         <BreadcrumbListJsonLd key="crumbs" caseStudy={study} />,
       ],
     ]),
+    ...publishedPosts.flatMap((post): [string, ReactElement][] => [
+      [`PostWebPageJsonLd (${post.slug})`, <PostWebPageJsonLd key="page" post={post} />],
+      [`PostArticleJsonLd (${post.slug})`, <PostArticleJsonLd key="article" post={post} />],
+      [`PostBreadcrumbJsonLd (${post.slug})`, <PostBreadcrumbJsonLd key="crumbs" post={post} />],
+    ]),
   ];
   return elements.map(([source, element]) => {
     const { container, unmount } = render(element);
@@ -756,8 +885,11 @@ function onlyNode({ source, blocks }: { source: string; blocks: string[] }): Jso
 describe('the offline structured-data gate (#55)', () => {
   it('parses every block the site serves as schema.org JSON-LD with a type', async () => {
     expect(caseStudies.length, 'the data file must define case studies').toBeGreaterThan(0);
+    expect(publishedPosts.length, 'the mocked index must hold published posts').toBeGreaterThan(0);
     const rendered = await renderEveryBlock();
-    expect(rendered).toHaveLength(2 + Object.keys(pages).length + 3 * caseStudies.length);
+    expect(rendered).toHaveLength(
+      2 + Object.keys(pages).length + 3 * caseStudies.length + 3 * publishedPosts.length,
+    );
 
     const problems: string[] = [];
     for (const entry of rendered) {
@@ -911,17 +1043,19 @@ async function renderEveryRoute(): Promise<
   { route: string; nodes: JsonLdNode[]; html: string; title: unknown }[]
 > {
   const { PersonJsonLd, WebsiteJsonLd } = await importWithSiteUrl('https://example.test');
-  const [home, about, work, skills, contact, blog, privacy, study, notFound] = await Promise.all([
-    import('@/app/page'),
-    import('@/app/about/page'),
-    import('@/app/work/page'),
-    import('@/app/skills/page'),
-    import('@/app/contact/page'),
-    import('@/app/blog/page'),
-    import('@/app/privacy/page'),
-    import('@/app/work/[slug]/page'),
-    import('@/app/not-found'),
-  ]);
+  const [home, about, work, skills, contact, blog, privacy, study, post, notFound] =
+    await Promise.all([
+      import('@/app/page'),
+      import('@/app/about/page'),
+      import('@/app/work/page'),
+      import('@/app/skills/page'),
+      import('@/app/contact/page'),
+      import('@/app/blog/page'),
+      import('@/app/privacy/page'),
+      import('@/app/work/[slug]/page'),
+      import('@/app/blog/[slug]/page'),
+      import('@/app/not-found'),
+    ]);
   // Each route with the title its head is given: the page module's own metadata, the very value
   // Next reads, so a page that hands `buildMetadata()` one title and its page node another fails.
   type Route = [string, () => ReactElement | Promise<ReactElement>, () => unknown];
@@ -939,6 +1073,15 @@ async function renderEveryRoute(): Promise<
         `/work/${caseStudy.slug}`,
         () => study.default(params()),
         async () => (await study.generateMetadata(params())).title,
+      ];
+    }),
+    // The published posts: the fixtures, through the mock at the top of this file.
+    ...publishedPosts.map(({ slug }): Route => {
+      const params = () => ({ params: Promise.resolve({ slug }) });
+      return [
+        `/blog/${slug}`,
+        () => post.default(params()),
+        async () => (await post.generateMetadata(params())).title,
       ];
     }),
     ['404', () => <notFound.default />, () => notFound.metadata.title],
@@ -978,7 +1121,8 @@ async function renderEveryRoute(): Promise<
 function expectedTypes(route: string): string[] {
   if (route === '404') return ['Person', 'WebSite'];
   if (route === '/about') return ['Person', 'WebSite', 'ProfilePage'];
-  if (route.startsWith('/work/')) {
+  // A case study and a post are both an article on a page of their own (#61, 61f).
+  if (route.startsWith('/work/') || route.startsWith('/blog/')) {
     return ['Person', 'WebSite', 'WebPage', 'TechArticle', 'BreadcrumbList'];
   }
   return ['Person', 'WebSite', 'WebPage'];
@@ -998,11 +1142,13 @@ describe('the JSON-LD graph on every route (#57)', () => {
     routes = await renderEveryRoute();
   });
 
-  it('renders every route, the case studies and the 404 included', () => {
+  it('renders every route, the case studies, the posts and the 404 included', () => {
     // `pages` is the whole list of static routes (it is typed over `StaticRoute`), so a route added
     // there and not here fails.
     const rendered = routes.map(({ route }) => route);
     expect(rendered.filter((route) => route in pages).sort()).toEqual(Object.keys(pages).sort());
+    // The control for the post rows: an empty list would let them all pass.
+    expect(publishedPosts.length).toBeGreaterThan(0);
     expect(rendered).toEqual([
       '/',
       '/about',
@@ -1012,6 +1158,7 @@ describe('the JSON-LD graph on every route (#57)', () => {
       '/blog',
       '/privacy',
       ...caseStudies.map(({ slug }) => `/work/${slug}`),
+      ...publishedPosts.map(({ slug }) => `/blog/${slug}`),
       '404',
     ]);
   });
@@ -1062,6 +1209,28 @@ describe('the JSON-LD graph on every route (#57)', () => {
         { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://example.test' },
         { '@type': 'ListItem', position: 2, name: 'Work', item: 'https://example.test/work' },
         { '@type': 'ListItem', position: 3, name: study.title, item: page.url },
+      ]);
+    }
+  });
+
+  it('points each post’s article and breadcrumb at its page, dated as its data, the trail ordered to it', () => {
+    for (const entry of publishedPosts) {
+      const route = `/blog/${entry.slug}`;
+      const { nodes } = routes.find((rendered) => rendered.route === route)!;
+      const page = nodeOfType(route, nodes, 'WebPage');
+      const article = nodeOfType(route, nodes, 'TechArticle');
+      const crumbs = nodeOfType(route, nodes, 'BreadcrumbList');
+      expect(article.mainEntityOfPage, route).toEqual({ '@id': page['@id'] });
+      expect(article['@id'], route).toBe(`${String(page.url)}#article`);
+      expect([article.datePublished, article.dateModified], route).toEqual([
+        entry.publishedAt,
+        entry.updatedAt,
+      ]);
+      expect(page.breadcrumb, route).toEqual({ '@id': crumbs['@id'] });
+      expect(crumbs.itemListElement, route).toEqual([
+        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://example.test' },
+        { '@type': 'ListItem', position: 2, name: 'Writing', item: 'https://example.test/blog' },
+        { '@type': 'ListItem', position: 3, name: entry.title, item: page.url },
       ]);
     }
   });
