@@ -1123,7 +1123,7 @@ describe('postToMarkdown()', () => {
 
   it('names the post whose title is empty', () => {
     expect(() => postToMarkdown({ ...everyBlockPost, title: ' ' })).toThrow(
-      'serialise: postToMarkdown: the heading of /blog/fixture-every-block is empty',
+      'serialise: postToMarkdown: the title of /blog/fixture-every-block is empty',
     );
   });
 });

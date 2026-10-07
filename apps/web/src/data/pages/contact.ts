@@ -1,7 +1,7 @@
 /**
  * The copy `/contact` renders, and the page record its Markdown twin reads (#59). The page keeps
  * the layout, the classes, the hook under its `h1` (#58), and each profile's icon, which it keys by
- * the link's `name`, and maps over what is here, `h1` included, so a page and its twin cannot
+ * the link's `name`, and renders what is here, `h1` included, so a page and its twin cannot
  * disagree.
  * Every string is text the page already showed.
  */

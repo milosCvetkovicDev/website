@@ -1,7 +1,7 @@
 /**
  * The copy `/about` renders, and the page record its Markdown twin reads (#59). The page keeps the
  * layout, the classes, the hook under its `h1` (#58), and its "Last updated" line, which reads
- * `STATIC_ROUTE_UPDATED` (#57) as /privacy's does, and maps over what is here, `h1` included, so a
+ * `STATIC_ROUTE_UPDATED` (#57) as /privacy's does, and renders what is here, `h1` included, so a
  * page and its twin cannot disagree.
  * Every string is text the page shows, with one exception: the `Quick facts` heading, which the
  * page gives screen readers only (#58), since every record section needs a heading. The quick facts
