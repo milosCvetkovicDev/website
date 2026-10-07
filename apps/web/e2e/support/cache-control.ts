@@ -92,6 +92,16 @@ export function parseDirectives(values: readonly string[]): Directives | undefin
 const isZero = (value: string | undefined) => value !== undefined && /^0+$/.test(value);
 
 /**
+ * Whether `name` was sent and never given an argument. RFC 9111 gives `no-store`, `must-revalidate`
+ * and the unqualified `no-cache` none, and lets a cache act on the first of two occurrences (4.2.1),
+ * so one that carries an argument anywhere does not count.
+ */
+const bare = (directives: Directives, name: string) => {
+  const values = directives.get(name);
+  return values !== undefined && values.every((value) => value === undefined);
+};
+
+/**
  * What a set of directives leaves a cache: `no-store`, nothing stored at all; `revalidate`, nothing
  * reused without asking the origin first; `undefined`, a reuse without asking.
  *
@@ -110,7 +120,7 @@ const isZero = (value: string | undefined) => value !== undefined && /^0+$/.test
  * a cache ignore them (5.3, 5.4).
  */
 export function directiveBound(directives: Directives): 'no-store' | 'revalidate' | undefined {
-  if (directives.has('no-store')) {
+  if (bare(directives, 'no-store')) {
     return 'no-store';
   }
   if (directives.has('stale-while-revalidate') || directives.has('stale-if-error')) {
@@ -119,21 +129,22 @@ export function directiveBound(directives: Directives): 'no-store' | 'revalidate
   if (!(directives.get('s-maxage') ?? []).every(isZero)) {
     return undefined;
   }
-  if (directives.get('no-cache')?.includes(undefined)) {
+  if (bare(directives, 'no-cache')) {
     return 'revalidate';
   }
   const maxAge = directives.get('max-age') ?? [];
-  return maxAge.length > 0 && maxAge.every(isZero) && directives.has('must-revalidate')
+  return maxAge.length > 0 && maxAge.every(isZero) && bare(directives, 'must-revalidate')
     ? 'revalidate'
     : undefined;
 }
 
 /**
- * The fields that set a cache's lifetime for a response: `Cache-Control` for every cache, and the
- * targeted fields a CDN downstream may obey in its place, `CDN-Cache-Control` (RFC 9213) and
- * `Surrogate-Control`.
+ * Whether a field sets a cache's lifetime for a response: `Cache-Control` for every cache, and the
+ * targeted fields a CDN downstream may obey in its place, `CDN-Cache-Control` and any vendor's
+ * `<vendor>-CDN-Cache-Control` (RFC 9213), and `Surrogate-Control`.
  */
-const LIFETIME_FIELDS = ['cache-control', 'cdn-cache-control', 'surrogate-control'] as const;
+const isLifetimeField = (name: string) =>
+  name === 'cache-control' || name === 'surrogate-control' || name.endsWith('cdn-cache-control');
 
 export type CacheBound =
   { bound: 'no-store' | 'revalidate'; reason?: undefined } | { bound: undefined; reason: string };
@@ -142,18 +153,21 @@ export type CacheBound =
  * What every cache downstream may do with the response: `no-store` or `revalidate` when every
  * lifetime field it sent bounds it (the weaker of the two when they differ), or a reason naming the
  * field that does not. A response without `Cache-Control` leaves a cache a heuristic lifetime
- * (RFC 9111, 4.2.2), so it gets no bound either.
+ * (RFC 9111, 4.2.2), so it gets no bound either. nginx's own `X-Accel-Expires` bounds only at zero,
+ * which keeps the response out of its cache.
  */
 export function cacheBound(headers: readonly HeaderLine[]): CacheBound {
   if (fieldValues(headers, 'cache-control').length === 0) {
     return { bound: undefined, reason: 'it sent no Cache-Control' };
   }
+  const accel = fieldValues(headers, 'x-accel-expires');
+  if (!accel.every((value) => isZero(value.trim()))) {
+    return { bound: undefined, reason: `it sent x-accel-expires: "${accel.join(', ')}"` };
+  }
   let bound: 'no-store' | 'revalidate' = 'no-store';
-  for (const field of LIFETIME_FIELDS) {
+  const fields = new Set(headers.map(({ name }) => name.toLowerCase()).filter(isLifetimeField));
+  for (const field of fields) {
     const values = fieldValues(headers, field);
-    if (values.length === 0) {
-      continue;
-    }
     const sent = `${field}: "${values.join(', ')}"`;
     const directives = parseDirectives(values);
     if (directives === undefined) {

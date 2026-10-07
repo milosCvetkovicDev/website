@@ -178,8 +178,9 @@ can report a `scripts/` file differently from `pnpm typecheck`, which is the ref
   `text/markdown; charset=utf-8`. A third test per route checks that a cache downstream cannot
   hand the twin to a browser: the Markdown answer's `Vary` lists `accept` or is `*`, or, as on
   Vercel, which drops `accept` there (#217), its caching fields (`Cache-Control`, and any
-  `CDN-Cache-Control` or `Surrogate-Control`) forbid storing it or make every cache revalidate it
-  (`no-cache`, or `max-age=0` with `must-revalidate`, and no `s-maxage` above 0 or `stale-*`), its
+  `CDN-Cache-Control`, `<vendor>-CDN-Cache-Control` or `Surrogate-Control`) forbid storing it or
+  make every cache revalidate it (a bare `no-cache`, or `max-age=0` with `must-revalidate`, and no
+  `s-maxage` above 0, `stale-*` or `X-Accel-Expires` above 0), its
   one ETag differs from the page's, each representation's own ETag in `If-None-Match` gets a `304`,
   and the other's gets `200` with the type asked for. The rules live in
   `e2e/support/cache-control.ts`, unit-tested in `src/test/cache-control.test.ts`, and fail closed

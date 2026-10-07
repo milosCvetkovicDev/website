@@ -7710,7 +7710,7 @@
       "id": "adr-0030-correction-cache-control-rules",
       "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
       "anchor": "The rules are `apps/web/e2e/support/cache-control.ts`",
-      "claim": "The live negotiation spec takes its revalidation rules from e2e/support/cache-control.ts, which counts no-store and refuses stale-while-revalidate and stale-if-error.",
+      "claim": "The live negotiation spec takes its revalidation rules from e2e/support/cache-control.ts, which refuses stale-while-revalidate and stale-if-error.",
       "method": "file-line",
       "evaluation": "live",
       "check": {

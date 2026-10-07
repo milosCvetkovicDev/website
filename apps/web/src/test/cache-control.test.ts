@@ -85,6 +85,22 @@ describe('directiveBound', () => {
     expect(boundOf('no-store, max-age=600, stale-while-revalidate=60')).toBe('no-store');
   });
 
+  it('counts a directive that takes no argument only where every occurrence has none', () => {
+    // RFC 9111 gives no-store, no-cache's unqualified form and must-revalidate no argument, and
+    // lets a cache act on the first of two occurrences (4.2.1), so a qualified one is no bound.
+    expect(boundOf('no-store="x", no-cache')).toBe('revalidate');
+    for (const value of [
+      'no-store="x"',
+      'no-store="x", max-age=600',
+      'no-cache="set-cookie", no-cache',
+      'no-cache, no-cache="set-cookie"',
+      'max-age=0, must-revalidate="no"',
+      'max-age=0, must-revalidate, must-revalidate=x',
+    ]) {
+      expect(boundOf(value), value).toBeUndefined();
+    }
+  });
+
   it('gives no bound where a cache may reuse the response without asking', () => {
     for (const value of [
       'public, max-age=600',
@@ -146,6 +162,26 @@ describe('cacheBound', () => {
     expect(
       cacheBound([...cc('no-store'), { name: 'cdn-cache-control', value: 'no-store' }]),
     ).toEqual({ bound: 'no-store' });
+  });
+
+  it('holds a vendor’s own targeted field (RFC 9213) and nginx’s lifetime field too', () => {
+    const base = cc('public, max-age=0, must-revalidate');
+    expect(
+      cacheBound([...base, { name: 'Cloudflare-CDN-Cache-Control', value: 'max-age=86400' }]),
+    ).toEqual({
+      bound: undefined,
+      reason: 'it sent cloudflare-cdn-cache-control: "max-age=86400"',
+    });
+    expect(
+      cacheBound([...base, { name: 'Vercel-CDN-Cache-Control', value: 'max-age=86400' }]).bound,
+    ).toBe(undefined);
+    expect(cacheBound([...base, { name: 'X-Accel-Expires', value: '3600' }])).toEqual({
+      bound: undefined,
+      reason: 'it sent x-accel-expires: "3600"',
+    });
+    expect(cacheBound([...base, { name: 'X-Accel-Expires', value: '0' }])).toEqual({
+      bound: 'revalidate',
+    });
   });
 });
 

@@ -213,11 +213,13 @@ request with a browser's `Accept` and the twin's ETag in `If-None-Match` is answ
 Markdown. Since #217 the live check holds that bound where the Markdown answer's `Vary` lists
 neither `accept` nor `*`: `apps/web/e2e-live/markdown-negotiation.spec.ts` passes on such a `Vary`,
 or on caching fields that forbid storing the answer, or on all of these: caching fields
-(`Cache-Control`, and any `CDN-Cache-Control` or `Surrogate-Control`) of `no-cache`, or of
-`max-age=0` with `must-revalidate`, with no `s-maxage` above 0, `stale-while-revalidate` or
-`stale-if-error`; one well-formed ETag on each answer, the two different and the Markdown one stable
-across the test; each representation's own ETag answered `304`; and the other's answered `200` with
-the representation asked for, alone or beside the own one. The rules are
+(`Cache-Control`, and any `CDN-Cache-Control`, `<vendor>-CDN-Cache-Control` or `Surrogate-Control`)
+of a bare `no-cache`, or of `max-age=0` with `must-revalidate`, with no `s-maxage` above 0,
+`stale-while-revalidate` or `stale-if-error`, and no `X-Accel-Expires` above 0; one well-formed ETag
+on each answer, the two different and the Markdown one stable across the test; each
+representation's own ETag answered `304`; the other's answered `200` with the representation asked
+for; and both together answered with a `304` naming the own ETag or a `200` of the representation
+asked for. The rules are
 `apps/web/e2e/support/cache-control.ts`, which fails closed on a field that does not parse. A cache
 that ignores `must-revalidate` breaks RFC 9111 and is outside what it checks. So is the agent's
 side: the page's answer lacks `Accept` in its `Vary` on both servers, and a cache may hand it to an
@@ -229,8 +231,9 @@ Evidence:
   (Actions run 36839470865, a `deployment_status` run on 2026-10-01), failed 20 tests, each on the
   negotiated Markdown answer's `Vary`, which it received as
   `["rsc", "next-router-state-tree", "next-router-prefetch", "next-router-segment-prefetch"]`. Every
-  one of the 33 runs from then until 2026-10-07 failed the same 20 tests on that assertion alone
-  (run 37582366418, on 4e8b2d4, among them).
+  one of the 33 runs that tested production from then through run 37591669597 (on 6d61eac,
+  2026-10-07) failed the same 20 tests on that assertion alone (run 37582366418, on 4e8b2d4, among
+  them).
 - On 2026-10-07,
   `curl -sS -o /dev/null -D - -H 'Accept: text/markdown, */*' https://miloscvetkovic.dev/about`
   printed `HTTP/2 200`, `content-type: text/markdown; charset=utf-8`,

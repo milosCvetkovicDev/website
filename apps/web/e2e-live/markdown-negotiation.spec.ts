@@ -33,8 +33,9 @@ import { ASKS_FOR_MARKDOWN, BROWSER_ACCEPT, MARKDOWN, varyOf } from '../e2e/supp
  *   twin under a key of its own, and a browser's request never matches it. This is what
  *   `next start` sends;
  * - or the Markdown answer leaves a cache nothing to replay without asking, which is what Vercel
- *   sends. Its `Cache-Control`, and any `CDN-Cache-Control` or `Surrogate-Control` a CDN downstream
- *   would obey instead, forbids storing it or makes every cache revalidate before each reuse
+ *   sends. Its `Cache-Control`, and any `CDN-Cache-Control`, `<vendor>-CDN-Cache-Control` or
+ *   `Surrogate-Control` a CDN downstream would obey instead, with nginx's `X-Accel-Expires` at zero
+ *   if sent, forbids storing it or makes every cache revalidate before each reuse
  *   (`e2e/support/cache-control.ts` has the rules, `src/test/cache-control.test.ts` their cases).
  *   When it may be stored, it and the page each carry one entity tag, and the two differ, compared
  *   weakly as `If-None-Match` compares them (RFC 9110, 13.1.2), so the revalidation names the
