@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (corrected 2026-10-07)
 
 ## Date
 
@@ -112,16 +112,18 @@ down.
   handler sets its own `Vary` (`rsc` and the three `next-router-*` request headers) with
   `setHeader` after the `headers()` entries have been applied, in
   `next/dist/build/templates/app-page-runtime.js` of 16.3.6, so on a page the `Accept` entry is
-  replaced. Every negotiated Markdown answer carries Next's `Vary` and `Accept` both, and a twin
-  requested by its own URL, which serves one representation, carries Next's `Vary` only (measured
-  2026-10-01). A cache that honours `Vary`, as RFC 9111 requires, can therefore never hand the
-  twin to a request for the page that did not ask for it, while it may hand the page to an agent
-  that asked for Markdown, which is what that agent got before this record. Issue #59 cites
-  Vercel's markdown-access documentation (last updated 2026-09-03) for this rewrite and for its CDN
-  keying the cache on `Accept`. `next start` has no shared cache to measure that on, so the live
-  check of [ADR 0026](0026-vercel-web-analytics.md) measures it on the apex after every production
-  deployment and daily: `apps/web/e2e-live/markdown-negotiation.spec.ts` asks each negotiating
-  route for Markdown and then as a browser, and the other way round, without busting the cache.
+  replaced. Under `next start` every negotiated Markdown answer carries Next's `Vary` and `Accept`
+  both, and a twin requested by its own URL, which serves one representation, carries Next's
+  `Vary` only (measured 2026-10-01); on Vercel the negotiated Markdown answer carries Next's `Vary`
+  only as well. Under `next start` a cache that honours `Vary`, as RFC 9111 requires, can
+  therefore never hand the twin to a request for the page that did not ask for it, while it may
+  hand the page to an agent that asked for Markdown, which is what that agent got before this
+  record. Issue #59 cites Vercel's markdown-access documentation (last updated 2026-09-03) for this
+  rewrite and for its CDN keying the cache on `Accept`. `next start` has no shared cache to
+  measure that on, so the live check of [ADR 0026](0026-vercel-web-analytics.md) measures it on
+  the apex after every production deployment and daily:
+  `apps/web/e2e-live/markdown-negotiation.spec.ts` asks each negotiating route for Markdown and
+  then as a browser, and the other way round, without busting the cache.
 - **`next.config.ts` now imports the data modules** (`static-routes.ts`, `case-studies.ts`) and
   `lib/pathname.ts`. Next's config loader compiles every module it requires with one set of
   options and no file name, so an `@/` import becomes `./src/…`, a path that is right only beside
@@ -168,3 +170,88 @@ down.
 - **The refusal as a negative lookahead inside the `has` value.** It matches the same requests;
   a separate `missing` condition keeps each value one readable pattern and asks nothing of the
   router's regular-expression engine beyond groups and repetition.
+
+## Corrections
+
+### 2026-10-07: `Vary: Accept` on Vercel
+
+One statement inside `## Decision` and two sentences of `### Trade-offs` were false about the
+production site on the day this record was accepted: Vercel does not send the `Accept` entry on a
+negotiated Markdown answer. `## Decision` is never rewritten, so its statement is annotated here,
+and the Trade-offs sentences are corrected in place, under
+[ADR 0012](0012-correcting-accepted-records.md).
+
+**Each negotiating route sends `Vary: Accept`**, decision 5 in `## Decision`. The record reads:
+"Each negotiating route sends `Vary: Accept`, from one `headers()` entry per route". What is true:
+each negotiating route has that entry, and whether it reaches the wire depends on the server. Under
+`next start` it reaches the negotiated Markdown answer and not the HTML page, as `### Trade-offs`
+already said of the page. On Vercel it reaches neither: the negotiated Markdown answer carries
+Next's own `Vary` only,
+`rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch`, while the
+security headers of [ADR 0023](0023-static-security-headers.md), from the same `headers()`, arrive
+on it. Vercel applies the configuration, then sends the prerendered answer's own `Vary`. What was
+wrong: "sends" holds for the configuration and under `next start`, not on the host that serves the
+site.
+
+**Every negotiated Markdown answer carries `Accept`**, in `### Trade-offs`, the bullet on
+`Vary: Accept` and the HTML page. It read: "Every negotiated Markdown answer carries Next's `Vary`
+and `Accept` both, and a twin requested by its own URL, which serves one representation, carries
+Next's `Vary` only (measured 2026-10-01). A cache that honours `Vary`, as RFC 9111 requires, can
+therefore never hand the twin to a request for the page that did not ask for it". It now says that
+both hold under `next start`, where they were measured, and that on Vercel the negotiated Markdown
+answer carries Next's `Vary` only as well. What was wrong: a measurement taken under `next start`
+was stated of every negotiated answer, and the conclusion drawn from it of every cache in front of
+the site. The rest of the bullet is unchanged, though rewrapped.
+
+What keeps a cache downstream of Vercel from handing the twin to a browser instead, measured on the
+apex on 2026-10-07: the negotiated answer carries
+`Cache-Control: public, max-age=0, must-revalidate`, so a cache that follows RFC 9111 revalidates it
+before each reuse, and a strong ETag that differs from the page's at the same URL. That
+`Cache-Control` is Vercel's default for prerendered output; nothing in `next.config.ts` sets it. A
+request with a browser's `Accept` and the twin's ETag in `If-None-Match` is answered
+`200 text/html`, not `304`, and a request for Markdown with the page's ETag is answered `200`
+Markdown. Since #217 the live check holds that bound where the Markdown answer's `Vary` lists
+neither `accept` nor `*`: `apps/web/e2e-live/markdown-negotiation.spec.ts` passes on such a `Vary`,
+or on caching fields that forbid storing the answer, or on all of these: caching fields
+(`Cache-Control`, and any `Surrogate-Control` or targeted `<target>-Cache-Control` field, such as
+`CDN-Cache-Control`) of a bare `no-cache`, or of `max-age=0` with `must-revalidate`, with no
+`s-maxage` above 0, `stale-while-revalidate` or `stale-if-error`, and no `X-Accel-Expires` other
+than 0; one well-formed ETag
+on each answer, the two different and the Markdown one stable across the test; each
+representation's own ETag answered `304`; the other's answered `200` with the representation asked
+for; and both together answered with a `304` naming the own ETag or a `200` of the representation
+asked for. The rules are
+`apps/web/e2e/support/cache-control.ts`, which fails closed on a field that does not parse. A cache
+that ignores `must-revalidate` breaks RFC 9111 and is outside what it checks. So is the agent's
+side: the page's answer lacks `Accept` in its `Vary` on both servers, and a cache may hand it to an
+agent, as `### Trade-offs` already accepts; the check does not read the page's `Cache-Control`.
+
+Evidence:
+
+- The live check's first run against this record's deployment, on b73f41e, the commit that added it
+  (Actions run 36839470865, a `deployment_status` run on 2026-10-01), failed 20 tests, each on the
+  negotiated Markdown answer's `Vary`, which it received as
+  `["rsc", "next-router-state-tree", "next-router-prefetch", "next-router-segment-prefetch"]`. Every
+  one of the 33 runs that tested production from then through run 37591669597 (on 6d61eac,
+  2026-10-07) failed the same 20 tests on that assertion alone (run 37582366418, on 4e8b2d4, among
+  them).
+- On 2026-10-07,
+  `curl -sS -o /dev/null -D - -H 'Accept: text/markdown, */*' https://miloscvetkovic.dev/about`
+  printed `HTTP/2 200`, `content-type: text/markdown; charset=utf-8`,
+  `vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch`,
+  `cache-control: public, max-age=0, must-revalidate`, `etag: "d3f5b3507e24a0214cacc669c54f6641"`,
+  `x-vercel-cache: HIT`, `x-content-type-options: nosniff`, `x-frame-options: DENY` and the CSP.
+  With Chromium's `Accept` for a navigation the same URL printed
+  `content-type: text/html; charset=utf-8`, `etag: "0fac66c0b05a9ee915c174613f987e34"`, the same
+  `cache-control` and the same `vary`,
+  `rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch`. With
+  Chromium's `Accept` and `If-None-Match: "d3f5b3507e24a0214cacc669c54f6641"` it answered
+  `200 text/html; charset=utf-8`, and with `Accept: text/markdown, */*` and
+  `If-None-Match: "0fac66c0b05a9ee915c174613f987e34"` it answered
+  `200 text/markdown; charset=utf-8`, while each representation's own ETag got a `304`. `/` and
+  `/work/self-healing-agent` answered the same way.
+- Under `next start` the measurement of 2026-10-01 stands, and `e2e/markdown-negotiation.spec.ts`
+  asserts `Accept` in the negotiated answer's `Vary` in CI.
+
+This correction changes nothing about the decision it annotates. Decision 5's entries stay: they
+reach the negotiated answer under `next start` and on any host that keeps them.

@@ -7525,11 +7525,11 @@
       "anchor": "| 0030 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0030's record carries the status line \"Accepted\".",
+      "claim": "ADR 0030's record carries the status line \"Accepted (corrected 2026-10-07)\".",
       "check": {
         "file": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-10-07)"
       }
     },
     {
@@ -7538,11 +7538,11 @@
       "anchor": "| 0030 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0030 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0030 gives the record's status line, \"Accepted (corrected 2026-10-07)\" (ADR 0012: the status in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0030 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-10-07)"
       }
     },
     {
@@ -7648,6 +7648,16 @@
       "check": { "path": "docs/adr/0026-vercel-web-analytics.md" }
     },
     {
+      "id": "adr-0030-link-0012-correcting-accepted-records",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0012-correcting-accepted-records.md)",
+      "claim": "The link to 0012-correcting-accepted-records.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0012-correcting-accepted-records.md" }],
+      "check": { "path": "docs/adr/0012-correcting-accepted-records.md" }
+    },
+    {
       "id": "adr-0030-script-check-build-output",
       "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
       "anchor": "`pnpm check:build-output`",
@@ -7694,6 +7704,30 @@
       "check": {
         "path": "apps/web/e2e-live/markdown-negotiation.spec.ts",
         "contains": "serves Markdown to an agent after a browser's request"
+      }
+    },
+    {
+      "id": "adr-0030-correction-cache-control-rules",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "The rules are `apps/web/e2e/support/cache-control.ts`",
+      "claim": "The live negotiation spec takes its revalidation rules from e2e/support/cache-control.ts, which refuses stale-while-revalidate and stale-if-error.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e/support/cache-control.ts",
+        "contains": "directives.has('stale-while-revalidate') || directives.has('stale-if-error')"
+      }
+    },
+    {
+      "id": "adr-0030-correction-live-spec-uses-rules",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "The rules are `apps/web/e2e/support/cache-control.ts`",
+      "claim": "The live negotiation spec imports its cache bound, entity tag and Vary rules from e2e/support/cache-control.ts.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e-live/markdown-negotiation.spec.ts",
+        "contains": "import { cacheBound, entityTag, variesOnAccept } from '../e2e/support/cache-control';"
       }
     },
     {

@@ -42,15 +42,22 @@ both values as anchored, case-sensitive regular expressions, so a non-zero weigh
 refuses) and `Text/Markdown` gets the page. `varyOnAccept()` appends one `headers()` entry per
 negotiating route with `Vary: Accept`, after the two entries above, which stay as they are; the
 twin URLs get none, since each serves one representation. Next applies `headers()` to the requested
-path, before the rewrite, so a negotiated Markdown answer carries Next's own `Vary` and `Accept`
-both; on an HTML page Next's App Router handler sets its `Vary` after `headers()`, so `Accept` is
-absent there under `next start`, and ADR 0030 says what that leaves open.
+path, before the rewrite, so under `next start` a negotiated Markdown answer carries Next's own
+`Vary` and `Accept` both; on an HTML page Next's App Router handler sets its `Vary` after
+`headers()`, so `Accept` is absent there, and ADR 0030 says what that leaves open. On Vercel the
+negotiated Markdown answer loses `Accept` too: the platform sends the prerendered answer's own
+`Vary`, Next's, while the other `headers()` entries arrive (measured 2026-10-07, #217, ADR 0030's
+correction of that date). There `Cache-Control: public, max-age=0, must-revalidate` and a different
+ETag per representation keep a downstream cache from handing the twin to a browser. That
+`Cache-Control` is Vercel's default for prerendered output, not a value `headers()` sets.
 `src/test/next-config.test.ts` pins the rules through `unstable_getResponseFromNextConfig` and
 fails when the negotiated routes and the twin handlers under `src/app` differ;
-`e2e/markdown-negotiation.spec.ts` checks them on the wire, and
+`e2e/markdown-negotiation.spec.ts` checks them on the wire, `Vary: Accept` included, and
 `e2e-live/markdown-negotiation.spec.ts`, run by the live check after every production deployment
-and daily, checks that Vercel's CDN keys its cache on `Accept` (`.github/workflows/live-check.yml`,
-`ci-and-scripts.md`).
+and daily, checks that Vercel's CDN keeps the two apart and that a cache downstream could not hand
+the twin to a browser: `Accept` in the Markdown answer's `Vary`, or forced revalidation under an
+ETag of its own that the site answers with the other representation
+(`.github/workflows/live-check.yml`, `ci-and-scripts.md`).
 
 ## Gotchas
 
