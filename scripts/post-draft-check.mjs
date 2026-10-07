@@ -318,18 +318,31 @@ const isTable = (lines) =>
   DELIMITER_ROW.test(lines[1]);
 
 /**
- * A pipe table row with its cells trimmed and in canonical form, or the delimiter row as `---`s.
- * Every backslash and pipe in a cell is escaped, so a row reads back as exactly its cells; a
- * backslash that canonical text has already escaped shows doubled, on both sides alike.
+ * A pipe table row's cells as written, trimmed. GFM splits a row at each unescaped `|` before it
+ * reads any inline syntax, so nothing in one cell pairs with anything in the next.
  * @param {string} line
- * @param {boolean} delimiter
- * @param {string} origin
  */
-function tableRow(line, delimiter, origin) {
+function tableCells(line) {
   let row = line.trim();
   if (row.startsWith('|')) row = row.slice(1);
   if (row.endsWith('|') && !row.endsWith('\\|')) row = row.slice(0, -1);
-  const cells = row.split(/(?<!\\)\|/).map((cell) => cell.trim());
+  return row.split(/(?<!\\)\|/).map((cell) => cell.trim());
+}
+
+/**
+ * A pipe table row with its cells trimmed and in canonical form, or the delimiter row as `---`s.
+ * Every backslash and pipe in a cell is escaped, so a row reads back as exactly its cells; a
+ * backslash that canonical text has already escaped shows doubled, on both sides alike. A body row
+ * with fewer cells than `width` gets empty ones, as GFM pads it. A longer one keeps the extra cells
+ * that GFM drops, so it differs from the twin's row: a difference that fails safe.
+ * @param {string} line
+ * @param {boolean} delimiter
+ * @param {number} width the delimiter row's cell count for a body row, or 0 to leave it as written
+ * @param {string} origin
+ */
+function tableRow(line, delimiter, width, origin) {
+  const cells = tableCells(line);
+  while (cells.length < width) cells.push('');
   const shown = delimiter
     ? cells.map(() => '---')
     : cells.map((cell) => canonicalInline(cell, origin).replace(/[\\|]/g, '\\$&'));
@@ -344,7 +357,10 @@ function tableRow(line, delimiter, origin) {
  */
 function canonicalTable(lines, caption, origin) {
   const captioned = caption === null ? [] : [`Table: ${canonicalInline(caption.slice(7), origin)}`];
-  const rows = lines.map((line, index) => tableRow(line, index === 1, origin));
+  const width = tableCells(lines[1]).length;
+  const rows = lines.map((line, index) =>
+    tableRow(line, index === 1, index > 1 ? width : 0, origin),
+  );
   return ['table:', ...captioned, ...rows].join('\n');
 }
 
@@ -621,7 +637,6 @@ const REFUSED_INLINE = [
   [/\]\[/, 'a reference-style link'],
   [/\*/, 'an emphasis marker *; write \\* for the character'],
   [/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/u, 'an emphasis marker _; write \\_ for the character'],
-  [/~~/, 'strikethrough'],
   [
     /&(?:#\d+|#[Xx][\dA-Fa-f]+|[A-Za-z][\dA-Za-z]*);/,
     'an entity reference; write the character itself, or \\& for an ampersand',
@@ -711,6 +726,76 @@ function prose(tokens, labels) {
     .join('');
 }
 
+/** CommonMark's Unicode whitespace: a `Zs` space, a tab, a line feed, a form feed or a return. */
+const WHITESPACE = /[\p{Zs}\t\n\f\r]/u;
+
+/**
+ * The spans in which GFM pairs `~` as strikethrough: the run of text, where each code span, escape
+ * and link stands as one character that is not a space, and each link's text on its own.
+ * @param {Token[]} tokens
+ * @returns {string[]}
+ */
+function tildeSpans(tokens) {
+  const labels = /** @type {string[]} */ ([]);
+  const span = tokens
+    .map((token) => {
+      if ('code' in token) return 'c';
+      if ('label' in token) {
+        labels.push(...tildeSpans(token.label));
+        return 'l';
+      }
+      return token.text.replace(ESCAPE, 'e');
+    })
+    .join('');
+  return [span, ...labels];
+}
+
+/**
+ * Whether GFM may strike part of `span` through: a run of one or two `~` that can open, followed
+ * later by a run of the same length that can close. A run of three or more stays text. A run can
+ * open unless whitespace or the span's end follows it, and close unless whitespace or the span's
+ * start comes before it: CommonMark's flanking rules without their punctuation clauses, so that
+ * the check refuses a few pairs GFM leaves as text and misses none it strikes.
+ * @param {string} span
+ */
+function strikes(span) {
+  /** @type {Set<number>} */
+  const opened = new Set();
+  for (const run of span.matchAll(/~+/g)) {
+    const length = run[0].length;
+    if (length > 2) continue;
+    const before = span[run.index - 1];
+    const after = span[run.index + length];
+    if (opened.has(length) && before !== undefined && !WHITESPACE.test(before)) return true;
+    if (after !== undefined && !WHITESPACE.test(after)) opened.add(length);
+  }
+  return false;
+}
+
+/**
+ * The unescaped `](` in running text as written, by kind: `opened` when an unescaped `[` before it
+ * is still open, so that CommonMark may read it as a link's end, and `stray` when none is. Each `[`
+ * opens a bracket and each `]` closes the last one open, never below none; an escape is skipped.
+ * @param {string} text
+ */
+function linkCloses(text) {
+  const found = { opened: false, stray: false };
+  let depth = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '\\') index += 1;
+    else if (char === '[') depth += 1;
+    else if (char === ']') {
+      if (text[index + 1] === '(') {
+        if (depth > 0) found.opened = true;
+        else found.stray = true;
+      }
+      depth = Math.max(0, depth - 1);
+    }
+  }
+  return found;
+}
+
 /**
  * Running text or a link's label as written, its escapes kept and each code span or link a space,
  * for reading it again for links. `prose()` drops each escape whole, which would read `[b]\!(c)` as
@@ -747,16 +832,35 @@ function refusedInline(source, at, block) {
   if (reread.some((label) => label.some((token) => 'label' in token))) {
     problems.push(`${at}: a link inside a link's text`);
   }
-  // A `](` that `linkAt()` did not take, as with a title or a space around the destination, stays
-  // text on both sides, while CommonMark makes it a link. An escaped `\]` is text.
-  if ([tokens, ...reread].some((run) => /(?<!\\)(?:\\\\)*\]\(/.test(written(run)))) {
+  // A `](` that `linkAt()` did not take stays text on both sides. After an unescaped `[` that no
+  // `]` has closed, CommonMark can still read it as the end of a link that `linkAt()` does not,
+  // one with a title or spaces around its destination. With no open `[` before it, CommonMark
+  // leaves it text as well; it is refused anyway, by its own message, as escaping the `]` costs
+  // nothing. An escaped `\]` is text.
+  const closes = [tokens, ...reread].map((run) => linkCloses(written(run)));
+  if (closes.some(({ opened }) => opened)) {
     problems.push(
       `${at}: a link title or spaces around a link's destination; the post format has neither`,
     );
   }
+  if (closes.some(({ stray }) => stray)) {
+    problems.push(`${at}: a \`](\` with no open \`[\` before it: escape the \`]\` as \`\\]\``);
+  }
   const text = prose(tokens, true);
   for (const [pattern, what] of REFUSED_INLINE) {
     if (pattern.test(text)) problems.push(`${at}: ${what}`);
+  }
+  // GFM pairs one or two `~` on each side as strikethrough, `~a~` as well as `~~a~~`, inside one
+  // paragraph, item, quote, heading, caption, table cell or link text, where the page shows the
+  // tildes. A table's cells are read one by one, as GFM splits the row before its inline syntax.
+  const spans =
+    block === 'table'
+      ? tableCells(source).flatMap((cell) => tildeSpans(inlineTokens(cell)))
+      : tildeSpans(tokens);
+  if (spans.some(strikes)) {
+    problems.push(
+      `${at}: a pair of ~ that GFM may read as strikethrough; write \\~ for the character`,
+    );
   }
   // GFM links a bare `www.` address too, after a space, `(`, a bracket or an emphasis mark.
   if (/https?:\/\/|(?:^|[\s*_~([\]])www\.[\p{L}\p{N}_-]/iu.test(prose(tokens, false))) {
@@ -833,12 +937,29 @@ export function refusedSyntax(body, firstLine = 1) {
     ended = '';
     const previous = lines[index - 1] ?? '';
     const next = lines[index + 1] ?? '';
+    const above = block;
     if (block !== null && !continues(block, line)) {
       problems.push(`${at}: start each block after a blank line`);
       block = null;
     }
     const opened = opensFence(line);
     if (opened) {
+      // CommonMark strips as many spaces from each line of a fence indented by one to three as the
+      // fence has, which the twin's fence at the margin does not. A fence at a list item's text
+      // belongs to the item: on the item's next line the rule for a block without a blank line
+      // above reports it, and after a blank line it is a code block inside the item, whose lines
+      // at the margin would close it and leave the item.
+      const spaces = leadingSpaces(line);
+      const inItem = (above === 'list' || after !== '') && spaces >= indent;
+      if (inItem && above !== 'list') {
+        problems.push(`${at}: a code fence inside a list item`);
+      } else if (spaces > 0 && !inItem) {
+        const unit = spaces === 1 ? 'space' : 'spaces';
+        problems.push(
+          `${at}: a code fence indented by ${spaces} ${unit}; ` +
+            `remove the ${spaces} ${unit} from the fence and from each of its lines`,
+        );
+      }
       endRun();
       fence = opened.run;
       fenceAt = at;
@@ -863,6 +984,16 @@ export function refusedSyntax(body, firstLine = 1) {
       }
     } else if (block === 'caption') {
       block = 'table';
+    }
+    // GFM reads a table only when its header row has as many cells as its delimiter row.
+    if (block === 'table' && (opening || above === 'caption') && DELIMITER_ROW.test(next)) {
+      const [header, delimiter] = [tableCells(line).length, tableCells(next).length];
+      if (header !== delimiter) {
+        problems.push(
+          `${at}: not a table: the header row has ${header} ${header === 1 ? 'cell' : 'cells'} ` +
+            `and the delimiter row ${delimiter}`,
+        );
+      }
     }
     for (const [pattern, what] of REFUSED_LINES) {
       if (pattern.test(line)) problems.push(`${at}: ${what}`);

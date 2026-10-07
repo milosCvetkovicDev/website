@@ -66,8 +66,9 @@ describe('page titles and descriptions', () => {
   // Every published post, read from the index the page reads: none until the owner publishes the
   // first, and `blog/__tests__/post-page.test.tsx` proves the same metadata over the fixtures
   // meanwhile. A post's summary is its description (#61, 61b), so a published summary has to fit
-  // in 155 characters here, although `posts.test.ts` lets a summary run to 300 for the lists and
-  // the feed, which show it whole.
+  // in 155 characters here. The publish procedure's earlier `posts.test.ts` step refuses a longer
+  // one first, since Vitest runs no files in order; that file holds a draft entry to 300 characters
+  // and a published post to 155.
   it('every published post fits a results page, under a title no other route has', async () => {
     const taken = new Set(routes.map(([, metadata]) => served(metadata.title)));
     for (const { slug } of publishedPosts) {
