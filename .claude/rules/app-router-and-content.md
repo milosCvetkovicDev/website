@@ -150,12 +150,15 @@ begun once UTC+14 has reached it: an accepted tolerance of up to 14 hours agains
 The JSON-LD is one graph joined by `@id` (#57, ADR 0031): `src/lib/structured-data.ts` builds the
 nodes as plain objects and `components/json-ld.tsx` renders each in its own block through
 `serializeJsonLd`, the one `JSON.stringify` there. The root layout renders the Person and the
-WebSite on every route, the 404 included; each static route and case study renders a
+WebSite on every route, the 404 included; each static route, case study and post renders a
 `WebPageJsonLd` with the path and title it passes to `buildMetadata()`, except /about, whose
 `ProfilePageJsonLd` is dated with the day its "Last updated" line shows, and a case study adds its
-TechArticle and BreadcrumbList (a post page has none yet). A node names another by `{ '@id': … }`
-alone. A new route renders its page node, and `components/__tests__/json-ld.test.tsx` and
-`e2e/seo-surface.spec.ts` pin each route's types.
+TechArticle and BreadcrumbList, as a post does with `PostArticleJsonLd` and `PostBreadcrumbJsonLd`
+(61f): the same types, no BlogPosting (#61), and no `description` or `keywords` on a post's
+article, because its page prints neither its summary nor its tags. A node names another by
+`{ '@id': … }` alone. A new route renders its page node, and `components/__tests__/json-ld.test.tsx`
+and `e2e/seo-surface.spec.ts` pin each route's types; with no post published, the e2e graph test
+reports how many post routes it covered in an annotation.
 
 The Person asserts only what a page shows (57b):
 

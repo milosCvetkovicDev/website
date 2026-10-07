@@ -15,8 +15,8 @@ import { siteOrigin } from './site-origin';
  * a reference, `{ '@id': … }` and nothing else, so no fact is written twice and nothing restates
  * what the node it points at owns. The root layout renders the Person and the WebSite on every
  * route, the 404 included; each page adds its own WebPage (a ProfilePage on /about), and a case
- * study adds its TechArticle and its BreadcrumbList. The blocks stay separate rather than one
- * `@graph`: the `@id` references are what join them.
+ * study or a post adds its TechArticle and its BreadcrumbList. The blocks stay separate rather than
+ * one `@graph`: the `@id` references are what join them.
  *
  * Every URL is absolute on `siteOrigin()`, `NEXT_PUBLIC_SITE_URL` as a bare origin, falling back to
  * production, and a route's URL is its canonical, built from the same pathname its `buildMetadata()`
@@ -207,9 +207,15 @@ export function profilePage({ path, dateModified }: { path: string; dateModified
 }
 
 /**
- * A technical write-up on its own route, by the Person. The page it is the main entity of is that
- * route's WebPage, so the article carries no `url` of its own. Its image is the route's own card,
- * served at `<canonical>/og-image.png`, a prerendered route whose URL carries no hash.
+ * A technical write-up on its own route, by the Person: a case study, or a post (#61). The page it is
+ * the main entity of is that route's WebPage, so the article carries no `url` of its own. Its image
+ * is the route's own card, served at `<canonical>/og-image.png`, a prerendered route whose URL
+ * carries no hash.
+ *
+ * `description` and `keywords` are for a page that prints them, as ADR 0031's fifth decision asks:
+ * a case study shows its description and its tags, so its article carries both, while a post page
+ * shows neither (its summary is only the head's description, its tags are drawn on its card alone),
+ * so a post's article carries neither, and the node leaves out a predicate it is not given.
  */
 export function techArticle({
   path,
@@ -221,24 +227,24 @@ export function techArticle({
 }: {
   path: string;
   headline: string;
-  description: string;
+  description?: string;
   datePublished: string;
   dateModified: string;
-  keywords: readonly string[];
+  keywords?: readonly string[];
 }) {
   return {
     '@context': CONTEXT,
     '@type': 'TechArticle',
     '@id': routeNodeId(path, 'article'),
     headline,
-    description,
+    ...(description !== undefined && { description }),
     image: `${canonicalUrl(path)}/og-image.png`,
     author: reference(PERSON_ID),
     mainEntityOfPage: reference(webPageId(path)),
     isPartOf: reference(WEBSITE_ID),
     datePublished: contentDate(datePublished, 'techArticle'),
     dateModified: contentDate(dateModified, 'techArticle'),
-    keywords,
+    ...(keywords !== undefined && { keywords }),
   };
 }
 

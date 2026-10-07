@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { PostArticleJsonLd, PostBreadcrumbJsonLd, WebPageJsonLd } from '@/components/json-ld';
 import { PostBody } from '@/components/post-body';
 import { FOOTER_LINES, getPost, publishedPosts } from '@/data/posts';
 import { formatContentDates } from '@/lib/content-date';
@@ -73,6 +74,12 @@ export default async function PostPage({ params }: PageProps) {
 
   return (
     <div className="py-16 md:py-24">
+      {/* #57's nodes, as a case study renders them (#61): the page named with the title its head
+          carries, the post as its TechArticle, and its trail. Outside the article below, which an
+          extractor reads for the post alone. */}
+      <WebPageJsonLd path={`/blog/${post.slug}`} name={post.metaTitle ?? post.title} breadcrumb />
+      <PostArticleJsonLd post={post} />
+      <PostBreadcrumbJsonLd post={post} />
       <div className="mx-auto max-w-3xl px-6">
         <Link
           href="/blog"

@@ -4,6 +4,8 @@
 // `</script>` in any of them end the script element early.
 import type { CaseStudy } from '@/data/case-studies';
 import type { PageRecord } from '@/data/pages/types';
+// A type alone: it compiles away, so this module never carries the posts' values (`posts.test.ts`).
+import type { PublishedPost } from '@/data/posts';
 import {
   breadcrumbList,
   person,
@@ -42,8 +44,9 @@ export function WebsiteJsonLd() {
 
 /**
  * A route's WebPage: `path` and `name` are the pathname and the title the page passes to
- * `buildMetadata()`. A case study adds `breadcrumb` and renders its `BreadcrumbListJsonLd` too.
- * /about renders `ProfilePageJsonLd` instead, and the 404 renders neither.
+ * `buildMetadata()`. A case study adds `breadcrumb` and renders its `BreadcrumbListJsonLd` too, as a
+ * post does with its `PostBreadcrumbJsonLd`. /about renders `ProfilePageJsonLd` instead, and the 404
+ * renders neither.
  */
 export function WebPageJsonLd(props: {
   path: string;
@@ -88,6 +91,46 @@ export function BreadcrumbListJsonLd({ caseStudy }: { caseStudy: CaseStudy }) {
           { name: 'Home', path: '/' },
           { name: 'Work', path: '/work' },
           { name: caseStudy.title, path },
+        ],
+      })}
+    />
+  );
+}
+
+/** The path of a post's page. */
+const postPath = (post: PublishedPost) => `/blog/${post.slug}`;
+
+/**
+ * A published post as an article (#61): the case studies' TechArticle, by the site's Person, its
+ * headline the post's `h1` and its dates the ones its Published and Updated line shows. #61 adds no
+ * node type, so a post is no BlogPosting. It leaves out `description` and `keywords`, which the
+ * post page does not show (`techArticle()`), and asserts nothing about how the post was written,
+ * which the page does not say either (ADR 0034).
+ */
+export function PostArticleJsonLd({ post }: { post: PublishedPost }) {
+  return (
+    <JsonLd
+      data={techArticle({
+        path: postPath(post),
+        headline: post.title,
+        datePublished: post.publishedAt,
+        dateModified: post.updatedAt,
+      })}
+    />
+  );
+}
+
+/** Home → Writing → the post: /blog is Writing in the navigation, its title and its card. */
+export function PostBreadcrumbJsonLd({ post }: { post: PublishedPost }) {
+  const path = postPath(post);
+  return (
+    <JsonLd
+      data={breadcrumbList({
+        path,
+        trail: [
+          { name: 'Home', path: '/' },
+          { name: 'Writing', path: '/blog' },
+          { name: post.title, path },
         ],
       })}
     />

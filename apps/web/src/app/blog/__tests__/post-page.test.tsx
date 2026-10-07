@@ -7,6 +7,7 @@ import { pages } from '@/data/pages';
 import { FOOTER_LINES, publishedPosts } from '@/data/posts';
 import { formatContentDate } from '@/lib/content-date';
 import { blogToMarkdown, pageToMarkdown, postToMarkdown } from '@/lib/serialise';
+import { canonicalUrl } from '@/lib/structured-data';
 import { draftPost, everyBlockPost, hostileTitlePost } from '@/test/fixtures/posts';
 import PostPage, { dynamicParams, generateMetadata, generateStaticParams } from '../[slug]/page';
 import * as card from '../[slug]/og-image.png/route';
@@ -236,6 +237,83 @@ describe('its metadata', () => {
     expect(metadata.title).toBe(post.metaTitle);
     expect(metadata.openGraph?.title).toBe(post.title);
     expect(metadata.twitter?.title).toBe(post.title);
+  });
+});
+
+/** The raw text of every ld+json script in a render, in document order. */
+function jsonLdSources(container: HTMLElement): string[] {
+  return [...container.querySelectorAll('script[type="application/ld+json"]')].map(
+    (script) => script.innerHTML,
+  );
+}
+
+// The page's own nodes; the root layout adds the Person and the WebSite, and
+// `components/__tests__/json-ld.test.tsx` joins the two into one graph per route.
+describe('its JSON-LD (61f)', () => {
+  it.each(publishedPosts.map((post) => [post.slug, post] as const))(
+    '%s serves a WebPage, a TechArticle and a BreadcrumbList, outside its article',
+    async (_slug, post) => {
+      const { container } = render(await PostPage(paramsOf(post.slug)));
+      const nodes = jsonLdSources(container).map(
+        (source) => JSON.parse(source) as Record<string, unknown>,
+      );
+      // #57's types, as a case study serves them: no new node type, BlogPosting included (#61).
+      expect(nodes.map((node) => node['@type'])).toEqual([
+        'WebPage',
+        'TechArticle',
+        'BreadcrumbList',
+      ]);
+      // An extractor that reads the article gets the post, and nothing about the page around it.
+      expect(container.querySelector('article script')).toBeNull();
+    },
+  );
+
+  it.each(publishedPosts.map((post) => [post.slug, post] as const))(
+    '%s dates its article with the days its line shows, and heads it with its h1',
+    async (_slug, post) => {
+      const { container } = render(await PostPage(paramsOf(post.slug)));
+      const article = jsonLdSources(container)
+        .map((source) => JSON.parse(source) as Record<string, unknown>)
+        .find((node) => node['@type'] === 'TechArticle');
+      // The post's own dates (#61), which the visible Published and Updated line reads too.
+      expect(article?.datePublished).toBe(post.publishedAt);
+      expect(article?.dateModified).toBe(post.updatedAt);
+      expect(article?.datePublished).toBe(dateLabelled('Published').getAttribute('dateTime'));
+      expect(article?.dateModified).toBe(dateLabelled('Updated').getAttribute('dateTime'));
+      expect(article?.headline).toBe(screen.getByRole('heading', { level: 1 }).textContent);
+    },
+  );
+
+  it.each(publishedPosts.map((post) => [post.slug, post] as const))(
+    '%s names its page node with the title its head carries, at its canonical',
+    async (_slug, post) => {
+      const { container } = render(await PostPage(paramsOf(post.slug)));
+      const [page, , crumbs] = jsonLdSources(container).map(
+        (source) => JSON.parse(source) as Record<string, unknown>,
+      );
+      const metadata = await generateMetadata(paramsOf(post.slug));
+      // `metaTitle` when the post sets one, as the head's title is: the fixture added by the mock
+      // above is the one whose page node a `name={post.title}` would get wrong.
+      expect(page.name).toBe(metadata.title);
+      expect(page.url).toBe(canonicalUrl(`/blog/${post.slug}`));
+      expect(page.breadcrumb).toEqual({ '@id': crumbs['@id'] });
+    },
+  );
+
+  it('keeps the hostile title inside its scripts, and reads it back as written', async () => {
+    const { container } = render(await PostPage(paramsOf(hostileTitlePost.slug)));
+    const sources = jsonLdSources(container);
+    expect(sources).toHaveLength(3);
+    // `serializeJsonLd` writes every `<` as `<`, so no `</script>` can end a block early.
+    for (const source of sources) expect(source).not.toContain('<');
+    const [page, article, crumbs] = sources.map(
+      (source) => JSON.parse(source) as Record<string, unknown>,
+    );
+    expect(page.name).toBe(hostileTitlePost.title);
+    expect(article.headline).toBe(hostileTitlePost.title);
+    expect((crumbs.itemListElement as { name: string }[]).at(-1)?.name).toBe(
+      hostileTitlePost.title,
+    );
   });
 });
 

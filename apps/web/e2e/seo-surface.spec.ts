@@ -499,11 +499,10 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
   // nothing else, and a page node's `url` is the canonical link the same document serves.
   const typesOf = (path: string) => {
     if (path === NOT_FOUND_ROUTE) return ['Person', 'WebSite'];
-    // A post page has no page node of its own until #61 (61f) builds its nodes with these builders;
-    // pinned here so the first published post cannot ship without anyone deciding what it serves.
-    if (POST_ROUTES.includes(path)) return ['Person', 'WebSite'];
     if (path === '/about') return ['Person', 'WebSite', 'ProfilePage'];
-    if ((CASE_STUDY_ROUTES as readonly string[]).includes(path)) {
+    // A case study and a post are both an article on a page of their own, with #57's types and no
+    // new one (#61, 61f).
+    if ([...CASE_STUDY_ROUTES, ...POST_ROUTES].includes(path)) {
       return ['Person', 'WebSite', 'WebPage', 'TechArticle', 'BreadcrumbList'];
     }
     return ['Person', 'WebSite', 'WebPage'];
@@ -587,13 +586,38 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
     }
   }
 
-  // A case study's article is its page's main entity, and its breadcrumb runs Home, Work, the study,
-  // in that order, each step at the canonical its own document serves.
-  for (const study of caseStudies) {
-    const path = caseStudyRoute(study.slug);
+  // A case study's or a post's article is its page's main entity, at `<canonical>#article`, dated
+  // with the days its data holds (which its visible Published and Updated line reads too), and its
+  // breadcrumb runs Home, the section, the article, in that order, each step at the canonical its
+  // own document serves.
+  const articles = [
+    ...caseStudies.map((study) => ({
+      path: caseStudyRoute(study.slug),
+      list: 'CASE_STUDY_ROUTES',
+      section: ['Work', '/work'],
+      title: study.title,
+      dates: [study.publishedAt, study.updatedAt],
+    })),
+    ...publishedPosts.map((post) => ({
+      path: postRoute(post.slug),
+      list: 'POST_ROUTES',
+      section: ['Writing', '/blog'],
+      title: post.title,
+      dates: [post.publishedAt, post.updatedAt],
+    })),
+  ];
+  // No post is published until the owner publishes the first, and an empty list checks nothing:
+  // the report says how many post routes this test covered, rather than passing on none unseen.
+  test.info().annotations.push({
+    type: 'post routes',
+    description:
+      `${POST_ROUTES.length} post route(s) held to the case studies' types and checks` +
+      (POST_ROUTES.length === 0 ? ': none is published, so no post was checked' : ''),
+  });
+  for (const { path, list, section, title, dates } of articles) {
     const nodes = served.get(path);
     if (!nodes) {
-      problems.push(`${path}: not among the routes walked above (CASE_STUDY_ROUTES)`);
+      problems.push(`${path}: not among the routes walked above (${list})`);
       continue;
     }
     const byType = (type: string) => nodes.find((node) => node['@type'] === type);
@@ -602,7 +626,7 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
       problems.push(`${path}: no WebPage, TechArticle or BreadcrumbList, so nothing below checked`);
       continue;
     }
-    // The article's image is the study's card, fetched from this server by its path.
+    // The article's image is the route's card, fetched from this server by its path.
     const image = new URL(String(article.image));
     const response = await request.get(`${image.pathname}${image.search}`);
     const type = response.headers()['content-type'] ?? '(none)';
@@ -611,8 +635,17 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
         `${path}: the TechArticle's image ${image.href} answers ${response.status()} ${type}`,
       );
     }
+    if (article['@id'] !== `${canonicalOf.get(path)}#article`) {
+      problems.push(`${path}: the TechArticle's @id is ${String(article['@id'])}`);
+    }
     if ((article.mainEntityOfPage as { '@id'?: unknown })?.['@id'] !== webPage['@id']) {
       problems.push(`${path}: the TechArticle's mainEntityOfPage is not its WebPage`);
+    }
+    const marked = [article.datePublished, article.dateModified];
+    if (!isDeepStrictEqual(marked, dates)) {
+      problems.push(
+        `${path}: the TechArticle is dated ${String(marked)}, its data ${String(dates)}`,
+      );
     }
     if ((webPage.breadcrumb as { '@id'?: unknown })?.['@id'] !== crumbs['@id']) {
       problems.push(`${path}: the WebPage's breadcrumb is not its BreadcrumbList`);
@@ -621,8 +654,8 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
     const expected = JSON.stringify(
       [
         ['Home', canonicalOf.get('/')],
-        ['Work', canonicalOf.get('/work')],
-        [study.title, canonicalOf.get(path)],
+        [section[0], canonicalOf.get(section[1])],
+        [title, canonicalOf.get(path)],
       ].map(([name, item], i) => ({ '@type': 'ListItem', position: i + 1, name, item })),
     );
     if (trail !== expected)
