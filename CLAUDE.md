@@ -22,7 +22,7 @@ tracked file: new guidance goes into the rule for its area, not here.
   metadata, Open Graph images and icons, JSON-LD, the AI-refusal gate.
 - `ui-components.md` (components, hooks, route pages, `globals.css`, the web ESLint config): accent
   and status colour tokens, the components barrel, lazy GSAP, the accessibility gate.
-- `unit-tests.md` (`__tests__`, `src/test`, `vitest.config.ts`): stubs, jsdom cost, slow queries,
+- `unit-tests.md` (`__tests__`, `src/test`, `vitest.config.mts`): stubs, jsdom cost, slow queries,
   timeouts, expected failures.
 - `e2e-tests.md` (`apps/web/e2e`, `playwright.config.ts`, the flake scripts, `ci.yml`,
   `flake-hunt.yml`): the hydration and GSAP waits, projects, server ownership, ports, `.next-e2e`,
@@ -127,12 +127,12 @@ Always finish with `pnpm lint`.
 - Layouts import components directly, never through the `components/index.ts` barrel, and no
   rendered component imports GSAP statically; lint fails on both (ADR 0009).
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
-  `vitest.config.ts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`, and
-  keep relative imports for siblings inside one folder.
+  `vitest.config.mts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`,
+  and keep relative imports for siblings inside one folder.
 
 ## Testing
 
-- Unit tests sit next to the code in `__tests__` folders. `apps/web/vitest.config.ts` picks up
+- Unit tests sit next to the code in `__tests__` folders. `apps/web/vitest.config.mts` picks up
   `src/**/*.test.{ts,tsx}` in jsdom with globals enabled; `src/test/setup.ts` only imports
   `@testing-library/jest-dom/vitest`.
 - e2e specs wait for hydration through `e2e/support/hydration.ts` (`gotoHydrated`,

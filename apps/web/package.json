@@ -48,7 +48,7 @@
     "vitest": "^5.0.0"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,mjs,cjs}": [
+    "*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}": [
       "eslint --fix --max-warnings 0 --no-warn-ignored",
       "prettier --write"
     ],

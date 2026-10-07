@@ -29,9 +29,13 @@ export default defineConfig({
       exclude: ['src/test/**', 'src/**/__tests__/**'],
     },
   },
+  // Mirrors `paths` in tsconfig.json. The file is `.mts` so Vite's native config loader reads it as
+  // ESM rather than warning on every run (#188); `"type": "module"` in apps/web/package.json would
+  // do the same but change how Next, Playwright and Node load every other config here. ESM has no
+  // `__dirname`, hence `import.meta.dirname`.
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src'),
+      '@': resolve(import.meta.dirname, './src'),
     },
   },
 });
