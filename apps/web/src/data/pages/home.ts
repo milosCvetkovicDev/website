@@ -1,7 +1,8 @@
 import type { PageRecord, ProseSection } from './types';
 
 /**
- * The home page's record: its title and description, and the lines the story is built around.
+ * The home page's record: its title, its `h1` and description, and the lines the story is built
+ * around.
  *
  * The story's client components import this module to render their closing lines, so everything in
  * it ships in the home page's client chunk. It imports types only and must stay that way: a runtime
@@ -77,6 +78,8 @@ export const homePage = {
   path: '/',
   // The root template applies to child segments only, so this is the whole title; `absolute` says so.
   title: { absolute: 'Milos Cvetkovic | Senior Full-Stack Engineer' },
+  // The hero's `h1` (`hero-content.tsx`), which says who the site is about (#58).
+  heading: 'Milos Cvetkovic — senior full-stack engineer and architect building AI-native systems',
   summary:
     'Senior Full Stack Engineer building AI-native systems: self-healing agents, legacy rescue and cloud architecture in TypeScript, React and NestJS.',
   // Every closing pair, in the order `storyClosings` lists them, which is the story's order: a pair

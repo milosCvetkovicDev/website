@@ -78,6 +78,12 @@ export interface PageRecord {
   path: string;
   /** The title the route passes to `buildMetadata()`, template or absolute. */
   title: string | { absolute: string };
+  /**
+   * The page's `h1`: the page renders it from here and the twin opens with it as its `#` line
+   * (#58), so the two cannot name the page differently. The title above names it in a browser tab
+   * and a search result instead.
+   */
+  heading: string;
   /** The route's meta description, and the paragraph that opens its twin. */
   summary: string;
   sections: readonly PageSection[];

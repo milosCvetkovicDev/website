@@ -280,6 +280,7 @@ describe('absoluteUrl()', () => {
 const FIXTURE: PageRecord = {
   path: '/about',
   title: 'About — Senior Full-Stack Engineer',
+  heading: 'About Milos Cvetkovic: legacy rescue, clean architecture, and AI-native systems',
   summary: 'I fix the systems everyone else gave up on.',
   sections: [
     {
@@ -334,10 +335,10 @@ describe('pageToMarkdown() and renderSections()', () => {
     expect(pageToMarkdown(FIXTURE)).not.toContain(OWNER_TODO);
   });
 
-  it('renders the title, summary and source, then every section variant', () => {
+  it('opens with the heading, never the meta title, then the summary, source and sections', () => {
     expect(pageToMarkdown(FIXTURE)).toBe(
       [
-        '# About — Senior Full-Stack Engineer',
+        '# About Milos Cvetkovic: legacy rescue, clean architecture, and AI-native systems',
         '',
         'I fix the systems everyone else gave up on.',
         '',
@@ -367,15 +368,16 @@ describe('pageToMarkdown() and renderSections()', () => {
     );
   });
 
-  it('uses an absolute title as it stands, and names the root without a trailing slash', () => {
+  it('opens with the heading under an absolute title too, and names the root without a slash', () => {
     const home = pageToMarkdown({
       path: '/',
-      title: { absolute: 'Milos Cvetkovic — Senior Full-Stack Engineer' },
+      title: { absolute: 'Milos Cvetkovic | Senior Full-Stack Engineer' },
+      heading: 'Milos Cvetkovic — senior full-stack engineer',
       summary: 'Summary.',
       sections: [],
     });
     expect(home).toBe(
-      `# Milos Cvetkovic — Senior Full-Stack Engineer\n\nSummary.\n\nSource: ${ORIGIN}\n`,
+      `# Milos Cvetkovic — senior full-stack engineer\n\nSummary.\n\nSource: ${ORIGIN}\n`,
     );
   });
 
@@ -678,10 +680,10 @@ describe('pageToMarkdown() and renderSections()', () => {
     expect(() => renderSections([content])).toThrow(error);
   });
 
-  it('refuses a record without a title or a summary', () => {
-    expect(() =>
-      pageToMarkdown({ ...FIXTURE, title: {} as unknown as PageRecord['title'] }),
-    ).toThrow('pageToMarkdown: the record for /about has no title');
+  it('refuses a record whose heading or summary is blank', () => {
+    expect(() => pageToMarkdown({ ...FIXTURE, heading: ' ' })).toThrow(
+      'serialise: pageToMarkdown: the heading of /about is empty',
+    );
     expect(() => pageToMarkdown({ ...FIXTURE, summary: '' })).toThrow(
       /summary of \/about is empty/,
     );
@@ -1158,12 +1160,10 @@ describe('blogToMarkdown()', () => {
     );
   });
 
-  it('names itself, and the post whose title is empty, in an error', () => {
-    expect(() =>
-      blogToMarkdown({ ...pages['/blog'], title: {} as unknown as PageRecord['title'] }, [
-        everyBlockPost,
-      ]),
-    ).toThrow('blogToMarkdown: the record for /blog has no title');
+  it('names itself, and the blank heading or post title, in an error', () => {
+    expect(() => blogToMarkdown({ ...pages['/blog'], heading: ' ' }, [everyBlockPost])).toThrow(
+      'serialise: blogToMarkdown: the heading of /blog is empty',
+    );
     expect(() => blogToMarkdown(pages['/blog'], [{ ...everyBlockPost, title: ' ' }])).toThrow(
       'serialise: blogToMarkdown: the title of fixture-every-block is empty',
     );

@@ -7,7 +7,8 @@ import type { InlineLink, PageRecord, ProseSection } from './types';
 /**
  * /work: the copy `app/work/page.tsx` renders around its cards, and the record its Markdown twin
  * reads (#59). The cards themselves read `caseStudies`, and so does the record, so neither restates
- * a study's title, description or metric. The `h1` and the hook under it stay in the page (#58).
+ * a study's title, description or metric. The page renders its `h1` from the record's `heading`
+ * (#58); the hook under it stays in the page.
  */
 
 /**
@@ -68,6 +69,7 @@ const studies = caseStudies.map(
 export const workRecord: PageRecord = {
   path: '/work',
   title: 'Work — AI agents & legacy modernization',
+  heading: 'Case studies: AI agents, legacy modernization, and build infrastructure',
   summary:
     'Real projects, real constraints, real results. Case studies on AI agents, legacy modernization, and high-performance systems.',
   sections: [

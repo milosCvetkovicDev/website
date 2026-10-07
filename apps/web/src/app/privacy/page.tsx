@@ -38,7 +38,7 @@ export default function PrivacyPage() {
     <div className="py-16 md:py-24">
       <WebPageJsonLd path={privacyRecord.path} name={privacyRecord.title} />
       <div className="mx-auto max-w-3xl px-6">
-        <h1 className="mb-6 text-4xl font-bold md:text-5xl">Privacy</h1>
+        <h1 className="mb-6 text-4xl font-bold md:text-5xl">{privacyRecord.heading}</h1>
         <p className="mb-12 text-xl text-[var(--muted)]">{privacyCopy.intro}</p>
 
         <section className="mb-10">

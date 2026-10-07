@@ -4,14 +4,14 @@
  * `@/data/pages`, the list of static-route records the Markdown twins render (#59 AC 13), and the
  * handlers that serve them.
  *
- * Four things are pinned here. Every static route has a record at its own path, with a summary
- * and at least one section. The entries moved out of the `/about`, `/skills` and `/contact` page
- * modules all reach the twin: every timeline entry, belief and quick fact, every core skill,
- * differentiator and toolkit category, and every profile link. Every folder with a `page.tsx` has
- * its twin handler beside it, since `buildMetadata()` advertises a twin for every route that calls
- * it. And each handler is static and answers with exactly what the serialiser renders from its
- * record: the handlers are imported and called, so a handler that adds Markdown of its own, or
- * reads another route's record, fails on the body it serves.
+ * Four things are pinned here. Every static route has a record at its own path, with a title, a
+ * heading, a summary and at least one section. The entries moved out of the `/about`, `/skills`
+ * and `/contact` page modules all reach the twin: every timeline entry, belief and quick fact,
+ * every core skill, differentiator and toolkit category, and every profile link. Every folder with
+ * a `page.tsx` has its twin handler beside it, since `buildMetadata()` advertises a twin for every
+ * route that calls it. And each handler is static and answers with exactly what the serialiser
+ * renders from its record: the handlers are imported and called, so a handler that adds Markdown
+ * of its own, or reads another route's record, fails on the body it serves.
  *
  * `e2e/markdown-twins.spec.ts` checks the served twins against the served pages; this file is the
  * fast half that names the record or the handler that went missing.
@@ -69,7 +69,12 @@ describe('the page records', () => {
     for (const [route, record] of records) expect(record.path, route).toBe(route);
   });
 
-  it.each(records)('%s has a summary and at least one section', (_route, record) => {
+  // The twin reads the heading, not the title, so its refusal of a blank one no longer covers the
+  // title the page hands `buildMetadata()`: this does (#58).
+  it.each(records)('%s has a title, a heading, a summary and a section', (_route, record) => {
+    const title = typeof record.title === 'string' ? record.title : record.title.absolute;
+    expect(title.trim()).not.toBe('');
+    expect(record.heading.trim()).not.toBe('');
     expect(record.summary.trim()).not.toBe('');
     expect(record.sections.length).toBeGreaterThan(0);
     for (const section of record.sections) expect(section.heading.trim()).not.toBe('');

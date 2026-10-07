@@ -277,7 +277,7 @@ export default function WorkPage() {
           </div>
           {/* The h1 names the subject; the hook under it stays the largest line (#58). */}
           <h1 className="mb-3 text-lg leading-snug font-semibold text-balance md:text-xl">
-            Case studies: AI agents, legacy modernization, and build infrastructure
+            {workRecord.heading}
           </h1>
           <p className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">
             Problems solved. Systems shipped.

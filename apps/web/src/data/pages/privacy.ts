@@ -2,7 +2,8 @@ import type { PageRecord, Paragraph, ProseSection } from './types';
 
 /**
  * /privacy: the notice `app/privacy/page.tsx` renders, and the record its Markdown twin reads (#59).
- * The `h1` and the "Last updated" line, which reads `STATIC_ROUTE_UPDATED`, stay in the page.
+ * The page renders its `h1` from the record's `heading` (#58); the "Last updated" line, which
+ * reads `STATIC_ROUTE_UPDATED`, stays in the page.
  */
 
 // Each claim here is sourced: the analytics ones from Vercel's "Privacy and Compliance" page for
@@ -81,6 +82,7 @@ export const privacyCopy = {
 export const privacyRecord: PageRecord = {
   path: '/privacy',
   title: 'Privacy',
+  heading: 'Privacy',
   summary:
     'What this site collects: page-view statistics through Vercel Web Analytics, with no cookies, accounts, forms, ads or cross-site tracking.',
   sections: [
