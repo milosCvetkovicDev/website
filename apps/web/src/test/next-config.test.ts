@@ -42,6 +42,7 @@ import nextConfig, {
 } from '../../next.config';
 import { PRODUCTION_ALIAS_HOST } from '../../production-alias';
 import { caseStudies } from '../data/case-studies';
+import { publishedPosts } from '../data/posts';
 import { STATIC_ROUTE_UPDATED } from '../data/static-routes';
 import { markdownTwinPath } from '../lib/pathname';
 
@@ -438,6 +439,7 @@ describe('markdown negotiation', () => {
   // The dynamic segments whose twin handler serves one route per record, and those records.
   const DYNAMIC_TWIN_ROUTES: Record<string, () => string[]> = {
     '/work/[slug]': () => caseStudies.map(({ slug }) => `/work/${slug}`),
+    '/blog/[slug]': () => publishedPosts.map(({ slug }) => `/blog/${slug}`),
   };
   const ROUTE_FILES = ['route.ts', 'route.tsx', 'route.js', 'route.jsx', 'route.mjs'];
 
@@ -473,10 +475,11 @@ describe('markdown negotiation', () => {
     });
   };
 
-  it('negotiates exactly the routes that have a twin: the static routes and every case study', () => {
+  it('negotiates exactly the routes that have a twin: the static routes, every case study and every published post', () => {
     expect(MARKDOWN_ROUTES).toEqual([
       ...Object.keys(STATIC_ROUTE_UPDATED),
       ...caseStudies.map(({ slug }) => `/work/${slug}`),
+      ...publishedPosts.map(({ slug }) => `/blog/${slug}`),
     ]);
     expect(MARKDOWN_ROUTES).toContain('/');
     expect(new Set(MARKDOWN_ROUTES).size).toBe(MARKDOWN_ROUTES.length);

@@ -1,0 +1,3 @@
+# lint-staged runs Prettier from this directory, where the root .prettierignore does not apply.
+# Written in variant Markdown on purpose: the publish check's round-trip test reads it as it is.
+src/test/fixtures/post-draft.md
