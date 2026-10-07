@@ -82,7 +82,7 @@ lines, block lists (`tags:` then `  - a`), or folded or literal values (`>`, `>-
 | `title`       | `title`     | The page's `h1`.                                                                                                                                                     |
 | `metaTitle`   | `metaTitle` | Required when `title` plus ` \| Milos Cvetkovic` would pass 60 characters. The writer leaves it out otherwise; nothing in this repository checks that.               |
 | `slug`        | `slug`      | Lowercase words joined by hyphens. Never changes once published. The check compares it with the slug in the twin's `Source:` URL, whose path must be `/blog/<slug>`. |
-| `description` | `summary`   | 50 to 300 characters.                                                                                                                                                |
+| `description` | `summary`   | 50 to 155 characters, because it is also the post's meta description.                                                                                                |
 | `tags`        | `tags`      | Optional; none blank, none repeated. The twin does not carry them, so the publish pull request quotes them beside the entry's.                                       |
 | `date`        | (none)      | Not used: the dates follow D9.                                                                                                                                       |
 | (tracker)     | `kind`      | Read from the writing room's tracker, not from the front matter (D2).                                                                                                |
@@ -110,19 +110,27 @@ line is refused: start each block after a blank line.
 
 The rules `posts.test.ts` holds a post to apply to the draft as written: headings at level 2 or 3,
 no level 3 before the first level 2, no heading twice; a link's text says where it goes; a link on
-this site names a page that exists. The first column of a table is its row headers.
+this site is written as a path, not as a URL that names the site's own host (with or without
+`www.`, on any port), and names a page that exists. The first column of a table is its row headers.
 
-Not allowed, and caught by the check when present: bold or italics, images, raw HTML or HTML
+Not allowed, and caught by the check when present: bold or italics, strikethrough (a run of one or
+two `~` that can open, followed in the same paragraph, item, quote, heading, table cell, caption or
+link text by a run as long that can close, where a run can open before a character that is not
+whitespace and close after one, as GFM pairs `~a~` as well as `~~a~~`; `~5 to ~10`, `~/.zshrc` and
+a run of three stay text), images, raw HTML or HTML
 comments, entity references such as `&amp;`, footnotes, `#` or `####` and deeper headings, setext
 headings, code or links in a heading, a table caption or a table cell, code or a link in a link's
-text, a link with a title or spaces around its destination, nested lists, a task list item such as
+text, a link with a title or spaces around its destination, a `]` straight before a `(` with no
+open `[` before them (escape the `]` as `\]`), nested lists, a task list item such as
 `- [ ]`, a heading, list, quote, table, code block or rule inside a list item or quote (such as
 `> ## Results`), an ordered list that does not start at 1, a list that changes its bullet or its
 `.` or `)` between items, a blank line between two items of one kind (one loose list in Markdown,
 or two lists when the marker changes), a list item or quote of more than one paragraph, hard line
 breaks, reference-style links, autolinks (`<…@…>` included), bare `http://`, `https://` or `www.`
 addresses and bare email addresses, a tab anywhere outside a code fence (the front matter
-included), a line that looks blank but holds a space other than a space or a tab (such as a
+included), a code fence indented by one to three spaces outside a list item, a table whose header
+row and delimiter row differ in cells, a line that looks
+blank but holds a space other than a space or a tab (such as a
 no-break space), a block that does not start after a blank line, and a `---` rule inside the body.
 The disclosure line is not written in `draft.md`: the site adds it (D3). Corrected 2026-10-06: the
 publish check's review in Task 8 widened this list from a line indented with a tab to any tab
@@ -132,7 +140,15 @@ and a line that only looks blank; and the front matter's forms above were spelle
 what the check reads. P4's review then added single-quoted values to those forms, held the twin's
 `Source:` path to exactly `/blog/<slug>` where the check compares the slug (an earlier text took
 the URL's last path segment), and made exit 1 cover refused syntax as well as differences, as the
-publish check below now says.
+publish check below now says. Corrected 2026-10-07: the final review of P1-P4 held `description` to
+155 characters, not 300, because the post's page uses it as its meta description, which
+`page-metadata.test.ts` caps at 155. `posts.test.ts` now holds a draft entry's summary to 300
+characters and a published post's to 155. The same review added to the list above a pair of `~`
+that GFM may strike through, counted per paragraph, item, quote, heading, table cell, caption or
+link text; an indented code fence; a stray `]` before a `(`; and a table whose header and delimiter
+rows differ in cells. It also made the check pad a short table row with empty cells, as GFM does,
+and made `posts.test.ts` refuse a link that names this site's own host, which a post writes as a
+path.
 
 ## The publish check
 
@@ -157,7 +173,9 @@ nothing else: backslash escapes are removed from text, an absolute URL on the or
 list item collapses to one space as the serialiser's `text()` collapses it (a no-break or thin space
 is kept, so it differs from a plain one), `*` and `+` list markers become `-`, an ordered list is
 renumbered from 1, table cells are trimmed and the delimiter row is normalised, and a code fence is
-reduced to the shortest that holds its content.
+reduced to the shortest that holds its content. One step reads the draft as GFM does instead: a
+table's body row shorter than its delimiter row gets empty cells, while a longer one keeps the
+cells GFM drops, so it differs, which fails safe.
 
 The canonical form keeps kinds apart. Each block is written under a line naming its kind (`heading
 2:`, `paragraph:`, `list ordered:`, `quote:`, `code ts:`, `table:` and so on), and running text is

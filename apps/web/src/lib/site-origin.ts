@@ -1,4 +1,10 @@
 /**
+ * The site's origin in production: what `siteOrigin()` falls back to, and the origin a post may
+ * not link to by its full URL, which `posts.test.ts` asks to be written as a path instead.
+ */
+export const PRODUCTION_ORIGIN = 'https://miloscvetkovic.dev';
+
+/**
  * `NEXT_PUBLIC_SITE_URL`, or production when it is unset or blank, as the bare origin. A trailing
  * slash is dropped, so `https://x.dev/` cannot write `https://x.dev//about`; anything that is not an
  * http(s) origin (no scheme, a path, a query) throws at build time rather than ship broken URLs.
@@ -8,7 +14,7 @@
  * resolves from `metadataBase`, which normalises the same value the same way.
  */
 export function siteOrigin(): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim() || 'https://miloscvetkovic.dev';
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim() || PRODUCTION_ORIGIN;
   let url: URL | undefined;
   try {
     url = new URL(configured);
