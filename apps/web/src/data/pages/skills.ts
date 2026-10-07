@@ -1,3 +1,4 @@
+import { OCCUPATION } from '@/data/profile';
 import { social } from '@/data/social';
 import type { InlineLink, PageRecord, Table } from './types';
 
@@ -151,7 +152,7 @@ export const differentiators: readonly Differentiator[] = [
  * The copy the page renders around its `h1`, the hook under it and its three lists, in page order.
  */
 export const skillsCopy = {
-  eyebrow: 'Technical toolkit · Milos Cvetkovic, Senior Full-Stack Engineer',
+  eyebrow: `Technical toolkit · Milos Cvetkovic, ${OCCUPATION}`,
   intro: [
     'What matters is knowing ',
     { text: 'when', tag: 'em' },

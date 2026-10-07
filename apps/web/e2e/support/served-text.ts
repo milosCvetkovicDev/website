@@ -61,14 +61,21 @@ import type { Page } from '@playwright/test';
  * so the `<title>` counts: that is what `served-html.spec.ts` measures. `'body'` reads the page's
  * copy only, so a phrase the `<title>` repeats (every case study's title does) can only be found in
  * the body, and a hydrated page serialised back to HTML is read on the same terms as the response.
+ *
+ * `separator` is what joins the text nodes: nothing by default, for the reasons above. A check that
+ * a phrase stands as a whole word needs the other reading too, because zero-join cannot show a word
+ * boundary that only an element boundary makes: a list of tags reads `claude codedddkubernetes`, and
+ * a heading runs into the paragraph after it. `' '` joins them with a space, which cannot merge two
+ * words but splits a word whose letters sit in separate elements (`m o s t`). A phrase that is a
+ * whole word in either reading is on the page (the Person describe in `seo-surface.spec.ts`).
  */
 export async function servedText(
   page: Page,
   html: string,
-  { root = 'document' }: { root?: 'document' | 'body' } = {},
+  { root = 'document', separator = '' }: { root?: 'document' | 'body'; separator?: '' | ' ' } = {},
 ): Promise<string> {
   return page.evaluate(
-    ({ markup, from }) => {
+    ({ markup, from, joint }) => {
       const skipped = new Set(['script', 'style', 'template']);
       const parts: string[] = [];
       const walk = (parent: Node) => {
@@ -83,8 +90,8 @@ export async function servedText(
       };
       const doc = new DOMParser().parseFromString(markup, 'text/html');
       walk(from === 'body' ? doc.body : doc);
-      return parts.join('').replace(/\s+/g, ' ');
+      return parts.join(joint).replace(/\s+/g, ' ');
     },
-    { markup: html, from: root },
+    { markup: html, from: root, joint: separator },
   );
 }

@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { OWNER_TODO } from '../src/data/owner-todo';
 import { yearsOfExperience } from '../src/data/profile';
@@ -26,6 +27,8 @@ import { PAGE_HEADINGS } from './support/page-headings';
 // #58's tables, counted from the data their records read (the last tests in this file).
 import { facts, timeline } from '../src/data/pages/about';
 import { skillCategories } from '../src/data/pages/skills';
+// The Person's visible facts (57b, the describe at the end of this file).
+import { servedText } from './support/served-text';
 
 /**
  * The head every crawler and link-preview bot reads.
@@ -544,8 +547,13 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
     for (const node of nodes) {
       for (const { at, ref } of referencesIn(node)) {
         const where = `${path}: ${String(node['@type'])}.${at}`;
-        if (!ids.has(String(ref['@id']))) {
-          problems.push(`${where} names ${String(ref['@id'])}, which this document does not serve`);
+        // But one, by name (57b): the Person is the main entity of /about's ProfilePage, which
+        // only /about serves; the Person's own describe at the end of this file holds it there.
+        // It still has to name something: a non-empty `@id`.
+        const crossRoute = node['@type'] === 'Person' && at === 'mainEntityOfPage';
+        const id = ref['@id'];
+        if (crossRoute ? typeof id !== 'string' || id === '' : !ids.has(String(id))) {
+          problems.push(`${where} names ${String(id)}, which this document does not serve`);
         }
         const extra = Object.keys(ref).filter((key) => key !== '@id');
         if (extra.length > 0) problems.push(`${where} carries ${extra.join(', ')} beside its @id`);
@@ -1177,4 +1185,280 @@ test('every page serves one non-empty h1 of its own, and five name their subject
       `${route} serves its hook once, as a paragraph outside any heading`,
     ).toEqual([{ tag: 'p', inHeading: false }]);
   }
+});
+
+// #57 AC 6 (57b): the Person, which the layout serves on every route, asserts nothing a reader of
+// the site cannot see, the rule ADR 0031's Decision 5 holds every node to. Each fact it states is
+// found, case-insensitively and as a whole word or phrase, in the body text of at least one page as
+// `support/served-text.ts` extracts it (the one extractor the served-text specs share, so a phrase
+// means the same here as there; it reads no script, so the JSON-LD cannot find itself), and each
+// profile it names is the href of a link some page renders. Every string in the Person is checked
+// one of those ways or sits at a path `NOT_PAGE_TEXT` names with what holds it instead, so a
+// predicate added later, at any depth, is held to the rule by default.
+test.describe('the Person states only what the pages show (#57)', () => {
+  /**
+   * The Person's strings that are not facts to find in a page's text, by path with array indices
+   * dropped, each with what holds it instead. A path rather than a key, so a `url` or a
+   * `description` added under another predicate is still checked; a path named here that the Person
+   * no longer has fails as stale. `@context` and `@type` are vocabulary wherever they sit.
+   */
+  const NOT_PAGE_TEXT: Readonly<Record<string, string>> = {
+    '@id': "an identifier on the site's origin, held by the graph test above",
+    url: "the site's origin, held by the graph test above",
+    sameAs: 'a profile: the href of a link some page renders, checked below',
+    alternateName: "a profile's handle: the last segment of a sameAs link, checked below",
+    description: 'a sentence rather than one fact: checked below clause by clause',
+    'hasCredential.credentialCategory': "vocabulary: schema.org's word for the kind of credential",
+    'mainEntityOfPage.@id': "/about's ProfilePage, checked below",
+  };
+  const VOCABULARY: ReadonlySet<string> = new Set(['@context', '@type']);
+
+  /** The facts #57 AC 6 names, so the walk cannot pass by finding none of them. */
+  const REQUIRED = [
+    'jobTitle',
+    'knowsAbout[0]',
+    'hasCredential.name',
+    'address.addressLocality',
+    'address.addressCountry',
+    'hasOccupation.name',
+  ];
+
+  /** Every string in a node, at any depth, with its path and the key it sits under. */
+  function stringsIn(
+    value: unknown,
+    at = '',
+    key = '',
+  ): { at: string; key: string; text: string }[] {
+    if (typeof value === 'string') return [{ at, key, text: value }];
+    if (Array.isArray(value)) {
+      return value.flatMap((entry, i) => stringsIn(entry, `${at}[${i}]`, key));
+    }
+    if (typeof value !== 'object' || value === null) return [];
+    return Object.entries(value).flatMap(([name, entry]) =>
+      stringsIn(entry, at === '' ? name : `${at}.${name}`, name),
+    );
+  }
+
+  /** A path with its array indices dropped, as `NOT_PAGE_TEXT` names it. */
+  const pathOf = (at: string) => at.replace(/\[\d+\]/g, '');
+
+  /**
+   * Whether lower-cased body text shows a phrase as a whole: no letter or digit may touch either
+   * end, so "React" is not found in "Reactive", nor "DDD" in "DDDs". Whitespace inside the phrase
+   * matches any run of it, as the extractor collapses it. A page's text is read twice, its text
+   * nodes joined with nothing and with a space (`servedText`'s `separator` says why), and a phrase
+   * whole in either reading is shown.
+   */
+  function shows(body: string, phrase: string): boolean {
+    // A blank fact is not a fact a page shows: without this it would match any text.
+    if (phrase.trim() === '') return false;
+    const pattern = phrase
+      .toLowerCase()
+      .trim()
+      .split(/\s+/)
+      .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .join('\\s+');
+    return new RegExp(`(?<![\\p{L}\\p{N}])${pattern}(?![\\p{L}\\p{N}])`, 'u').test(body);
+  }
+
+  /**
+   * The description's clauses that are facts to find: the years clause goes (its figure is held to
+   * the pages by the #49 test above), then the rest is cut at punctuation and at the words that
+   * join clauses.
+   */
+  function descriptionClauses(description: string): string[] {
+    return description
+      .replace(/\b\d+\+? years\b[^,.;:]*/g, ',')
+      .split(/[,.;:]|\b(?:with|and|now)\b/i)
+      .map((clause) => clause.trim())
+      .filter((clause) => clause !== '');
+  }
+
+  test('reads a phrase only as a whole word, and the description by its clauses', () => {
+    expect(shows('react, nestjs and node.js', 'React')).toBe(true);
+    expect(shows('reactive streams', 'React')).toBe(false);
+    expect(shows('a reactor', 'react')).toBe(false);
+    expect(shows('devopsdays 2026', 'DevOps')).toBe(false);
+    expect(shows('ai-native development', 'AI-Native Development')).toBe(true);
+    expect(shows('ai-native  development', 'AI-Native Development')).toBe(true);
+    expect(shows('works on node.js', 'Node.js')).toBe(true);
+    expect(shows('works on nodexjs', 'Node.js')).toBe(false);
+    expect(shows('any text at all', '')).toBe(false);
+    expect(shows('any text at all', ' \t ')).toBe(false);
+    expect(
+      descriptionClauses(
+        'Senior Full-Stack Engineer with 13 years of experience in software engineering, now building AI-native systems.',
+      ),
+    ).toEqual(['Senior Full-Stack Engineer', 'building AI-native systems']);
+    expect(
+      descriptionClauses(
+        'Senior Full Stack Engineer & Architect with 13 years of experience in software engineering, now building AI-native systems, self-healing agents, and cloud-native architecture.',
+      ),
+    ).toEqual([
+      'Senior Full Stack Engineer & Architect',
+      'building AI-native systems',
+      'self-healing agents',
+      'cloud-native architecture',
+    ]);
+  });
+
+  test('every fact in the Person is in some page’s text, and every profile it names is a link', async ({
+    page,
+    request,
+  }) => {
+    type Served = {
+      /** The body text in its two readings, lower-cased: joined with nothing and with a space. */
+      text: [string, string];
+      hrefs: string[];
+      nodes: Record<string, unknown>[];
+    };
+    const problems: string[] = [];
+    const served = new Map<string, Served>();
+    // The 404 is fetched for its Person, which has to be the same as every page's, but its text is
+    // not searched: it is no page of the site's, and a fact only it showed would be a fact no route
+    // shows.
+    for (const path of PAGE_ROUTES) {
+      const response = await request.get(path);
+      expect(response.status(), `GET ${path}`).toBe(expectedStatus(path));
+      const html = await response.text();
+      const { hrefs, blocks } = await page.evaluate((markup) => {
+        const doc = new DOMParser().parseFromString(markup, 'text/html');
+        return {
+          hrefs: [...doc.body.querySelectorAll('a[href]')].map(
+            (link) => link.getAttribute('href') ?? '',
+          ),
+          blocks: [...doc.querySelectorAll('script[type="application/ld+json"]')].map(
+            (script) => script.textContent ?? '',
+          ),
+        };
+      }, html);
+      const nodes: Record<string, unknown>[] = [];
+      blocks.forEach((block, index) => {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(block);
+        } catch (error) {
+          problems.push(`${path}: JSON-LD block ${index} does not parse: ${String(error)}`);
+          return;
+        }
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          problems.push(`${path}: JSON-LD block ${index} is not one node`);
+          return;
+        }
+        nodes.push(parsed as Record<string, unknown>);
+      });
+      served.set(path, {
+        text: [
+          (await servedText(page, html, { root: 'body' })).toLowerCase(),
+          (await servedText(page, html, { root: 'body', separator: ' ' })).toLowerCase(),
+        ],
+        hrefs,
+        nodes,
+      });
+    }
+    const pages = [...served].filter(([path]) => path !== NOT_FOUND_ROUTE);
+
+    // The extractor reads no script: were the JSON-LD in the text, every fact would find itself.
+    for (const [path, { text }] of served) {
+      if (text.some((reading) => reading.includes('"@type"'))) {
+        problems.push(`${path}: the body text includes JSON-LD`);
+      }
+    }
+
+    // One Person, the layout's, on every route, the 404 included, so the facts below are the facts
+    // of every route.
+    const persons = new Map<string, Record<string, unknown>>();
+    for (const [path, { nodes }] of served) {
+      const found = nodes.filter((node) => node['@type'] === 'Person');
+      if (found.length === 1) persons.set(path, found[0]);
+      else problems.push(`${path} serves ${found.length} Persons, not 1`);
+    }
+    const person = persons.get('/about');
+    if (!person) throw new Error(`/about serves no single Person: ${problems.join('; ')}`);
+    for (const [path, other] of persons) {
+      if (!isDeepStrictEqual(other, person)) problems.push(`${path} serves another Person`);
+    }
+
+    // The facts: each in the text of at least one page. `shownOn` goes into the report, so the
+    // pull request can list each fact beside the routes that show it.
+    const shownOn: Record<string, string[]> = {};
+    const find = (label: string, text: string) => {
+      const routes = pages.filter(([, { text: readings }]) =>
+        readings.some((body) => shows(body, text)),
+      );
+      shownOn[label] = routes.map(([path]) => path);
+      return routes.length > 0;
+    };
+    const strings = stringsIn(person);
+    for (const exempt of Object.keys(NOT_PAGE_TEXT)) {
+      if (!strings.some(({ at }) => pathOf(at) === exempt)) {
+        problems.push(`NOT_PAGE_TEXT names ${exempt}, which the Person does not have`);
+      }
+    }
+    const facts = strings.filter(
+      ({ at, key }) => !VOCABULARY.has(key) && !(pathOf(at) in NOT_PAGE_TEXT),
+    );
+    for (const { at, text } of facts) {
+      if (!find(`${at}: ${text}`, text)) problems.push(`${at} "${text}" is in the text of no page`);
+    }
+    for (const at of REQUIRED) {
+      if (!facts.some((fact) => fact.at === at)) problems.push(`the Person states no ${at}`);
+    }
+
+    // The description, a sentence: each of its clauses but the years is in some page's text.
+    const description = typeof person.description === 'string' ? person.description : '';
+    const clauses = descriptionClauses(description);
+    if (clauses.length === 0) problems.push(`the description "${description}" states nothing`);
+    for (const clause of clauses) {
+      if (!find(`description: ${clause}`, clause)) {
+        problems.push(`the description's "${clause}" is in the text of no page`);
+      }
+    }
+
+    // The profiles: each the href of a link some page renders.
+    const profiles = Array.isArray(person.sameAs) ? person.sameAs.map(String) : [];
+    if (profiles.length === 0) problems.push('the Person names no profile in sameAs');
+    for (const profile of profiles) {
+      const routes = pages.filter(([, { hrefs }]) => hrefs.includes(profile));
+      shownOn[`sameAs: ${profile}`] = routes.map(([path]) => path);
+      if (routes.length === 0) problems.push(`sameAs ${profile} is the href of no rendered link`);
+    }
+
+    // The alias: the handle of one of those profiles, with or without the `@` it is written after.
+    // A handle is the URL's last non-empty path segment, compared without case, as X compares them.
+    const alias = typeof person.alternateName === 'string' ? person.alternateName : '';
+    const handle = alias.replace(/^@/, '').toLowerCase();
+    const handleOf = (profile: string) => {
+      try {
+        return new URL(profile).pathname.split('/').filter(Boolean).at(-1)?.toLowerCase();
+      } catch {
+        problems.push(`sameAs ${profile} is not a URL`);
+        return undefined;
+      }
+    };
+    const owner = profiles.find((profile) => handleOf(profile) === handle);
+    shownOn[`alternateName: ${alias}`] = owner ? shownOn[`sameAs: ${owner}`] : [];
+    if (handle === '' || !owner) {
+      problems.push(`alternateName "${alias}" is the handle of no profile in sameAs`);
+    }
+
+    // The page the Person is the main entity of is /about's ProfilePage: the one reference the
+    // graph test above lets name a node another route serves.
+    const profilePage = served.get('/about')?.nodes.find((n) => n['@type'] === 'ProfilePage');
+    if (
+      profilePage === undefined ||
+      !isDeepStrictEqual(person.mainEntityOfPage, { '@id': profilePage['@id'] })
+    ) {
+      problems.push(
+        `the Person's mainEntityOfPage is ${JSON.stringify(person.mainEntityOfPage)}, ` +
+          `not /about's ProfilePage ${String(profilePage?.['@id'])}`,
+      );
+    }
+
+    await test.info().attach('person-facts-by-route.json', {
+      body: JSON.stringify(shownOn, null, 2),
+      contentType: 'application/json',
+    });
+    expect(problems).toEqual([]);
+  });
 });

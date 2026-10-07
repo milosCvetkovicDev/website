@@ -157,6 +157,21 @@ TechArticle and BreadcrumbList (a post page has none yet). A node names another 
 alone. A new route renders its page node, and `components/__tests__/json-ld.test.tsx` and
 `e2e/seo-surface.spec.ts` pin each route's types.
 
+The Person asserts only what a page shows (57b):
+
+- Sources: its place and certification come from `data/profile.ts`, which /about's record reads
+  too; its occupation (`hasOccupation`, `jobTitle` and the description's opening) from the same
+  module, which the /work, /skills and /contact eyebrows read; its profiles and handle from
+  `data/social.ts`.
+- The check: the Person describe at the end of `e2e/seo-surface.spec.ts` fails on any string in it
+  that no page's body text shows as a whole word, on any description clause but the years that no
+  page shows, and on a profile no page renders as a link.
+- Exempt by path in its `NOT_PAGE_TEXT`, each checked another way: `@id`, `url`, `sameAs`,
+  `alternateName`, `description`, `hasCredential.credentialCategory` and `mainEntityOfPage.@id`;
+  `@context` and `@type` are vocabulary at any depth.
+- Its `mainEntityOfPage` names /about's ProfilePage, the one reference both graph tests let resolve
+  on another route.
+
 ## Owner placeholders
 
 A value only the owner can supply is left as a registered placeholder, never invented, through

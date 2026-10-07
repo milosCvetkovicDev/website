@@ -19,6 +19,7 @@ describe('yearsFigures', () => {
 describe('yearsClausesAboutAi', () => {
   it('passes the copy the site ships', () => {
     for (const text of [
+      'Senior Full-Stack Engineer with 13 years of experience in software engineering, now building AI-native systems.',
       'Senior Full Stack Engineer & Architect with 13 years of experience in software engineering, now building AI-native systems, self-healing agents, and cloud-native architecture.',
       'I fix the systems everyone else gave up on: 13 years rescuing legacy codebases, now building AI agents that fix their own bugs. Based in Belgrade.',
     ]) {

@@ -14,9 +14,12 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { facts, timeline } from '../pages/about';
+import { aboutRecord, credentials, facts, timeline } from '../pages/about';
 import {
   CAREER_START_YEAR,
+  CERTIFICATION,
+  LOCATION,
+  OCCUPATION,
   experienceFact,
   experienceFigureSince,
   yearsOfExperience,
@@ -104,6 +107,53 @@ describe('the quick fact that states it', () => {
 
   it('is the fact the /about record lists, whole', () => {
     expect(facts).toContainEqual(experienceFact());
+  });
+});
+
+describe('the facts the Person JSON-LD asserts (57b)', () => {
+  // The Person may assert only what a page shows (#57 AC 6), so each fact it names is stated once,
+  // here, and /about reads it from here too: the page, its Markdown twin and the markup cannot
+  // disagree. The literals are the oracle: they are the strings /about printed before 57b, and the
+  // owner approves them in the pull request.
+  it('holds the certification, the place and the occupation as the pages print them', () => {
+    expect(CERTIFICATION).toBe('Angular Certified Architect');
+    expect(LOCATION).toEqual({ locality: 'Belgrade', country: 'Serbia' });
+    expect(OCCUPATION).toBe('Senior Full-Stack Engineer');
+  });
+
+  it('is what /about’s credentials and description show, read from here', () => {
+    const shown = credentials.map(({ text }) => text);
+    expect(shown).toContain(CERTIFICATION);
+    expect(shown).toContain(`${LOCATION.locality}, ${LOCATION.country}`);
+    expect(aboutRecord.summary.endsWith(` Based in ${LOCATION.locality}.`)).toBe(true);
+  });
+
+  it('is written in this module only, in no other source file', () => {
+    // A string typed back into a page record or a component would print the same text today and
+    // drift tomorrow. Comments may name the facts; code may not. Tests are left out: they hold the
+    // literals as their oracle.
+    const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+    const sources = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) {
+          return name === '__tests__' || path === join(SRC, 'test') ? [] : sources(path);
+        }
+        return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
+      });
+    // Block comments, and line comments that do not follow a `:` (a URL's `//` is not one).
+    const code = (source: string) =>
+      source.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, (_, before = '') => before);
+    const files = sources(SRC).filter((path) => path !== join(SRC, 'data/profile.ts'));
+    expect(files).toContain(join(SRC, 'data/pages/about.ts'));
+    for (const literal of [CERTIFICATION, LOCATION.locality, LOCATION.country]) {
+      const pattern = new RegExp(`\\b${literal}\\b`);
+      const typed = files.filter((path) => pattern.test(code(readFileSync(path, 'utf8'))));
+      expect(typed, literal).toEqual([]);
+    }
+    // The comment stripper keeps code: a literal after a URL on the same line is still found.
+    expect(code("const a = 'https://x.test'; const b = 'Serbia';")).toContain('Serbia');
+    expect(code('/* Serbia */ const a = 1; // Belgrade')).not.toMatch(/Serbia|Belgrade/);
   });
 });
 
