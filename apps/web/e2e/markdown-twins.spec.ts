@@ -12,9 +12,9 @@ import { alternates, attributeText, fetchHead, first } from './support/served-he
  * advertises it from its `<head>` with `<link rel="alternate" type="text/markdown">`.
  *
  * Everything here reads served bytes through `request`, as an agent's fetch tool does: the head as
- * `support/served-head.ts` parses it, and the twin as the text it is. The one browser use is the
- * two parity tests at the end, which parse a served page with `DOMParser` (scripting off, nothing
- * navigated) because a heading's text is only what a parser says it is.
+ * `support/served-head.ts` parses it, and the twin as the text it is. The only browser use is in
+ * the two parity tests at the end, which parse a served page with `DOMParser` (scripting off,
+ * nothing navigated) because a heading's text is only what a parser says it is.
  *
  * The routes and their twin paths come from `endpoints.ts` and `routes.ts`, so a new static route
  * or case study is checked here without touching this file. `machine-readable.spec.ts` keeps its
@@ -223,6 +223,9 @@ for (const { route, twin } of MARKDOWN_TWINS) {
   test(`${route} serves one h1, and ${twin} opens with it`, async ({ page, request }) => {
     const response = await request.get(route);
     expect(response.status()).toBe(200);
+    expect(response.headers()['content-type'], `${route} should be served as HTML`).toMatch(
+      /^text\/html/,
+    );
     const h1s = await pageH1s(page, await response.text());
     expect(h1s, `${route} should serve exactly one h1`).toHaveLength(1);
 
