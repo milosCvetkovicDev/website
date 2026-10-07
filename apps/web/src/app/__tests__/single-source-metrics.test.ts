@@ -6,10 +6,11 @@
  * Rows R33 and R34 of the RED manifest, both fixed by #49.
  *
  * `apps/web/src/data` is the single source of truth for project copy and metrics, and pages are
- * supposed to read from it rather than restate any of it. Two families of literal break that today, and
- * both are invisible to any test that renders a component, because a hard-coded `73%` renders exactly
- * as well as a derived one. The only instrument that can see the difference is the source text, so this
- * file reads the modules as files.
+ * supposed to read from it rather than restate any of it. Two families of literal broke that,
+ * metric figures (R33) and years of experience (R34). Neither does now: #162 fixed R34 and #207
+ * R33, and both rows pass. Both were invisible to any test that renders a component, because a
+ * hard-coded `73%` renders exactly as well as a derived one. The only instrument that can see the
+ * difference is the source text, so this file reads the modules as files.
  *
  * That makes it a lint rule wearing a test's clothes, and it is deliberately written as one: it reports
  * the file, the line and the literal, so a failure is actionable without opening anything.

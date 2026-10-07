@@ -41,9 +41,11 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   the server's stderr reaches the log, because `webServer.stdout` stays at Playwright's default,
   `'ignore'`, so every other server line is a finding, warnings included. A missing or empty log
   fails too, and so does a log with no `[WebServer]` line, which means the capture broke, since
-  every run prints the allowlisted block. The check runs whenever the suite ran, passed or failed,
-  and not after an earlier step failed, when there is no log to read. Its tests run in
-  `pnpm test:scripts`.
+  every run prints the allowlisted block. That block comes from the not-found specs, which only the
+  `chromium` project runs, so the check means something only on a run that includes `chromium`: a
+  run of `mobile-chrome` or `mobile-safari` alone always fails it with the capture message, which
+  is not a server problem. The check runs whenever the suite ran, passed or failed, and not after
+  an earlier step failed, when there is no log to read. Its tests run in `pnpm test:scripts`.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
   React hydration mismatches included, so a stray `console.warn` fails the `e2e` job. Its routes come
@@ -68,6 +70,20 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   text there fails; never widen a budget or lower a floor to quieten a failure. A new
   `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
   Conventions in `ui-components.md` and ADR 0011, which superseded 0008.
+- What a crawler reads is gated (#55). `e2e/no-js-text.spec.ts` reads each static route's and case
+  study's response body, never the hydrated DOM, and fails one that does not answer 200, falls
+  under its floor of characters or loses a load-bearing phrase; a floor is about 80% of the
+  measured text, so content moved behind a client-only component or a `<Suspense>` fails there
+  while every browser test stays green. `e2e/crawlability.spec.ts` checks every same-origin URL a
+  route's HTML names or its render requests against `/robots.txt`, for the `*` group, Googlebot and
+  Applebot (with Applebot's fallback to Googlebot's groups), and fails any one of them refused.
+- The e2e job makes one third-party call. `e2e/structured-data.spec.ts` posts the
+  `<script type="application/ld+json">` elements served on `/` and on the first case study, and
+  nothing else of the page, to `validator.schema.org/validate`, from the `chromium` project only, so
+  once per run, with no retries. It is advisory and fails open: a network error, a timeout, a
+  non-2xx answer or an answer that read nothing passes with an annotation, and only a verdict with
+  errors fails (`readVerdict` in `e2e/support/schema-validator.ts`). `SCHEMA_VALIDATOR_STRICT=1`
+  turns a missing verdict into a failure.
 
 ## Testing
 

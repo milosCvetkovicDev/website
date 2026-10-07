@@ -16,7 +16,7 @@ Personal site of Milos Cvetkovic, Senior Full-Stack Engineer. An interactive, an
 
 | Layer     | Choice                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------- |
-| Framework | Next.js 16 (App Router, server components by default), React 19, TypeScript 5                           |
+| Framework | Next.js 16 (App Router, server components by default), React 19, TypeScript 6                           |
 | Styling   | Tailwind CSS 4 (CSS-first config), Geist fonts                                                          |
 | Motion    | GSAP 3 + ScrollTrigger for the scroll story, SMIL and CSS for decorative details                        |
 | Monorepo  | Turborepo 2, pnpm 10 workspaces, Node 22                                                                |
@@ -64,7 +64,7 @@ CI runs on every pull request and every push to `main` (`.github/workflows/ci.ym
 | dependency review                 | Lockfile dependencies a pull request adds with a known advisory                                                                     | -                  | yes |
 | `pnpm check:allowbuilds`          | `allowBuilds` entries against the versions the lockfile resolves                                                                    | -                  | yes |
 | `pnpm check:adrs`                 | Each ADR's status, title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules            | -                  | yes |
-| `pnpm test:scripts`               | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step, commitlint configs, web server log, flake hunt | -                  | yes |
+| `pnpm test:scripts`               | Every `node:test` suite in `scripts/`, such as allowBuilds drift, AI refusals, Vercel build, commitlint, web server log, flake hunt | -                  | yes |
 | `pnpm format:check`               | Prettier, shared config, Tailwind class order                                                                                       | yes (staged files) | yes |
 | `pnpm lint`                       | ESLint with `--max-warnings 0` in `apps/web`                                                                                        | yes (staged files) | yes |
 | commitlint                        | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...); in CI, the PR title and every commit                            | yes                | yes |
