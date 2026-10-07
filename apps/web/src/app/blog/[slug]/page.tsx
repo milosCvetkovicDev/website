@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { PostArticleJsonLd, PostBreadcrumbJsonLd, PostWebPageJsonLd } from '@/components/json-ld';
 import { PostBody } from '@/components/post-body';
 import { FOOTER_LINES, getPost, publishedPosts } from '@/data/posts';
 import { formatContentDates } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
 import { cardAlt } from '@/lib/og-image';
+import { postPageTitle, postPath } from '@/lib/post-page';
 import { postStaticParams } from '@/lib/post-static-params';
 
 interface PageProps {
@@ -38,16 +40,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return buildMetadata({
     // A results page shows the shorter `metaTitle` when the post sets one; a link preview has the
-    // room for the whole title, and no template.
-    title: post.metaTitle ?? post.title,
+    // room for the whole title, and no template. The page node is named with the same helper.
+    title: postPageTitle(post),
     socialTitle: post.title,
     description: post.summary,
-    path: `/blog/${post.slug}`,
+    path: postPath(post),
     type: 'article',
     // `buildMetadata()` declares a complete `openGraph`, so `blog/opengraph-image.tsx` never reaches
     // a post: each has its own card, drawn by the handler beside this page.
     image: {
-      url: `/blog/${post.slug}/og-image.png`,
+      url: `${postPath(post)}/og-image.png`,
       alt: cardAlt(`Writing: ${post.title}`),
     },
   });
@@ -65,7 +67,7 @@ export default async function PostPage({ params }: PageProps) {
   // read too, so they cannot disagree. A date that does not format, or a pair updated before it
   // was published, throws here and fails the prerender.
   const { published, updated } = formatContentDates(
-    `/blog/${post.slug}`,
+    postPath(post),
     post.publishedAt,
     post.updatedAt,
   );
@@ -73,6 +75,12 @@ export default async function PostPage({ params }: PageProps) {
 
   return (
     <div className="py-16 md:py-24">
+      {/* #57's nodes, as a case study renders them (#61): the page named with the title its head
+          carries, the post as its TechArticle, and its trail. Outside the article below, which an
+          extractor reads for the post alone. */}
+      <PostWebPageJsonLd post={post} />
+      <PostArticleJsonLd post={post} />
+      <PostBreadcrumbJsonLd post={post} />
       <div className="mx-auto max-w-3xl px-6">
         <Link
           href="/blog"
