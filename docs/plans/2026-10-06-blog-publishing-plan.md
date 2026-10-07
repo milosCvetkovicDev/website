@@ -366,8 +366,8 @@ which sets both to `Shipped`.
 - Produces, in the fixtures: `everyBlockPost.kind === 'own'`, `hostileTitlePost.kind === 'jev'` and
   `draftPost.kind === 'own'`.
 
-(2026-10-07: the fences show the code as #241 shipped it; the final review's fixes in
-`fix/blog-publish-seams` changed `posts.test.ts` to refuse a published summary over 155 characters,
+(2026-10-07: the fences show the code as #241 shipped it; the final review's fixes in #242
+(`fix/blog-publish-seams`) changed `posts.test.ts` to refuse a published summary over 155 characters,
 a link the URL parser refuses, and a link that names this site's own host on any port, saying in the
 same problem when its path is no page, and the `posts.ts` comments to match.)
 
@@ -1977,8 +1977,8 @@ git commit -m "feat(web): serve each post's Markdown twin and list the posts in 
 
   The command is `node scripts/post-draft-check.mjs --kind own|jev <draft.md> <twin.md>`.
 
-(2026-10-07: the fences show the code as #241 shipped it; the final review's fixes in
-`fix/blog-publish-seams` changed the check to refuse a pair of `~` runs that GFM may strike through,
+(2026-10-07: the fences show the code as #241 shipped it; the final review's fixes in #242
+(`fix/blog-publish-seams`) changed the check to refuse a pair of `~` runs that GFM may strike through,
 a code fence indented outside a list item or inside one after a blank line, and a table whose header
 and delimiter rows differ in cells, to pad a short table row to the delimiter row's width, and to
 give a `](` with no open `[` before it its own message.)
