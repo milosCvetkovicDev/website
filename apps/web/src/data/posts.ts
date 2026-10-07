@@ -20,14 +20,19 @@
  * - Every post, draft or published, has a `kind`: `jev` for an article that reviews TypeSafe's Jev
  *   model, `own` otherwise. `posts.test.ts` fails when a published post that is not `jev` names Jev
  *   or TypeSafe in any text it shows, matched case-sensitively and as a whole word (ADR 0034).
+ * - A table needs a caption, two columns or more with a name each and no name twice, one row or
+ *   more, one cell per column in every row, a row header in each row and no header twice, and no
+ *   blank cell when it has three columns or more. Names and headers are compared ignoring case.
+ *   `TableBlock` says what such a table looks like on a phone, and what its cells must say.
  * - `src/data/__tests__/posts.test.ts` checks what a published post must hold: a unique slug of
  *   lowercase words and hyphens, real dates that are not in the future with `updatedAt` on or after
  *   `publishedAt`, a summary of 50 to 300 characters, a served title (`metaTitle` when set, then
  *   ` | Milos Cvetkovic`) of at most 60, tags that are neither blank nor repeated, and a body whose
  *   blocks are not empty, with headings at level 2 or 3, no level 3 before the first level 2 and no
- *   heading twice. Titles, the summary, headings and tags have no spaces at either end or two in a
- *   row; no text outside a code block holds a line break, a control or a direction character; a
- *   link's text says where it goes; and a link to this site names a page that exists.
+ *   heading twice. Titles, the summary, headings, tags, and a table's caption, column names and row
+ *   headers have no spaces at either end or two in a row; no text outside a code block holds a
+ *   line break, a control or a direction character; a link's text says where it goes; and a link
+ *   to this site names a page that exists.
  */
 
 /**
@@ -83,8 +88,29 @@ export interface QuoteBlock {
   readonly content: readonly Inline[];
 }
 
-/** Every block a post's body is built from; a sixth kind needs a renderer wherever posts render. */
-export type PostBlock = HeadingBlock | ParagraphBlock | ListBlock | CodeBlock | QuoteBlock;
+/**
+ * A table of plain-text cells, rendered by `components/data-table.tsx` like the site's other
+ * tables. The caption names it, and the first cell of each row is that row's header (ADR 0034).
+ *
+ * Below 640px a table of three or more columns stacks each row: its header and first value on one
+ * line, then each other value on a line of its own, with the column names hidden from sight
+ * (`data-table.tsx`, #226). A reader tells the values apart by their order alone, so:
+ *
+ * - no cell may be blank, which `posts.test.ts` checks;
+ * - each value says what it is without its column, by its unit or a word ("1,234 tokens", "$0.10",
+ *   "420 ms"). Where units cannot tell two columns apart, use two-column tables, which never stack
+ *   and keep their headers. No test can check this; whoever writes the table has to.
+ */
+export interface TableBlock {
+  readonly kind: 'table';
+  readonly caption: string;
+  readonly columns: readonly string[];
+  readonly rows: readonly (readonly [header: string, ...cells: string[]])[];
+}
+
+/** Every block a post's body is built from; a seventh kind needs a renderer wherever posts render. */
+export type PostBlock =
+  HeadingBlock | ParagraphBlock | ListBlock | CodeBlock | QuoteBlock | TableBlock;
 
 /**
  * Which kind of article a post is, as the writing room's tracker names it: `jev` for an article
