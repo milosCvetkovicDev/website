@@ -16,9 +16,10 @@ import { STACKED_BELOW, TABLES } from '../support/tables';
  * cell lies inside the viewport, every row is as tall as what it shows and no taller, the cells
  * come in that order, the column header row is drawn nowhere and stays anchored inside the table's
  * card, and the first timeline row's story is on screen. A word too long for the line breaks
- * rather than push the page sideways. The separator is drawn but never read or copied: a row
- * header's accessible name is its text alone, and the row copies as "2025 AI-Native Engineer", not
- * "2025AI-Native Engineer".
+ * rather than push the page sideways, and so do the column headers of a two-column table, which
+ * never stacks: a post may name its columns at any length. The separator is drawn but never read
+ * or copied: a row header's accessible name is its text alone, and the row copies as
+ * "2025 AI-Native Engineer", not "2025AI-Native Engineer".
  *
  * At 375px, that the stacked tables are still tables to assistive technology: the stacked layout
  * changes the display of every table element, which drops their table semantics in WebKit, so each
@@ -35,6 +36,12 @@ const WIDE = Object.entries(TABLES).flatMap(([route, tables]) =>
   tables.filter(isWideTable).map((table) => ({ route, table })),
 );
 const WIDE_ROUTES = [...new Set(WIDE.map(({ route }) => route))];
+
+/** Every table of two columns, with the route that serves it. */
+const NARROW = Object.entries(TABLES).flatMap(([route, tables]) =>
+  tables.filter((table) => !isWideTable(table)).map((table) => ({ route, table })),
+);
+const NARROW_ROUTES = [...new Set(NARROW.map(({ route }) => route))];
 
 /** Narrows the phone project's viewport to `width`, keeping its own height. */
 async function narrowTo(page: Page, width: number) {
@@ -220,6 +227,44 @@ test('a word too long for a stacked line breaks inside the row, not past the pag
           });
         expect.soft(overflow.card, `${table.caption}: the long word overflows its card`).toBe(0);
         expect.soft(overflow.page, `${table.caption}: the page scrolls sideways`).toBe(0);
+      }
+    });
+  }
+});
+
+test("a two-column table's long column headers fit inside its card, not past the page", async ({
+  page,
+}) => {
+  // Today's column names are one or two short words; a post's may be longer. Kept on one line,
+  // "Failure mode" and "What the agent did instead" pushed a 320px page 81px sideways, and a pair
+  // of 29 characters already 11px (measured once, 2026-10-07). These stand in for a post's: words
+  // that wrap, and one word too long for any line. The narrowest phone, and a Pixel 7's 412px,
+  // where names that long still ran 7-14px past the card.
+  for (const [route, width] of NARROW_ROUTES.flatMap((route) =>
+    [320, 412].map((width) => [route, width] as const),
+  )) {
+    await test.step(`${route} at ${width}px`, async () => {
+      await narrowTo(page, width);
+      await gotoHydrated(page, route);
+      for (const { table } of NARROW.filter((narrow) => narrow.route === route)) {
+        const overflow = await page
+          .getByRole('table', { name: table.caption, exact: true })
+          .evaluate((element) => {
+            const [first, second] = (element as HTMLTableElement).tHead!.rows[0]!.cells;
+            first!.textContent = 'What the agent did instead';
+            second!.textContent = 'x'.repeat(40);
+            const card = element.parentElement!;
+            return {
+              page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+              card: card.scrollWidth - card.clientWidth,
+            };
+          });
+        expect
+          .soft(overflow.card, `${table.caption} at ${width}px: a column header overflows its card`)
+          .toBe(0);
+        expect
+          .soft(overflow.page, `${table.caption} at ${width}px: the page scrolls sideways`)
+          .toBe(0);
       }
     });
   }
