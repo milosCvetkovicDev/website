@@ -233,6 +233,22 @@ describe('pickFromToTween', () => {
       'gsap.fromTo call #0, the alert reveal, threw instead of returning a tween.',
     );
   });
+
+  it('never hands a query a call whose vars are not both objects, and lists each argument', () => {
+    const fromTo = fromToSpy();
+    const alert = {};
+    // GSAP 2's form, (target, duration, fromVars, toVars), and a call with its vars left out.
+    (fromTo as unknown as (...args: unknown[]) => void)(alert, 0.6, { opacity: 0 }, { opacity: 1 });
+    (fromTo as unknown as (target: unknown) => void)(alert);
+    const matches = vi.fn(() => true);
+
+    expect(() => pickFromToTween(fromTo, { what: 'the alert reveal', matches })).toThrow(
+      'No gsap.fromTo call is the alert reveal. The spy saw 2 calls: ' +
+        '#0 a plain object (vars: 0.6) -> { opacity: 0 } -> { opacity: 1 }; ' +
+        '#1 a plain object (vars: undefined).',
+    );
+    expect(matches).not.toHaveBeenCalled();
+  });
 });
 
 describe('fromToOf', () => {
@@ -242,6 +258,13 @@ describe('fromToOf', () => {
     expect(matches(element, {}, {})).toBe(true);
     expect(matches({}, {}, {})).toBe(false);
     expect(matches([element], {}, {})).toBe(false);
+  });
+
+  it('refuses a missing element, which would match any call made with an unmounted ref', () => {
+    expect(() => fromToOf(null, 'the alert reveal')).toThrow(
+      'fromToOf was given null for the alert reveal: find the element first.',
+    );
+    expect(() => fromToOf(undefined, 'the alert reveal')).toThrow(/given undefined/);
   });
 });
 
