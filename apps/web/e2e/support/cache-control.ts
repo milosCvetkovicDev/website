@@ -92,9 +92,9 @@ export function parseDirectives(values: readonly string[]): Directives | undefin
 const isZero = (value: string | undefined) => value !== undefined && /^0+$/.test(value);
 
 /**
- * Whether `name` was sent and never given an argument. RFC 9111 gives `no-store`, `must-revalidate`
- * and the unqualified `no-cache` none, and lets a cache act on the first of two occurrences (4.2.1),
- * so one that carries an argument anywhere does not count.
+ * Whether `name` was sent and never given an argument. RFC 9111 gives `no-store`,
+ * `must-revalidate` and the unqualified `no-cache` none, and lets a cache act on the first of two
+ * occurrences (4.2.1), so one that carries an argument anywhere does not count.
  */
 const bare = (directives: Directives, name: string) => {
   const values = directives.get(name);
@@ -140,11 +140,13 @@ export function directiveBound(directives: Directives): 'no-store' | 'revalidate
 
 /**
  * Whether a field sets a cache's lifetime for a response: `Cache-Control` for every cache, and the
- * targeted fields a CDN downstream may obey in its place, `CDN-Cache-Control` and any vendor's
- * `<vendor>-CDN-Cache-Control` (RFC 9213), and `Surrogate-Control`.
+ * fields a CDN downstream may obey in its place: `Surrogate-Control`, and any targeted field, which
+ * RFC 9213 names `<target>-Cache-Control` by convention (`CDN-Cache-Control`,
+ * `Akamai-Cache-Control`). The RFC warns a cache not to pick its fields by that suffix alone; here
+ * a field read in excess can only refuse a bound, never grant one.
  */
 const isLifetimeField = (name: string) =>
-  name === 'cache-control' || name === 'surrogate-control' || name.endsWith('cdn-cache-control');
+  name === 'cache-control' || name === 'surrogate-control' || name.endsWith('-cache-control');
 
 export type CacheBound =
   { bound: 'no-store' | 'revalidate'; reason?: undefined } | { bound: undefined; reason: string };

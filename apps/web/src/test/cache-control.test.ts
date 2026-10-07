@@ -164,7 +164,7 @@ describe('cacheBound', () => {
     ).toEqual({ bound: 'no-store' });
   });
 
-  it('holds a vendor’s own targeted field (RFC 9213) and nginx’s lifetime field too', () => {
+  it('holds every <target>-Cache-Control field, and nginx’s lifetime field too', () => {
     const base = cc('public, max-age=0, must-revalidate');
     expect(
       cacheBound([...base, { name: 'Cloudflare-CDN-Cache-Control', value: 'max-age=86400' }]),
@@ -172,9 +172,16 @@ describe('cacheBound', () => {
       bound: undefined,
       reason: 'it sent cloudflare-cdn-cache-control: "max-age=86400"',
     });
-    expect(
-      cacheBound([...base, { name: 'Vercel-CDN-Cache-Control', value: 'max-age=86400' }]).bound,
-    ).toBe(undefined);
+    for (const name of [
+      'Vercel-CDN-Cache-Control',
+      'Akamai-Cache-Control',
+      'ExampleCDN-Cache-Control',
+    ]) {
+      expect(cacheBound([...base, { name, value: 'max-age=86400' }]).bound, name).toBe(undefined);
+    }
+    expect(cacheBound([...base, { name: 'X-Accel-Expires', value: '@1767225600' }]).bound).toBe(
+      undefined,
+    );
     expect(cacheBound([...base, { name: 'X-Accel-Expires', value: '3600' }])).toEqual({
       bound: undefined,
       reason: 'it sent x-accel-expires: "3600"',

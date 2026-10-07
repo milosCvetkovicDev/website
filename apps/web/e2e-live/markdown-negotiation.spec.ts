@@ -33,9 +33,9 @@ import { ASKS_FOR_MARKDOWN, BROWSER_ACCEPT, MARKDOWN, varyOf } from '../e2e/supp
  *   twin under a key of its own, and a browser's request never matches it. This is what
  *   `next start` sends;
  * - or the Markdown answer leaves a cache nothing to replay without asking, which is what Vercel
- *   sends. Its `Cache-Control`, and any `CDN-Cache-Control`, `<vendor>-CDN-Cache-Control` or
- *   `Surrogate-Control` a CDN downstream would obey instead, with nginx's `X-Accel-Expires` at zero
- *   if sent, forbids storing it or makes every cache revalidate before each reuse
+ *   sends. Its `Cache-Control`, and any `Surrogate-Control` or targeted `<target>-Cache-Control`
+ *   field (`CDN-Cache-Control`) a CDN downstream would obey instead, with nginx's `X-Accel-Expires`
+ *   at zero if sent, forbids storing it or makes every cache revalidate before each reuse
  *   (`e2e/support/cache-control.ts` has the rules, `src/test/cache-control.test.ts` their cases).
  *   When it may be stored, it and the page each carry one entity tag, and the two differ, compared
  *   weakly as `If-None-Match` compares them (RFC 9110, 13.1.2), so the revalidation names the
@@ -110,8 +110,8 @@ async function expectKeptApart(request: APIRequestContext, path: string) {
   expect(
     bound.reason,
     `${why} its caching fields must forbid storing it (no-store) or make every cache revalidate ` +
-      'it (no-cache, or max-age=0 with must-revalidate, and no s-maxage above 0, ' +
-      `stale-while-revalidate or stale-if-error); ${bound.reason}`,
+      'it (a bare no-cache, or max-age=0 with must-revalidate, and no s-maxage above 0, ' +
+      `stale-while-revalidate, stale-if-error or X-Accel-Expires other than 0); ${bound.reason}`,
   ).toBeUndefined();
   if (bound.bound === 'no-store') {
     return;

@@ -213,9 +213,10 @@ request with a browser's `Accept` and the twin's ETag in `If-None-Match` is answ
 Markdown. Since #217 the live check holds that bound where the Markdown answer's `Vary` lists
 neither `accept` nor `*`: `apps/web/e2e-live/markdown-negotiation.spec.ts` passes on such a `Vary`,
 or on caching fields that forbid storing the answer, or on all of these: caching fields
-(`Cache-Control`, and any `CDN-Cache-Control`, `<vendor>-CDN-Cache-Control` or `Surrogate-Control`)
-of a bare `no-cache`, or of `max-age=0` with `must-revalidate`, with no `s-maxage` above 0,
-`stale-while-revalidate` or `stale-if-error`, and no `X-Accel-Expires` above 0; one well-formed ETag
+(`Cache-Control`, and any `Surrogate-Control` or targeted `<target>-Cache-Control` field, such as
+`CDN-Cache-Control`) of a bare `no-cache`, or of `max-age=0` with `must-revalidate`, with no
+`s-maxage` above 0, `stale-while-revalidate` or `stale-if-error`, and no `X-Accel-Expires` other
+than 0; one well-formed ETag
 on each answer, the two different and the Markdown one stable across the test; each
 representation's own ETag answered `304`; the other's answered `200` with the representation asked
 for; and both together answered with a `304` naming the own ETag or a `200` of the representation
