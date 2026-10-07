@@ -795,13 +795,21 @@ describe('the publish check', () => {
       });
     }
 
-    const TILDES =
-      'two or more ~, which GFM can pair as strikethrough; write \\~ for the character';
+    const TILDES = 'a pair of ~ that GFM may read as strikethrough; write \\~ for the character';
 
     /** @type {[string, string[], string][]} */
     const pairedTildes = [
       ['a pair around a word', ['A ~fast~ run.'], 'line 29'],
+      ['a pair at the start of a paragraph', ['~fast~'], 'line 29'],
       ['tildes between digits', ['From 3~5 runs and 7~9 more.'], 'line 29'],
+      ['a pair of doubled tildes', ['~~a~~'], 'line 29'],
+      ['a pair inside spaces', ['a ~b~ c'], 'line 29'],
+      ["a pair in a link's text", ['See [a ~fast~ run](/work).'], 'line 29'],
+      [
+        'a pair in a caption',
+        ['Table: A ~fast~ day', '', '| Day | Note |', '| --- | --- |', '| Monday | b |'],
+        'line 29',
+      ],
       ['a pair across the lines of a paragraph', ['A ~fast', 'run~ here.'], 'lines 29-30'],
       ['a pair in a list item', ['- A ~fast~ run'], 'line 29'],
       ['a pair in a quote', ['> A ~fast~ run.'], 'line 29'],
@@ -835,6 +843,14 @@ describe('the publish check', () => {
       ['tildes in a link destination', ['See [the folder](/~a/~b).']],
       ['one ~ in each of two cells', ['| From | To |', '| --- | --- |', '| ~5 | ~9 |']],
       ['one ~ in each of two items', ['- About ~5 minutes', '- About ~9 minutes']],
+      ['two ~ that close nothing', ['It takes ~5 to ~10 minutes.']],
+      ['two ~ before numbers', ['~200 ms against ~50 ms.']],
+      ['two ~ in home paths', ['Copy ~/.zshrc to ~/backup.']],
+      ['runs of three ~', ['This will ~~~not~~~ strike.']],
+      ['a run of one ~ and a run of two', ['~a~~']],
+      ["one ~ in the text and one in a link's text", ['a~b [c~d](/work)']],
+      ["one ~ in each of two links' text", ['[~a](/x) and [~b](/y)']],
+      ['two ~ after spaces', ['about ~5 minutes, sometimes ~9 minutes']],
     ];
     for (const [name, lines] of loneTildes) {
       it(`accepts ${name}, which GFM cannot pair as strikethrough`, () => {

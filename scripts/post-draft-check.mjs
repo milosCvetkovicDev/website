@@ -726,6 +726,52 @@ function prose(tokens, labels) {
     .join('');
 }
 
+/** CommonMark's Unicode whitespace: a `Zs` space, a tab, a line feed, a form feed or a return. */
+const WHITESPACE = /[\p{Zs}\t\n\f\r]/u;
+
+/**
+ * The spans in which GFM pairs `~` as strikethrough: the run of text, with each code span, escape and
+ * link standing as one character that is not a space, and each link's text on its own.
+ * @param {Token[]} tokens
+ * @returns {string[]}
+ */
+function tildeSpans(tokens) {
+  const labels = /** @type {string[]} */ ([]);
+  const span = tokens
+    .map((token) => {
+      if ('code' in token) return 'c';
+      if ('label' in token) {
+        labels.push(...tildeSpans(token.label));
+        return 'l';
+      }
+      return token.text.replace(ESCAPE, 'e');
+    })
+    .join('');
+  return [span, ...labels];
+}
+
+/**
+ * Whether GFM may strike part of `span` through: a run of one or two `~` that can open, followed
+ * later by a run of the same length that can close. A run of three or more stays text. A run can
+ * open unless whitespace or the span's end follows it, and close unless whitespace or the span's
+ * start comes before it: CommonMark's flanking rules without their punctuation clauses, so that
+ * the check refuses a few pairs GFM leaves as text and misses none it strikes.
+ * @param {string} span
+ */
+function strikes(span) {
+  /** @type {Set<number>} */
+  const opened = new Set();
+  for (const run of span.matchAll(/~+/g)) {
+    const length = run[0].length;
+    if (length > 2) continue;
+    const before = span[run.index - 1];
+    const after = span[run.index + length];
+    if (opened.has(length) && before !== undefined && !WHITESPACE.test(before)) return true;
+    if (after !== undefined && !WHITESPACE.test(after)) opened.add(length);
+  }
+  return false;
+}
+
 /**
  * The unescaped `](` in running text as written, by kind: `opened` when an unescaped `[` comes
  * before one, so that CommonMark may read it as a link's end, and `stray` when none does.
@@ -801,13 +847,15 @@ function refusedInline(source, at, block) {
     if (pattern.test(text)) problems.push(`${at}: ${what}`);
   }
   // GFM pairs one or two `~` on each side as strikethrough, `~a~` as well as `~~a~~`, inside one
-  // paragraph, item, quote, heading or table cell, where the page shows the tildes. A lone `~`
-  // stays text, so only a second one is refused.
+  // paragraph, item, quote, heading, caption, table cell or link text, where the page shows the
+  // tildes. A table's cells are read one by one, as GFM splits the row before its inline syntax.
   const spans =
-    block === 'table' ? tableCells(source).map((cell) => prose(inlineTokens(cell), true)) : [text];
-  if (spans.some((span) => (span.match(/~/g) ?? []).length > 1)) {
+    block === 'table'
+      ? tableCells(source).flatMap((cell) => tildeSpans(inlineTokens(cell)))
+      : tildeSpans(tokens);
+  if (spans.some(strikes)) {
     problems.push(
-      `${at}: two or more ~, which GFM can pair as strikethrough; write \\~ for the character`,
+      `${at}: a pair of ~ that GFM may read as strikethrough; write \\~ for the character`,
     );
   }
   // GFM links a bare `www.` address too, after a space, `(`, a bracket or an emphasis mark.
