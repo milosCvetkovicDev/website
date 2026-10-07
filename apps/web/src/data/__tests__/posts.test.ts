@@ -17,6 +17,7 @@ import { isWideTable } from '@/data/pages/table';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { formatContentDate, isPublishableContentDate } from '@/lib/content-date';
 import { NO_PUBLISHED_POST_SLUG } from '@/lib/post-static-params';
+import { PRODUCTION_ORIGIN } from '@/lib/site-origin';
 import { draftPost, everyBlockPost, fixturePosts, hostileTitlePost } from '@/test/fixtures/posts';
 import {
   buildPostIndex,
@@ -37,11 +38,14 @@ const TITLE_SUFFIX = ' | Milos Cvetkovic';
 /** Google cuts a title at about 600 px, some 60 characters, as page-metadata.test.ts holds. */
 const TITLE_MAX = 60;
 /**
- * #61's bounds for a summary. They are not a meta description's: 61b decides whether a summary can
- * double as one, which page-metadata.test.ts holds to 155 characters.
+ * #61's bounds for every entry's summary, a draft's included. A published post's summary is also
+ * its meta description (61b), so `descriptionProblems` holds the published index to
+ * `DESCRIPTION_MAX`: a draft entry is held to 300 characters and a published post to 155.
  */
 const SUMMARY_MIN = 50;
 const SUMMARY_MAX = 300;
+/** What page-metadata.test.ts allows every page's meta description, a post's summary included. */
+const DESCRIPTION_MAX = 155;
 /** Lowercase letters and digits in words joined by single hyphens: the `<slug>` in `/blog/<slug>`. */
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 /** One character of a URL as RFC 3986 writes it: ASCII, with anything else percent-encoded. */
@@ -56,6 +60,13 @@ const HREF = new RegExp(
   String.raw`^(?:https://[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d{1,5})?(?:[/?#]${URL_CHARACTER}*)?|/(?!/)${URL_CHARACTER}*)$`,
   'i',
 );
+/**
+ * This site's own hosts. A link to one, on any port, is written as a path, which the page-exists
+ * check covers; a full URL on them would skip it. The URL parser lowercases a host and keeps the
+ * port out of `hostname`.
+ */
+const OWN_HOST = new URL(PRODUCTION_ORIGIN).hostname;
+const OWN_HOSTS = new Set([OWN_HOST, `www.${OWN_HOST}`]);
 /** Link text that says nothing of where the link goes, as a screen reader's list of links reads it. */
 const VAGUE_LINK_TEXT = /^(?:here|click here|this|that|link|this link|more|read more)[.!:]?$/i;
 /** A code block's language as a Markdown fence's info string and a `language-*` class can carry it. */
@@ -99,6 +110,19 @@ function pagesFor(list: readonly Post[]): ReadonlySet<string> {
     ...caseStudies.map(({ slug }) => `/work/${slug}`),
     ...list.filter((post) => post.draft === false).map(({ slug }) => `/blog/${slug}`),
   ]);
+}
+
+/**
+ * `href` as the URL parser reads it, or null where the parser refuses it: a port over 65535, an
+ * IPv4 address with a part over 255 or a punycode label that does not decode, which `HREF` lets
+ * through.
+ */
+function parseUrl(href: string): URL | null {
+  try {
+    return new URL(href);
+  } catch {
+    return null;
+  }
 }
 
 /** Problems with a run of inline pieces: a paragraph, a quote or one list item. */
@@ -146,14 +170,28 @@ function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<strin
       } else if (VAGUE_LINK_TEXT.test(label.trim())) {
         problems.push(`${at}: the link text ${JSON.stringify(label)} does not say where it goes`);
       } else text += label;
+      const elsewhere = `${at}: the link goes to ${JSON.stringify(href)}, which is neither an https URL nor a path on this site`;
       if (typeof href !== 'string' || !HREF.test(href)) {
-        problems.push(
-          `${at}: the link goes to ${JSON.stringify(href)}, which is neither an https URL nor a path on this site`,
-        );
-      } else if (href.startsWith('/') && !pages.has(href.split(/[?#]/)[0])) {
-        problems.push(
-          `${at}: the link goes to ${JSON.stringify(href)}, which is no page on this site`,
-        );
+        problems.push(elsewhere);
+      } else if (href.startsWith('/')) {
+        if (!pages.has(href.split(/[?#]/)[0])) {
+          problems.push(
+            `${at}: the link goes to ${JSON.stringify(href)}, which is no page on this site`,
+          );
+        }
+      } else {
+        const url = parseUrl(href);
+        if (url === null) {
+          problems.push(elsewhere);
+        } else if (OWN_HOSTS.has(url.hostname)) {
+          // In one problem with the page-exists check's finding, so the writer who swaps the URL
+          // for its path is not sent to a second failure.
+          const missing = pages.has(url.pathname) ? '' : ', which is no page on this site';
+          problems.push(
+            `${at}: the link goes to ${JSON.stringify(href)}, which names this site's own host; ` +
+              `write its path, ${JSON.stringify(url.pathname + url.search + url.hash)}${missing}`,
+          );
+        }
       }
     } else {
       afterCode = false;
@@ -510,6 +548,24 @@ function problemsIn(list: readonly Post[], today: Date): string[] {
       problems.push(...contentProblems(post, pages), ...namingProblems(post));
   }
   return problems;
+}
+
+/**
+ * Problems with the published index alone: a post's summary is its meta description, which
+ * page-metadata.test.ts holds to 155 characters, so a published summary of 156 to 300 characters
+ * passes `problemsIn` and is refused here. This runs where the publish procedure's posts.test.ts
+ * step does, before the page's own test would fail.
+ */
+function descriptionProblems(published: readonly PublishedPost[]): string[] {
+  return published.flatMap(({ slug, summary }) => {
+    const length = characters(summary);
+    return length > DESCRIPTION_MAX
+      ? [
+          `${slug}: the summary is ${length} characters; ` +
+            `it is the meta description, so at most ${DESCRIPTION_MAX}`,
+        ]
+      : [];
+  });
 }
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -956,6 +1012,10 @@ const defects: [string, Post[], RegExp][] = [
     'https://localhost:3000/',
     'https://example.com/\u202egnp.exe',
     'https://ex\u00e4mple.com',
+    // HREF lets these through; the URL parser refuses them.
+    'https://example.com:99999/x',
+    'https://1.2.3.999/',
+    'https://xn--a.com/',
   ].map((href): [string, Post[], RegExp] => [
     `a link to ${JSON.stringify(href)}`,
     [withLink(href)],
@@ -973,6 +1033,26 @@ const defects: [string, Post[], RegExp][] = [
     [withLink('/blog/fixture-draft'), draftPost],
     /, piece 2: the link goes to "\/blog\/fixture-draft", which is no page on this site$/,
   ],
+  // A link that names this site's own host, on any port, is written as a path, which the
+  // page-exists check covers; a path that names no page is reported in the same problem.
+  ...(
+    [
+      ['https://miloscvetkovic.dev/wrok', '/wrok', 'missing'],
+      ['https://www.miloscvetkovic.dev/work?view=all#top', '/work?view=all#top', 'page'],
+      ['https://MilosCvetkovic.dev', '/', 'page'],
+      ['https://miloscvetkovic.dev:443/blog', '/blog', 'page'],
+      ['https://miloscvetkovic.dev:8443/work', '/work', 'page'],
+      ['https://WWW.miloscvetkovic.dev/work', '/work', 'page'],
+    ] as const
+  ).map(([href, path, target]): [string, Post[], RegExp] => [
+    `a link to ${href}, which names this site's own host`,
+    [withLink(href)],
+    new RegExp(
+      `, piece 2: the link goes to ${escapeRegExp(JSON.stringify(href))}, which names this ` +
+        `site's own host; write its path, ${escapeRegExp(JSON.stringify(path))}` +
+        `${target === 'missing' ? ', which is no page on this site' : ''}$`,
+    ),
+  ]),
   [
     'a piece that is both inline code and a link',
     [withBody(paragraph('See ', { code: 'x', text: 'y', href: 'javascript:alert(1)' }, '.'))],
@@ -1206,6 +1286,9 @@ const accepted: [string, Post[]][] = [
     '/work?view=all#top',
     'https://example.com:8443/wiki/A_(b)',
     'https://example.com/%E2%9C%93',
+    'https://miloscvetkovic.dev.example.com/work',
+    'https://blog.miloscvetkovic.dev/work',
+    'https://example.com/miloscvetkovic.dev',
   ].map((href): [string, Post[]] => [`a link to ${href}`, [withLink(href)]]),
   ['a link to a published post', [withLink('/blog/fixture-hostile-title'), hostileTitlePost]],
   [
@@ -1306,11 +1389,30 @@ describe('posts', () => {
     }
   });
 
+  it('fit each published summary in a meta description', () => {
+    expect(descriptionProblems(publishedPosts)).toEqual([]);
+  });
+
   it('can never take the placeholder slug the development server is given', () => {
     // `postStaticParams` hands `next dev` this slug while nothing is published; the slug rule is
     // what keeps a real post from ever answering at it.
     expect(SLUG.test(NO_PUBLISHED_POST_SLUG)).toBe(false);
     expect(getPost(NO_PUBLISHED_POST_SLUG)).toBeUndefined();
+  });
+});
+
+describe('descriptionProblems', () => {
+  it('names each published post whose summary is longer than a meta description', () => {
+    const { publishedPosts: index } = buildPostIndex([
+      published({ slug: 'one-too-long', summary: 'x'.repeat(DESCRIPTION_MAX + 1) }),
+      published({ slug: 'at-the-limit', summary: 'x'.repeat(DESCRIPTION_MAX) }),
+      published({ slug: 'the-longest', summary: 'x'.repeat(SUMMARY_MAX) }),
+      { ...draftPost, summary: 'x'.repeat(SUMMARY_MAX) },
+    ]);
+    expect(descriptionProblems(index)).toEqual([
+      'one-too-long: the summary is 156 characters; it is the meta description, so at most 155',
+      'the-longest: the summary is 300 characters; it is the meta description, so at most 155',
+    ]);
   });
 });
 
