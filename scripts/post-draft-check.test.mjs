@@ -795,6 +795,73 @@ describe('the publish check', () => {
       });
     }
 
+    const TILDES = 'a pair of ~ that GFM may read as strikethrough; write \\~ for the character';
+
+    /** @type {[string, string[], string][]} */
+    const pairedTildes = [
+      ['a pair around a word', ['A ~fast~ run.'], 'line 29'],
+      ['a pair at the start of a paragraph', ['~fast~'], 'line 29'],
+      ['tildes between digits', ['From 3~5 runs and 7~9 more.'], 'line 29'],
+      ['a pair of doubled tildes', ['~~a~~'], 'line 29'],
+      ['a pair inside spaces', ['a ~b~ c'], 'line 29'],
+      ["a pair in a link's text", ['See [a ~fast~ run](/work).'], 'line 29'],
+      [
+        'a pair in a caption',
+        ['Table: A ~fast~ day', '', '| Day | Note |', '| --- | --- |', '| Monday | b |'],
+        'line 29',
+      ],
+      ['a pair across the lines of a paragraph', ['A ~fast', 'run~ here.'], 'lines 29-30'],
+      ['a pair in a list item', ['- A ~fast~ run'], 'line 29'],
+      ['a pair in a quote', ['> A ~fast~ run.'], 'line 29'],
+      ['a pair in a heading', ['## A ~fast~ run'], 'line 29'],
+      [
+        'a pair in a table cell',
+        ['| Day | Note |', '| --- | --- |', '| Monday | ~b~ |'],
+        'line 31',
+      ],
+    ];
+    for (const [name, lines, at] of pairedTildes) {
+      it(`reports two ~ that GFM can pair as strikethrough: ${name}`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.ok(problems.includes(`${at}: ${TILDES}`), problems.join('\n'));
+      });
+    }
+
+    it('reports ~~a~~ once, by the same message as a single pair', () => {
+      const problems = differences(draft([...BODY, '', 'Some ~~struck~~ text.']), twin(), 'own');
+      assert.deepEqual(
+        problems.filter((problem) => problem.includes('strikethrough')),
+        [`line 29: ${TILDES}`],
+      );
+    });
+
+    /** @type {[string, string[]][]} */
+    const loneTildes = [
+      ['a single ~', ['About ~5 minutes.']],
+      ['tildes in code', ['Run `ls ~a~` now.']],
+      ['escaped tildes', ['A \\~fast\\~ run.']],
+      ['tildes in a link destination', ['See [the folder](/~a/~b).']],
+      ['one ~ in each of two cells', ['| From | To |', '| --- | --- |', '| ~5 | ~9 |']],
+      ['one ~ in each of two items', ['- About ~5 minutes', '- About ~9 minutes']],
+      ['two ~ that close nothing', ['It takes ~5 to ~10 minutes.']],
+      ['two ~ before numbers', ['~200 ms against ~50 ms.']],
+      ['two ~ in home paths', ['Copy ~/.zshrc to ~/backup.']],
+      ['runs of three ~', ['This will ~~~not~~~ strike.']],
+      ['a run of one ~ and a run of two', ['~a~~']],
+      ["one ~ in the text and one in a link's text", ['a~b [c~d](/work)']],
+      ["one ~ in each of two links' text", ['[~a](/x) and [~b](/y)']],
+      ['two ~ after spaces', ['about ~5 minutes, sometimes ~9 minutes']],
+    ];
+    for (const [name, lines] of loneTildes) {
+      it(`accepts ${name}, which GFM cannot pair as strikethrough`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.deepEqual(
+          problems.filter((problem) => problem.includes('strikethrough')),
+          [],
+        );
+      });
+    }
+
     /**
      * The body's diff for a table whose last row the draft writes as `draftRow` and the twin
      * serves as `twinRow`.
@@ -819,6 +886,127 @@ describe('the publish check', () => {
       const body = tableDiff('| C:\\dir | 1 |', '| C:\\\\dir | 2 |');
       assert.match(body, /^- \| C:\\\\\\\\dir \| 1 \|$/m);
       assert.match(body, /^\+ \| C:\\\\\\\\dir \| 2 \|$/m);
+    });
+
+    it('pads a short table row with empty cells, as GFM does, so it equals the full row', () => {
+      assert.equal(tableDiff('| Disk |', '| Disk |  |'), '');
+      assert.equal(tableDiff('| Disk', '| Disk |  |'), '');
+    });
+
+    it('keeps the extra cells of a row longer than its header: a difference, failing safe', () => {
+      assert.match(tableDiff('| Disk | 1 | 2 |', '| Disk | 1 |'), /^- \| Disk \| 1 \| 2 \|$/m);
+    });
+
+    /** @type {[string, string[], string][]} */
+    const unevenHeaders = [
+      [
+        'a header longer than its delimiter row',
+        ['| A | B |', '| --- |', '| 1 | 2 |'],
+        'line 29: not a table: the header row has 2 cells and the delimiter row 1',
+      ],
+      [
+        'a header shorter than its delimiter row',
+        ['| A |', '| --- | --- |', '| 1 |'],
+        'line 29: not a table: the header row has 1 cell and the delimiter row 2',
+      ],
+      [
+        'a header under a caption',
+        ['Table: Sizes', '| Path | Size |', '| --- | --- | --- |', '| a | 1 |'],
+        'line 30: not a table: the header row has 2 cells and the delimiter row 3',
+      ],
+    ];
+    for (const [name, lines, message] of unevenHeaders) {
+      it(`reports ${name}, which GFM does not read as a table`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.ok(problems.includes(message), problems.join('\n'));
+      });
+    }
+
+    /** @param {number} spaces */
+    const unindent = (spaces) => {
+      const unit = spaces === 1 ? 'space' : 'spaces';
+      return (
+        `a code fence indented by ${spaces} ${unit}; ` +
+        `remove the ${spaces} ${unit} from the fence and from each of its lines`
+      );
+    };
+    const FENCE_ADVICE = 'from the fence and from each of its lines';
+
+    /** @type {[string, string[], string][]} */
+    const indentedFences = [
+      ['two spaces', ['  ```js', '  const a = 1;', '  ```'], `line 29: ${unindent(2)}`],
+      ['one space, with tildes', [' ~~~', 'const a = 1;', '~~~'], `line 29: ${unindent(1)}`],
+      ['three spaces', ['   ```', 'const a = 1;', '```'], `line 29: ${unindent(3)}`],
+      [
+        'one space after a list item, left of its text',
+        ['- An item', '', ' ```js', 'const a = 1;', '```'],
+        `line 31: ${unindent(1)}`,
+      ],
+    ];
+    for (const [name, lines, message] of indentedFences) {
+      it(`reports a code fence indented by ${name}`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.ok(problems.includes(message), problems.join('\n'));
+      });
+    }
+
+    /** @type {[string, string[], string][]} */
+    const fencesInItems = [
+      [
+        'a fence that opens a list item',
+        ['- ```js', '  const a = 1;', '  ```'],
+        'line 29: a code fence inside a list item',
+      ],
+      [
+        'a fence on the line after an item',
+        ['- An item', '  ```js', '  const a = 1;', '  ```'],
+        'line 30: start each block after a blank line',
+      ],
+      [
+        "a fence at an item's text after a blank line",
+        ['- An item', '', '  ```js', '  a', '  ```'],
+        'line 31: a code fence inside a list item',
+      ],
+      // CommonMark closes the item's fence, empty, at the `a` below it, makes `a` a paragraph and
+      // opens a fence at the last line that is never closed.
+      [
+        "a fence at an item's text after a blank line, its lines at the margin",
+        ['- An item', '', '  ```js', 'a', '```'],
+        'line 31: a code fence inside a list item',
+      ],
+    ];
+    for (const [name, lines, message] of fencesInItems) {
+      it(`reports ${name} by the rules for list items, not the margin's`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.ok(problems.includes(message), problems.join('\n'));
+        assert.deepEqual(
+          problems.filter((problem) => problem.includes(FENCE_ADVICE)),
+          [],
+        );
+      });
+    }
+
+    it('accepts a code fence at the margin, as the twin writes it', () => {
+      const fence = ['```js', 'const a = 1;', '```'];
+      assert.deepEqual(
+        differences(
+          draft([...BODY, '', ...fence]),
+          twin({ body: [...SERVED, '', ...fence] }),
+          'own',
+        ),
+        [],
+      );
+    });
+
+    it("reports a fence at an item's text that the twin serves after the item", () => {
+      const approved = ['- An item', '', '  ```js', 'a', '```'];
+      const served = ['- An item', '', '```js', 'a', '```'];
+      const problems = differences(
+        draft([...BODY, '', ...approved]),
+        twin({ body: [...SERVED, '', ...served] }),
+        'own',
+      );
+      assert.deepEqual(problems, ['line 31: a code fence inside a list item']);
     });
 
     it('reports a code fence that is never closed by the line it opened on', () => {
@@ -873,6 +1061,40 @@ describe('the publish check', () => {
         assert.match(output, /^line 29: a link title or spaces around a link's destination; /m);
       });
     }
+
+    const STRAY = 'a `](` with no open `[` before it: escape the `]` as `\\]`';
+    for (const [name, approved] of [
+      ['an escaped bracket before it', 'Write \\[text](url) for a link.'],
+      ['no bracket before it', 'The list ends](here) mid-sentence.'],
+      ['a bracket only in code before it', 'Run `ls [a` then b](c) here.'],
+      ['only a whole link before it', 'See [the docs](/work) and b](c) here.'],
+      ['a closed bracket pair before it', 'See [1] and the list ends](here).'],
+    ]) {
+      it(`reports a \`](\` with ${name} by its own message`, () => {
+        const problems = differences(draft([...BODY, '', approved]), twin(), 'own');
+        assert.ok(problems.includes(`line 29: ${STRAY}`), problems.join('\n'));
+        assert.deepEqual(
+          problems.filter((problem) => problem.includes('a link title')),
+          [],
+        );
+      });
+    }
+
+    const NEITHER = 'the post format has neither';
+    it('reports a title after a stray ] by the message for a title, not the stray one', () => {
+      const approved = 'The list ends] and [the docs](/work "Work page") here.';
+      const problems = differences(draft([...BODY, '', approved]), twin(), 'own');
+      assert.ok(
+        problems.includes(
+          "line 29: a link title or spaces around a link's destination; " + NEITHER,
+        ),
+        problems.join('\n'),
+      );
+      assert.deepEqual(
+        problems.filter((problem) => problem.includes('escape the `]`')),
+        [],
+      );
+    });
 
     for (const [approved, served] of [
       ['- [ ] write the post', '- \\[ \\] write the post'],

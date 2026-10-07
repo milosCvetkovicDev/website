@@ -31,7 +31,8 @@
  *   `TableBlock` says what such a table looks like on a phone, and what its cells must say.
  * - `src/data/__tests__/posts.test.ts` checks what a published post must hold: a unique slug of
  *   lowercase words and hyphens, real dates that are not in the future with `updatedAt` on or after
- *   `publishedAt`, a summary of 50 to 300 characters, a served title (`metaTitle` when set, then
+ *   `publishedAt`, a summary of 50 to 155 characters, as it is also the page's meta description (a
+ *   draft entry's is held to 50 to 300), a served title (`metaTitle` when set, then
  *   ` | Milos Cvetkovic`) of at most 60, tags that are neither blank nor repeated, and a body whose
  *   blocks are not empty, with headings at level 2 or 3, no level 3 before the first level 2 and no
  *   heading twice. The body does not open with a bulleted list, which the twin's list of dates
@@ -40,8 +41,8 @@
  *   headings, tags, and a table's caption, column names and row headers have no spaces at either
  *   end or two in a row; no text outside a code block holds a line break, a control or a direction
  *   character; inline code holds more than whitespace, and no two pieces of it stand side by side,
- *   which the twin would write as one; a link's text says where it goes; and a link to this site
- *   names a page that exists.
+ *   which the twin would write as one; a link's text says where it goes; and a link to this site is
+ *   written as a path, not as a URL that names the site's own host, and names a page that exists.
  */
 
 /**
@@ -134,7 +135,11 @@ interface PostContent {
   readonly title: string;
   /** A shorter `<title>`, for a title that would pass 60 characters with ` | Milos Cvetkovic`. */
   readonly metaTitle?: string;
-  /** The post in a sentence or two, 50 to 300 characters, for wherever it is listed rather than read. */
+  /**
+   * The post in a sentence or two: what lists show where it is not read, and the page's meta
+   * description. `posts.test.ts` holds a draft entry's to 50 to 300 characters and a published
+   * post's to 50 to 155.
+   */
   readonly summary: string;
   readonly tags: readonly string[];
   /** `jev` when the post reviews TypeSafe's Jev model, so that it ends with `FOOTER_LINES.jev`. */
