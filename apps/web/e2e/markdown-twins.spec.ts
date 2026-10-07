@@ -226,8 +226,9 @@ for (const { route, twin } of MARKDOWN_TWINS) {
     const h1s = await pageH1s(page, await response.text());
     expect(h1s, `${route} should serve exactly one h1`).toHaveLength(1);
 
+    // Collapsed as the h1 is, so a no-break space both sides carry cannot read as a difference.
     const [opening] = visible(await fetchTwin(request, twin)).split('\n');
-    expect(opening, `${twin} should open with the page's h1`).toBe(`# ${h1s[0]}`);
+    expect(collapsed(opening), `${twin} should open with the page's h1`).toBe(`# ${h1s[0]}`);
   });
 }
 
