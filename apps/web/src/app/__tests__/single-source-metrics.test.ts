@@ -33,12 +33,23 @@ import { caseStudies, formatMetric } from '@/data/case-studies';
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
+ * Every regular file under `root`, subfolders included, as a path relative to it. Folders are left
+ * out even when their name ends like a source file: a route folder such as `about/index.md/` (#173)
+ * would otherwise reach `readFileSync` and throw `EISDIR` (#189).
+ */
+function filesUnder(root: string): string[] {
+  return readdirSync(root, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(root, join(entry.parentPath, entry.name)));
+}
+
+/**
  * The page records under `src/data/pages`, one module per route, less `types.ts`, which holds no
  * copy. They are read from the directory, subfolders included, rather than listed, so a record
  * added later is scanned without anyone remembering to add it here. A `.tsx` record counts; a
  * declaration file or a test beside the records does not.
  */
-const PAGE_RECORDS = readdirSync(join(SRC, 'data/pages'), { recursive: true, encoding: 'utf8' })
+const PAGE_RECORDS = filesUnder(join(SRC, 'data/pages'))
   .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts') && name !== 'types.ts')
   .filter((name) => !/(^|\/)__tests__\/|\.test\./.test(name))
   .sort()
@@ -194,7 +205,7 @@ describe('metrics and biography live in one place', () => {
     // COPY_MODULES names the routes and the JSON-LD; a component or helper added later is not on it.
     // Every module under src outside src/data renders or builds what the pages say, so none of them
     // may state the figure either. src/data is where it belongs: profile.ts derives it.
-    const modules = readdirSync(SRC, { recursive: true, encoding: 'utf8' })
+    const modules = filesUnder(SRC)
       .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts'))
       .filter((name) => !/(^|\/)(__tests__|test)\/|\.test\./.test(name))
       .filter((name) => !name.startsWith('data/') || name.startsWith('data/pages/'));
