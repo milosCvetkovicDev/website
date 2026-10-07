@@ -1002,12 +1002,13 @@ describe('the publish check', () => {
       });
     }
 
-    const STRAY = 'a `](` with no link before it: escape the `]` as `\\]`';
+    const STRAY = 'a `](` with no `[` before it: escape the `]` as `\\]`';
     for (const [name, approved] of [
       ['an escaped bracket before it', 'Write \\[text](url) for a link.'],
       ['no bracket before it', 'The list ends](here) mid-sentence.'],
       ['a bracket only in code before it', 'Run `ls [a` then b](c) here.'],
-      ['a link before it', 'See [the docs](/work) and b](c) here.'],
+      ['only a whole link before it', 'See [the docs](/work) and b](c) here.'],
+      ['a closed bracket pair before it', 'See [1] and the list ends](here).'],
     ]) {
       it(`reports a \`](\` with ${name} by its own message`, () => {
         const problems = differences(draft([...BODY, '', approved]), twin(), 'own');
@@ -1018,6 +1019,22 @@ describe('the publish check', () => {
         );
       });
     }
+
+    const NEITHER = 'the post format has neither';
+    it('reports a title after a stray ] by the message for a title, not the stray one', () => {
+      const approved = 'The list ends] and [the docs](/work "Work page") here.';
+      const problems = differences(draft([...BODY, '', approved]), twin(), 'own');
+      assert.ok(
+        problems.includes(
+          "line 29: a link title or spaces around a link's destination; " + NEITHER,
+        ),
+        problems.join('\n'),
+      );
+      assert.deepEqual(
+        problems.filter((problem) => problem.includes('escape the `]`')),
+        [],
+      );
+    });
 
     for (const [approved, served] of [
       ['- [ ] write the post', '- \\[ \\] write the post'],

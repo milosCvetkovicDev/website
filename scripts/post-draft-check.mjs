@@ -730,8 +730,8 @@ function prose(tokens, labels) {
 const WHITESPACE = /[\p{Zs}\t\n\f\r]/u;
 
 /**
- * The spans in which GFM pairs `~` as strikethrough: the run of text, with each code span, escape and
- * link standing as one character that is not a space, and each link's text on its own.
+ * The spans in which GFM pairs `~` as strikethrough: the run of text, where each code span, escape
+ * and link stands as one character that is not a space, and each link's text on its own.
  * @param {Token[]} tokens
  * @returns {string[]}
  */
@@ -773,20 +773,24 @@ function strikes(span) {
 }
 
 /**
- * The unescaped `](` in running text as written, by kind: `opened` when an unescaped `[` comes
- * before one, so that CommonMark may read it as a link's end, and `stray` when none does.
+ * The unescaped `](` in running text as written, by kind: `opened` when an unescaped `[` before it
+ * is still open, so that CommonMark may read it as a link's end, and `stray` when none is. Each `[`
+ * opens a bracket and each `]` closes the last one open, never below none; an escape is skipped.
  * @param {string} text
  */
 function linkCloses(text) {
   const found = { opened: false, stray: false };
-  let open = false;
+  let depth = 0;
   for (let index = 0; index < text.length; index += 1) {
     const char = text[index];
     if (char === '\\') index += 1;
-    else if (char === '[') open = true;
-    else if (char === ']' && text[index + 1] === '(') {
-      if (open) found.opened = true;
-      else found.stray = true;
+    else if (char === '[') depth += 1;
+    else if (char === ']') {
+      if (text[index + 1] === '(') {
+        if (depth > 0) found.opened = true;
+        else found.stray = true;
+      }
+      depth = Math.max(0, depth - 1);
     }
   }
   return found;
@@ -828,11 +832,11 @@ function refusedInline(source, at, block) {
   if (reread.some((label) => label.some((token) => 'label' in token))) {
     problems.push(`${at}: a link inside a link's text`);
   }
-  // A `](` that `linkAt()` did not take stays text on both sides. After an unescaped `[`,
-  // CommonMark can still read it as the end of a link that `linkAt()` does not, one with a title
-  // or spaces around its destination. With no `[` before it, CommonMark leaves it text as well; it
-  // is refused anyway, by its own message, as escaping the `]` costs nothing. An escaped `\]` is
-  // text.
+  // A `](` that `linkAt()` did not take stays text on both sides. After an unescaped `[` that no
+  // `]` has closed, CommonMark can still read it as the end of a link that `linkAt()` does not,
+  // one with a title or spaces around its destination. With no such `[` before it, CommonMark
+  // leaves it text as well; it is refused anyway, by its own message, as escaping the `]` costs
+  // nothing. An escaped `\]` is text.
   const closes = [tokens, ...reread].map((run) => linkCloses(written(run)));
   if (closes.some(({ opened }) => opened)) {
     problems.push(
@@ -840,7 +844,7 @@ function refusedInline(source, at, block) {
     );
   }
   if (closes.some(({ stray }) => stray)) {
-    problems.push(`${at}: a \`](\` with no link before it: escape the \`]\` as \`\\]\``);
+    problems.push(`${at}: a \`](\` with no \`[\` before it: escape the \`]\` as \`\\]\``);
   }
   const text = prose(tokens, true);
   for (const [pattern, what] of REFUSED_INLINE) {
