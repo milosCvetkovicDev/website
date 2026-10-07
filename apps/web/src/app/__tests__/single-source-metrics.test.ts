@@ -3,13 +3,14 @@
  *
  * The single-source rule in CLAUDE.md, enforced over the source files themselves.
  *
- * Rows R33 and R34 of the RED manifest, both fixed by #49.
+ * Rows R33 and R34 of the RED manifest, issue #49.
  *
  * `apps/web/src/data` is the single source of truth for project copy and metrics, and pages are
- * supposed to read from it rather than restate any of it. Two families of literal break that today, and
- * both are invisible to any test that renders a component, because a hard-coded `73%` renders exactly
- * as well as a derived one. The only instrument that can see the difference is the source text, so this
- * file reads the modules as files.
+ * supposed to read from it rather than restate any of it. Two families of literal broke that,
+ * metric figures (R33) and years of experience (R34). Neither does now: #162 fixed R34 and #207
+ * R33, and both rows pass. Both were invisible to any test that renders a component, because a
+ * hard-coded `73%` renders exactly as well as a derived one. The only instrument that can see the
+ * difference is the source text, so this file reads the modules as files.
  *
  * That makes it a lint rule wearing a test's clothes, and it is deliberately written as one: it reports
  * the file, the line and the literal, so a failure is actionable without opening anything.
@@ -33,12 +34,24 @@ import { caseStudies, formatMetric } from '@/data/case-studies';
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
+ * Every regular file under `root`, subfolders included, as a path relative to it. Folders are left
+ * out even when their name ends like a source file: route folders carry file-like names
+ * (`about/index.md/`, #173), and one ending in `.ts` or `.tsx` would pass the callers' filters,
+ * reach `readFileSync` and throw `EISDIR` (#189).
+ */
+function filesUnder(root: string): string[] {
+  return readdirSync(root, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(root, join(entry.parentPath, entry.name)));
+}
+
+/**
  * The page records under `src/data/pages`, one module per route, less `types.ts`, which holds no
  * copy. They are read from the directory, subfolders included, rather than listed, so a record
  * added later is scanned without anyone remembering to add it here. A `.tsx` record counts; a
  * declaration file or a test beside the records does not.
  */
-const PAGE_RECORDS = readdirSync(join(SRC, 'data/pages'), { recursive: true, encoding: 'utf8' })
+const PAGE_RECORDS = filesUnder(join(SRC, 'data/pages'))
   .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts') && name !== 'types.ts')
   .filter((name) => !/(^|\/)__tests__\/|\.test\./.test(name))
   .sort()
@@ -194,7 +207,7 @@ describe('metrics and biography live in one place', () => {
     // COPY_MODULES names the routes and the JSON-LD; a component or helper added later is not on it.
     // Every module under src outside src/data renders or builds what the pages say, so none of them
     // may state the figure either. src/data is where it belongs: profile.ts derives it.
-    const modules = readdirSync(SRC, { recursive: true, encoding: 'utf8' })
+    const modules = filesUnder(SRC)
       .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts'))
       .filter((name) => !/(^|\/)(__tests__|test)\/|\.test\./.test(name))
       .filter((name) => !name.startsWith('data/') || name.startsWith('data/pages/'));

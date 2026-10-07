@@ -12,6 +12,7 @@ import {
 import { gsap, ScrollTrigger } from '../gsap-runtime';
 import { requestGsap } from '../load-gsap';
 import { LoopPhase } from '../loop-phase';
+import { fromToOf, pickFromToTween } from './gsap-tweens';
 
 /**
  * `LoopPhase`'s healing sequence.
@@ -250,14 +251,14 @@ describe('LoopPhase', () => {
 
   it('R21 (#47): an unmount mid-run leaves no live tween and no inline opacity behind', () => {
     const { unmount } = mount();
-    // Spied after mount, so the first call is the alert reveal the 500 ms timer creates — the one that
-    // is built after `gsap.context` has already closed.
+    // Spied after mount, so the spy sees the alert reveal the 500 ms timer creates — the one that
+    // is built after `gsap.context` has already closed — and none of the mount's own tweens.
     const fromToSpy = vi.spyOn(gsap, 'fromTo');
     act(() => vi.advanceTimersByTime(500));
-    expect(fromToSpy, 'the alert reveal must have been created by the timer').toHaveBeenCalled();
-    // `gsap.fromTo`'s first parameter is a TweenTarget union; here it is always `alertRef.current`.
-    const target = fromToSpy.mock.calls[0][0] as HTMLElement;
+    const target = alertPanel();
+    const { tween } = pickFromToTween(fromToSpy, fromToOf(target, 'the alert panel reveal'));
     expect(gsap.getTweensOf(target)).toHaveLength(1);
+    expect(gsap.getTweensOf(target)[0]).toBe(tween);
 
     unmount();
 

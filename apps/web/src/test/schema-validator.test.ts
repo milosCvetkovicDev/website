@@ -1,17 +1,17 @@
 /**
  * The pure half of `e2e/structured-data.spec.ts`: what counts as validator.schema.org's verdict, and
- * which ld+json elements a served document holds. These branches decide whether the advisory check
- * can fail at all, so a flipped condition here would turn it into one that always passes. No DOM.
+ * which ld+json elements a served document holds (`e2e/support/json-ld.ts`, which every spec reads
+ * JSON-LD through). These branches decide whether a check can fail at all, so a flipped condition
+ * here would turn one into a check that always passes. No DOM.
  *
  * @vitest-environment node
  */
 import { describe, expect, it } from 'vitest';
+import { jsonLdNodes, jsonLdOpenTagCount, jsonLdScripts } from '../../e2e/support/json-ld';
 import {
   XSSI_PREFIX,
   clip,
   describeErrors,
-  jsonLdOpenTagCount,
-  jsonLdScripts,
   readVerdict,
   type ValidatorReport,
 } from '../../e2e/support/schema-validator';
@@ -174,5 +174,62 @@ describe('jsonLdScripts', () => {
     const html = `<script type="application/ld+json">${block}</script><script type="application/ld+json">${block}`;
     expect(jsonLdScripts(html)).toHaveLength(1);
     expect(jsonLdOpenTagCount(html)).toBe(2);
+  });
+
+  it('ends an element at an end tag with whitespace or attributes, as HTML does', () => {
+    const html = [
+      `<script type="application/ld+json">${block}</script >`,
+      `<script type="application/ld+json">${block}</script\n>`,
+      `<script type="application/ld+json">${block}</script x>`,
+    ].join('');
+    expect(jsonLdScripts(html)).toHaveLength(3);
+    expect(jsonLdOpenTagCount(html)).toBe(3);
+  });
+
+  it('reads neither a data-type attribute nor a longer type as ld+json, and counts both', () => {
+    const html = [
+      `<script data-type="application/ld+json" src="/x.js"></script>`,
+      `<script type="application/ld+jsonp">${block}</script>`,
+      `<script type="application/ld+json; charset=utf-8">${block}</script>`,
+    ].join('');
+    expect(jsonLdScripts(html)).toEqual([]);
+    expect(jsonLdOpenTagCount(html)).toBe(3);
+  });
+});
+
+describe('jsonLdNodes', () => {
+  const tag = (body: string) => `<script type="application/ld+json">${body}</script>`;
+
+  it('parses every block, in document order', () => {
+    const html = tag('{"@type":"Person"}') + '<p>x</p>' + tag('{"@type":"WebSite"}');
+    expect(jsonLdNodes(html, '/')).toEqual([{ '@type': 'Person' }, { '@type': 'WebSite' }]);
+    expect(jsonLdNodes('<p>no blocks</p>', '/')).toEqual([]);
+  });
+
+  it('takes the body as written, without decoding entities, as the HTML parser does', () => {
+    expect(jsonLdNodes(tag('{"name":"a &amp; b"}'), '/')).toEqual([{ name: 'a &amp; b' }]);
+  });
+
+  it('refuses a tag naming the type that it could not read, naming the route', () => {
+    expect(() => jsonLdNodes(tag('{}') + '<script type="application/ld+json">{}', '/work')).toThrow(
+      '/work: 2 script tags mention application/ld+json, but 1 could be read as ld+json elements',
+    );
+    expect(() => jsonLdNodes('<script data-type="application/ld+json"></script>', '/')).toThrow(
+      /1 script tags mention application\/ld\+json, but 0/,
+    );
+  });
+
+  it('refuses a block that does not parse, naming the route, the index and the text', () => {
+    expect(() => jsonLdNodes(tag('{}') + tag('{"a":'), '/about')).toThrow(
+      /^\/about: JSON-LD block 1 does not parse \(SyntaxError: .*\): \{"a":$/,
+    );
+  });
+
+  it('refuses a block that is not one node: an array, a primitive, or an @graph', () => {
+    for (const body of ['[{"@type":"Person"}]', '"Person"', 'null', '{"@graph":[]}']) {
+      expect(() => jsonLdNodes(tag(body), '/')).toThrow(
+        `/: JSON-LD block 0 is not one node: ${body}`,
+      );
+    }
   });
 });

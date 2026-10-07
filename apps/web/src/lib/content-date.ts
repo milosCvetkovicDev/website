@@ -8,7 +8,9 @@
  * published text. Nothing here reads `Intl`, `toLocale*` or a `Date`'s local getters.
  *
  * `e2e/seo-surface.spec.ts` imports this module directly, outside the bundler, so it stays free of
- * imports: an `@/` alias, `server-only` or an asset here would stop that whole spec file loading.
+ * imports: `server-only` or an asset here would stop that whole spec file loading. Playwright
+ * resolves the `@/` alias, but `next.config.ts` reaches this module through `case-studies.ts`, and
+ * Next's config loader does not (ADR 0030; `next-config.test.ts` loads the config that way).
  */
 
 const MONTHS = [

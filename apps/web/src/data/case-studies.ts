@@ -188,8 +188,9 @@ export interface CaseStudy {
   }[];
   /**
    * When the case study first went public and when its visible content last changed, as ISO dates
-   * (`YYYY-MM-DD`). The sitemap's `lastmod` and the TechArticle's dates read them, so bump
-   * `updatedAt` in the commit that changes what the page says, and only then.
+   * (`YYYY-MM-DD`). The page's visible Published and Updated line, the TechArticle's dates and the
+   * sitemap's `lastmod` read them, so bump `updatedAt` in the commit that changes what the page
+   * says, and only then.
    */
   publishedAt: string;
   updatedAt: string;

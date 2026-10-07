@@ -11,7 +11,7 @@
  * Markdown reader sees, backslash escapes removed, so correct escaping never reads as a gap.
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -229,7 +229,11 @@ describe('markdownResponse()', () => {
   // route, so a handler cannot build and serve a twin of its own.
   it('is the only writer of the Markdown content type under src/app', () => {
     const app = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app');
-    const offenders = readdirSync(app, { recursive: true, encoding: 'utf8' })
+    // Regular files only: route folders carry file-like names (`about/index.md/`, #173), and one
+    // that ended in a script extension would reach readFileSync and throw EISDIR (#189).
+    const offenders = readdirSync(app, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => relative(app, join(entry.parentPath, entry.name)))
       .filter((name) => /\.(?:ts|tsx|js|mjs)$/.test(name))
       .filter((name) => !/(^|\/)__tests__\/|\.test\./.test(name))
       .filter((name) => readFileSync(join(app, name), 'utf8').includes('text/markdown'));

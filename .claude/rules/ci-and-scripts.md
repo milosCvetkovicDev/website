@@ -123,8 +123,10 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 
 The root has no `typescript` at all, so `.vscode/settings.json` points `typescript.tsdk` at
 `apps/web/node_modules/typescript/lib`, the shipping app's own compiler (`^6` in its
-`package.json`; 6.0.3 on 2026-09-27). `@repo/scripts` resolves 5.9.3 from its `^5`, so the editor
-can report a `scripts/` file differently from `pnpm typecheck`, which is the reference there.
+`package.json`; 6.0.3 on 2026-09-27). `@repo/scripts` declares its own `^6`, and the lockfile holds
+one `typescript`, 6.0.3 on 2026-10-07, so the editor and `pnpm typecheck` run the same compiler on a
+`scripts/` file today. The two ranges are separate entries, so an update that moves only one of them
+splits the versions again, and `pnpm typecheck` is the reference for `scripts/` when they disagree.
 
 ## Quality gates
 

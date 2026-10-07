@@ -1562,9 +1562,13 @@ describe('problemsIn', () => {
 });
 
 describe('imports of the posts module', () => {
-  const sources = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter(
-    (name) => /\.tsx?$/.test(name) && !/(?:^|[\\/])(?:__tests__|test)[\\/]/.test(name),
-  );
+  // Regular files only: route folders carry file-like names (`about/index.md/`, #173), and one
+  // ending in `.ts` or `.tsx` would pass the filter below, reach readFileSync and throw EISDIR
+  // (#189).
+  const sources = readdirSync(SRC, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(SRC, join(entry.parentPath, entry.name)))
+    .filter((name) => /\.tsx?$/.test(name) && !/(?:^|[\\/])(?:__tests__|test)[\\/]/.test(name));
   const page = join(SRC, 'app', 'blog', 'page.tsx');
 
   it('read the index, never posts itself, and never from a client component', () => {

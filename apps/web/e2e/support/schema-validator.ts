@@ -1,8 +1,8 @@
 /**
- * The pure half of `e2e/structured-data.spec.ts`: finding the ld+json elements in a served document,
- * and deciding whether validator.schema.org's answer is a verdict. No network and no Playwright, so
- * `src/test/schema-validator.test.ts` pins every branch that decides whether the advisory check can
- * fail, the way `src/test/playwright-config.test.ts` pins the config's parsing.
+ * The pure half of `e2e/structured-data.spec.ts`: deciding whether validator.schema.org's answer is
+ * a verdict (`support/json-ld.ts` finds the ld+json elements it posts). No network and no
+ * Playwright, so `src/test/schema-validator.test.ts` pins every branch that decides whether the
+ * advisory check can fail, the way `src/test/playwright-config.test.ts` pins the config's parsing.
  */
 
 /** What the validator prefixes every JSON answer with, so that the answer cannot run as a script. */
@@ -27,31 +27,6 @@ export interface ValidatorReport {
 }
 
 export type Verdict = { reached: true; report: ValidatorReport } | { reached: false; why: string };
-
-/** Every ld+json script element, whatever the order and quoting of its attributes. */
-const LD_JSON_ELEMENT =
-  /<script\b[^>]*\btype\s*=\s*["']?application\/ld\+json["']?[^>]*>[\s\S]*?<\/script>/gi;
-
-/**
- * Every ld+json script element in a served document, verbatim. A pattern is enough here: the blocks
- * are written through `serializeJsonLd`, which escapes every `<`, so none can contain `</script>`;
- * and Next's flight payload further down describes each one as a React element in escaped JSON
- * (`\"type\":\"application/ld+json\"`), which is not inside a script tag, so nothing is sent twice.
- */
-export function jsonLdScripts(html: string): string[] {
-  return [...html.matchAll(LD_JSON_ELEMENT)].map(([element]) => element);
-}
-
-/**
- * The script open tags that mention `application/ld+json` anywhere in their attributes, counted
- * independently of `jsonLdScripts`, so a block the element pattern misses is a count mismatch the
- * spec fails on rather than a block that silently never reaches the validator.
- */
-export function jsonLdOpenTagCount(html: string): number {
-  return [...html.matchAll(/<script\b[^>]*>/gi)].filter(([tag]) =>
-    /application\/ld\+json/i.test(tag),
-  ).length;
-}
 
 /**
  * Up to `max` characters of text from a third party, safe to print: every control character (the

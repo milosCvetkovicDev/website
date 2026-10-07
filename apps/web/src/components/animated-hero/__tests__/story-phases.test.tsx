@@ -825,7 +825,10 @@ it('no module in the story declares a closing line itself', () => {
   // decoded, JSX string expressions such as {' '} unwrapped, line breaks collapsed. Each sentence is
   // looked for on its own, so restating half of a line is found too.
   const directory = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const modules = readdirSync(directory).filter((file) => /\.tsx?$/.test(file));
+  // Regular files only, so a folder named like a module cannot reach readFileSync (#189).
+  const modules = readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+    .map((entry) => entry.name);
   expect(modules, 'the check reads the phases').toContain('game-complete.tsx');
   const sentences = Object.values(storyClosings)
     .flatMap(({ heading, paragraphs }) => [heading, ...paragraphs])
