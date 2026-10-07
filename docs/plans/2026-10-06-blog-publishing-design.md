@@ -82,7 +82,7 @@ lines, block lists (`tags:` then `  - a`), or folded or literal values (`>`, `>-
 | `title`       | `title`     | The page's `h1`.                                                                                                                                                     |
 | `metaTitle`   | `metaTitle` | Required when `title` plus ` \| Milos Cvetkovic` would pass 60 characters. The writer leaves it out otherwise; nothing in this repository checks that.               |
 | `slug`        | `slug`      | Lowercase words joined by hyphens. Never changes once published. The check compares it with the slug in the twin's `Source:` URL, whose path must be `/blog/<slug>`. |
-| `description` | `summary`   | 50 to 300 characters.                                                                                                                                                |
+| `description` | `summary`   | 50 to 155 characters, because it is also the post's meta description.                                                                                                |
 | `tags`        | `tags`      | Optional; none blank, none repeated. The twin does not carry them, so the publish pull request quotes them beside the entry's.                                       |
 | `date`        | (none)      | Not used: the dates follow D9.                                                                                                                                       |
 | (tracker)     | `kind`      | Read from the writing room's tracker, not from the front matter (D2).                                                                                                |
@@ -132,7 +132,10 @@ and a line that only looks blank; and the front matter's forms above were spelle
 what the check reads. P4's review then added single-quoted values to those forms, held the twin's
 `Source:` path to exactly `/blog/<slug>` where the check compares the slug (an earlier text took
 the URL's last path segment), and made exit 1 cover refused syntax as well as differences, as the
-publish check below now says.
+publish check below now says. Corrected 2026-10-07: the final review of P1-P4 held `description` to
+155 characters, not 300, because the post's page uses it as its meta description, which
+`page-metadata.test.ts` caps at 155. `posts.test.ts` now refuses a longer summary on the published
+index; its 300 cap is only the shape rule its fixtures exercise.
 
 ## The publish check
 

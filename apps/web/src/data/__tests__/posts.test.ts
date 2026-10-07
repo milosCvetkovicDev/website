@@ -37,11 +37,14 @@ const TITLE_SUFFIX = ' | Milos Cvetkovic';
 /** Google cuts a title at about 600 px, some 60 characters, as page-metadata.test.ts holds. */
 const TITLE_MAX = 60;
 /**
- * #61's bounds for a summary. They are not a meta description's: 61b decides whether a summary can
- * double as one, which page-metadata.test.ts holds to 155 characters.
+ * #61's bounds for a summary's shape, which the fixtures exercise. A published post's summary is
+ * also its meta description (61b), so `descriptionProblems` holds the published index to
+ * `DESCRIPTION_MAX` as well.
  */
 const SUMMARY_MIN = 50;
 const SUMMARY_MAX = 300;
+/** What page-metadata.test.ts allows every page's meta description, a post's summary included. */
+const DESCRIPTION_MAX = 155;
 /** Lowercase letters and digits in words joined by single hyphens: the `<slug>` in `/blog/<slug>`. */
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 /** One character of a URL as RFC 3986 writes it: ASCII, with anything else percent-encoded. */
@@ -510,6 +513,24 @@ function problemsIn(list: readonly Post[], today: Date): string[] {
       problems.push(...contentProblems(post, pages), ...namingProblems(post));
   }
   return problems;
+}
+
+/**
+ * Problems with the published index alone: a post's summary is its meta description, which
+ * page-metadata.test.ts holds to 155 characters, so a published summary of 156 to 300 characters
+ * passes `problemsIn` and is refused here. This runs where the publish procedure's posts.test.ts
+ * step does, before the page's own test would fail.
+ */
+function descriptionProblems(published: readonly PublishedPost[]): string[] {
+  return published.flatMap(({ slug, summary }) => {
+    const length = characters(summary);
+    return length > DESCRIPTION_MAX
+      ? [
+          `${slug}: the summary is ${length} characters; ` +
+            `it is the meta description, so at most ${DESCRIPTION_MAX}`,
+        ]
+      : [];
+  });
 }
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -1306,11 +1327,30 @@ describe('posts', () => {
     }
   });
 
+  it('fit each published summary in a meta description', () => {
+    expect(descriptionProblems(publishedPosts)).toEqual([]);
+  });
+
   it('can never take the placeholder slug the development server is given', () => {
     // `postStaticParams` hands `next dev` this slug while nothing is published; the slug rule is
     // what keeps a real post from ever answering at it.
     expect(SLUG.test(NO_PUBLISHED_POST_SLUG)).toBe(false);
     expect(getPost(NO_PUBLISHED_POST_SLUG)).toBeUndefined();
+  });
+});
+
+describe('descriptionProblems', () => {
+  it('names each published post whose summary is longer than a meta description', () => {
+    const { publishedPosts: index } = buildPostIndex([
+      published({ slug: 'one-too-long', summary: 'x'.repeat(DESCRIPTION_MAX + 1) }),
+      published({ slug: 'at-the-limit', summary: 'x'.repeat(DESCRIPTION_MAX) }),
+      published({ slug: 'the-longest', summary: 'x'.repeat(SUMMARY_MAX) }),
+      { ...draftPost, summary: 'x'.repeat(SUMMARY_MAX) },
+    ]);
+    expect(descriptionProblems(index)).toEqual([
+      'one-too-long: the summary is 156 characters; it is the meta description, so at most 155',
+      'the-longest: the summary is 300 characters; it is the meta description, so at most 155',
+    ]);
   });
 });
 
