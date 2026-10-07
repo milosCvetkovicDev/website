@@ -92,6 +92,16 @@ export const unfilledOwnerFields: readonly UnfilledOwnerField[] = [
     why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the Nx remote cache's 5× faster builds: facts only the owner has.",
     expires: '2026-10-31',
   },
+  {
+    field: 'about.facts.1.basis#which years, and what counts as rescued',
+    why: "The basis of /about's 12 production systems rescued: the years it covers and what counts as a rescue, facts only the owner has. The quick facts leave the row out until then.",
+    expires: '2026-10-31',
+  },
+  {
+    field: 'about.facts.2.basis#which years',
+    why: "The basis of /about's 4 teams led: the years it covers, a fact only the owner has. The quick facts leave the row out until then.",
+    expires: '2026-10-31',
+  },
 ];
 
 /**

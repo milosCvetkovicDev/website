@@ -23,7 +23,8 @@ import { describe, expect, it } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
 import { pages } from '@/data/pages';
 import { publishedPosts } from '@/data/posts';
-import { aboutCopy, beliefs, credentials, facts, timeline } from '@/data/pages/about';
+import { aboutCopy, beliefs, credentials, facts, shownFacts, timeline } from '@/data/pages/about';
+import { OWNER_TODO, unfilledOwnerFields } from '@/data/owner-todo';
 import { asSentence } from '@/data/pages/table';
 import { socialLinks } from '@/data/pages/contact';
 import { coreSkills, differentiators, skillCategories } from '@/data/pages/skills';
@@ -94,7 +95,7 @@ describe('the entries moved out of the page modules', () => {
     expect(about).toContain(
       `## ${aboutCopy.timelineHeading}\n\nTable: Career timeline\n\n| Year | Role | Company | What changed |`,
     );
-    expect(about).toContain(`## Quick facts\n\n| Fact | Figure |`);
+    expect(about).toContain(`## Quick facts\n\n| Fact | Figure | Basis |`);
     for (const { year, role, company, highlight, description } of timeline) {
       expect(about).toContain(
         `| ${year} | ${role} | ${company} | ${asSentence(highlight)} ${description} |`,
@@ -103,8 +104,57 @@ describe('the entries moved out of the page modules', () => {
     for (const { title, description } of beliefs) {
       expect(about).toContain(`- **${title}**: ${description}`);
     }
-    expect(about).toContain('| Fact | Figure |');
-    for (const { label, value } of facts) expect(about).toContain(`| ${label} | ${value} |`);
+    expect(about).toContain('| Fact | Figure | Basis |');
+    // Each fact with its basis (#58), less any whose basis is still the owner's placeholder: the
+    // page leaves that row out, and so does the twin.
+    expect(shownFacts.length).toBeGreaterThan(0);
+    for (const { label, value, basis } of shownFacts) {
+      expect(about).toContain(`| ${label} | ${value} | ${basis} |`);
+    }
+    for (const fact of facts.filter((entry) => !shownFacts.includes(entry))) {
+      expect(about).not.toContain(fact.label);
+    }
+    // The basis of the years counts "from the first role in the timeline below": the quick facts
+    // come before the timeline here, as on the page (`about-contact-pages.test.tsx`).
+    expect(about.indexOf('## Quick facts')).toBeGreaterThan(-1);
+    expect(about.indexOf('## Quick facts')).toBeLessThan(about.indexOf('Table: Career timeline'));
+  });
+
+  it("leaves out exactly the quick facts whose basis is the owner's placeholder, and no other", () => {
+    // shownFacts' rule, pinned rather than restated: hidden are the facts with a marker in their
+    // basis, each with a register row (owner-todo.test.ts), and every shown fact states a basis
+    // with a letter or digit in it and holds no marker in its label, figure or basis.
+    const hidden = facts.filter((fact) => !shownFacts.includes(fact));
+    expect(hidden).toEqual(facts.filter(({ basis }) => basis.includes(OWNER_TODO)));
+    const rows = unfilledOwnerFields.filter(({ field }) => field.startsWith('about.facts.'));
+    expect(hidden.length, 'one hidden fact per register row').toBe(rows.length);
+    expect(shownFacts.length).toBeGreaterThan(0);
+    for (const { label, value, basis } of shownFacts) {
+      expect(basis, label).toMatch(/[\p{L}\p{N}]/u);
+      expect(`${label} ${value} ${basis}`, label).not.toContain(OWNER_TODO);
+    }
+    for (const { label, value } of hidden) {
+      expect(`${label} ${value}`, `${label}: only its basis waits for the owner`).not.toContain(
+        OWNER_TODO,
+      );
+    }
+  });
+
+  it("names, in each quick fact's register row, the figure and label of the fact the row points at", () => {
+    // The gate keys a row by the fact's index, so an inserted or reordered fact would leave a row
+    // whose text describes another fact. Its figure and label in the row's text pin it, as each
+    // metric definition's row is pinned in case-studies.test.ts.
+    const rows = unfilledOwnerFields.filter(({ field }) => field.startsWith('about.facts.'));
+    for (const { field, why } of rows) {
+      const index = /^about\.facts\.(\d+)\.basis#/.exec(field)?.[1];
+      const fact = index === undefined ? undefined : facts[Number(index)];
+      expect(fact, `${field} points at no fact's basis`).toBeDefined();
+      if (!fact) continue;
+      expect(fact.basis, field).toContain(OWNER_TODO);
+      expect(why, `${field} (${fact.label})`).toContain(
+        `${fact.value} ${fact.label.toLowerCase()}`,
+      );
+    }
   });
 
   it('keeps every core skill, differentiator and toolkit category in the /skills twin', () => {

@@ -80,12 +80,12 @@ describe('the day the printed figure took effect', () => {
     // past the recorded dates pinned here.
     vi.resetModules();
     vi.useFakeTimers({ toFake: ['Date'] });
-    // The clock sits on the recorded day of `/` and /about, never before it: a recorded date ahead
-    // of the clock would be a lastmod and a visible "Last updated" day in the future.
-    vi.setSystemTime(new Date('2026-10-05T12:00:00Z'));
+    // The clock sits on the later recorded day of `/` and /about, never before it: a recorded date
+    // ahead of the clock would be a lastmod and a visible "Last updated" day in the future.
+    vi.setSystemTime(new Date('2026-10-07T12:00:00Z'));
     const today = (await import('../static-routes')).STATIC_ROUTE_UPDATED;
     expect(today['/']).toBe('2026-10-05');
-    expect(today['/about']).toBe('2026-10-05');
+    expect(today['/about']).toBe('2026-10-07');
 
     vi.resetModules();
     vi.setSystemTime(new Date('2031-06-15T12:00:00Z'));
@@ -99,6 +99,8 @@ describe('the quick fact that states it', () => {
     expect(experienceFact(new Date('2026-09-28T12:00:00Z'))).toEqual({
       label: 'Years shipping code',
       value: '13',
+      // The owner's wording (#58, 2026-10-07), naming the year the count starts from.
+      basis: 'Counted from the first role in the timeline below, 2013.',
     });
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2031-06-15T12:00:00Z'));

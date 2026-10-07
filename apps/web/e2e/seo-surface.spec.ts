@@ -13,7 +13,7 @@ import {
   expectedStatus,
   postRoute,
 } from './routes';
-import { caseStudies } from '../src/data/case-studies';
+import { caseStudies, caseStudyMetricScope } from '../src/data/case-studies';
 import { questions } from '../src/data/pages/about';
 import { coreSkills, skillsCopy } from '../src/data/pages/skills';
 import { workCopy } from '../src/data/pages/work';
@@ -25,10 +25,19 @@ import { fetchHead, first } from './support/served-head';
 import { TABLES, expectedTable, servedTables } from './support/tables';
 import { PAGE_HEADINGS } from './support/page-headings';
 // #58's tables, counted from the data their records read (the last tests in this file).
-import { facts, timeline } from '../src/data/pages/about';
+import { facts, shownFacts, timeline } from '../src/data/pages/about';
 import { skillCategories } from '../src/data/pages/skills';
 // The Person's visible facts (57b, the describe at the end of this file).
 import { servedText } from './support/served-text';
+// The scope every figure states (58e, the describe before the Person's).
+import { visible } from '../src/test/markdown';
+import {
+  CASE_STUDIES_JSON,
+  CASE_STUDY_ENDPOINTS,
+  FEED,
+  MARKDOWN_TWINS,
+  markdownTwinPath,
+} from './endpoints';
 
 /**
  * The head every crawler and link-preview bot reads.
@@ -1064,8 +1073,10 @@ for (const [route, tables] of Object.entries(TABLES)) {
 test('the table rows are counted from the data the records read (#58)', () => {
   // The expectations above come from the records; this pins the records to their data, so a record
   // that dropped a row would not set its own, shorter, expectation.
+  // A quick fact whose basis still holds the owner's placeholder is left out of the table (58e):
+  // `shownFacts`, whose rule data/__tests__/pages.test.ts pins.
   expect(TABLES['/about']?.map(({ caption, rows }) => [caption, rows.length])).toEqual([
-    ['Quick facts', facts.length],
+    ['Quick facts', shownFacts.length],
     ['Career timeline', timeline.length],
   ]);
   expect(TABLES['/skills']?.map(({ caption, rows }) => [caption, rows.length])).toEqual([
@@ -1185,6 +1196,180 @@ test('every page serves one non-empty h1 of its own, and five name their subject
       `${route} serves its hook once, as a paragraph outside any heading`,
     ).toEqual([{ tag: 'p', inHeading: false }]);
   }
+});
+
+// #58 AC 9, the /about half of AC 11 and AC 12 (58e): every figure says what it counted. A case
+// study's metric panel prints `formatMetricScope()`'s sentence, which is the basis alone while the
+// owner has yet to define the window and method, and the basis, the window and the method once they
+// have; the twin writes the same sentence on its Basis line. /about's quick facts carry a Basis
+// cell, and a fact whose basis is still the owner's placeholder is left out whole, on the page and
+// in the twin. Read from the served HTML, which no crawler runs, and from the served twins.
+test.describe('every figure states its scope, and no placeholder stands in for one (58e)', () => {
+  /** The text of each paragraph in each "Headline result" panel of the served page. */
+  const servedPanels = (page: Page, html: string) =>
+    page.evaluate((markup) => {
+      const doc = new DOMParser().parseFromString(markup, 'text/html');
+      return [
+        ...doc.querySelectorAll('main#main-content section[aria-label="Headline result"]'),
+      ].map((panel) =>
+        [...panel.querySelectorAll('p')].map((p) =>
+          (p.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        ),
+      );
+    }, html);
+
+  /** How many times `needle` occurs in `haystack`. */
+  const occurrences = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+
+  for (const study of caseStudies) {
+    const path = caseStudyRoute(study.slug);
+
+    test(`${path} serves its metric's scope sentence once, under the figure, and on its twin's Basis line`, async ({
+      page,
+      request,
+    }) => {
+      const { basis } = study.highlight.metric;
+      // Throws, naming the study, when there is no basis to state, as the page and twin do.
+      const scope = caseStudyMetricScope(study);
+
+      const response = await request.get(path);
+      expect(response.status(), `GET ${path}`).toBe(200);
+      const html = await response.text();
+      const panels = await servedPanels(page, html);
+      expect(panels, `${path} serves one Headline result panel`).toHaveLength(1);
+      expect(panels[0]?.at(-1), 'the panel ends with the scope sentence').toBe(scope);
+      const body = await servedText(page, html, { root: 'body' });
+      expect(occurrences(body, scope), `${path} serves its scope sentence exactly once`).toBe(1);
+      // One producer: the sentence holds the basis, which is never printed beside it as well.
+      expect(occurrences(body, basis), `${path} serves its basis once, inside the sentence`).toBe(
+        1,
+      );
+
+      const twinResponse = await request.get(markdownTwinPath(path));
+      expect(twinResponse.status(), `GET ${markdownTwinPath(path)}`).toBe(200);
+      const twin = visible(await twinResponse.text());
+      expect(
+        occurrences(twin, `\n- Basis: ${scope}\n`),
+        'the twin writes it on its Basis line',
+      ).toBe(1);
+      expect(occurrences(twin, basis), 'and the basis nowhere else').toBe(1);
+    });
+  }
+
+  test("/about serves a filled Basis cell in every quick-fact row, and no fact whose basis is the owner's", async ({
+    page,
+    request,
+  }) => {
+    // The rule that picks them is shownFacts', pinned in data/__tests__/pages.test.ts.
+    const stated = shownFacts;
+    const unstated = facts.filter((fact) => !shownFacts.includes(fact));
+    expect(stated.length, 'some quick fact has a basis to show').toBeGreaterThan(0);
+
+    const response = await request.get('/about');
+    expect(response.status(), 'GET /about').toBe(200);
+    const html = await response.text();
+    const quickFacts = (await servedTables(page, html)).find(
+      ({ caption }) => caption === 'Quick facts',
+    );
+    expect(quickFacts, '/about serves its quick facts as a table').toBeDefined();
+    if (!quickFacts) return;
+    expect(quickFacts.head.columns.map(({ text }) => text)).toEqual(['Fact', 'Figure', 'Basis']);
+    for (const { header, cells } of quickFacts.rows) {
+      expect(cells.at(-1)?.text ?? '', `the Basis cell of "${header.text}"`).toMatch(
+        /[\p{L}\p{N}]/u,
+      );
+    }
+    expect(
+      quickFacts.rows.map(({ header, cells }) => [header.text, ...cells.map(({ text }) => text)]),
+      'one row per fact with a basis, in data order, each with its figure and basis',
+    ).toEqual(stated.map(({ label, value, basis }) => [label, value, basis]));
+
+    const twinResponse = await request.get(markdownTwinPath('/about'));
+    expect(twinResponse.status(), 'GET /about/index.md').toBe(200);
+    const twin = visible(await twinResponse.text());
+    expect(twin).toContain('| Fact | Figure | Basis |');
+    for (const { label, value, basis } of stated) {
+      expect(twin, `the twin's row for "${label}"`).toContain(`| ${label} | ${value} | ${basis} |`);
+    }
+
+    // A fact the owner has yet to give a basis is left out whole, its label and figure with it.
+    const body = await servedText(page, html, { root: 'body', separator: ' ' });
+    for (const { label } of unstated) {
+      expect(body, `/about must not show "${label}" before its basis is filled`).not.toContain(
+        label,
+      );
+      expect(twin, `/about/index.md must not show "${label}" either`).not.toContain(label);
+    }
+  });
+
+  test("no route, twin, case-study JSON or feed states a quick fact whose basis is the owner's", async ({
+    request,
+  }) => {
+    // A hidden fact's claim stays unpublished everywhere until its basis arrives, not only in
+    // /about's table: its label, as any page, head, JSON-LD block, twin or endpoint would phrase it.
+    const unstated = facts.filter((fact) => !shownFacts.includes(fact));
+    const paths = [
+      ...routes,
+      ...[
+        ...MARKDOWN_TWINS.map(({ twin }) => twin),
+        CASE_STUDIES_JSON,
+        ...CASE_STUDY_ENDPOINTS.map(({ json }) => json),
+        FEED,
+      ].map((path) => ({ path, status: 200 })),
+    ];
+    const served = await Promise.all(
+      paths.map(async ({ path, status: expected }) => {
+        const response = await request.get(path);
+        const body = (await response.text()).toLowerCase();
+        return { path, expected, status: response.status(), body };
+      }),
+    );
+    // A path that failed to serve would pass the search below without being searched.
+    for (const { path, expected, status, body } of served) {
+      expect.soft(status, path).toBe(expected);
+      expect.soft(body.length, `${path} must serve a body`).toBeGreaterThan(0);
+    }
+    const problems = served.flatMap(({ path, body }) =>
+      unstated
+        .filter(({ label }) => body.includes(label.toLowerCase()))
+        .map(({ label }) => `${path} states "${label}"`),
+    );
+    expect(problems, 'a fact the owner has yet to give a basis is served').toEqual([]);
+  });
+
+  test('no Markdown twin, case-study JSON or feed serves an owner placeholder', async ({
+    request,
+  }) => {
+    // The machine-readable half of the placeholder test above, which covers the pages (their
+    // JSON-LD and meta descriptions inside them), the sitemap, robots.txt and the manifest: every
+    // twin, the static routes', the case studies' and any published post's, from the one list of
+    // them, then the case-study JSON and the Atom feed. /llms.txt joins when #60 serves it. Fetched
+    // together, so the run does not grow one request at a time with the post list.
+    expect(MARKDOWN_TWINS.length, 'there are twins to read').toBeGreaterThan(0);
+    const paths = [
+      ...MARKDOWN_TWINS.map(({ twin }) => twin),
+      CASE_STUDIES_JSON,
+      ...CASE_STUDY_ENDPOINTS.map(({ json }) => json),
+      FEED,
+    ];
+    const served = await Promise.all(
+      paths.map(async (path) => {
+        const response = await request.get(path);
+        return { path, status: response.status(), body: await response.text() };
+      }),
+    );
+    const problems: string[] = [];
+    for (const { path, status, body } of served) {
+      expect.soft(status, path).toBe(200);
+      expect.soft(body.length, `${path} must serve a body`).toBeGreaterThan(0);
+      const at = body.indexOf(OWNER_TODO);
+      if (at !== -1) problems.push(`${path} serves "${body.slice(Math.max(0, at - 40), at + 60)}"`);
+    }
+    expect(
+      problems,
+      'a placeholder reached a twin: omit the sentence, row or block until the owner fills it',
+    ).toEqual([]);
+  });
 });
 
 // #57 AC 6 (57b): the Person, which the layout serves on every route, asserts nothing a reader of
