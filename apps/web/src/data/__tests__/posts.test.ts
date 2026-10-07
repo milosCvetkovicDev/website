@@ -111,6 +111,19 @@ function pagesFor(list: readonly Post[]): ReadonlySet<string> {
   ]);
 }
 
+/**
+ * `href` as the URL parser reads it, or null where the parser refuses it: a port over 65535, an
+ * IPv4 address with a part over 255 or a punycode label that does not decode, which `HREF` lets
+ * through.
+ */
+function parseUrl(href: string): URL | null {
+  try {
+    return new URL(href);
+  } catch {
+    return null;
+  }
+}
+
 /** Problems with a run of inline pieces: a paragraph, a quote or one list item. */
 function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<string>): string[] {
   if (!Array.isArray(pieces) || pieces.length === 0) return [`${where} is empty`];
@@ -156,10 +169,9 @@ function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<strin
       } else if (VAGUE_LINK_TEXT.test(label.trim())) {
         problems.push(`${at}: the link text ${JSON.stringify(label)} does not say where it goes`);
       } else text += label;
+      const elsewhere = `${at}: the link goes to ${JSON.stringify(href)}, which is neither an https URL nor a path on this site`;
       if (typeof href !== 'string' || !HREF.test(href)) {
-        problems.push(
-          `${at}: the link goes to ${JSON.stringify(href)}, which is neither an https URL nor a path on this site`,
-        );
+        problems.push(elsewhere);
       } else if (href.startsWith('/')) {
         if (!pages.has(href.split(/[?#]/)[0])) {
           problems.push(
@@ -167,8 +179,10 @@ function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<strin
           );
         }
       } else {
-        const url = new URL(href);
-        if (OWN_HOSTS.has(url.hostname)) {
+        const url = parseUrl(href);
+        if (url === null) {
+          problems.push(elsewhere);
+        } else if (OWN_HOSTS.has(url.hostname)) {
           problems.push(
             `${at}: the link goes to ${JSON.stringify(href)} on this site's own origin; ` +
               `write its path, ${JSON.stringify(url.pathname + url.search + url.hash)}`,
@@ -994,6 +1008,10 @@ const defects: [string, Post[], RegExp][] = [
     'https://localhost:3000/',
     'https://example.com/\u202egnp.exe',
     'https://ex\u00e4mple.com',
+    // HREF lets these through; the URL parser refuses them.
+    'https://example.com:99999/x',
+    'https://1.2.3.999/',
+    'https://xn--a.com/',
   ].map((href): [string, Post[], RegExp] => [
     `a link to ${JSON.stringify(href)}`,
     [withLink(href)],
