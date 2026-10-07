@@ -1562,8 +1562,9 @@ describe('problemsIn', () => {
 });
 
 describe('imports of the posts module', () => {
-  // Regular files only: a route folder named like a module (`about/index.md/` is the shape, #173)
-  // would reach readFileSync and throw EISDIR (#189).
+  // Regular files only: route folders carry file-like names (`about/index.md/`, #173), and one
+  // ending in `.ts` or `.tsx` would pass the filter below, reach readFileSync and throw EISDIR
+  // (#189).
   const sources = readdirSync(SRC, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => relative(SRC, join(entry.parentPath, entry.name)))

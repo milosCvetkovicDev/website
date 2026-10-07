@@ -3,7 +3,7 @@
  *
  * The single-source rule in CLAUDE.md, enforced over the source files themselves.
  *
- * Rows R33 and R34 of the RED manifest, both fixed by #49.
+ * Rows R33 and R34 of the RED manifest, issue #49.
  *
  * `apps/web/src/data` is the single source of truth for project copy and metrics, and pages are
  * supposed to read from it rather than restate any of it. Two families of literal broke that,
@@ -35,8 +35,9 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
  * Every regular file under `root`, subfolders included, as a path relative to it. Folders are left
- * out even when their name ends like a source file: a route folder such as `about/index.md/` (#173)
- * would otherwise reach `readFileSync` and throw `EISDIR` (#189).
+ * out even when their name ends like a source file: route folders carry file-like names
+ * (`about/index.md/`, #173), and one ending in `.ts` or `.tsx` would pass the callers' filters,
+ * reach `readFileSync` and throw `EISDIR` (#189).
  */
 function filesUnder(root: string): string[] {
   return readdirSync(root, { recursive: true, withFileTypes: true })

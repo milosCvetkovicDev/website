@@ -77,13 +77,14 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   while every browser test stays green. `e2e/crawlability.spec.ts` checks every same-origin URL a
   route's HTML names or its render requests against `/robots.txt`, for the `*` group, Googlebot and
   Applebot (with Applebot's fallback to Googlebot's groups), and fails any one of them refused.
-- The e2e job makes one third-party call. `e2e/structured-data.spec.ts` posts the
+- The e2e job calls one third party. `e2e/structured-data.spec.ts` posts the
   `<script type="application/ld+json">` elements served on `/` and on the first case study, and
-  nothing else of the page, to `validator.schema.org/validate`, from the `chromium` project only, so
-  once per run, with no retries. It is advisory and fails open: a network error, a timeout, a
-  non-2xx answer or an answer that read nothing passes with an annotation, and only a verdict with
-  errors fails (`readVerdict` in `e2e/support/schema-validator.ts`). `SCHEMA_VALIDATOR_STRICT=1`
-  turns a missing verdict into a failure.
+  nothing else of the page, to `validator.schema.org/validate`, one request per route, from the
+  `chromium` project only, so twice per run, with no retries. It is advisory and fails open: a
+  network error, a timeout, a non-2xx answer or an answer that read nothing passes with an
+  annotation, and only a verdict with errors fails (`readVerdict` in
+  `e2e/support/schema-validator.ts`). `SCHEMA_VALIDATOR_STRICT=1` turns a missing verdict into a
+  failure.
 
 ## Testing
 
