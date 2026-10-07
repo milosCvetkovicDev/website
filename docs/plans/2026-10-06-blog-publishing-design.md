@@ -124,7 +124,8 @@ text, a link with a title or spaces around its destination, nested lists, a task
 or two lists when the marker changes), a list item or quote of more than one paragraph, hard line
 breaks, reference-style links, autolinks (`<…@…>` included), bare `http://`, `https://` or `www.`
 addresses and bare email addresses, a tab anywhere outside a code fence (the front matter
-included), a line that looks blank but holds a space other than a space or a tab (such as a
+included), a code fence indented by one to three spaces outside a list item, a line that looks
+blank but holds a space other than a space or a tab (such as a
 no-break space), a block that does not start after a blank line, and a `---` rule inside the body.
 The disclosure line is not written in `draft.md`: the site adds it (D3). Corrected 2026-10-06: the
 publish check's review in Task 8 widened this list from a line indented with a tab to any tab
@@ -138,7 +139,7 @@ publish check below now says. Corrected 2026-10-07: the final review of P1-P4 he
 155 characters, not 300, because the post's page uses it as its meta description, which
 `page-metadata.test.ts` caps at 155. `posts.test.ts` now refuses a longer summary on the published
 index; its 300 cap is only the shape rule its fixtures exercise. The same review added
-strikethrough to the list above.
+strikethrough and an indented code fence to the list above.
 
 ## The publish check
 

@@ -872,6 +872,67 @@ describe('the publish check', () => {
       assert.match(body, /^\+ \| C:\\\\\\\\dir \| 2 \|$/m);
     });
 
+    it('pads a short table row with empty cells, as GFM does, so it equals the full row', () => {
+      assert.equal(tableDiff('| Disk |', '| Disk |  |'), '');
+      assert.equal(tableDiff('| Disk', '| Disk |  |'), '');
+    });
+
+    it('keeps the extra cells of a row longer than its header: a difference, failing safe', () => {
+      assert.match(tableDiff('| Disk | 1 | 2 |', '| Disk | 1 |'), /^- \| Disk \| 1 \| 2 \|$/m);
+    });
+
+    const FENCE_AT_MARGIN = 'start the fence at the margin';
+
+    /** @type {[string, string[], string][]} */
+    const indentedFences = [
+      [
+        'two spaces',
+        ['  ```js', '  const a = 1;', '  ```'],
+        'line 29: a code fence indented by 2 spaces',
+      ],
+      [
+        'one space, with tildes',
+        [' ~~~', 'const a = 1;', '~~~'],
+        'line 29: a code fence indented by 1 space',
+      ],
+      [
+        'three spaces',
+        ['   ```', 'const a = 1;', '```'],
+        'line 29: a code fence indented by 3 spaces',
+      ],
+      [
+        'one space after a list item, left of its text',
+        ['- An item', '', ' ```js', 'const a = 1;', '```'],
+        'line 31: a code fence indented by 1 space',
+      ],
+    ];
+    for (const [name, lines, message] of indentedFences) {
+      it(`reports a code fence indented by ${name}`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.ok(problems.includes(`${message}; ${FENCE_AT_MARGIN}`), problems.join('\n'));
+      });
+    }
+
+    /** @type {[string, string[]][]} */
+    const fencesInItems = [
+      ['a fence that opens a list item', ['- ```js', '  const a = 1;', '  ```']],
+      ['a fence on the line after an item', ['- An item', '  ```js', '  const a = 1;', '  ```']],
+      [
+        "a fence at an item's text after a blank line",
+        ['- An item', '', '  ```js', '  a', '  ```'],
+      ],
+      ['a fence at the margin', ['```js', 'const a = 1;', '```']],
+    ];
+    for (const [name, lines] of fencesInItems) {
+      it(`leaves ${name} to the rules for list items`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.deepEqual(
+          problems.filter((problem) => problem.includes(FENCE_AT_MARGIN)),
+          [],
+        );
+      });
+    }
+
     it('reports a code fence that is never closed by the line it opened on', () => {
       const problems = differences(
         draft([...BODY, '', 'One.', '', '~~~~ts', 'const a = 1;']),

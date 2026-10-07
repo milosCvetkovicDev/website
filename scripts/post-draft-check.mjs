@@ -332,13 +332,17 @@ function tableCells(line) {
 /**
  * A pipe table row with its cells trimmed and in canonical form, or the delimiter row as `---`s.
  * Every backslash and pipe in a cell is escaped, so a row reads back as exactly its cells; a
- * backslash that canonical text has already escaped shows doubled, on both sides alike.
+ * backslash that canonical text has already escaped shows doubled, on both sides alike. A body row
+ * with fewer cells than `width` gets empty ones, as GFM pads it. A longer one keeps the extra cells
+ * that GFM drops, so it differs from the twin's row: a difference that fails safe.
  * @param {string} line
  * @param {boolean} delimiter
+ * @param {number} width the delimiter row's cell count for a body row, or 0 to leave it as written
  * @param {string} origin
  */
-function tableRow(line, delimiter, origin) {
+function tableRow(line, delimiter, width, origin) {
   const cells = tableCells(line);
+  while (cells.length < width) cells.push('');
   const shown = delimiter
     ? cells.map(() => '---')
     : cells.map((cell) => canonicalInline(cell, origin).replace(/[\\|]/g, '\\$&'));
@@ -353,7 +357,10 @@ function tableRow(line, delimiter, origin) {
  */
 function canonicalTable(lines, caption, origin) {
   const captioned = caption === null ? [] : [`Table: ${canonicalInline(caption.slice(7), origin)}`];
-  const rows = lines.map((line, index) => tableRow(line, index === 1, origin));
+  const width = tableCells(lines[1]).length;
+  const rows = lines.map((line, index) =>
+    tableRow(line, index === 1, index > 1 ? width : 0, origin),
+  );
   return ['table:', ...captioned, ...rows].join('\n');
 }
 
@@ -851,12 +858,24 @@ export function refusedSyntax(body, firstLine = 1) {
     ended = '';
     const previous = lines[index - 1] ?? '';
     const next = lines[index + 1] ?? '';
+    const above = block;
     if (block !== null && !continues(block, line)) {
       problems.push(`${at}: start each block after a blank line`);
       block = null;
     }
     const opened = opensFence(line);
     if (opened) {
+      // CommonMark strips as many spaces from each line of a fence indented by one to three as the
+      // fence has, which the twin's fence at the margin does not. A fence at a list item's text
+      // belongs to the item, where the rules for list items report it.
+      const spaces = leadingSpaces(line);
+      const inItem = (above === 'list' || after !== '') && spaces >= indent;
+      if (spaces > 0 && !inItem) {
+        problems.push(
+          `${at}: a code fence indented by ${spaces} ${spaces === 1 ? 'space' : 'spaces'}; ` +
+            'start the fence at the margin',
+        );
+      }
       endRun();
       fence = opened.run;
       fenceAt = at;
