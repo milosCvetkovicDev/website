@@ -985,6 +985,16 @@ export function refusedSyntax(body, firstLine = 1) {
     } else if (block === 'caption') {
       block = 'table';
     }
+    // GFM reads a table only when its header row has as many cells as its delimiter row.
+    if (block === 'table' && (opening || above === 'caption') && DELIMITER_ROW.test(next)) {
+      const [header, delimiter] = [tableCells(line).length, tableCells(next).length];
+      if (header !== delimiter) {
+        problems.push(
+          `${at}: not a table: the header row has ${header} ${header === 1 ? 'cell' : 'cells'} ` +
+            `and the delimiter row ${delimiter}`,
+        );
+      }
+    }
     for (const [pattern, what] of REFUSED_LINES) {
       if (pattern.test(line)) problems.push(`${at}: ${what}`);
     }

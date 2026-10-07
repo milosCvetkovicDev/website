@@ -897,6 +897,31 @@ describe('the publish check', () => {
       assert.match(tableDiff('| Disk | 1 | 2 |', '| Disk | 1 |'), /^- \| Disk \| 1 \| 2 \|$/m);
     });
 
+    /** @type {[string, string[], string][]} */
+    const unevenHeaders = [
+      [
+        'a header longer than its delimiter row',
+        ['| A | B |', '| --- |', '| 1 | 2 |'],
+        'line 29: not a table: the header row has 2 cells and the delimiter row 1',
+      ],
+      [
+        'a header shorter than its delimiter row',
+        ['| A |', '| --- | --- |', '| 1 |'],
+        'line 29: not a table: the header row has 1 cell and the delimiter row 2',
+      ],
+      [
+        'a header under a caption',
+        ['Table: Sizes', '| Path | Size |', '| --- | --- | --- |', '| a | 1 |'],
+        'line 30: not a table: the header row has 2 cells and the delimiter row 3',
+      ],
+    ];
+    for (const [name, lines, message] of unevenHeaders) {
+      it(`reports ${name}, which GFM does not read as a table`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.ok(problems.includes(message), problems.join('\n'));
+      });
+    }
+
     /** @param {number} spaces */
     const unindent = (spaces) => {
       const unit = spaces === 1 ? 'space' : 'spaces';
