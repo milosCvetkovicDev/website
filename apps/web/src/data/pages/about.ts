@@ -9,6 +9,7 @@
  * with their captions and column headers, and the twin writes with the same columns.
  */
 import { formatMetric, getCaseStudy } from '@/data/case-studies';
+import { OWNER_TODO, ownerTodo } from '@/data/owner-todo';
 import { CERTIFICATION, LOCATION, experienceFact, yearsOfExperience } from '@/data/profile';
 import { social } from '@/data/social';
 import type { PageRecord, PageSection, Paragraph, Table } from './types';
@@ -52,6 +53,12 @@ export interface Belief {
 export interface Fact {
   readonly label: string;
   readonly value: string;
+  /**
+   * What the figure counted, and over what (#58): the quick facts' Basis column. A basis only the
+   * owner can state is an `ownerTodo(...)` marker with a row in `unfilledOwnerFields`, and the
+   * table leaves that fact out, on the page and in the twin, until the owner fills it.
+   */
+  readonly basis: string;
 }
 
 export interface Credential {
@@ -141,13 +148,25 @@ export const beliefs: readonly Belief[] = [
 ];
 
 // The first fact is the years of experience, whole from the profile: its figure is derived there,
-// and its label names the figure, so neither is spelled out in this module (R34).
+// and its label names the figure, so neither is spelled out in this module (R34). Each basis says
+// what its figure counted (#58); the two only the owner can state are placeholders until then.
 export const facts: readonly Fact[] = [
   experienceFact(),
-  { label: 'Production systems rescued', value: '12' },
-  { label: 'Teams led', value: '4' },
-  { label: 'Morning coffee required', value: '2 cups' },
+  {
+    label: 'Production systems rescued',
+    value: '12',
+    basis: ownerTodo('which years, and what counts as rescued'),
+  },
+  { label: 'Teams led', value: '4', basis: ownerTodo('which years') },
+  { label: 'Morning coffee required', value: '2 cups', basis: 'Not a measurement.' },
 ];
+
+/**
+ * The quick facts a reader is shown: every fact but one whose basis still holds the owner's
+ * placeholder, which is left out whole rather than shown without its basis or with the marker
+ * (`owner-todo.ts`'s publication rule). The page and the twin both read the table built from these.
+ */
+export const shownFacts: readonly Fact[] = facts.filter(({ basis }) => !basis.includes(OWNER_TODO));
 
 // The certification and the place are facts the Person JSON-LD asserts too, so both come from the
 // profile, where the markup reads them (#57): the page, its twin and the markup cannot disagree.
@@ -226,11 +245,14 @@ export const aboutCopy = {
   },
 } as const;
 
-/** The quick facts as a table (#58): each fact's label heads its row. */
+/**
+ * The quick facts as a table (#58): each fact's label heads its row, and its basis says what the
+ * figure counted. Three columns, so on a phone each row stacks into a block (`DataTable`).
+ */
 export const factsTable: Table = {
   caption: 'Quick facts',
-  columns: ['Fact', 'Figure'],
-  rows: facts.map(({ label, value }) => [label, value]),
+  columns: ['Fact', 'Figure', 'Basis'],
+  rows: shownFacts.map(({ label, value, basis }) => [label, value, basis]),
 };
 
 /**

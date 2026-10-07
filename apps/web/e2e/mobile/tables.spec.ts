@@ -100,7 +100,9 @@ test(`the wide tables stack each row into a block at ${PHONE_WIDTHS.join(', ')}p
 }) => {
   // A navigation and a read per route, and one for the story, per width.
   test.setTimeout(30_000 + PHONE_WIDTHS.length * (WIDE_ROUTES.length + 1) * 3_000);
+  // The quick facts joined them with their Basis column (58e): three columns, so they stack too.
   expect(WIDE.map(({ route, table }) => `${route} ${table.caption}`)).toEqual([
+    '/about Quick facts',
     '/about Career timeline',
     '/skills Skills by category',
   ]);

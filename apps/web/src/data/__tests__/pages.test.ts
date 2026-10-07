@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
 import { pages } from '@/data/pages';
 import { publishedPosts } from '@/data/posts';
-import { aboutCopy, beliefs, credentials, facts, timeline } from '@/data/pages/about';
+import { aboutCopy, beliefs, credentials, facts, shownFacts, timeline } from '@/data/pages/about';
 import { asSentence } from '@/data/pages/table';
 import { socialLinks } from '@/data/pages/contact';
 import { coreSkills, differentiators, skillCategories } from '@/data/pages/skills';
@@ -94,7 +94,7 @@ describe('the entries moved out of the page modules', () => {
     expect(about).toContain(
       `## ${aboutCopy.timelineHeading}\n\nTable: Career timeline\n\n| Year | Role | Company | What changed |`,
     );
-    expect(about).toContain(`## Quick facts\n\n| Fact | Figure |`);
+    expect(about).toContain(`## Quick facts\n\n| Fact | Figure | Basis |`);
     for (const { year, role, company, highlight, description } of timeline) {
       expect(about).toContain(
         `| ${year} | ${role} | ${company} | ${asSentence(highlight)} ${description} |`,
@@ -103,8 +103,16 @@ describe('the entries moved out of the page modules', () => {
     for (const { title, description } of beliefs) {
       expect(about).toContain(`- **${title}**: ${description}`);
     }
-    expect(about).toContain('| Fact | Figure |');
-    for (const { label, value } of facts) expect(about).toContain(`| ${label} | ${value} |`);
+    expect(about).toContain('| Fact | Figure | Basis |');
+    // Each fact with its basis (#58), less any whose basis is still the owner's placeholder: the
+    // page leaves that row out, and so does the twin.
+    expect(shownFacts.length).toBeGreaterThan(0);
+    for (const { label, value, basis } of shownFacts) {
+      expect(about).toContain(`| ${label} | ${value} | ${basis} |`);
+    }
+    for (const fact of facts.filter((entry) => !shownFacts.includes(entry))) {
+      expect(about).not.toContain(fact.label);
+    }
   });
 
   it('keeps every core skill, differentiator and toolkit category in the /skills twin', () => {

@@ -8,6 +8,7 @@ import {
   credentials,
   facts,
   questions,
+  shownFacts,
   timeline,
   type StoryParagraph,
 } from '@/data/pages/about';
@@ -59,10 +60,20 @@ describe('/about', () => {
         description,
       ]),
       ...beliefs.flatMap(({ title, description, icon }) => [title, description, icon]),
-      ...facts.flatMap(({ label, value }) => [label, value]),
+      ...shownFacts.flatMap(({ label, value, basis }) => [label, value, basis]),
       ...credentials.map(({ icon, text }) => `${icon} ${text}`),
     ]) {
       expect(main, `/about must render "${text}"`).toContain(text);
+    }
+
+    // A quick fact whose basis the owner has not supplied yet is left out whole, label and figure
+    // with it, rather than shown without its basis (#58).
+    const hidden = facts.filter((fact) => !shownFacts.includes(fact));
+    expect(shownFacts.length + hidden.length).toBe(facts.length);
+    for (const { label } of hidden) {
+      expect(main, `/about must not render "${label}" before its basis is filled`).not.toContain(
+        label,
+      );
     }
 
     // Each emphasised run of the story is its own element, of the kind the record names.
@@ -114,8 +125,9 @@ describe('/about', () => {
       lastQuestion.compareDocumentPosition(factsHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
       'the facts heading comes after the last question',
     ).toBeTruthy();
-    for (const { value } of facts) {
+    for (const { value, basis } of shownFacts) {
       expect(factsHeading.nextElementSibling?.textContent).toContain(value);
+      expect(factsHeading.nextElementSibling?.textContent).toContain(basis);
     }
   });
 

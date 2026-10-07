@@ -22,9 +22,10 @@ export interface CaseStudyFigure {
 export interface CaseStudyMetric extends CaseStudyFigure {
   /**
    * One line, a sentence: what the figure counted, against what baseline (#49). The case-study
-   * page prints it under the figure, and its Markdown twin beside the figure. When and how it was
-   * measured is the study's `metricDefinition`, not this. `featured-projects.ts` drops it before the
-   * home page's client cards, which print no basis, so it is not serialised into that payload.
+   * page prints it under the figure, and its Markdown twin on the line after the figure, each as
+   * the start of `formatMetricScope()`'s sentence (#58). When and how it was measured is the
+   * study's `metricDefinition`, not this. `featured-projects.ts` drops it before the home page's
+   * client cards, which print no basis, so it is not serialised into that payload.
    */
   basis: string;
 }
@@ -114,14 +115,15 @@ function measuredSentences(definition: MetricDefinition): string | null {
 
 /**
  * The one sentence that says what a headline figure is a fraction of, over what period and how it
- * was measured: the metric's `basis` (#49), then the window, then the method. It is meant to be
- * the single producer of that sentence, so a page renders it and a serialiser writes it rather
- * than joining the parts again. Nothing renders it yet. Until then the basis prints alone: in the
- * case-study page's metric panel and on the `- Basis:` line of its Markdown twin (#49). #58 puts
- * this sentence in both places *instead of* those two, not beside them, or the basis prints twice;
- * `e2e/case-study.spec.ts` and `lib/__tests__/serialise.test.ts` each fail on a second copy. It
- * takes the basis as a parameter rather than reading
- * `CaseStudyMetric`, so it depends on nothing about that interface's shape.
+ * was measured: the metric's `basis` (#49), then the window, then the method. It is the single
+ * producer of that sentence, so a page renders it and a serialiser writes it rather than joining
+ * the parts again: the case-study page's metric panel prints it under the figure, and its Markdown
+ * twin writes it on the `- Basis:` line (#58), each *instead of* the basis alone, never beside it,
+ * or the basis would print twice; `e2e/case-study.spec.ts` and `lib/__tests__/serialise.test.ts`
+ * each fail on a second copy. While a study's definition is still the owner's placeholder, the
+ * sentence is the basis alone, so both read as they did before #58. It takes the basis as a
+ * parameter rather than reading `CaseStudyMetric`, so it depends on nothing about that interface's
+ * shape.
  *
  * Total, and never a half-built string: the basis alone, on one line, while the definition cannot be
  * stated, `null` when there is neither, and never a placeholder marker, an empty part, a line break

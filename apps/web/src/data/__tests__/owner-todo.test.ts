@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { caseStudies } from '../case-studies';
+import { aboutCopy, beliefs, credentials, facts, questions, timeline } from '../pages/about';
 import {
   MAX_EXPIRY_DAYS,
   OWNER_TODO,
@@ -48,7 +49,12 @@ const RENDERS_ONLY: Record<string, string> = {
  * that imports owner-todo has to be imported by this file (for an entry here) or named in
  * `RENDERS_ONLY`: the 'every importer' test below fails otherwise.
  */
-const OWNER_TODO_SOURCES: OwnerTodoSource[] = [{ id: 'case-studies', value: caseStudies }];
+const OWNER_TODO_SOURCES: OwnerTodoSource[] = [
+  { id: 'case-studies', value: caseStudies },
+  // The /about record's copy, every list and string its page and twin are built from (58e): the
+  // quick facts' bases hold the owner's placeholders, and the table leaves such a fact out.
+  { id: 'about', value: { aboutCopy, beliefs, credentials, facts, questions, timeline } },
+];
 
 const NOW = new Date('2026-09-28T12:00:00Z');
 const IN_DATE = '2026-10-31';
