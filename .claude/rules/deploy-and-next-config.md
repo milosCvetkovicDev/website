@@ -31,13 +31,13 @@ or collapse repeated slashes, and the plain 500 for a malformed percent-encoding
 The same file negotiates the Markdown twins (#59,
 `docs/adr/0030-generated-endpoints-as-static-route-handlers.md`). `rewrites()` returns one
 `beforeFiles` rule per route in `MARKDOWN_ROUTES` (the keys of `STATIC_ROUTE_UPDATED` plus
-`/work/<slug>` per case study), each a literal source with `/` among them, rewriting to
-`markdownTwinPath(route)` when the `accept` header lists the media range `text/markdown`
-(`ACCEPTS_MARKDOWN` in `has`) and does not give it a weight of zero (`REFUSES_MARKDOWN` in
-`missing`, so `text/markdown;q=0` gets the page). Never widen a source to `/:path*`: a
-Markdown-asking request for `robots.txt`, the sitemap, an Open Graph image or a `/_next/static`
-chunk would then be rewritten to an `index.md` that does not exist. Next matches both values as
-anchored, case-sensitive regular expressions, so a non-zero weight is not ranked
+`/work/<slug>` per case study and `/blog/<slug>` per published post), each a literal source with `/`
+among them, rewriting to `markdownTwinPath(route)` when the `accept` header lists the media range
+`text/markdown` (`ACCEPTS_MARKDOWN` in `has`) and does not give it a weight of zero
+(`REFUSES_MARKDOWN` in `missing`, so `text/markdown;q=0` gets the page). Never widen a source to
+`/:path*`: a Markdown-asking request for `robots.txt`, the sitemap, an Open Graph image or a
+`/_next/static` chunk would then be rewritten to an `index.md` that does not exist. Next matches
+both values as anchored, case-sensitive regular expressions, so a non-zero weight is not ranked
 (`text/html, text/markdown;q=0.1` still gets Markdown; ranking needs the middleware ADR 0017
 refuses) and `Text/Markdown` gets the page. `varyOnAccept()` appends one `headers()` entry per
 negotiating route with `Vary: Accept`, after the two entries above, which stay as they are; the
@@ -63,15 +63,15 @@ and daily, checks that Vercel's CDN keys its cache on `Accept` (`.github/workflo
   evaluated as `<projectDir>/next.config.compiled.js`, so the starting directory is whatever Next
   was invoked on, not this file, and `next info` from a subdirectory then resolves outside the
   repository. `apps/web/src/test/next-config.test.ts` pins all of this.
-- `apps/web/next.config.ts` imports `src/data/static-routes.ts`, `src/data/case-studies.ts` and
-  `src/lib/pathname.ts` for the negotiated routes. Next's config loader compiles every module it
-  requires with the same options and no file name, so an `@/` import becomes `./src/...`, right
-  only beside the config: every module that chain reaches imports by relative path. The last test
-  in `src/test/next-config.test.ts` loads the config through that loader in a child process and
-  fails on an alias there, which Vitest's own `resolve.alias` would hide. `next dev` restarts only
-  when a `next.config.*` file itself changes, not a module it imports, so a static route or case
-  study added under a running dev server is served, twin included, but not negotiated until the
-  server is restarted.
+- `apps/web/next.config.ts` imports `src/data/static-routes.ts`, `src/data/case-studies.ts`,
+  `src/data/posts.ts` and `src/lib/pathname.ts` for the negotiated routes. Next's config loader
+  compiles every module it requires with the same options and no file name, so an `@/` import
+  becomes `./src/...`, right only beside the config: every module that chain reaches imports by
+  relative path. The last test in `src/test/next-config.test.ts` loads the config through that
+  loader in a child process and fails on an alias there, which Vitest's own `resolve.alias` would
+  hide. `next dev` restarts only when a `next.config.*` file itself changes, not a module it
+  imports, so a static route or case study added, or a post published, under a running dev server is
+  served, twin included, but not negotiated until the server is restarted.
 - `apps/web/next.config.ts` also sends the security headers (ADR 0023), and its CSP allows this
   origin only: a script, stylesheet, font, image (a `data:` one included) or connection from
   anywhere else is refused, and the browser logs the refusal as a console error.

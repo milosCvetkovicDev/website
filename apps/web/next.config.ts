@@ -11,6 +11,7 @@ import { PRODUCTION_ALIAS_HOST } from './production-alias';
 // beside this file. No module these reach may use the alias (`src/test/next-config.test.ts` loads
 // this file through that loader to prove it).
 import { caseStudies } from './src/data/case-studies';
+import { publishedPosts } from './src/data/posts';
 import { STATIC_ROUTE_UPDATED } from './src/data/static-routes';
 import { markdownTwinPath } from './src/lib/pathname';
 
@@ -152,12 +153,14 @@ export const PRODUCTION_ALIAS_HEADERS = [{ key: 'X-Robots-Tag', value: 'noindex'
 
 /**
  * Every route that has a Markdown twin (#59): the static routes, which are the keys of
- * `STATIC_ROUTE_UPDATED` (`data/pages` holds a record for each), and one route per case study. The
- * same list the twins' route handlers are built from, so a route gains its rewrite with its twin.
+ * `STATIC_ROUTE_UPDATED` (`data/pages` holds a record for each), one route per case study and one
+ * per published post. The same list the twins' route handlers are built from, so a route gains its
+ * rewrite with its twin.
  */
 export const MARKDOWN_ROUTES: readonly string[] = [
   ...Object.keys(STATIC_ROUTE_UPDATED),
   ...caseStudies.map(({ slug }) => `/work/${slug}`),
+  ...publishedPosts.map(({ slug }) => `/blog/${slug}`),
 ];
 
 /**

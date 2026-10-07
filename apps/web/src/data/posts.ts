@@ -1,3 +1,8 @@
+// No imports, or relative ones only, never `@/...`: `next.config.ts` imports this module to derive
+// the routes that negotiate a Markdown twin, and Next's config loader turns an `@/` import into
+// `./src/...`, a path that is right only beside the config (`src/test/next-config.test.ts` loads
+// the config through that loader to catch it).
+
 /**
  * The blog's posts: the one source every page, twin, feed and sitemap entry for a post is to read,
  * in the shape `case-studies.ts` gives the case studies (#61, ADR 0028). A post's body is typed
@@ -29,10 +34,14 @@
  *   `publishedAt`, a summary of 50 to 300 characters, a served title (`metaTitle` when set, then
  *   ` | Milos Cvetkovic`) of at most 60, tags that are neither blank nor repeated, and a body whose
  *   blocks are not empty, with headings at level 2 or 3, no level 3 before the first level 2 and no
- *   heading twice. Titles, the summary, headings, tags, and a table's caption, column names and row
- *   headers have no spaces at either end or two in a row; no text outside a code block holds a
- *   line break, a control or a direction character; a link's text says where it goes; and a link
- *   to this site names a page that exists.
+ *   heading twice. The body does not open with a bulleted list, which the twin's list of dates
+ *   would run into, and no two lists of one kind (bulleted or numbered) stand next to each other:
+ *   the twin, and a Markdown draft, would read either pair as one list. Titles, the summary,
+ *   headings, tags, and a table's caption, column names and row headers have no spaces at either
+ *   end or two in a row; no text outside a code block holds a line break, a control or a direction
+ *   character; inline code holds more than whitespace, and no two pieces of it stand side by side,
+ *   which the twin would write as one; a link's text says where it goes; and a link to this site
+ *   names a page that exists.
  */
 
 /**

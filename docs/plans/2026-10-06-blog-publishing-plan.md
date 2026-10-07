@@ -425,7 +425,13 @@ Add to the end of `defects`:
         'body[0].content[1].code',
         'TypeSafe',
       ],
-      ['a list item', { body: [{ kind: 'list', items: [['Ask Jev.']] }] }, 'body[0].items[0][0]', 'Jev'],
+      [
+        'a list item',
+        // Numbered, because a body may not open with a bulleted list.
+        { body: [{ kind: 'list', ordered: true, items: [['Ask Jev.']] }] },
+        'body[0].items[0][0]',
+        'Jev',
+      ],
       ['a code block', { body: [{ kind: 'code', code: 'model = "Jev"' }] }, 'body[0].code', 'Jev'],
       // The page names the code figure by its language, and the twin's fence carries it.
       [
@@ -1350,13 +1356,13 @@ The twin's layout, which Task 8 parses:
 3. a blank line, then the body;
 4. for a kind with lines: a blank line, `---`, then each line as its own paragraph.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `serialise.test.ts`:
 
 - add `blogToMarkdown`, `postBodyToMarkdown` and `postToMarkdown` to the import from `'../serialise'`;
-- import `buildPostIndex` from `'@/data/posts'`, `pages` from `'@/data/pages'`, and `everyBlockPost`,
-  `fixturePosts` and `hostileTitlePost` from `'@/test/fixtures/posts'`;
+- import `buildPostIndex` and `type PostBlock` from `'@/data/posts'`, `pages` from `'@/data/pages'`,
+  and `everyBlockPost`, `fixturePosts` and `hostileTitlePost` from `'@/test/fixtures/posts'`;
 - add this at the end of the file. It writes the site's origin as the file's `ORIGIN` constant, as
   the page and case-study tests do:
 
@@ -1455,13 +1461,64 @@ describe('postToMarkdown()', () => {
     );
   });
 
+  it('escapes a ! that ends text before a link, which would make the link an image', () => {
+    expect(
+      postBodyToMarkdown(
+        [
+          {
+            kind: 'paragraph',
+            content: [
+              'Look!',
+              { text: 'the work page', href: '/work' },
+              ' Run!',
+              { code: 'x' },
+              '!',
+            ],
+          },
+        ],
+        'fixture',
+      ),
+    ).toBe(`Look\\![the work page](${ORIGIN}/work) Run!\`x\`!`);
+  });
+
   it('refuses a table the page could not draw, as it refuses a page table', () => {
     expect(() =>
       postBodyToMarkdown(
         [{ kind: 'table', caption: 'One column', columns: ['Only'], rows: [['a']] }],
         'fixture',
       ),
-    ).toThrow(/has one column/);
+    ).toThrow(/^serialise: the table at block 1 of fixture has one column/);
+  });
+
+  it.each<[string, PostBlock[], string]>([
+    [
+      'an empty heading',
+      [{ kind: 'heading', level: 3, text: ' ' }],
+      'serialise: the level-3 heading at block 1 of fixture is empty',
+    ],
+    [
+      'a link to another scheme',
+      [{ kind: 'paragraph', content: ['See ', { text: 'the file', href: 'ftp://example.com/a' }] }],
+      'serialise: the link "ftp://example.com/a" in block 1 of fixture is neither a path on this site nor an http(s) or mailto URL',
+    ],
+    [
+      'a link with no text in a list item',
+      [{ kind: 'list', items: [['One.'], [{ text: ' ', href: '/work' }]] }],
+      'serialise: the link to "/work" in item 2 of block 1 of fixture has no text',
+    ],
+    [
+      'a block kind it has no writer for',
+      [{ kind: 'video' } as unknown as PostBlock],
+      'postToMarkdown: no writer for the block kind "video" at block 1 of fixture',
+    ],
+  ])('names the post and the block for %s', (_name, body, message) => {
+    expect(() => postBodyToMarkdown(body, 'fixture')).toThrow(message);
+  });
+
+  it('names the post whose title is empty', () => {
+    expect(() => postToMarkdown({ ...everyBlockPost, title: ' ' })).toThrow(
+      'serialise: postToMarkdown: the title of /blog/fixture-every-block is empty',
+    );
   });
 });
 
@@ -1496,10 +1553,21 @@ describe('blogToMarkdown()', () => {
       ].join('\n'),
     );
   });
+
+  it('names itself, and the post whose title is empty, in an error', () => {
+    expect(() =>
+      blogToMarkdown({ ...pages['/blog'], title: {} as unknown as PageRecord['title'] }, [
+        everyBlockPost,
+      ]),
+    ).toThrow('blogToMarkdown: the record for /blog has no title');
+    expect(() => blogToMarkdown(pages['/blog'], [{ ...everyBlockPost, title: ' ' }])).toThrow(
+      'serialise: blogToMarkdown: the title of fixture-every-block is empty',
+    );
+  });
 });
 `````
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 ```bash
 pnpm --filter web exec vitest run src/lib/__tests__/serialise.test.ts
@@ -1507,7 +1575,7 @@ pnpm --filter web exec vitest run src/lib/__tests__/serialise.test.ts
 
 Expected: FAIL, because `postToMarkdown is not a function`.
 
-- [ ] **Step 3: Split `table()` so that a post can always write its caption line**
+- [x] **Step 3: Split `table()` so that a post can always write its caption line**
 
 In `serialise.ts`:
 
@@ -1524,23 +1592,28 @@ function table(heading: string, content: Table, where = `the table under "${head
 }
 ```
 
-Change `heading`'s signature to `function heading(level: 1 | 2 | 3, value: string): string`.
+Change `heading`'s signature to
+``function heading(level: 1 | 2 | 3, value: string, what = `a level-${level} heading`): string``,
+so that a post's heading names its place in an error.
 
 Move the title lookup out of `pageToMarkdown` into a helper, keeping its error message, and have
 `pageToMarkdown` call it:
 
 ```ts
-/** A record's own title: the string, or the `absolute` one a record sets to skip the template. */
-function titleOf(page: PageRecord): string {
+/**
+ * A record's own title: the string, or the `absolute` one a record sets to skip the template.
+ * `caller` names the twin's writer in an error.
+ */
+function titleOf(page: PageRecord, caller: string): string {
   const title = typeof page.title === 'string' ? page.title : page.title?.absolute;
   if (typeof title !== 'string') {
-    throw new Error(`pageToMarkdown: the record for ${page.path} has no title`);
+    throw new Error(`${caller}: the record for ${page.path} has no title`);
   }
   return title;
 }
 ```
 
-- [ ] **Step 4: Write the post serialiser**
+- [x] **Step 4: Write the post serialiser**
 
 Add `import { FOOTER_LINES, type Inline, type PostBlock, type PublishedPost } from '@/data/posts';`
 to the imports. Then add after `caseStudyToMarkdown`:
@@ -1560,19 +1633,26 @@ function codeSpan(code: string): string {
   return `${ticks}${pad}${code}${pad}${ticks}`;
 }
 
-/** A fenced code block, whose fence is one backtick longer than the code's longest run, three at least. */
+/**
+ * A fenced code block, whose fence is one backtick longer than the code's longest run, three at
+ * least.
+ */
 function codeBlock(code: string, language = ''): string {
   const fence = '`'.repeat(Math.max(3, longestBacktickRun(code) + 1));
   return `${fence}${language}\n${code}\n${fence}`;
 }
 
-/** A run of a post's inline pieces: text as `text()` writes it, code spans, and links. */
-function postInline(content: readonly Inline[]): string {
+/**
+ * A run of a post's inline pieces: text as `text()` writes it, code spans, and links; `where` names
+ * the block in a link's error. It cannot reuse `inline()`, which has no code piece and collapses
+ * every run of spaces in the joined line: a code span's spaces are code, and must stay as written.
+ */
+function postInline(content: readonly Inline[], where: string): string {
   const pieces = content.filter((piece) => piece !== '');
   return pieces
     .map((piece, index) => {
       if (typeof piece !== 'string') {
-        return piece.code !== undefined ? codeSpan(piece.code) : link(piece);
+        return piece.code !== undefined ? codeSpan(piece.code) : link(piece, where);
       }
       const next = pieces[index + 1];
       // `!` right before a link's `[` would make the link an image.
@@ -1584,23 +1664,25 @@ function postInline(content: readonly Inline[]): string {
     .trim();
 }
 
+/** One block of a post; `where` is its place, as in `block 3 of <slug>`, for an error. */
 function postBlock(content: PostBlock, where: string): string {
   switch (content.kind) {
     case 'heading':
-      return heading(content.level, content.text);
+      return heading(content.level, content.text, `the level-${content.level} heading at ${where}`);
     case 'paragraph':
-      return block(nonEmpty(postInline(content.content), where));
+      return block(nonEmpty(postInline(content.content, where), where));
     case 'list':
       return entries(content.items, where)
         .map((item, index) => {
           const marker = content.ordered ? `${index + 1}.` : '-';
-          return `${marker} ${block(nonEmpty(postInline(item), `item ${index + 1} of ${where}`))}`;
+          const at = `item ${index + 1} of ${where}`;
+          return `${marker} ${block(nonEmpty(postInline(item, at), at))}`;
         })
         .join('\n');
     case 'code':
       return codeBlock(nonEmpty(content.code, where), content.language);
     case 'quote':
-      return `> ${block(nonEmpty(postInline(content.content), where))}`;
+      return `> ${block(nonEmpty(postInline(content.content, where), where))}`;
     case 'table': {
       // Always captioned, even under a heading of the same words, so a draft's `Table:` line and
       // the twin's compare line for line (D6 of the publishing design).
@@ -1611,7 +1693,7 @@ function postBlock(content: PostBlock, where: string): string {
       // The types rule this out; a post cast from elsewhere must not lose a block silently.
       const unknown: never = content;
       throw new Error(
-        `postToMarkdown: no writer for the block kind "${(unknown as { kind: string }).kind}"`,
+        `postToMarkdown: no writer for the block kind "${(unknown as { kind: string }).kind}" at ${where}`,
       );
     }
   }
@@ -1646,15 +1728,16 @@ export function postToMarkdown(post: PublishedPost): string {
 
 /**
  * `/blog`'s twin. While no post is published it is the record, Coming Soon card included, as the
- * page shows. After that it lists each published post newest first, as the page does: the title as a
- * heading, the day it was published and its URL, then its summary.
+ * page shows. After that it lists the posts in the order given, which `publishedPosts` keeps
+ * newest first, as the page does: the title as a heading, the day it was published and its URL,
+ * then its summary.
  */
 export function blogToMarkdown(page: PageRecord, list: readonly PublishedPost[]): string {
   if (list.length === 0) return pageToMarkdown(page);
   return document([
-    opening(titleOf(page), page.summary, page.path, 'blogToMarkdown'),
+    opening(titleOf(page, 'blogToMarkdown'), page.summary, page.path, 'blogToMarkdown'),
     ...list.flatMap((post) => [
-      heading(2, post.title),
+      heading(2, post.title, `blogToMarkdown: the title of ${post.slug}`),
       `- Published: ${post.publishedAt}\n- URL: ${absoluteUrl(`/blog/${post.slug}`)}`,
       paragraph(post.summary, `blogToMarkdown: the summary of ${post.slug}`),
     ]),
@@ -1662,7 +1745,7 @@ export function blogToMarkdown(page: PageRecord, list: readonly PublishedPost[])
 }
 ```
 
-- [ ] **Step 5: Run the tests until they pass, then typecheck**
+- [x] **Step 5: Run the tests until they pass, then typecheck**
 
 ```bash
 pnpm --filter web exec vitest run src/lib/__tests__/serialise.test.ts
@@ -1672,7 +1755,7 @@ pnpm typecheck
 Expected: PASS, and typecheck exits 0. If an expected string differs, fix the serialiser, not the
 expectation. The expectations follow D6 and the escaping rules the file's other tests pin.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/web/src/lib/serialise.ts apps/web/src/lib/__tests__/serialise.test.ts docs/plans/2026-10-06-blog-publishing-plan.md
@@ -1697,17 +1780,18 @@ git commit -m "feat(web): write a post and the /blog list as Markdown twins (61e
 - Produces: a static twin at `/blog/<slug>/index.md` for each published post, negotiated from
   `/blog/<slug>` by `Accept: text/markdown`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `post-page.test.tsx`, add `import * as twin from '../[slug]/index.md/route';` beside the card
 import, and `import { postToMarkdown } from '@/lib/serialise';`. Then add:
 
 ```tsx
 describe('the post twin', () => {
-  it('prerenders one twin per published post, and no other', () => {
+  it('prerenders one twin per published post, and no other', async () => {
     expect(twin.dynamic).toBe('force-static');
     expect(twin.dynamicParams).toBe(false);
-    expect(twin.generateStaticParams()).toEqual(generateStaticParams());
+    // The page's list is async; the twin's, like the card's, is not.
+    expect(twin.generateStaticParams()).toEqual(await generateStaticParams());
   });
 
   it("serves the post's Markdown, as postToMarkdown writes it", async () => {
@@ -1715,6 +1799,7 @@ describe('the post twin', () => {
       new Request('http://localhost/'),
       paramsOf(hostileTitlePost.slug),
     );
+    expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('text/markdown; charset=utf-8');
     expect(await response.text()).toBe(postToMarkdown(hostileTitlePost));
   });
@@ -1722,7 +1807,7 @@ describe('the post twin', () => {
   it('refuses a draft, as dynamicParams would before it', async () => {
     await expect(
       twin.GET(new Request('http://localhost/'), paramsOf(draftPost.slug)),
-    ).rejects.toThrow(/unknown post "fixture-draft"/);
+    ).rejects.toThrow(`unknown post ${JSON.stringify(draftPost.slug)}`);
   });
 });
 ```
@@ -1764,7 +1849,7 @@ In `apps/web/src/test/next-config.test.ts`:
   `negotiates exactly the routes that have a twin: the static routes, every case study and every published post`,
   and append `...publishedPosts.map(({ slug }) => `/blog/${slug}`),` to the expected list.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 ```bash
 pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx src/data/__tests__/pages.test.ts src/test/next-config.test.ts
@@ -1773,7 +1858,7 @@ pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx src/
 Expected: FAIL. The twin route module does not exist, so the post-page file fails to import. The
 next-config list lacks the posts.
 
-- [ ] **Step 3: Add the post twin route**
+- [x] **Step 3: Add the post twin route**
 
 Create `apps/web/src/app/blog/[slug]/index.md/route.ts`:
 
@@ -1797,14 +1882,16 @@ export function generateStaticParams() {
 export async function GET(_request: Request, { params }: RouteContext<'/blog/[slug]/index.md'>) {
   const { slug } = await params;
   const post = getPost(slug);
-  // Unreachable while `generateStaticParams` and `getPost` read one index: `dynamicParams` 404s any
-  // other slug first. If they ever drift, the prerender fails naming the slug.
+  // Unreachable in a build while `generateStaticParams` and `getPost` read one index:
+  // `dynamicParams` 404s any other slug first, and if they ever drift, the prerender fails naming
+  // the slug. Reached under `next dev` while nothing is published: `postStaticParams` adds a
+  // placeholder slug there that `getPost` cannot find, so requesting it throws here.
   if (!post) throw new Error(`index.md: unknown post ${JSON.stringify(slug)}`);
   return markdownResponse(postToMarkdown(post));
 }
 ```
 
-- [ ] **Step 4: Make `/blog`'s twin list the posts**
+- [x] **Step 4: Make `/blog`'s twin list the posts**
 
 In `apps/web/src/app/blog/index.md/route.ts`, keep the comment and replace the code with:
 
@@ -1820,7 +1907,7 @@ export function GET() {
 }
 ```
 
-- [ ] **Step 5: Negotiate the post twins**
+- [x] **Step 5: Negotiate the post twins**
 
 In `apps/web/next.config.ts`, add `import { publishedPosts } from './src/data/posts';` after the
 `case-studies` import. `posts.ts` imports nothing, so the rule that modules loaded by the config
@@ -1847,7 +1934,7 @@ append to `MARKDOWN_TWINS`:
 `e2e/markdown-twins.spec.ts` then checks each post twin's status, its type, the page's alternate link
 and heading parity as soon as a post is published. While none is, it checks nothing more.
 
-- [ ] **Step 6: Run the tests until they pass, then check the build**
+- [x] **Step 6: Run the tests until they pass, then check the build**
 
 ```bash
 pnpm --filter web exec vitest run src/app/blog/__tests__/post-page.test.tsx src/data/__tests__/pages.test.ts src/test/next-config.test.ts
@@ -1858,7 +1945,7 @@ pnpm --filter web build && pnpm check:build-output
 Expected: PASS. Typecheck exits 0. `check:build-output` exits 0: the new handler prerenders, here
 with no paths, as the card route does while nothing is published.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add 'apps/web/src/app/blog/[slug]/index.md/route.ts' apps/web/src/app/blog/index.md/route.ts apps/web/src/app/blog/__tests__/post-page.test.tsx apps/web/src/data/__tests__/pages.test.ts apps/web/next.config.ts apps/web/src/test/next-config.test.ts apps/web/e2e/endpoints.ts docs/plans/2026-10-06-blog-publishing-plan.md
@@ -1885,7 +1972,7 @@ git commit -m "feat(web): serve each post's Markdown twin and list the posts in 
 
   The command is `node scripts/post-draft-check.mjs --kind own|jev <draft.md> <twin.md>`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `scripts/post-draft-check.test.mjs`:
 
@@ -1905,7 +1992,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { FOOTER_LINES, check, differences } from './post-draft-check.mjs';
+import { FOOTER_LINES, check, differences, lineDiff } from './post-draft-check.mjs';
 
 const ORIGIN = 'https://miloscvetkovic.dev';
 const TITLE = 'Where the tokens go: one week';
@@ -2014,6 +2101,33 @@ describe('the publish check', () => {
     assert.deepEqual(differences(draft(), twin({ kind: 'jev' }), 'jev'), []);
   });
 
+  /** @type {[string, string, string][]} */
+  const quoted = [
+    ['a quoted title holding " #"', 'title: "Week 1 #notes"', 'Week 1 #notes'],
+    ['an unquoted title holding # inside a word', 'title: Tokens in C# code', 'Tokens in C# code'],
+    [
+      'a title with \\" and \\\\ escapes',
+      'title: "A \\"quoted\\" C:\\\\temp"',
+      'A "quoted" C:\\temp',
+    ],
+    ['a list written [a, b]', 'tags: [tokens, cost]', TITLE],
+  ];
+  for (const [name, line, title] of quoted) {
+    it(`finds nothing for front matter with ${name}`, () => {
+      const front = line.startsWith('tags:')
+        ? replace(FRONT, 4, FRONT[4], line)
+        : replace(FRONT, 1, line);
+      assert.deepEqual(differences(draft(BODY, front), twin({ title }), 'own'), []);
+    });
+  }
+
+  it('finds nothing in a twin served on another origin, as a preview serves it', () => {
+    assert.deepEqual(
+      differences(draft(), twin().replaceAll(ORIGIN, 'http://localhost:3211'), 'own'),
+      [],
+    );
+  });
+
   describe('compares as equal what the serialiser changes on purpose', () => {
     /** @type {[string, string, string][]} */
     const cases = [
@@ -2069,12 +2183,16 @@ describe('the publish check', () => {
         draft(replace(replace(BODY, 13, '````yaml'), 17, '````')),
         twin(),
       ],
-      ['CRLF line endings and a byte-order mark', `﻿${draft().replace(/\n/g, '\r\n')}`, twin()],
+      [
+        'CRLF line endings and a byte-order mark',
+        `\uFEFF${draft().replace(/\n/g, '\r\n')}`,
+        twin(),
+      ],
       ["an absolute link on the twin's origin", draft(replace(BODY, 0, SERVED[0])), twin()],
       [
         'a no-break space on both sides',
-        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234 tokens'))),
-        twin({ body: replace(SERVED, 0, SERVED[0].replace('1,234 tokens', '1,234 tokens')) }),
+        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234\u00A0tokens'))),
+        twin({ body: replace(SERVED, 0, SERVED[0].replace('1,234 tokens', '1,234\u00A0tokens')) }),
       ],
       [
         'a single-quoted title with a doubled quote, as Prettier writes YAML',
@@ -2135,10 +2253,27 @@ describe('the publish check', () => {
       ],
       [
         'a no-break space in the draft where the twin has a plain space',
-        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234 tokens'))),
+        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234\u00A0tokens'))),
         twin(),
         'own',
-        /^- A paragraph .* 1,234 tokens\.$/m,
+        /^- A paragraph .* 1,234\u00A0tokens\.$/m,
+      ],
+      [
+        'a no-break space in the body, pointed at under its line',
+        draft(replace(BODY, 0, BODY[0].replace('1,234 tokens', '1,234\u00A0tokens'))),
+        twin(),
+        'own',
+        /^- A paragraph .* 1,234\u00A0tokens\.\n\? +\^ U\+00A0\n\+ A paragraph .* 1,234 tokens\.$/m,
+      ],
+      [
+        'a no-break space in the summary, pointed at under its line',
+        draft(
+          BODY,
+          replace(FRONT, 3, `description: ${SUMMARY.replace('a summary', 'a\u00A0summary')}`),
+        ),
+        twin(),
+        'own',
+        /^the summary differs \(- draft, \+ twin\):\n- .* a\u00A0summary, .*\n\? +\^ U\+00A0\n\+ /m,
       ],
       [
         'kept bold, which the comparison alone would pass',
@@ -2181,6 +2316,20 @@ describe('the publish check', () => {
         twin({ kind: 'jev' }),
         'own',
         /^the footer is \["I have/m,
+      ],
+      [
+        'an own twin that ends with a --- rule and nothing after it',
+        draft(),
+        `${twin()}\n---\n`,
+        'own',
+        /^the footer is a --- rule with nothing after it, but a post of kind own has no footer$/m,
+      ],
+      [
+        'a jev twin that ends with a --- rule and nothing after it',
+        draft(),
+        `${twin()}\n---\n`,
+        'jev',
+        /^the footer is a --- rule with nothing after it, but a post of kind jev ends with \["I/m,
       ],
     ];
     for (const [name, approved, served, kind, pattern] of cases) {
@@ -2346,6 +2495,122 @@ describe('the publish check', () => {
       assert.deepEqual(differences(approved, served, 'own'), []);
     });
 
+    for (const [marker, indent] of [
+      ['-', '  '],
+      ['1.', '   '],
+    ]) {
+      it(`reads a later line of a ${marker} item as CommonMark does: only an item from 1 interrupts`, () => {
+        // Indented to the item's text, the line is inside the item, where `1995.` cannot interrupt
+        // its paragraph, so the line continues it.
+        const lines = [`${marker} It was cold in`, `${indent}1995. It was a good year.`];
+        const served = twin({
+          body: [...SERVED, '', `${marker} It was cold in 1995. It was a good year.`],
+        });
+        assert.deepEqual(differences(draft([...BODY, '', ...lines]), served, 'own'), []);
+      });
+    }
+
+    it("starts the next item at a marker left of the item's text, whatever its number", () => {
+      const approved = draft([...BODY, '', '1. It was cold in', '1995. It was a good year.']);
+      const served = twin({ body: [...SERVED, '', '1. It was cold in', '2. It was a good year.'] });
+      assert.deepEqual(differences(approved, served, 'own'), []);
+    });
+
+    /** @type {[string, string[], string[], RegExp][]} */
+    const interrupted = [
+      ['a list item', ['- It was', '  01. b'], ['- It was 01. b'], /^line 30: a nested list$/m],
+      ['a quote', ['> It was', '> 01. b'], ['> It was 01. b'], /^line 30: a list inside a quote$/m],
+      [
+        'a paragraph',
+        ['It was', '01. b'],
+        ['It was 01. b'],
+        /^line 30: start each block after a blank line$/m,
+      ],
+    ];
+    for (const [where, approved, served, pattern] of interrupted) {
+      it(`reads 01. in ${where} as CommonMark does: an item from 1, which interrupts it`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', ...approved]),
+          'twin.md': twin({ body: [...SERVED, '', ...served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, pattern);
+      });
+    }
+
+    for (const [approved, served] of [
+      [
+        ['- It was', '* b'],
+        ['- It was', '- b'],
+      ],
+      [
+        ['1. It was', '2) b'],
+        ['1. It was', '2. b'],
+      ],
+    ]) {
+      it(`reports a list that changes its bullet or delimiter: ${approved.join(' / ')}`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', ...approved]),
+          'twin.md': twin({ body: [...SERVED, '', ...served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, /^line 30: a change of bullet or delimiter starts a new list /m);
+      });
+    }
+
+    it('accepts a list that uses * throughout', () => {
+      const approved = draft([...BODY, '', '* It was', '* b']);
+      const served = twin({ body: [...SERVED, '', '- It was', '- b'] });
+      assert.deepEqual(differences(approved, served, 'own'), []);
+    });
+
+    it('accepts a numbered list and a bulleted list with a paragraph between them', () => {
+      const lines = ['1. One', '2. Two', '', 'Between them.', '', '- Three'];
+      const served = twin({ body: [...SERVED, '', ...lines] });
+      assert.deepEqual(differences(draft([...BODY, '', ...lines]), served, 'own'), []);
+    });
+
+    /** @type {[string[], string[], number][]} */
+    const loose = [
+      [['1. First', '', '2. Second'], ['1. First', '2. Second'], 31],
+      [['- a', '', '- b'], ['- a', '- b'], 31],
+      [['- a', '', '* b'], ['- a', '- b'], 31],
+      [['1. a', '', '2) b'], ['1. a', '2. b'], 31],
+      [['- a', '', '', '- b'], ['- a', '- b'], 32],
+      [['- a', 'continued', '', '- b'], ['- a continued', '- b'], 32],
+    ];
+    for (const [approved, served, line] of loose) {
+      it(`reports a blank line between list items: ${JSON.stringify(approved)}`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', ...approved]),
+          'twin.md': twin({ body: [...SERVED, '', ...served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(
+          output,
+          new RegExp(
+            `^line ${line}: a blank line between list items makes one loose list in Markdown, ` +
+              'or two lists when the marker changes, and a post holds neither; ' +
+              'remove the blank line$',
+            'm',
+          ),
+        );
+      });
+    }
+
+    for (const lines of [
+      ['- a', '', '1. b'],
+      ['1. a', '', '- b'],
+    ]) {
+      it(`accepts lists of two kinds with a blank line between them: ${lines.join(' / ')}`, () => {
+        const served = twin({ body: [...SERVED, '', ...lines] });
+        assert.deepEqual(differences(draft([...BODY, '', ...lines]), served, 'own'), []);
+      });
+    }
+
     it('reports a whole-line --- rule once, as a rule, not as a list item holding one', () => {
       const problems = differences(draft([...BODY, '', '- ---']), twin(), 'own');
       assert.deepEqual(
@@ -2365,6 +2630,12 @@ describe('the publish check', () => {
       ['a bare URL', 'See https://example.com for more.', /a bare URL/],
       ['a bare www. address', 'See www.example.com for more.', /^line 29: a bare URL/],
       [
+        'a bare www. address in brackets',
+        'See [www.example.com] for more.',
+        /^line 29: a bare URL/,
+      ],
+      ['a bare email address', 'Write to name@example.com today.', /^line 29: an email address/],
+      [
         "a link inside a link's text",
         'See [the [work](/work) page](/work).',
         /^line 29: a link inside a link's text$/,
@@ -2377,15 +2648,38 @@ describe('the publish check', () => {
       ['an entity reference', 'Fish &amp; chips, &#169; and &#x2014;.', /an entity reference/],
       ['a footnote', 'A claim.[^1]', /a footnote/],
       ['a reference-style link', 'See [the docs][docs].', /a reference-style link/],
+      [
+        'a link reference definition in a quote',
+        '> [docs]: /work',
+        /^line 29: a reference-style link definition/,
+      ],
+      [
+        'a link reference definition in a list item',
+        '- [docs]: /work',
+        /^line 29: a reference-style link definition/,
+      ],
+      [
+        'a link reference definition in a quote in an ordered item',
+        '1. > [docs]: /work',
+        /^line 29: a reference-style link definition/,
+      ],
       ['a level-1 heading', '# A second title', /a level-1 heading/],
       ['a level-4 heading', '#### Too deep', /a heading below level 3/],
       ['a setext heading', ['A heading', '---'], /a setext heading underline/],
       ['a --- rule', ['---'], /a --- rule/],
       ['a nested list', ['- An item', '  - A nested item'], /a nested list/],
+      ['a nested ordered list', ['1. An item', '   1. A nested item'], /^line 30: a nested list$/],
       ['an ordered list that starts at 3', ['3. Third', '4. Fourth'], /starts at 3/],
       ['a quote of two paragraphs', ['> One.', '>', '> Two.'], /an empty quote line/],
       ['a hard line break', ['A line that breaks  ', 'here.'], /a hard line break/],
       ['a line indented with a tab', '\tIndented text.', /a line indented with a tab/],
+      ['a tab inside a line', 'Tokens:\t1,234 a day.', /^line 29: a tab; /],
+      [
+        'a tab after a list marker, which CommonMark reads as a list',
+        '-\tAn item',
+        /^line 29: a tab; /,
+      ],
+      ['a tab in a code span', 'Run `make\tall` now.', /^line 29: a tab; /],
       ['italics with underscores', 'Some _italic_ text.', /an emphasis marker _/],
       ['strikethrough', 'Some ~~struck~~ text.', /strikethrough/],
       [
@@ -2439,6 +2733,85 @@ describe('the publish check', () => {
       });
     }
 
+    /** @type {[string, string[]][]} */
+    const notBreaks = [
+      ['trailing spaces before a blank line', ['The end of a paragraph.  ', '', 'The next one.']],
+      ['trailing spaces before the next item', ['- An item  ', '- The next item']],
+      ['trailing spaces before the next numbered item', ['1. An item  ', '2. The next item']],
+      [
+        'trailing spaces before the next row',
+        ['| Day | Tokens |  ', '| --- | --- |  ', '| Monday | 1,234 |'],
+      ],
+      [
+        'trailing spaces after a caption',
+        ['Table: Tokens  ', '| Day | Tokens |', '| --- | --- |', '| Monday | 1,234 |'],
+      ],
+      ['an escaped backslash', ['A folder named C:\\\\', 'and more text.']],
+      ['two escaped backslashes', ['A share named \\\\\\\\', 'and more text.']],
+    ];
+    for (const [name, lines] of notBreaks) {
+      it(`accepts ${name}, which makes no hard line break`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.deepEqual(
+          problems.filter((problem) => problem.includes('hard line break')),
+          [],
+        );
+      });
+    }
+
+    /** @type {[string, string[]][]} */
+    const breaks = [
+      ['a trailing backslash', ['A line that breaks\\', 'here.']],
+      ['three trailing backslashes', ['A folder named C:\\\\\\', 'here.']],
+      ['trailing spaces in a list item', ['- An item that breaks  ', '  here.']],
+      ['trailing spaces before a lazy line of an item', ['- An item that breaks  ', 'here.']],
+      ['trailing spaces in a quote', ['> A quote that breaks  ', '> here.']],
+    ];
+    for (const [name, lines] of breaks) {
+      it(`reports a hard line break: ${name}`, () => {
+        const problems = differences(draft([...BODY, '', ...lines]), twin(), 'own');
+        assert.ok(problems.includes('line 29: a hard line break'), problems.join('\n'));
+      });
+    }
+
+    /**
+     * The body's diff for a table whose last row the draft writes as `draftRow` and the twin
+     * serves as `twinRow`.
+     * @param {string} draftRow @param {string} twinRow
+     */
+    const tableDiff = (draftRow, twinRow) => {
+      const head = ['| Path | Size |', '| --- | --- |'];
+      const problems = differences(
+        draft([...BODY, '', ...head, draftRow]),
+        twin({ body: [...SERVED, '', ...head, twinRow] }),
+        'own',
+      );
+      return problems.find((problem) => problem.startsWith('the body differs')) ?? '';
+    };
+
+    it("escapes a backslash in a table row's code, as it escapes a pipe there", () => {
+      const body = tableDiff('| `C:\\dir` | 1 |', '| C:\\\\dir | 2 |');
+      assert.match(body, /^- \| `C:\\\\dir` \| 1 \|$/m);
+    });
+
+    it("escapes a table row's text backslash again, after canonical text's escape", () => {
+      const body = tableDiff('| C:\\dir | 1 |', '| C:\\\\dir | 2 |');
+      assert.match(body, /^- \| C:\\\\\\\\dir \| 1 \|$/m);
+      assert.match(body, /^\+ \| C:\\\\\\\\dir \| 2 \|$/m);
+    });
+
+    it('reports a code fence that is never closed by the line it opened on', () => {
+      const problems = differences(
+        draft([...BODY, '', 'One.', '', '~~~~ts', 'const a = 1;']),
+        twin(),
+        'own',
+      );
+      assert.ok(
+        problems.includes('line 31: the code fence opened with ~~~~ is never closed'),
+        problems.join('\n'),
+      );
+    });
+
     it('accepts the same characters escaped, inside code, or inside a word', () => {
       const approved = draft([
         ...BODY,
@@ -2450,11 +2823,165 @@ describe('the publish check', () => {
       });
       assert.deepEqual(differences(approved, served, 'own'), []);
     });
+
+    it("accepts brackets and an escape in a link's text that make no link of their own", () => {
+      const approved = draft([...BODY, '', 'See [a [b]\\!(c) d](/work).']);
+      const served = twin({ body: [...SERVED, '', `See [a \\[b\\]!(c) d](${ORIGIN}/work).`] });
+      assert.deepEqual(differences(approved, served, 'own'), []);
+    });
+
+    for (const [form, approved, served] of [
+      [
+        'a title',
+        'See [the docs](/work "Work page") now.',
+        'See \\[the docs\\](/work "Work page") now.',
+      ],
+      [
+        'spaces around its destination',
+        'See [the docs]( /work ) now.',
+        'See \\[the docs\\]( /work ) now.',
+      ],
+    ]) {
+      it(`reports a link with ${form}, which the twin serves as text`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', approved]),
+          'twin.md': twin({ body: [...SERVED, '', served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, /^line 29: a link title or spaces around a link's destination; /m);
+      });
+    }
+
+    for (const [approved, served] of [
+      ['- [ ] write the post', '- \\[ \\] write the post'],
+      ['- [x] done', '- \\[x\\] done'],
+      ['1. [X] done', '1. \\[X\\] done'],
+    ]) {
+      it(`reports a task list item, which GFM renders as a checkbox: ${approved}`, () => {
+        const files = {
+          'draft.md': draft([...BODY, '', approved]),
+          'twin.md': twin({ body: [...SERVED, '', served] }),
+        };
+        const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+        assert.equal(status, 1);
+        assert.match(output, /^line 29: a task list item, which GFM renders as a checkbox; /m);
+      });
+    }
+
+    it('accepts escaped brackets before a parenthesis, which make no link', () => {
+      const line = 'Brackets \\[like these\\](/work "Work page") stay text.';
+      const served = twin({ body: [...SERVED, '', line] });
+      assert.deepEqual(differences(draft([...BODY, '', line]), served, 'own'), []);
+    });
+
+    it('reports an email autolink once, whatever its address starts with', () => {
+      for (const address of ['name@example.com', '2026@example.com']) {
+        const problems = differences(draft([...BODY, '', `Write to <${address}>.`]), twin(), 'own');
+        assert.deepEqual(
+          problems.filter((problem) => problem.startsWith('line 29:')),
+          ['line 29: raw HTML, an HTML comment or an autolink'],
+          address,
+        );
+      }
+    });
+
+    it('accepts an email address as a link or as code', () => {
+      const line = 'Write to [name@example.com](mailto:name@example.com) or `name@example.com`.';
+      const served = twin({ body: [...SERVED, '', line] });
+      assert.deepEqual(differences(draft([...BODY, '', line]), served, 'own'), []);
+    });
+
+    it('reports a tab in the front matter by its line', () => {
+      const front = replace(FRONT, 1, `title: "Where the tokens go:\tone week"`);
+      const problems = differences(draft(BODY, front), twin(), 'own');
+      assert.ok(
+        problems.some((problem) => /^line 2: a tab in the front matter; /.test(problem)),
+        problems.join('\n'),
+      );
+    });
+
+    it('reports a blank line that holds a tab, as it does in the front matter', () => {
+      const files = {
+        'draft.md': draft([...BODY, '', 'One.', ' \t', 'Two.']),
+        'twin.md': twin({ body: [...SERVED, '', 'One.', '', 'Two.'] }),
+      };
+      const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files));
+      assert.equal(status, 1);
+      assert.match(output, /^line 30: a tab on a blank line; /m);
+    });
+
+    /** @type {[string, string, string][]} */
+    const unicodeBlanks = [
+      ['a no-break space', '\u00A0', 'U+00A0'],
+      ['an ideographic space between spaces', ' \u3000 ', 'U+3000'],
+      ['a no-break space and a form feed', '\u00A0\f\u00A0', 'U+00A0 and U+000C'],
+    ];
+    for (const [name, blank, named] of unicodeBlanks) {
+      it(`reports a line that only looks blank: ${name}`, () => {
+        const approved = draft([...BODY, '', 'One.', blank, 'Two.']);
+        const served = twin({ body: [...SERVED, '', 'One.', '', 'Two.'] });
+        assert.deepEqual(differences(approved, served, 'own'), [
+          `line 30: a line of ${named} looks blank but is text to Markdown; leave it empty`,
+        ]);
+      });
+    }
+
+    it('accepts a line of no-break spaces inside a code fence', () => {
+      const code = ['```text', 'One.', '\u00A0\u00A0', 'Two.', '```'];
+      const served = twin({ body: [...SERVED, '', ...code] });
+      assert.deepEqual(differences(draft([...BODY, '', ...code]), served, 'own'), []);
+    });
+
+    it('accepts a blank line that holds a tab inside a code fence', () => {
+      const code = ['```make', 'all:', '\t', '\tnode build.mjs', '```'];
+      const served = twin({ body: [...SERVED, '', ...code] });
+      assert.deepEqual(differences(draft([...BODY, '', ...code]), served, 'own'), []);
+    });
+
+    it('accepts a tab inside a code fence, where it is code', () => {
+      const code = ['```make', 'all:', '\tnode build.mjs', '```'];
+      const served = twin({ body: [...SERVED, '', ...code] });
+      assert.deepEqual(differences(draft([...BODY, '', ...code]), served, 'own'), []);
+    });
+  });
+});
+
+describe('lineDiff()', () => {
+  it('points at a no-break space, which prints like a space, and names it', () => {
+    assert.equal(
+      lineDiff(['1,234\u00A0tokens'], ['1,234 tokens']),
+      ['- 1,234\u00A0tokens', `? ${' '.repeat(5)}^ U+00A0`, '+ 1,234 tokens'].join('\n'),
+    );
+  });
+
+  it('points at format characters, which print as nothing, and names them', () => {
+    assert.equal(
+      lineDiff(['co\u00ADop\u200Bx\u2060y'], ['coopxy']),
+      ['- co\u00ADop\u200Bx\u2060y', '?   ^  ^ ^ U+00AD, U+200B, U+2060', '+ coopxy'].join('\n'),
+    );
+  });
+
+  it('keeps a tab in its guide line, so the mark stays under its character', () => {
+    assert.equal(
+      lineDiff(['\tx\u2009y\u00A0z'], ['\tx y z']),
+      ['- \tx\u2009y\u00A0z', '? \t ^ ^ U+2009, U+00A0', '+ \tx y z'].join('\n'),
+    );
   });
 });
 
 describe('check()', () => {
   const files = { 'draft.md': draft(), 'twin.md': twin({ kind: 'jev' }) };
+  /**
+   * The files with the front matter's line at `index` replaced by `lines`.
+   * @param {number} index @param {...string} lines
+   */
+  const withFront = (index, ...lines) => ({
+    ...files,
+    'draft.md': draft(BODY, replace(FRONT, index, ...lines)),
+  });
+  const TAKES = 'the front matter takes key: value lines, and lists written \\[a, b\\]';
+  const ARGV = ['--kind', 'own', 'draft.md', 'twin.md'];
 
   it('exits 0 quietly when the two agree', () => {
     assert.deepEqual(check(['--kind', 'jev', 'draft.md', 'twin.md'], reader(files)), {
@@ -2491,13 +3018,149 @@ describe('check()', () => {
           FRONT.filter((line) => !line.startsWith('description:')),
         ),
       },
-      /needs a title, a slug and a description/,
+      /^post-draft-check: the front matter's description is missing or blank$/m,
     ],
     [
       'a twin that does not open with its title',
       ['--kind', 'own', 'draft.md', 'twin.md'],
       { ...files, 'twin.md': md(SERVED) },
       /does not open with a # title/,
+    ],
+    [
+      'a Source URL on another path than /blog/<slug>',
+      ['--kind', 'own', 'draft.md', 'twin.md'],
+      { ...files, 'twin.md': twin().replace(`${ORIGIN}/blog/`, `${ORIGIN}/work/`) },
+      new RegExp(
+        "^post-draft-check: the twin's Source URL is not /blog/<slug>: " +
+          `${ORIGIN.replaceAll('.', '\\.')}/work/where-the-tokens-go$`,
+        'm',
+      ),
+    ],
+    [
+      'a Source URL one folder deeper than /blog/<slug>',
+      ['--kind', 'own', 'draft.md', 'twin.md'],
+      { ...files, 'twin.md': twin().replace(`${ORIGIN}/blog/`, `${ORIGIN}/blog/2026/`) },
+      /^post-draft-check: the twin's Source URL is not \/blog\/<slug>: \S+\/blog\/2026\/\S+$/m,
+    ],
+    [
+      'an opening fence with a space after it',
+      ARGV,
+      withFront(0, '--- '),
+      /^post-draft-check: line 1: a front matter fence is "--- "; write exactly ---$/m,
+    ],
+    [
+      'an opening fence with a space after it and no closing fence',
+      ARGV,
+      { ...files, 'draft.md': md(['--- ', FRONT[1], '', 'One paragraph.']) },
+      /^post-draft-check: line 1: a front matter fence is "--- "; write exactly ---$/m,
+    ],
+    [
+      'a closing fence of four dashes',
+      ARGV,
+      withFront(5, '----'),
+      /^post-draft-check: line 6: a front matter fence is "----"; write exactly ---$/m,
+    ],
+    [
+      'a YAML block list',
+      ARGV,
+      withFront(4, 'date: 2026-10-06', 'tags:', '  - tokens'),
+      new RegExp(`^post-draft-check: line 7: a YAML block list item; ${TAKES}$`, 'm'),
+    ],
+    ...['>', '>-', '|'].map(
+      (indicator) =>
+        /** @type {[string, string[], Record<string, string>, RegExp]} */ ([
+          `a folded or literal value written ${indicator}`,
+          ARGV,
+          withFront(3, `description: ${indicator}`, `  ${SUMMARY}`),
+          new RegExp(
+            `^post-draft-check: line 4: a folded or literal value \\(\\${indicator}\\); ${TAKES}$`,
+            'm',
+          ),
+        ]),
+    ),
+    [
+      'a comment line',
+      ARGV,
+      withFront(4, '# the dates follow D9', 'date: 2026-10-06'),
+      new RegExp(`^post-draft-check: line 5: a comment; ${TAKES}$`, 'm'),
+    ],
+    [
+      'an unquoted value holding " #", which YAML reads as a comment',
+      ARGV,
+      withFront(3, `description: ${SUMMARY} #draft`),
+      new RegExp(
+        '^post-draft-check: line 4: " #" starts a YAML comment in an unquoted value; ' +
+          'quote it or drop the comment$',
+        'm',
+      ),
+    ],
+    [
+      'an unquoted value that opens with #',
+      ARGV,
+      withFront(1, 'title: #1 where the tokens go'),
+      /^post-draft-check: line 2: " #" starts a YAML comment in an unquoted value; /m,
+    ],
+    ...[
+      ['\\t', 'title: "Where the tokens go:\\tone week"'],
+      ['\\u', 'title: "Where the tokens go: caf\\u00e9"'],
+      ['\\/', 'title: "Where the tokens go: in\\/out"'],
+    ].map(
+      ([escape, line]) =>
+        /** @type {[string, string[], Record<string, string>, RegExp]} */ ([
+          `the escape ${escape} in a double-quoted value`,
+          ARGV,
+          withFront(1, line),
+          new RegExp(
+            `^post-draft-check: line 2: the escape \\${escape} in a double-quoted value; ` +
+              'write the character itself, as only \\\\" and \\\\\\\\ are read$',
+            'm',
+          ),
+        ]),
+    ),
+    [
+      'a key given twice',
+      ARGV,
+      withFront(4, 'date: 2026-10-06', 'title: "Another title"'),
+      /^post-draft-check: line 6: the key title appears twice in the front matter$/m,
+    ],
+    [
+      'a draft with no body',
+      ARGV,
+      { ...files, 'draft.md': draft([]) },
+      /^post-draft-check: the draft has no body after its front matter$/m,
+    ],
+    [
+      'a twin with no body',
+      ARGV,
+      { ...files, 'twin.md': twin({ body: [] }) },
+      /^post-draft-check: the twin has no body after its Published and Updated lines$/m,
+    ],
+    [
+      'a jev twin with a footer and no body',
+      ['--kind', 'jev', 'draft.md', 'twin.md'],
+      { ...files, 'twin.md': twin({ body: [], kind: 'jev' }) },
+      /^post-draft-check: the twin has no body after its Published and Updated lines$/m,
+    ],
+    [
+      'front matter without a title',
+      ARGV,
+      withFront(1),
+      /^post-draft-check: the front matter's title is missing or blank$/m,
+    ],
+    [
+      'a slug of spaces',
+      ARGV,
+      withFront(2, 'slug: "   "'),
+      /^post-draft-check: the front matter's slug is missing or blank$/m,
+    ],
+    [
+      'an empty description and no title',
+      ARGV,
+      {
+        ...files,
+        'draft.md': draft(BODY, [FRONT[0], FRONT[2], 'description:', ...FRONT.slice(4)]),
+      },
+      /^post-draft-check: the front matter's title and description are missing or blank$/m,
     ],
   ];
   for (const [name, argv, given, pattern] of cannotRun) {
@@ -2521,7 +3184,79 @@ describe('check()', () => {
   });
 });
 
+describe('check() on a file it cannot read, or a fault in itself', () => {
+  it('names the path of a directory given as the draft, in one line', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'post-draft-check-'));
+    try {
+      writeFileSync(join(dir, 'twin.md'), twin());
+      const { status, output } = check(['--kind', 'own', dir, join(dir, 'twin.md')]);
+      assert.equal(status, 2);
+      assert.match(output, /^post-draft-check: EISDIR: /);
+      assert.ok(output.endsWith(` '${dir}'\n`), output);
+      assert.equal(output.split('\n').length, 2, output);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('names the path of a missing twin once, as Node already does', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'post-draft-check-'));
+    try {
+      writeFileSync(join(dir, 'draft.md'), draft());
+      const gone = join(dir, 'gone.md');
+      const { status, output } = check(['--kind', 'own', join(dir, 'draft.md'), gone]);
+      assert.equal(status, 2);
+      assert.match(output, /^post-draft-check: ENOENT: /);
+      assert.equal(output.split(gone).length, 2, output);
+      assert.equal(output.split('\n').length, 2, output);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('exits 2 with the message and the stack of an error the check did not expect', () => {
+    const { status, output } = check(['--kind', 'own', 'draft.md', 'twin.md'], () => {
+      throw new TypeError('a fault in the check');
+    });
+    assert.equal(status, 2);
+    assert.match(
+      output,
+      /^post-draft-check: a fault in the check\nTypeError: a fault in the check\n +at /,
+    );
+  });
+
+  it('keeps the message of a check that could not run to one line, without a stack', () => {
+    const files = { 'draft.md': md(BODY), 'twin.md': twin() };
+    assert.deepEqual(check(['--kind', 'own', 'draft.md', 'twin.md'], reader(files)), {
+      status: 2,
+      output: 'post-draft-check: the draft does not open with front matter between two --- lines\n',
+    });
+  });
+});
+
 describe('the command', () => {
+  it('exits 2, not 1, with a stack when realpathSync throws as the script loads', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'post-draft-check-'));
+    try {
+      const script = new URL('./post-draft-check.mjs', import.meta.url).href;
+      // With -e, process.argv[1] is the first argument: a path that does not exist.
+      const { status, stderr } = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `await import(${JSON.stringify(script)});`,
+          join(dir, 'gone.md'),
+        ],
+        { encoding: 'utf8' },
+      );
+      assert.equal(status, 2, stderr);
+      assert.match(stderr, /^post-draft-check: ENOENT: [^\n]*\nError: ENOENT: [^\n]*\n +at /);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("exits with check()'s status when run with node", () => {
     const dir = mkdtempSync(join(tmpdir(), 'post-draft-check-'));
     try {
@@ -2542,7 +3277,7 @@ describe('the command', () => {
 });
 `````
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 ```bash
 node --test scripts/post-draft-check.test.mjs
@@ -2550,7 +3285,7 @@ node --test scripts/post-draft-check.test.mjs
 
 Expected: FAIL, with `Cannot find module` for `./post-draft-check.mjs`.
 
-- [ ] **Step 3: Write the check**
+- [x] **Step 3: Write the check**
 
 Create `scripts/post-draft-check.mjs`:
 
@@ -2568,8 +3303,12 @@ Create `scripts/post-draft-check.mjs`:
 // Then it compares the slug, the title, the summary, the body and the footer, after undoing on both
 // sides only what the serialiser does on purpose. The canonical form keeps every block's kind, and
 // keeps text apart from code spans and links, so a block kind changed or a link or code span the
-// entry flattened into plain text is a difference. Exit 0 when they agree, quietly; 1 with each
-// difference; 2 when the check could not run, whatever stopped it. Plain Node, no dependencies.
+// entry flattened into plain text is a difference. Exit 0 when they agree, quietly; 1 with the
+// differences or refused syntax; 2 when the check could not run, whatever stopped it.
+//
+// The dates are not compared: D9 sets them on the day the pull request opens. `--kind` is the
+// writing room tracker's kind (D2), never read back from `posts.ts`; D4's naming check in
+// `posts.test.ts` is the backstop for a Jev post marked `own`. Plain Node, no dependencies.
 
 import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -2585,7 +3324,7 @@ export const FOOTER_LINES = Object.freeze({
   jev: Object.freeze(['I have no relationship with TypeSafe.']),
 });
 
-/** The check could not run (exit 2), as opposed to finding a difference (exit 1). */
+/** The check could not run (exit 2), not differences or refused syntax (exit 1). */
 export class CannotRun extends Error {}
 
 /** A backslash escape of ASCII punctuation, which CommonMark reads as the character itself. */
@@ -2872,6 +3611,8 @@ const isTable = (lines) =>
 
 /**
  * A pipe table row with its cells trimmed and in canonical form, or the delimiter row as `---`s.
+ * Every backslash and pipe in a cell is escaped, so a row reads back as exactly its cells; a
+ * backslash that canonical text has already escaped shows doubled, on both sides alike.
  * @param {string} line
  * @param {boolean} delimiter
  * @param {string} origin
@@ -2883,7 +3624,7 @@ function tableRow(line, delimiter, origin) {
   const cells = row.split(/(?<!\\)\|/).map((cell) => cell.trim());
   const shown = delimiter
     ? cells.map(() => '---')
-    : cells.map((cell) => canonicalInline(cell, origin).replace(/\|/g, '\\|'));
+    : cells.map((cell) => canonicalInline(cell, origin).replace(/[\\|]/g, '\\$&'));
   return `| ${shown.join(' | ')} |`;
 }
 
@@ -2900,17 +3641,62 @@ function canonicalTable(lines, caption, origin) {
 }
 
 /**
- * A list with `-` for every bullet, ordered items numbered from 1, and each item's lines joined.
+ * How many spaces a line starts with. A list item's line with fewer than the item's text column
+ * leaves that item.
+ * @param {string} line
+ */
+const leadingSpaces = (line) => line.length - line.replace(/^ +/, '').length;
+
+/**
+ * The column where a list item's text starts: after its marker and the spaces that follow it, or
+ * one space after the marker when five or more follow, which make the text indented code.
+ * @param {string} line a list item's first line
+ */
+function itemIndent(line) {
+  const match = /^( {0,3})([-*+]|\d{1,9}[.)])( +)/.exec(line);
+  if (!match) return 0;
+  const spaces = match[3].length;
+  return match[1].length + match[2].length + (spaces > 4 ? 1 : spaces);
+}
+
+/**
+ * Whether a later line of a list starts an item, as CommonMark reads it. A line indented to the
+ * current item's text is inside that item, where it continues the paragraph unless it can interrupt
+ * one: a bullet with text, or an ordered item from 1 (`1.`, `01.`) with text, either of which nests
+ * a list. So `  1995. It was` there continues the item. A line indented less leaves the item and
+ * starts an item at any list marker, whatever its number; without a marker it is a lazy
+ * continuation. After an ordered item, a number with the same `.` or `)` starts the next item of
+ * the same list. A marker of the other kind, such as a number after a bullet item, starts a new
+ * list in CommonMark, which this check keeps in the same block; that fails safe, since
+ * `canonicalList()` keeps each item's kind, so no twin's list equals it. A change of bullet
+ * character, or from `.` to `)`, starts a new list of the same kind, which a post cannot hold
+ * beside another, so `refusedSyntax()` refuses it.
+ * @param {string} line
+ * @param {number} indent the column where the current item's text starts
+ */
+function startsItem(line, indent) {
+  if (leadingSpaces(line) < indent) return LIST_ITEM.test(line);
+  return /^ {0,3}(?:[-*+]|0*1[.)]) +\S/.test(line.slice(indent));
+}
+
+/**
+ * A list with `-` for every bullet, ordered items numbered from 1, and each item's lines joined. A
+ * later line starts an item only where `startsItem()` says CommonMark starts one.
  * @param {string[]} lines
  * @param {string} origin
  */
 function canonicalList(lines, origin) {
   /** @type {{ ordered: boolean, text: string[] }[]} */
   const items = [];
+  let indent = 0;
   for (const line of lines) {
-    const item = LIST_ITEM.exec(line);
-    if (item) items.push({ ordered: /\d/.test(item[1]), text: [item[2]] });
-    else items[items.length - 1]?.text.push(line);
+    const item = items.length === 0 || startsItem(line, indent) ? LIST_ITEM.exec(line) : null;
+    if (item) {
+      items.push({ ordered: /\d/.test(item[1]), text: [item[2]] });
+      indent = itemIndent(line);
+    } else {
+      items[items.length - 1]?.text.push(line);
+    }
   }
   let number = 0;
   const shown = items.map(({ ordered, text }) => {
@@ -2977,43 +3763,87 @@ export function canonicalise(blocks, origin) {
 
 /**
  * A front-matter value without its YAML quotes: `"…"` with its `\"` and `\\` escapes, or `'…'`
- * with its `''`. Prettier writes the single-quoted form, the writing room may write either.
+ * with its `''`. Prettier writes the single-quoted form, the writing room may write either. YAML
+ * reads more than this: a ` #` that starts a comment in an unquoted value, and escapes such as `\t`
+ * or `\u00e9` in a double-quoted one. Each of those is refused, so the value is never misread.
  * @param {string} value
+ * @param {string} at the value's line, for a message
  */
-function unquote(value) {
-  if (/^".*"$/.test(value)) return value.slice(1, -1).replace(/\\(["\\])/g, '$1');
+function unquote(value, at) {
+  if (/^".*"$/.test(value)) {
+    for (const [escape, char] of value.slice(1, -1).matchAll(/\\([\s\S]?)/g)) {
+      if (char !== '"' && char !== '\\') {
+        throw new CannotRun(
+          `${at}: the escape ${escape} in a double-quoted value; ` +
+            'write the character itself, as only \\" and \\\\ are read',
+        );
+      }
+    }
+    return value.slice(1, -1).replace(/\\(["\\])/g, '$1');
+  }
   if (/^'.*'$/.test(value)) return value.slice(1, -1).replace(/''/g, "'");
+  if (/(?:^|[ \t])#/.test(value)) {
+    throw new CannotRun(
+      `${at}: " #" starts a YAML comment in an unquoted value; quote it or drop the comment`,
+    );
+  }
   return value;
 }
 
+/** A line of three or more dashes, perhaps with spaces or tabs after them: meant as a fence. */
+const FENCE_LIKE = /^-{3,}[ \t]*$/;
+
+/** What a front-matter line may be, for a message that refuses one. */
+const TAKES = 'the front matter takes key: value lines, and lists written [a, b]';
+
 /**
- * The draft's front matter and body. Front matter is flat `key: value` lines between two `---`
- * lines, the first of them the file's first line. A value may be quoted as YAML quotes it.
+ * The draft's front matter and body. Front matter is flat `key: value` lines between two lines of
+ * exactly `---`, the first of them the file's first line; a list is written `[a, b]` on its key's
+ * line, and a value may be quoted as YAML quotes it. No key comes twice, and the body is not empty.
  * @param {string} source
  * @returns {{ front: Map<string, string>, body: string, firstBodyLine: number }}
  */
 export function parseDraft(source) {
-  const text = normalise(source);
-  const match = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(text);
-  if (!match)
+  const lines = normalise(source).split('\n');
+  const close = lines.findIndex((line, index) => index > 0 && FENCE_LIKE.test(line));
+  for (const index of [0, close]) {
+    const line = index === -1 ? '' : lines[index];
+    if (FENCE_LIKE.test(line) && line !== '---') {
+      throw new CannotRun(
+        `line ${index + 1}: a front matter fence is ${JSON.stringify(line)}; write exactly ---`,
+      );
+    }
+  }
+  if (lines[0] !== '---' || close === -1) {
     throw new CannotRun('the draft does not open with front matter between two --- lines');
+  }
   /** @type {Map<string, string>} */
   const front = new Map();
-  for (const line of match[1].split('\n')) {
-    if (!line.trim()) continue;
+  lines.slice(1, close).forEach((line, index) => {
+    const at = `line ${index + 2}`;
+    if (!line.trim()) return;
+    if (/^\s*#/.test(line)) throw new CannotRun(`${at}: a comment; ${TAKES}`);
+    if (/^\s*-(?:\s|$)/.test(line)) throw new CannotRun(`${at}: a YAML block list item; ${TAKES}`);
     const pair = /^([A-Za-z][\w-]*): *(.*)$/.exec(line);
-    if (!pair)
-      throw new CannotRun(`the front matter line ${JSON.stringify(line)} is not key: value`);
-    front.set(pair[1], unquote(pair[2].trim()));
-  }
-  return { front, body: text.slice(match[0].length), firstBodyLine: match[0].split('\n').length };
+    if (!pair) throw new CannotRun(`${at}: ${JSON.stringify(line)} is not key: value; ${TAKES}`);
+    const [key, value] = [pair[1], pair[2].trim()];
+    if (/^[|>][-+0-9]*$/.test(value)) {
+      throw new CannotRun(`${at}: a folded or literal value (${value}); ${TAKES}`);
+    }
+    if (front.has(key))
+      throw new CannotRun(`${at}: the key ${key} appears twice in the front matter`);
+    front.set(key, unquote(value, at));
+  });
+  const body = lines.slice(close + 1).join('\n');
+  if (!body.trim()) throw new CannotRun('the draft has no body after its front matter');
+  return { front, body, firstBodyLine: close + 2 };
 }
 
 /**
  * The served twin's parts, as `postToMarkdown` writes them: the `#` title, the summary, the
- * `Source:` line (on-site links are written on its origin, and its last path segment is the slug),
- * the Published and Updated lines, the body, and the footer lines that follow the last `---` rule
- * outside a code block.
+ * `Source:` line (on-site links are written on its origin, and its path is `/blog/<slug>`),
+ * the Published and Updated lines, the body, whether a `---` rule outside a code block ends it, and
+ * the footer lines that follow the last such rule.
  * @param {string} source
  */
 export function parseTwin(source) {
@@ -3036,13 +3866,21 @@ export function parseTwin(source) {
   } catch {
     throw new CannotRun(`the twin's Source line names no URL: ${url[1]}`);
   }
+  // Any origin, since a preview or a local server serves twins too, but only a post's own path.
+  const path = /^\/blog\/([^/]+)$/.exec(page.pathname);
+  if (!path) throw new CannotRun(`the twin's Source URL is not /blog/<slug>: ${url[1]}`);
   const rule = rest.map((block) => block.length === 1 && block[0] === '---').lastIndexOf(true);
+  const body = rule === -1 ? rest : rest.slice(0, rule);
+  if (body.length === 0) {
+    throw new CannotRun('the twin has no body after its Published and Updated lines');
+  }
   return {
     origin: page.origin,
-    slug: page.pathname.slice(page.pathname.lastIndexOf('/') + 1),
+    slug: path[1],
     title: heading[1],
     summary: summary.join('\n'),
-    body: rule === -1 ? rest : rest.slice(0, rule),
+    body,
+    ruled: rule !== -1,
     footer: rule === -1 ? [] : rest.slice(rule + 1).map((block) => block.join('\n')),
   };
 }
@@ -3051,16 +3889,26 @@ export function parseTwin(source) {
 const REFUSED_LINES = [
   [/^ {0,3}#(?: |$)/, 'a level-1 heading: the title, in the front matter, is the only one'],
   [/^ {0,3}#{4,6}(?: |$)/, 'a heading below level 3'],
-  [/^ {0,3}\[[^\]]+\]:/, 'a reference-style link definition or a footnote'],
-  [/^ {2,}(?:[-*+]|\d{1,9}[.)]) /, 'a nested list'],
+  // After any `>` and list markers too: a definition in a quote or a list item still defines the
+  // label, and turns a `[label]` anywhere in the post into a link.
+  [
+    /^ {0,3}(?:(?:>|[-*+] |\d{1,9}[.)] ) *)*\[[^\]]+\]:/,
+    'a reference-style link definition or a footnote',
+  ],
+  // Only a line that can interrupt the item's paragraph nests a list: see `startsItem()`.
+  [/^ {2,}(?:[-*+]|0*1[.)]) +\S/, 'a nested list'],
   [/^ {0,3}> *$/, 'an empty quote line, which makes a quote of more than one paragraph'],
   [/^ *\t/, 'a line indented with a tab; indent with spaces'],
+  // A tab anywhere else: CommonMark reads `-\tItem` as a list item, and the diff would show a
+  // tab in a code span as a space. A fence keeps its tabs.
+  [/^ *[^ \t].*\t/, 'a tab; write a space, or put the text in a code fence'],
 ];
 
 /** @type {[RegExp, string][]} */
 const REFUSED_INLINE = [
   [/!\[/, 'an image'],
-  [/<[A-Za-z!?/]/, 'raw HTML, an HTML comment or an autolink'],
+  // An email autolink's address may start with a digit or a mark: `<2026@example.com>`.
+  [/<(?:[A-Za-z!?/]|[\w.!#$%&'*+/=?^`{|}~-]+@)/, 'raw HTML, an HTML comment or an autolink'],
   [/\[\^/, 'a footnote'],
   [/\]\[/, 'a reference-style link'],
   [/\*/, 'an emphasis marker *; write \\* for the character'],
@@ -3100,7 +3948,7 @@ function blockKind(line, next) {
 function continues(block, line) {
   if (block === 'heading' || block === 'code' || opensFence(line)) return false;
   if (HEADING.test(line)) return false;
-  if (/^ {0,3}(?:[-*+]|1[.)]) +\S/.test(line)) return block === 'list';
+  if (/^ {0,3}(?:[-*+]|0*1[.)]) +\S/.test(line)) return block === 'list';
   if (/^ {0,3}>/.test(line)) return block === 'quote';
   if (/^ {0,3}\|/.test(line) || (line.includes('|') && DELIMITER_ROW.test(line))) {
     return block === 'table' || block === 'caption';
@@ -3114,8 +3962,8 @@ function continues(block, line) {
  * holds such syntax as text and the twin escapes its first mark, so the two bodies agree and only
  * this refusal catches it. A quote's later lines continue its paragraph, as CommonMark has it: a
  * `---` or `===` line makes the paragraph a setext heading, a delimiter row makes its last line a
- * table's header (GFM), and only a bullet or a `1.` item with text starts a list, so
- * `> 1995. It was` stays text there.
+ * table's header (GFM), and only a bullet or an item from 1 (`1.`, `01.`) with text starts a list,
+ * so `> 1995. It was` stays text there.
  * @param {string} content
  * @param {boolean} first whether `content` starts the item or quote
  * @returns {string | null}
@@ -3130,7 +3978,7 @@ function nestedBlock(content, first) {
   if (
     first
       ? /^ {0,3}(?:[-*+]|\d{1,9}[.)])(?: |$)/.test(content)
-      : /^ {0,3}(?:[-*+]|1[.)]) +\S/.test(content)
+      : /^ {0,3}(?:[-*+]|0*1[.)]) +\S/.test(content)
   ) {
     return 'a list';
   }
@@ -3156,6 +4004,14 @@ function prose(tokens, labels) {
 }
 
 /**
+ * Running text or a link's label as written, its escapes kept and each code span or link a space,
+ * for reading it again for links. `prose()` drops each escape whole, which would read `[b]\!(c)` as
+ * a link.
+ * @param {Token[]} tokens
+ */
+const written = (tokens) => tokens.map((token) => ('text' in token ? token.text : ' ')).join('');
+
+/**
  * The refused inline syntax in one run of text: a heading, a table row or caption, or the lines of a
  * paragraph, list item or quote joined, so a code span or link wrapped onto the next line is read
  * whole. Code spans, escapes and link destinations are left alone.
@@ -3178,16 +4034,29 @@ function refusedInline(source, at, block) {
   if (labels.some((label) => label.some((token) => 'code' in token))) {
     problems.push(`${at}: link text is plain text: no code`);
   }
-  if (labels.some((label) => inlineTokens(prose(label, false)).some((token) => 'label' in token))) {
+  // Each label read again with links allowed, so a link inside it is a link token.
+  const reread = labels.map((label) => inlineTokens(written(label)));
+  if (reread.some((label) => label.some((token) => 'label' in token))) {
     problems.push(`${at}: a link inside a link's text`);
+  }
+  // A `](` that `linkAt()` did not take, as with a title or a space around the destination, stays
+  // text on both sides, while CommonMark makes it a link. An escaped `\]` is text.
+  if ([tokens, ...reread].some((run) => /(?<!\\)(?:\\\\)*\]\(/.test(written(run)))) {
+    problems.push(
+      `${at}: a link title or spaces around a link's destination; the post format has neither`,
+    );
   }
   const text = prose(tokens, true);
   for (const [pattern, what] of REFUSED_INLINE) {
     if (pattern.test(text)) problems.push(`${at}: ${what}`);
   }
-  // GFM links a bare `www.` address too, after a space, `(` or an emphasis mark.
-  if (/https?:\/\/|(?:^|[\s*_~(])www\.[\p{L}\p{N}_-]/iu.test(prose(tokens, false))) {
+  // GFM links a bare `www.` address too, after a space, `(`, a bracket or an emphasis mark.
+  if (/https?:\/\/|(?:^|[\s*_~([\]])www\.[\p{L}\p{N}_-]/iu.test(prose(tokens, false))) {
     problems.push(`${at}: a bare URL, which GFM makes a link; write it as a link or as code`);
+  }
+  // And a bare email address; one inside `<…>` is an autolink, reported above.
+  if (/(?<![<\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+/.test(prose(tokens, false))) {
+    problems.push(`${at}: an email address, which GFM makes a link; write it as a link or as code`);
   }
   return problems;
 }
@@ -3205,12 +4074,20 @@ export function refusedSyntax(body, firstLine = 1) {
   const lines = body.split('\n');
   /** @type {string | null} */
   let fence = null;
+  /** the line the open code fence started on, for a fence that is never closed */
+  let fenceAt = '';
   /** @type {BlockKind | null} the block the line above belongs to; null after a blank line */
   let block = null;
   /** @type {{ kind: BlockKind, from: number, to: number, text: string[] } | null} */
   let run = null;
   /** whether the list item or quote the line belongs to already has a block refused inside it */
   let nested = false;
+  /** the column where the current list item's text starts, for `startsItem()` */
+  let indent = 0;
+  /** the last character of the current list's marker: its bullet, or its `.` or `)` */
+  let marker = '';
+  /** the marker of the list that the blank lines above this line end, if they end one */
+  let ended = '';
   const endRun = () => {
     if (run) {
       const [from, to] = [firstLine + run.from, firstLine + run.to];
@@ -3229,10 +4106,23 @@ export function refusedSyntax(body, firstLine = 1) {
       return;
     }
     if (!line.trim()) {
+      // A blank line is read before `REFUSED_LINES`: refuse its tab here, as the front matter does.
+      if (line.includes('\t')) problems.push(`${at}: a tab on a blank line; leave the line empty`);
+      // `trim()` strips any Unicode space; a CommonMark blank line holds only spaces and tabs.
+      const other = [...new Set(line.match(/[^ \t]/gu))].map(codePoint);
+      if (other.length > 0) {
+        problems.push(
+          `${at}: a line of ${other.join(' and ')} looks blank ` +
+            'but is text to Markdown; leave it empty',
+        );
+      }
       endRun();
+      if (block === 'list') ended = marker;
       block = null;
       return;
     }
+    const after = ended;
+    ended = '';
     const previous = lines[index - 1] ?? '';
     const next = lines[index + 1] ?? '';
     if (block !== null && !continues(block, line)) {
@@ -3243,12 +4133,22 @@ export function refusedSyntax(body, firstLine = 1) {
     if (opened) {
       endRun();
       fence = opened.run;
+      fenceAt = at;
       return;
     }
     const opening = block === null;
     if (block === null) {
       endRun();
       block = blockKind(line, next);
+      // An item of the same kind after a blank line joins the list above as a loose one, or starts
+      // a list beside it when the marker changes; a post holds neither.
+      const mark = block === 'list' ? (LIST_ITEM.exec(line)?.[1].slice(-1) ?? '') : '';
+      if (mark && after && /[-*+]/.test(mark) === /[-*+]/.test(after)) {
+        problems.push(
+          `${at}: a blank line between list items makes one loose list in Markdown, ` +
+            'or two lists when the marker changes, and a post holds neither; remove the blank line',
+        );
+      }
       const start = /^ {0,3}(\d{1,9})[.)] /.exec(line)?.[1];
       if (block === 'list' && start !== undefined && Number(start) !== 1) {
         problems.push(`${at}: an ordered list that starts at ${start}; the page numbers it from 1`);
@@ -3271,8 +4171,43 @@ export function refusedSyntax(body, firstLine = 1) {
         `${at}: an indented block: a second paragraph in a list item, or code without a fence`,
       );
     }
-    if (/(?: {2,}|\\)$/.test(line) && next.trim()) problems.push(`${at}: a hard line break`);
-    const item = block === 'list' ? LIST_ITEM.exec(line) : null;
+    const item =
+      block === 'list' && (opening || startsItem(line, indent)) ? LIST_ITEM.exec(line) : null;
+    if (item) {
+      // An item left of the last one's text stays in its list only with the same bullet, or the
+      // same `.` or `)`; one of its kind starts a new list beside it, which a post cannot hold.
+      const mark = item[1].slice(-1);
+      if (opening) {
+        marker = mark;
+      } else if (leadingSpaces(line) < indent) {
+        if (mark !== marker && /[-*+]/.test(mark) === /[-*+]/.test(marker)) {
+          problems.push(
+            `${at}: a change of bullet or delimiter starts a new list in Markdown, ` +
+              'which a post cannot hold next to another list of its kind',
+          );
+        }
+        marker = mark;
+      }
+      indent = itemIndent(line);
+    }
+    // Two spaces or an unescaped backslash end a line in a hard break only when the next line goes
+    // on with the same paragraph, item or quote; before a blank line, an item or a row they do not.
+    const backslashes = /\\*$/.exec(line)?.[0].length ?? 0;
+    if (
+      (/ {2,}$/.test(line) || backslashes % 2 === 1) &&
+      (block === 'paragraph' || block === 'list' || block === 'quote') &&
+      next.trim() &&
+      continues(block, next) &&
+      !(block === 'list' && startsItem(next, indent))
+    ) {
+      problems.push(`${at}: a hard line break`);
+    }
+    // GFM renders an item opening with `[ ]`, `[x]` or `[X]` as a checkbox, which a post has not.
+    if (item && /^\[[ xX]\](?: |$)/.test(item[2])) {
+      problems.push(
+        `${at}: a task list item, which GFM renders as a checkbox; escape the bracket as \\[`,
+      );
+    }
     if (item || (block === 'quote' && /^ {0,3}>/.test(line))) {
       if (item || opening) nested = false;
       // A whole line of `- ---` is a rule, reported above, rather than a list item holding one.
@@ -3297,13 +4232,50 @@ export function refusedSyntax(body, firstLine = 1) {
     if (block === 'heading' || block === 'caption' || block === 'table') endRun();
   });
   endRun();
-  if (fence !== null) problems.push(`the code fence opened with ${fence} is never closed`);
+  if (fence !== null)
+    problems.push(`${fenceAt}: the code fence opened with ${fence} is never closed`);
   return problems;
+}
+
+/** A character that prints as a space and is not one, such as a no-break space or a thin space. */
+/**
+ * A character that prints as a space and is not one (`\p{Zs}`), or prints as nothing at all
+ * (`\p{Cf}`: a soft hyphen, a zero-width space, a word joiner).
+ */
+const SPACE_LIKE = /(?! )[\p{Zs}\p{Cf}]/u;
+
+/**
+ * The `?` line that goes under a changed line holding a character that prints as a space and is
+ * not one, or prints as nothing, as Python's difflib marks a line: a `^` under each such character,
+ * a tab kept as a tab so the marks stay in their columns, then the characters' code points. Null
+ * for a line without one. Without it, a no-break space against a space, or a word with a
+ * zero-width space against the same word without, shows as two identical lines.
+ * @param {string} line
+ * @returns {string | null}
+ */
+function spaceGuide(line) {
+  const chars = Array.from(line);
+  const marked = [...new Set(chars.filter((char) => SPACE_LIKE.test(char)))];
+  if (marked.length === 0) return null;
+  const guide = chars.map((char) => {
+    if (char === '\t') return '\t';
+    return SPACE_LIKE.test(char) ? '^' : ' ';
+  });
+  return `? ${guide.join('').trimEnd()} ${marked.map(codePoint).join(', ')}`;
+}
+
+/**
+ * A character's code point as Unicode writes it, `U+00A0`.
+ * @param {string} char
+ */
+function codePoint(char) {
+  return `U+${(char.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`;
 }
 
 /**
  * A line diff of `a` against `b`, as `-` and `+` lines with two lines of context, or '' when they
- * are equal.
+ * are equal. A changed line holding a character that prints as a space and is not one is followed
+ * by its `spaceGuide()`.
  * @param {string[]} a
  * @param {string[]} b
  */
@@ -3338,9 +4310,15 @@ export function lineDiff(a, b) {
   if (!changed.includes(true)) return '';
   return steps
     .filter((_, index) => changed.slice(Math.max(0, index - 2), index + 3).includes(true))
-    .map(([mark, line]) => `${mark} ${line}`)
+    .flatMap(([mark, line]) => {
+      const guide = mark === ' ' ? null : spaceGuide(line);
+      return guide === null ? [`${mark} ${line}`] : [`${mark} ${line}`, guide];
+    })
     .join('\n');
 }
+
+/** The front-matter keys every draft gives, each with more than spaces in it. */
+const REQUIRED = ['title', 'slug', 'description'];
 
 /**
  * Every way the twin differs from the approved draft, and every use of refused syntax in the draft.
@@ -3354,13 +4332,21 @@ export function lineDiff(a, b) {
 export function differences(draftSource, twinSource, kind) {
   const draft = parseDraft(draftSource);
   const twin = parseTwin(twinSource);
-  const [title, slug, description] = ['title', 'slug', 'description'].map((key) =>
-    draft.front.get(key),
-  );
-  if (!title || !slug || !description) {
-    throw new CannotRun('the front matter needs a title, a slug and a description');
+  const [title = '', slug = '', description = ''] = REQUIRED.map((key) => draft.front.get(key));
+  const missing = REQUIRED.filter((key) => !draft.front.get(key)?.trim());
+  if (missing.length > 0) {
+    const names = missing.join(', ').replace(/, (?=[^,]*$)/, ' and ');
+    throw new CannotRun(
+      `the front matter's ${names} ${missing.length === 1 ? 'is' : 'are'} missing or blank`,
+    );
   }
-  const problems = refusedSyntax(draft.body, draft.firstBodyLine);
+  const problems = normalise(draftSource)
+    .split('\n')
+    .slice(0, draft.firstBodyLine - 1)
+    .flatMap((line, index) =>
+      line.includes('\t') ? [`line ${index + 1}: a tab in the front matter; write a space`] : [],
+    );
+  problems.push(...refusedSyntax(draft.body, draft.firstBodyLine));
   /** @param {string} value */
   const plain = (value) => canonicalText(value).trim();
   /** @type {[string, string, string][]} */
@@ -3370,7 +4356,9 @@ export function differences(draftSource, twinSource, kind) {
     ['summary', plain(description), canonicalInline(twin.summary, twin.origin)],
   ];
   for (const [what, want, got] of fields) {
-    if (want !== got) problems.push(`the ${what} differs (- draft, + twin):\n- ${want}\n+ ${got}`);
+    if (want !== got) {
+      problems.push(`the ${what} differs (- draft, + twin):\n${lineDiff([want], [got])}`);
+    }
   }
   const body = lineDiff(
     canonicalise(splitBlocks(draft.body), twin.origin).join('\n\n').split('\n'),
@@ -3379,7 +4367,13 @@ export function differences(draftSource, twinSource, kind) {
   if (body) problems.push(`the body differs (- draft, + twin):\n${body}`);
   const footer = twin.footer.map((line) => canonicalInline(line, twin.origin));
   const expected = FOOTER_LINES[kind];
-  if (JSON.stringify(footer) !== JSON.stringify(expected.map(plain))) {
+  if (twin.ruled && footer.length === 0) {
+    // The serialiser writes the rule only before a kind's lines, so a bare rule is a difference.
+    const ends = expected.length === 0 ? 'has no footer' : `ends with ${JSON.stringify(expected)}`;
+    problems.push(
+      `the footer is a --- rule with nothing after it, but a post of kind ${kind} ${ends}`,
+    );
+  } else if (JSON.stringify(footer) !== JSON.stringify(expected.map(plain))) {
     problems.push(
       `the footer is ${JSON.stringify(footer)}, but a post of kind ${kind} ends with ${JSON.stringify(expected)}`,
     );
@@ -3388,8 +4382,9 @@ export function differences(draftSource, twinSource, kind) {
 }
 
 /**
- * The check as a command: its exit status and what it prints. Exit 1 means differences and nothing
- * else, so every error, an unreadable file as much as a bug, exits 2 with its message.
+ * The check as a command: its exit status and what it prints. Exit 1 means differences or refused
+ * syntax and nothing else, so every error, an unreadable file as much as a bug, exits 2 with its
+ * message, and a bug with its stack too.
  * @param {string[]} argv the arguments after the script's path
  * @param {(path: string) => string} [read]
  * @returns {{ status: 0 | 1 | 2, output: string }}
@@ -3400,14 +4395,41 @@ export function check(argv, read = (path) => readFileSync(path, 'utf8')) {
   const files = at === -1 ? argv : argv.filter((_, index) => index !== at && index !== at + 1);
   if ((kind !== 'own' && kind !== 'jev') || files.length !== 2) return { status: 2, output: USAGE };
   try {
-    const problems = differences(read(files[0]), read(files[1]), kind);
+    const [draftSource, twinSource] = files.map((path) => readNamed(read, path));
+    const problems = differences(draftSource, twinSource, kind);
     return problems.length === 0
       ? { status: 0, output: '' }
       : { status: 1, output: `${problems.join('\n\n')}\n` };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { status: 2, output: `post-draft-check: ${message}\n` };
+    return { status: 2, output: `post-draft-check: ${failure(error)}\n` };
   }
+}
+
+/**
+ * The file at `path`, or a `CannotRun` that names it when the system refuses it: Node's message
+ * for a directory read as a file says `EISDIR` and not which file.
+ * @param {(path: string) => string} read
+ * @param {string} path
+ */
+function readNamed(read, path) {
+  try {
+    return read(path);
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && typeof error.code === 'string')) throw error;
+    const named = error.message.includes(`'${path}'`) ? '' : ` '${path}'`;
+    throw new CannotRun(`${error.message}${named}`);
+  }
+}
+
+/**
+ * What follows `post-draft-check:` for an error: a `CannotRun`'s message alone, as it names its
+ * cause; for anything else, a fault in the check, the message and then the stack.
+ * @param {unknown} error
+ */
+function failure(error) {
+  if (error instanceof CannotRun) return error.message;
+  if (error instanceof Error) return `${error.message}\n${error.stack ?? ''}`.trimEnd();
+  return String(error);
 }
 
 function main() {
@@ -3420,7 +4442,8 @@ function main() {
  * True when Node started this file, not when a test imported it. `realpathSync` for the reason
  * check-allowbuilds-drift.mjs documents: Node resolves `import.meta.url` and leaves
  * `process.argv[1]` as typed, so a path through a symlinked directory would otherwise skip `main()`
- * and exit 0 in silence. Nothing catches what `realpathSync` throws, for the same reason.
+ * and exit 0 in silence. What `realpathSync` throws is not swallowed, for the same reason: the call
+ * below reports it with its stack and exits 2, as for any fault, rather than Node's uncaught 1.
  *
  * @returns {boolean}
  */
@@ -3429,12 +4452,17 @@ function startedAsCommand() {
   return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
 }
 
-if (startedAsCommand()) main();
+try {
+  if (startedAsCommand()) main();
+} catch (error) {
+  process.stderr.write(`post-draft-check: ${failure(error)}\n`);
+  process.exitCode = 2;
+}
 ```
 
 The guard's code is the one `scripts/check-webserver-log.mjs` uses, so the scripts share one guard.
 
-- [ ] **Step 4: Run the tests until they pass, then typecheck**
+- [x] **Step 4: Run the tests until they pass, then typecheck**
 
 ```bash
 node --test scripts/post-draft-check.test.mjs
@@ -3446,7 +4474,7 @@ Expected: every test passes. `typecheck` exits 0, because `turbo typecheck` cove
 with `checkJs` strict. When a case fails, change the check, not the case: each case is a behaviour
 the design names.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/post-draft-check.mjs scripts/post-draft-check.test.mjs docs/plans/2026-10-06-blog-publishing-plan.md
@@ -3459,7 +4487,8 @@ git commit -m "feat(scripts): compare an approved blog draft with its served twi
 
 **Files:**
 
-- Create: `apps/web/src/test/fixtures/post-draft.md`, `apps/web/src/lib/__tests__/post-draft.test.ts`
+- Create: `apps/web/src/test/fixtures/post-draft.md`,
+  `apps/web/src/lib/__tests__/post-draft.test.ts`, `apps/web/.prettierignore`
 - Modify: `.prettierignore`, `.claude/rules/app-router-and-content.md`,
   `.claude/rules/ci-and-scripts.md`, `docs/plans/2026-09-28-blog-engine-plan.md` (61e's boxes),
   `docs/plans/README.md`, `docs/plans/2026-10-06-blog-publishing-plan.md` (this plan's boxes)
@@ -3468,18 +4497,29 @@ git commit -m "feat(scripts): compare an approved blog draft with its served twi
 
 - Consumes: `postToMarkdown` (Task 6); `differences` and `FOOTER_LINES` from the check (Task 8).
 
-- [ ] **Step 1: Keep Prettier away from the fixture draft**
+- [x] **Step 1: Keep Prettier away from the fixture draft**
 
 The fixture deliberately uses the variant syntax that the check canonicalises: `*` markers, `1.` for
 every item, a `~~~` fence, a wrapped paragraph, a padded table and alignment colons. Prettier would
-rewrite all of it. Before creating the file, add this to `.prettierignore` under `# Generated`:
+rewrite all of it. Before creating the file, give it an entry in two ignore files, because Prettier
+reads `.prettierignore` only from the directory it runs in. Add this to the root `.prettierignore`,
+which the repository-wide format check reads, under `# Generated`:
 
 ```
 # Written in variant Markdown on purpose: the publish check's round-trip test reads it as it is.
 apps/web/src/test/fixtures/post-draft.md
 ```
 
-- [ ] **Step 2: Write the fixture draft**
+Then create `apps/web/.prettierignore`. On commit, lint-staged runs `apps/web`'s tasks from
+`apps/web`, so its `prettier --write` does not see the root file:
+
+```
+# lint-staged runs Prettier from this directory, where the root .prettierignore does not apply.
+# Written in variant Markdown on purpose: the publish check's round-trip test reads it as it is.
+src/test/fixtures/post-draft.md
+```
+
+- [x] **Step 2: Write the fixture draft**
 
 Create `apps/web/src/test/fixtures/post-draft.md`. It is the approved draft that the every-block
 fixture would have come from. Copy it byte for byte: this plan marks the block `text` only so that
@@ -3532,9 +4572,11 @@ grep -c '^\* \|^~~~\|^1\. ' apps/web/src/test/fixtures/post-draft.md
 ```
 
 Expected: `7` (three `*` bullets, two `~~~` lines and two `1.` items). A lower count means Prettier
-rewrote the file: check the `.prettierignore` entry from Step 1, then write the file again.
+rewrote the file: check both entries from Step 1, in `.prettierignore` and in
+`apps/web/.prettierignore` (the commit hook's Prettier reads only the second), then write the file
+again.
 
-- [ ] **Step 3: Write the round-trip test**
+- [x] **Step 3: Write the round-trip test**
 
 Create `apps/web/src/lib/__tests__/post-draft.test.ts`:
 
@@ -3543,9 +4585,13 @@ Create `apps/web/src/lib/__tests__/post-draft.test.ts`:
  * @vitest-environment node
  *
  * The publish check against the serialiser it reads (ADR 0034). The fixture draft is the approved
- * draft the every-block fixture would come from, written in the variant Markdown a draft may use. A
- * change to how `postToMarkdown` escapes or lays out a block fails here, in CI, rather than at the
- * next publish.
+ * draft the every-block fixture would come from, written in the variant Markdown a draft may use.
+ * The check removes backslash escapes and the layout it canonicalises (bullet markers, fence
+ * lengths) from both sides, so what fails here, in CI rather than at the next publish, is a change
+ * to the block structure `postToMarkdown` writes (a block's kind, order or bounds, such as a lost
+ * blank line that lets a quote swallow the next line), to its footer, or to an escape whose loss
+ * changes what a Markdown reader sees in the fixture, such as `\|` in a table cell. The
+ * serialiser's escapes are pinned byte for byte in `serialise.test.ts`.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -3582,7 +4628,7 @@ describe('the publish check, against the serialiser', () => {
 });
 ```
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 ```bash
 pnpm --filter web exec vitest run src/lib/__tests__/post-draft.test.ts
@@ -3593,30 +4639,42 @@ Expected: PASS, and typecheck exits 0 (`apps/web` sets `allowJs`). If the first 
 difference, the diff names the line. Fix whichever side breaks the design's format, and never edit
 the fixture to match a serialiser bug.
 
-- [ ] **Step 5: Point the rules at the format and the check**
+- [x] **Step 5: Point the rules at the format and the check**
 
 In `.claude/rules/app-router-and-content.md`, in the bullet on the Markdown twins (#59), change
 ``and `work/[slug]/index.md/route.ts` for the case studies`` to
-`` `work/[slug]/index.md/route.ts` for the case studies and `blog/[slug]/index.md/route.ts` for the published posts (61e) ``.
-Add this paragraph after that bullet list:
+`` `work/[slug]/index.md/route.ts` for the case studies and `blog/[slug]/index.md/route.ts` for the published posts (61e) ``,
+and the `with its own` after it to `the two dynamic ones each with its own`, since the static twins
+export neither. Add these paragraphs after that bullet list:
 
 ```markdown
 A post's twin is written by `postToMarkdown()`: the opening, the dates, the body, then `---` and the
-kind's `FOOTER_LINES`. `/blog`'s twin is written by `blogToMarkdown()`, which lists the published
-posts once there are any. The post format an approved draft must follow, and the publish check
-(`scripts/post-draft-check.mjs`) that compares the draft with the served twin, are in
-`docs/plans/2026-10-06-blog-publishing-design.md`. That document is the contract the writing room's
-publish mode reads (ADR 0034). A change to how a post block is written there must keep
-`src/lib/__tests__/post-draft.test.ts` green.
+kind's `FOOTER_LINES` when it has any (`own` has none). `/blog`'s twin is written by
+`blogToMarkdown()`, which lists the published posts once there are any. The post format an approved
+draft must follow, and the publish check (`scripts/post-draft-check.mjs`) that compares the draft
+with the served twin, are in `docs/plans/2026-10-06-blog-publishing-design.md`. That document is the
+contract the writing room's publish mode reads (its D7, under ADR 0034). A change to how a post
+block is written there must keep `src/lib/__tests__/post-draft.test.ts` green. The check's `--kind`
+is the kind the writing room's tracker gives the article (the design's D2), never read back from
+`posts.ts`, with D4's naming check in `posts.test.ts` as the backstop for a Jev post marked `own`;
+the dates are not compared, because D9 sets them.
+
+A post table of three or more columns stacks each row below 640px and hides its column names from
+sight (`DataTable`, #226), so each value says what it is by its unit or a word ("1,234 tokens",
+"420 ms"), or the table keeps to two columns, which never stack. `posts.test.ts` refuses a blank
+cell there, but only whoever approves the draft can check the rest (`TableBlock` in
+`src/data/posts.ts`).
 ```
 
 In `.claude/rules/ci-and-scripts.md`, in the list of `scripts/` sources, add after
 `` `check-webserver-log.mjs` (the `e2e` job's server-log check), ``:
-`` `post-draft-check.mjs` (the publish check for a blog post, run by hand when a post is published, not in CI), ``.
+`` `post-draft-check.mjs` (the publish check for a blog post, run by hand when a post is published; CI runs only its tests. ``,
+then a note that `web#test` hashes only files under `apps/web`, so a local test run after editing
+the check must bypass turbo's cache (the rule names the commands), and close the parenthesis.
 Add a row to its command table, in the shape of its neighbours:
-`` `node scripts/post-draft-check.mjs --kind own\|jev <draft.md> <twin.md>` `` | `Compares an approved draft with the post's served twin: 0 equal, 1 differences, 2 could not run`.
+`` `node scripts/post-draft-check.mjs --kind own\|jev <draft.md> <twin.md>` `` | `Compares an approved draft with the post's served twin: 0 equal, 1 differences or refused syntax, 2 could not run`.
 
-- [ ] **Step 6: Tick the boxes and update the index**
+- [x] **Step 6: Tick the boxes and update the index**
 
 - In `docs/plans/2026-09-28-blog-engine-plan.md`, tick Task 5's steps (61e). Its Step 3 is met by
   `e2e/markdown-twins.spec.ts`, through the new `MARKDOWN_TWINS` entries, so add a note saying so.
@@ -3631,7 +4689,7 @@ node scripts/check-docs-drift.ts --skip-requires admin
 Expected: `0 drift, 0 uncatalogued`. Give any new link an entry in `docs/drift-manifest.json`: `method` `file-line`, `evaluation`
 `live`, `covers` naming the link token, and `check.path` the file it resolves to.
 
-- [ ] **Step 7: Run every gate, one at a time**
+- [x] **Step 7: Run every gate, one at a time**
 
 ```bash
 pnpm check:allowbuilds
@@ -3647,7 +4705,11 @@ pnpm --filter web build && CI=true pnpm --filter web test:e2e
 Expected: exit 0 from each. The e2e run covers the twins of the static routes and the case studies.
 No post is published, so it checks no post twin yet.
 
-- [ ] **Step 8: Commit, review and open the pull request**
+(Done 2026-10-06: every gate exited 0, one at a time. The e2e run went from the main shell on
+the tree before the review fixes, which changed no route's output: 487 passed, 2 skipped. The
+reviews' findings and their triage are in #241.)
+
+- [x] **Step 8: Commit, review and open the pull request**
 
 ```bash
 git add .prettierignore apps/web/src/test/fixtures/post-draft.md apps/web/src/lib/__tests__/post-draft.test.ts .claude/rules/app-router-and-content.md .claude/rules/ci-and-scripts.md docs/plans/2026-09-28-blog-engine-plan.md docs/plans/2026-10-06-blog-publishing-plan.md docs/plans/README.md docs/drift-manifest.json

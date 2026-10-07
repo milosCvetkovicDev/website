@@ -16,15 +16,21 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
 import { OWNER_TODO } from '@/data/owner-todo';
+import { pages } from '@/data/pages';
 import type { PageRecord, PageSection, Paragraph, TableSection } from '@/data/pages/types';
+import { buildPostIndex, type PostBlock } from '@/data/posts';
+import { everyBlockPost, fixturePosts, hostileTitlePost } from '@/test/fixtures/posts';
 import { visible } from '@/test/markdown';
 import { buildMetadata } from '../metadata';
 import { markdownTwinPath } from '../pathname';
 import {
   absoluteUrl,
+  blogToMarkdown,
   caseStudyToMarkdown,
   markdownResponse,
   pageToMarkdown,
+  postBodyToMarkdown,
+  postToMarkdown,
   renderSections,
 } from '../serialise';
 
@@ -374,7 +380,7 @@ describe('pageToMarkdown() and renderSections()', () => {
       rows: [['Teams led', '4', 'extra']],
     };
     expect(() => renderSections([ragged])).toThrow(
-      'renderSections: row 1 of the table under "Quick facts" has 3 cells for 2 columns',
+      'serialise: row 1 of the table under "Quick facts" has 3 cells for 2 columns',
     );
   });
 
@@ -894,5 +900,204 @@ describe('the spaced-out check', () => {
     expect('Most bugs live in the gap — and I mean a gap').not.toMatch(SPACED_OUT);
     expect('| A | B | C |\n| 1 | 2 | 3 |').not.toMatch(SPACED_OUT);
     expect(pageToMarkdown(FIXTURE)).not.toMatch(SPACED_OUT);
+  });
+});
+
+describe('postToMarkdown()', () => {
+  it('writes the every-block fixture: its opening, its dates, then every block kind in order', () => {
+    expect(postToMarkdown(everyBlockPost)).toBe(
+      [
+        '# Fixture: every block and inline kind',
+        '',
+        'A test fixture that uses each block kind and each inline kind once or more, so a renderer that drops one is caught.',
+        '',
+        `Source: ${ORIGIN}/blog/fixture-every-block`,
+        '',
+        '- Published: 2026-08-03',
+        '- Updated: 2026-08-20',
+        '',
+        `A paragraph of plain text, then inline code: \`buildPostIndex(posts)\`, then a link to [the work page](${ORIGIN}/work) and one to [an external page](https://example.com/fixture?kind=link#inline).`,
+        '',
+        '## A level-two heading',
+        '',
+        '- A bullet item of plain text.',
+        '- A bullet item with `inline code` in it.',
+        `- [A bullet item that is a link](${ORIGIN}/blog)`,
+        '',
+        '### A level-three heading',
+        '',
+        '1. The first numbered item.',
+        '2. The second numbered item.',
+        '',
+        '```ts',
+        "const greeting = 'fixture';",
+        'console.log(greeting);',
+        '```',
+        '',
+        '```',
+        'A code block with no language.',
+        '```',
+        '',
+        '> A quotation, with `code` and plain text in it.',
+        '',
+        // Captioned even where a heading might name it, so a draft's `Table:` line always has a twin.
+        'Table: Fixture: a table of three columns',
+        '',
+        '| Fixture run | Blocks | Result |',
+        '| --- | --- | --- |',
+        '| First run | 9 | Every block rendered |',
+        '| Second run | 9 | The same, with \\| and \\* in a cell |',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('escapes what Markdown would read as syntax, and ends a jev post with its lines after a rule', () => {
+    expect(postToMarkdown(hostileTitlePost)).toBe(
+      [
+        '# Fixture: & \\<tags\\> and "quotes"',
+        '',
+        'A test fixture whose title holds &, \\< and " and whose text holds \\*stars\\*, \\_underscores\\_ and \\<b\\>tags\\</b\\>, all of it plain text.',
+        '',
+        `Source: ${ORIGIN}/blog/fixture-hostile-title`,
+        '',
+        '- Published: 2026-09-07',
+        '- Updated: 2026-09-07',
+        '',
+        '\\# Not a heading, \\*not emphasis\\*, \\[not a link\\](/nowhere) & \\<em\\>not markup\\</em\\>.',
+        '',
+        '---',
+        '',
+        'I have no relationship with TypeSafe.',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('fences code longer than its longest backtick run, and pads a code span that starts with one', () => {
+    expect(
+      postBodyToMarkdown(
+        [
+          { kind: 'code', language: 'md', code: '```ts\nconst a = `b`;\n---\n```' },
+          { kind: 'paragraph', content: ['Run ', { code: '`x`' }, ' or ', { code: 'a``b' }, '.'] },
+        ],
+        'fixture',
+      ),
+    ).toBe(
+      [
+        '````md',
+        '```ts',
+        'const a = `b`;',
+        '---',
+        '```',
+        '````',
+        '',
+        'Run `` `x` `` or ```a``b```.',
+      ].join('\n'),
+    );
+  });
+
+  it('escapes a ! that ends text before a link, which would make the link an image', () => {
+    expect(
+      postBodyToMarkdown(
+        [
+          {
+            kind: 'paragraph',
+            content: [
+              'Look!',
+              { text: 'the work page', href: '/work' },
+              ' Run!',
+              { code: 'x' },
+              '!',
+            ],
+          },
+        ],
+        'fixture',
+      ),
+    ).toBe(`Look\\![the work page](${ORIGIN}/work) Run!\`x\`!`);
+  });
+
+  it('refuses a table the page could not draw, as it refuses a page table', () => {
+    expect(() =>
+      postBodyToMarkdown(
+        [{ kind: 'table', caption: 'One column', columns: ['Only'], rows: [['a']] }],
+        'fixture',
+      ),
+    ).toThrow(/^serialise: the table at block 1 of fixture has one column/);
+  });
+
+  it.each<[string, PostBlock[], string]>([
+    [
+      'an empty heading',
+      [{ kind: 'heading', level: 3, text: ' ' }],
+      'serialise: the level-3 heading at block 1 of fixture is empty',
+    ],
+    [
+      'a link to another scheme',
+      [{ kind: 'paragraph', content: ['See ', { text: 'the file', href: 'ftp://example.com/a' }] }],
+      'serialise: the link "ftp://example.com/a" in block 1 of fixture is neither a path on this site nor an http(s) or mailto URL',
+    ],
+    [
+      'a link with no text in a list item',
+      [{ kind: 'list', items: [['One.'], [{ text: ' ', href: '/work' }]] }],
+      'serialise: the link to "/work" in item 2 of block 1 of fixture has no text',
+    ],
+    [
+      'a block kind it has no writer for',
+      [{ kind: 'video' } as unknown as PostBlock],
+      'postToMarkdown: no writer for the block kind "video" at block 1 of fixture',
+    ],
+  ])('names the post and the block for %s', (_name, body, message) => {
+    expect(() => postBodyToMarkdown(body, 'fixture')).toThrow(message);
+  });
+
+  it('names the post whose title is empty', () => {
+    expect(() => postToMarkdown({ ...everyBlockPost, title: ' ' })).toThrow(
+      'serialise: postToMarkdown: the title of /blog/fixture-every-block is empty',
+    );
+  });
+});
+
+describe('blogToMarkdown()', () => {
+  it('is the record, Coming Soon card included, while no post is published', () => {
+    expect(blogToMarkdown(pages['/blog'], [])).toBe(pageToMarkdown(pages['/blog']));
+  });
+
+  it('lists each published post newest first, as /blog does: title, day, URL, summary', () => {
+    expect(blogToMarkdown(pages['/blog'], buildPostIndex(fixturePosts).publishedPosts)).toBe(
+      [
+        '# Writing',
+        '',
+        pages['/blog'].summary,
+        '',
+        `Source: ${ORIGIN}/blog`,
+        '',
+        '## Fixture: & \\<tags\\> and "quotes"',
+        '',
+        '- Published: 2026-09-07',
+        `- URL: ${ORIGIN}/blog/fixture-hostile-title`,
+        '',
+        'A test fixture whose title holds &, \\< and " and whose text holds \\*stars\\*, \\_underscores\\_ and \\<b\\>tags\\</b\\>, all of it plain text.',
+        '',
+        '## Fixture: every block and inline kind',
+        '',
+        '- Published: 2026-08-03',
+        `- URL: ${ORIGIN}/blog/fixture-every-block`,
+        '',
+        'A test fixture that uses each block kind and each inline kind once or more, so a renderer that drops one is caught.',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('names itself, and the post whose title is empty, in an error', () => {
+    expect(() =>
+      blogToMarkdown({ ...pages['/blog'], title: {} as unknown as PageRecord['title'] }, [
+        everyBlockPost,
+      ]),
+    ).toThrow('blogToMarkdown: the record for /blog has no title');
+    expect(() => blogToMarkdown(pages['/blog'], [{ ...everyBlockPost, title: ' ' }])).toThrow(
+      'serialise: blogToMarkdown: the title of fixture-every-block is empty',
+    );
   });
 });

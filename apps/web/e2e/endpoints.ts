@@ -1,6 +1,6 @@
 import { caseStudies } from '../src/data/case-studies';
 import { markdownTwinPath } from '../src/lib/pathname';
-import { STATIC_ROUTES, caseStudyRoute } from './routes';
+import { POST_ROUTES, STATIC_ROUTES, caseStudyRoute } from './routes';
 
 /**
  * The one manifest of the machine-readable paths this site serves, or is about to.
@@ -50,13 +50,14 @@ export const CASE_STUDY_ENDPOINTS = caseStudies.map(({ slug }) => ({
 }));
 
 /**
- * Every page route with its twin: the static routes and every case study, not the 404. `/privacy`
- * and `/blog` included: every route that goes through `buildMetadata()` advertises a twin, so every
- * one serves one (#59).
+ * Every page route with its twin: the static routes, every case study and every published post, not
+ * the 404. `/privacy` and `/blog` included: every route that goes through `buildMetadata()`
+ * advertises a twin, so every one serves one (#59).
  */
 export const MARKDOWN_TWINS = [
   ...STATIC_ROUTES.map((route) => ({ route, twin: markdownTwinPath(route) })),
   ...CASE_STUDY_ENDPOINTS.map(({ route, twin }) => ({ route, twin })),
+  ...POST_ROUTES.map((route) => ({ route, twin: markdownTwinPath(route) })),
 ];
 
 /** The llmstxt.org index of the site (#60). */
