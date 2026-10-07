@@ -451,6 +451,7 @@ describe('the JSON-LD blocks', () => {
         WebPageJsonLd,
         TechArticleJsonLd,
         BreadcrumbListJsonLd,
+        PostWebPageJsonLd,
         PostArticleJsonLd,
         PostBreadcrumbJsonLd,
       } = await importWithSiteUrl('https://example.test');
@@ -463,15 +464,16 @@ describe('the JSON-LD blocks', () => {
           <WebPageJsonLd path="/skills" name={hostile} />
           <TechArticleJsonLd caseStudy={study} />
           <BreadcrumbListJsonLd caseStudy={study} />
+          <PostWebPageJsonLd post={post} />
           <PostArticleJsonLd post={post} />
           <PostBreadcrumbJsonLd post={post} />
         </>,
       );
 
       const blocks = jsonLdBlocks(container);
-      expect(blocks).toHaveLength(7);
-      // The hostile text did reach the Person, the page, both articles and both trails.
-      expect(blocks.filter((body) => body.includes('\\u003c/script>'))).toHaveLength(6);
+      expect(blocks).toHaveLength(8);
+      // The hostile text did reach the Person, both pages, both articles and both trails.
+      expect(blocks.filter((body) => body.includes('\\u003c/script>'))).toHaveLength(7);
       const offenders = blocks
         .map((body, index) => ({ index, body }))
         .filter(({ body }) => body.toLowerCase().includes('</script'))
@@ -649,7 +651,7 @@ describe('the case-study JSON-LD blocks', () => {
 describe('the post JSON-LD blocks (#61, 61f)', () => {
   it('has published fixtures to describe', () => {
     // The control: every row below walks `publishedPosts`, so an empty list would pass them all.
-    expect(publishedPosts.length).toBeGreaterThan(1);
+    expect(publishedPosts.length).toBeGreaterThan(0);
   });
 
   it('describe each published post as a TechArticle by the site’s Person, with its own dates', async () => {
@@ -661,7 +663,7 @@ describe('the post JSON-LD blocks (#61, 61f)', () => {
       // The whole node, so a predicate added or left behind fails here. The case study's node, less
       // what a post page does not show (ADR 0031's fifth decision): no `description`, since the
       // summary is only the page's meta description, and no `keywords`, since a post's tags are
-      // drawn on its card alone. No new node type either, BlogPosting included (#61).
+      // drawn on its card alone. No new node type either, not even BlogPosting (#61).
       expect(article, post.slug).toEqual({
         '@context': 'https://schema.org',
         '@type': 'TechArticle',
@@ -702,8 +704,9 @@ describe('the post JSON-LD blocks (#61, 61f)', () => {
   it('keeps the hostile fixture title inside its scripts, and reads it back as written', async () => {
     const { PostArticleJsonLd, PostBreadcrumbJsonLd } =
       await importWithSiteUrl('https://example.test');
-    // The control: the fixture's title carries the characters the escape exists for.
-    expect(hostileTitlePost.title).toMatch(/[<&"]/);
+    // The control: the fixture's title carries a `<`, the character the escape exists for, so
+    // the `not.toContain('<')` below proves it was escaped rather than never there.
+    expect(hostileTitlePost.title).toContain('<');
     const { container } = render(
       <>
         <PostArticleJsonLd post={hostileTitlePost} />
@@ -762,7 +765,7 @@ describe('the builders refuse a node they cannot mark up truthfully (57a)', () =
       expect(() => profilePage({ path: '/about', dateModified: date }), date).toThrow(
         /profilePage: .* is not a YYYY-MM-DD day/,
       );
-      const article = { path: '/work/x', headline: 'X', description: 'X', keywords: [] };
+      const article = { path: '/work/x', headline: 'X', description: 'X', keywords: ['X'] };
       expect(
         () => techArticle({ ...article, datePublished: date, dateModified: '2026-10-02' }),
         date,
@@ -774,6 +777,33 @@ describe('the builders refuse a node they cannot mark up truthfully (57a)', () =
     }
     for (const name of ['', '  ', { absolute: '' }]) {
       expect(() => webPage({ path: '/skills', name }), JSON.stringify(name)).toThrow(/blank/);
+    }
+  });
+
+  it('refuses an article with a blank headline or an empty description or keywords (61f)', async () => {
+    const { techArticle } = await builders();
+    const article = {
+      path: '/work/x',
+      headline: 'X',
+      description: 'X',
+      datePublished: '2026-10-02',
+      dateModified: '2026-10-02',
+      keywords: ['X'],
+    };
+    // The control: the same input with each predicate given, or left out with `undefined`, builds.
+    expect(techArticle(article)).toMatchObject({ description: 'X', keywords: ['X'] });
+    const bare = techArticle({ ...article, description: undefined, keywords: undefined });
+    expect(bare).not.toHaveProperty('description');
+    expect(bare).not.toHaveProperty('keywords');
+    for (const headline of ['', '  ']) {
+      expect(() => techArticle({ ...article, headline }), JSON.stringify(headline)).toThrow(
+        /techArticle: an article needs a headline/,
+      );
+    }
+    for (const empty of [{ description: '' }, { description: ' ' }, { keywords: [] }]) {
+      expect(() => techArticle({ ...article, ...empty }), JSON.stringify(empty)).toThrow(
+        /techArticle: an empty description or keywords list/,
+      );
     }
   });
 });
@@ -793,6 +823,7 @@ async function renderEveryBlock(): Promise<{ source: string; blocks: string[] }[
     ProfilePageJsonLd,
     TechArticleJsonLd,
     BreadcrumbListJsonLd,
+    PostWebPageJsonLd,
     PostArticleJsonLd,
     PostBreadcrumbJsonLd,
   } = await importWithSiteUrl('https://example.test');
@@ -828,15 +859,7 @@ async function renderEveryBlock(): Promise<{ source: string; blocks: string[] }[
       ],
     ]),
     ...publishedPosts.flatMap((post): [string, ReactElement][] => [
-      [
-        `WebPageJsonLd (${post.slug})`,
-        <WebPageJsonLd
-          key="page"
-          path={`/blog/${post.slug}`}
-          name={post.metaTitle ?? post.title}
-          breadcrumb
-        />,
-      ],
+      [`PostWebPageJsonLd (${post.slug})`, <PostWebPageJsonLd key="page" post={post} />],
       [`PostArticleJsonLd (${post.slug})`, <PostArticleJsonLd key="article" post={post} />],
       [`PostBreadcrumbJsonLd (${post.slug})`, <PostBreadcrumbJsonLd key="crumbs" post={post} />],
     ]),

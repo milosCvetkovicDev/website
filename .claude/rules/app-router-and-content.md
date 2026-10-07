@@ -153,9 +153,11 @@ nodes as plain objects and `components/json-ld.tsx` renders each in its own bloc
 WebSite on every route, the 404 included; each static route, case study and post renders a
 `WebPageJsonLd` with the path and title it passes to `buildMetadata()`, except /about, whose
 `ProfilePageJsonLd` is dated with the day its "Last updated" line shows, and a case study adds its
-TechArticle and BreadcrumbList, as a post does with `PostArticleJsonLd` and `PostBreadcrumbJsonLd`
-(61f): the same types, no BlogPosting (#61), and no `description` or `keywords` on a post's
-article, because its page prints neither its summary nor its tags. A node names another by
+TechArticle and BreadcrumbList, as a post does with `PostWebPageJsonLd`, `PostArticleJsonLd` and
+`PostBreadcrumbJsonLd` (61f), which take its path and head title from `src/lib/post-page.ts`, as
+its `generateMetadata` does: the same types, no BlogPosting (#61), and no `description` or
+`keywords` on a post's article, because its page prints neither its summary nor its tags
+(`techArticle()` requires both keys, `undefined` leaving one out, and throws on an empty one). A node names another by
 `{ '@id': … }` alone. A new route renders its page node, and `components/__tests__/json-ld.test.tsx`
 and `e2e/seo-surface.spec.ts` pin each route's types; with no post published, the e2e graph test
 reports how many post routes it covered in an annotation.

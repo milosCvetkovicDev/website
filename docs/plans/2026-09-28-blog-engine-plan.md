@@ -168,7 +168,7 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
 - [x] **Step 2:** Post TechArticle and BreadcrumbList builders on #57's graph, rendered from the post
       page (D11), and the served type set checked on the post routes. (#57's own `techArticle()`
       and `breadcrumbList()` build them, through `PostArticleJsonLd` and `PostBreadcrumbJsonLd` in
-      `json-ld.tsx`, beside the post's `WebPageJsonLd`. The article leaves out `description` and
+      `json-ld.tsx`, beside the post's `PostWebPageJsonLd`. The article leaves out `description` and
       `keywords`, because the post page prints neither its summary nor its tags (ADR 0031's fifth
       decision). With no post published, the served check covers no post route and says so in its
       report.)

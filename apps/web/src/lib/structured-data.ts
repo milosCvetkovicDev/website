@@ -215,7 +215,11 @@ export function profilePage({ path, dateModified }: { path: string; dateModified
  * `description` and `keywords` are for a page that prints them, as ADR 0031's fifth decision asks:
  * a case study shows its description and its tags, so its article carries both, while a post page
  * shows neither (its summary is only the head's description, its tags are drawn on its card alone),
- * so a post's article carries neither, and the node leaves out a predicate it is not given.
+ * so a post's article carries neither, and the node leaves out a predicate it is not given. Both
+ * keys are required, `undefined` being the way to leave one out, so a case study that drops either
+ * line fails to compile rather than ship an article without it. A blank headline, an empty
+ * description or an empty keywords list throws, so the prerender fails rather than serve an empty
+ * predicate.
  */
 export function techArticle({
   path,
@@ -227,11 +231,17 @@ export function techArticle({
 }: {
   path: string;
   headline: string;
-  description?: string;
+  description: string | undefined;
   datePublished: string;
   dateModified: string;
-  keywords?: readonly string[];
+  keywords: readonly string[] | undefined;
 }) {
+  if (headline.trim() === '') {
+    throw new Error('techArticle: an article needs a headline, and this one is blank');
+  }
+  if (description?.trim() === '' || keywords?.length === 0) {
+    throw new Error('techArticle: an empty description or keywords list; leave it out');
+  }
   return {
     '@context': CONTEXT,
     '@type': 'TechArticle',

@@ -249,15 +249,36 @@ function jsonLdSources(container: HTMLElement): string[] {
 
 // The page's own nodes; the root layout adds the Person and the WebSite, and
 // `components/__tests__/json-ld.test.tsx` joins the two into one graph per route.
+/** A render's ld+json nodes, parsed. */
+function jsonLdNodes(container: HTMLElement): Record<string, unknown>[] {
+  return jsonLdSources(container).map((source) => JSON.parse(source) as Record<string, unknown>);
+}
+
+/** The one node of `type` among `nodes`; none, or two, throws. */
+function nodeOfType(nodes: Record<string, unknown>[], type: string): Record<string, unknown> {
+  const found = nodes.filter((node) => node['@type'] === type);
+  if (found.length !== 1) throw new Error(`${found.length} ${type} nodes, not 1`);
+  return found[0];
+}
+
 describe('its JSON-LD (61f)', () => {
+  it('has the published posts the rows below need', () => {
+    // The controls: every row below walks `publishedPosts`, so an empty list would pass them all;
+    // the metaTitle row needs a post whose head title is not its h1, and the date row a post never
+    // updated, whose `dateModified` is its publication day and whose Updated line still shows.
+    expect(publishedPosts.length).toBeGreaterThan(0);
+    expect(publishedPosts.some((post) => post.metaTitle && post.metaTitle !== post.title)).toBe(
+      true,
+    );
+    expect(publishedPosts.some((post) => post.updatedAt === post.publishedAt)).toBe(true);
+  });
+
   it.each(publishedPosts.map((post) => [post.slug, post] as const))(
     '%s serves a WebPage, a TechArticle and a BreadcrumbList, outside its article',
     async (_slug, post) => {
       const { container } = render(await PostPage(paramsOf(post.slug)));
-      const nodes = jsonLdSources(container).map(
-        (source) => JSON.parse(source) as Record<string, unknown>,
-      );
-      // #57's types, as a case study serves them: no new node type, BlogPosting included (#61).
+      const nodes = jsonLdNodes(container);
+      // #57's types, as a case study serves them: no new node type, not even BlogPosting (#61).
       expect(nodes.map((node) => node['@type'])).toEqual([
         'WebPage',
         'TechArticle',
@@ -272,15 +293,14 @@ describe('its JSON-LD (61f)', () => {
     '%s dates its article with the days its line shows, and heads it with its h1',
     async (_slug, post) => {
       const { container } = render(await PostPage(paramsOf(post.slug)));
-      const article = jsonLdSources(container)
-        .map((source) => JSON.parse(source) as Record<string, unknown>)
-        .find((node) => node['@type'] === 'TechArticle');
-      // The post's own dates (#61), which the visible Published and Updated line reads too.
-      expect(article?.datePublished).toBe(post.publishedAt);
-      expect(article?.dateModified).toBe(post.updatedAt);
-      expect(article?.datePublished).toBe(dateLabelled('Published').getAttribute('dateTime'));
-      expect(article?.dateModified).toBe(dateLabelled('Updated').getAttribute('dateTime'));
-      expect(article?.headline).toBe(screen.getByRole('heading', { level: 1 }).textContent);
+      const article = nodeOfType(jsonLdNodes(container), 'TechArticle');
+      // The post's own dates (#61), which the visible Published and Updated line reads too: the
+      // page prints both terms for every post, one never updated included.
+      expect(article.datePublished).toBe(post.publishedAt);
+      expect(article.dateModified).toBe(post.updatedAt);
+      expect(article.datePublished).toBe(dateLabelled('Published').getAttribute('dateTime'));
+      expect(article.dateModified).toBe(dateLabelled('Updated').getAttribute('dateTime'));
+      expect(article.headline).toBe(screen.getByRole('heading', { level: 1 }).textContent);
     },
   );
 
@@ -288,12 +308,12 @@ describe('its JSON-LD (61f)', () => {
     '%s names its page node with the title its head carries, at its canonical',
     async (_slug, post) => {
       const { container } = render(await PostPage(paramsOf(post.slug)));
-      const [page, , crumbs] = jsonLdSources(container).map(
-        (source) => JSON.parse(source) as Record<string, unknown>,
-      );
+      const nodes = jsonLdNodes(container);
+      const page = nodeOfType(nodes, 'WebPage');
+      const crumbs = nodeOfType(nodes, 'BreadcrumbList');
       const metadata = await generateMetadata(paramsOf(post.slug));
       // `metaTitle` when the post sets one, as the head's title is: the fixture added by the mock
-      // above is the one whose page node a `name={post.title}` would get wrong.
+      // above (its control is the first row) is the one a `name={post.title}` would get wrong.
       expect(page.name).toBe(metadata.title);
       expect(page.url).toBe(canonicalUrl(`/blog/${post.slug}`));
       expect(page.breadcrumb).toEqual({ '@id': crumbs['@id'] });
@@ -304,11 +324,14 @@ describe('its JSON-LD (61f)', () => {
     const { container } = render(await PostPage(paramsOf(hostileTitlePost.slug)));
     const sources = jsonLdSources(container);
     expect(sources).toHaveLength(3);
-    // `serializeJsonLd` writes every `<` as `<`, so no `</script>` can end a block early.
+    // The control: the title carries a `<`, so the check below proves it was escaped.
+    expect(hostileTitlePost.title).toContain('<');
+    // `serializeJsonLd` writes every `<` as `\u003c`, so no `</script>` can end a block early.
     for (const source of sources) expect(source).not.toContain('<');
-    const [page, article, crumbs] = sources.map(
-      (source) => JSON.parse(source) as Record<string, unknown>,
-    );
+    const nodes = jsonLdNodes(container);
+    const page = nodeOfType(nodes, 'WebPage');
+    const article = nodeOfType(nodes, 'TechArticle');
+    const crumbs = nodeOfType(nodes, 'BreadcrumbList');
     expect(page.name).toBe(hostileTitlePost.title);
     expect(article.headline).toBe(hostileTitlePost.title);
     expect((crumbs.itemListElement as { name: string }[]).at(-1)?.name).toBe(

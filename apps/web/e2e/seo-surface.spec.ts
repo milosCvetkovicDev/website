@@ -497,12 +497,13 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
   // layout's Person and WebSite on every route, the 404 included, then the page's own nodes. Every
   // node has an `@id` of its own, every reference names a node the same document serves and carries
   // nothing else, and a page node's `url` is the canonical link the same document serves.
+  // A case study and a post are both an article on a page of their own, with #57's types and no
+  // new one (#61, 61f).
+  const articleRoutes: readonly string[] = [...CASE_STUDY_ROUTES, ...POST_ROUTES];
   const typesOf = (path: string) => {
     if (path === NOT_FOUND_ROUTE) return ['Person', 'WebSite'];
     if (path === '/about') return ['Person', 'WebSite', 'ProfilePage'];
-    // A case study and a post are both an article on a page of their own, with #57's types and no
-    // new one (#61, 61f).
-    if ([...CASE_STUDY_ROUTES, ...POST_ROUTES].includes(path)) {
+    if (articleRoutes.includes(path)) {
       return ['Person', 'WebSite', 'WebPage', 'TechArticle', 'BreadcrumbList'];
     }
     return ['Person', 'WebSite', 'WebPage'];
@@ -608,11 +609,13 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
   ];
   // No post is published until the owner publishes the first, and an empty list checks nothing:
   // the report says how many post routes this test covered, rather than passing on none unseen.
+  // Counted from the list the loop below walks, so the report says what was checked.
+  const postArticles = articles.filter(({ list }) => list === 'POST_ROUTES').length;
   test.info().annotations.push({
     type: 'post routes',
     description:
-      `${POST_ROUTES.length} post route(s) held to the case studies' types and checks` +
-      (POST_ROUTES.length === 0 ? ': none is published, so no post was checked' : ''),
+      `${postArticles} post route(s) held to the case studies' types and checks` +
+      (postArticles === 0 ? ': none is published, so no post was checked' : ''),
   });
   for (const { path, list, section, title, dates } of articles) {
     const nodes = served.get(path);
@@ -635,7 +638,17 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
         `${path}: the TechArticle's image ${image.href} answers ${response.status()} ${type}`,
       );
     }
-    if (article['@id'] !== `${canonicalOf.get(path)}#article`) {
+    // A route without one canonical was reported in the walk above; its checks here would only
+    // compare against `undefined`.
+    const canonical = canonicalOf.get(path);
+    const sectionCanonical = canonicalOf.get(section[1]);
+    if (!canonical || !sectionCanonical || !canonicalOf.has('/')) {
+      problems.push(
+        `${path}: no canonical for it, / or ${section[1]}, so its article is unchecked`,
+      );
+      continue;
+    }
+    if (article['@id'] !== `${canonical}#article`) {
       problems.push(`${path}: the TechArticle's @id is ${String(article['@id'])}`);
     }
     if ((article.mainEntityOfPage as { '@id'?: unknown })?.['@id'] !== webPage['@id']) {
@@ -654,8 +667,8 @@ test('every route serves its JSON-LD as one graph of pinned types, joined by @id
     const expected = JSON.stringify(
       [
         ['Home', canonicalOf.get('/')],
-        [section[0], canonicalOf.get(section[1])],
-        [title, canonicalOf.get(path)],
+        [section[0], sectionCanonical],
+        [title, canonical],
       ].map(([name, item], i) => ({ '@type': 'ListItem', position: i + 1, name, item })),
     );
     if (trail !== expected)
