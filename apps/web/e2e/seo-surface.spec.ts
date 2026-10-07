@@ -1309,18 +1309,26 @@ test.describe('every figure states its scope, and no placeholder stands in for o
     // /about's table: its label, as any page, head, JSON-LD block, twin or endpoint would phrase it.
     const unstated = facts.filter((fact) => !shownFacts.includes(fact));
     const paths = [
-      ...routes.map(({ path }) => path),
-      ...MARKDOWN_TWINS.map(({ twin }) => twin),
-      CASE_STUDIES_JSON,
-      ...CASE_STUDY_ENDPOINTS.map(({ json }) => json),
-      FEED,
+      ...routes,
+      ...[
+        ...MARKDOWN_TWINS.map(({ twin }) => twin),
+        CASE_STUDIES_JSON,
+        ...CASE_STUDY_ENDPOINTS.map(({ json }) => json),
+        FEED,
+      ].map((path) => ({ path, status: 200 })),
     ];
     const served = await Promise.all(
-      paths.map(async (path) => ({
-        path,
-        body: (await (await request.get(path)).text()).toLowerCase(),
-      })),
+      paths.map(async ({ path, status: expected }) => {
+        const response = await request.get(path);
+        const body = (await response.text()).toLowerCase();
+        return { path, expected, status: response.status(), body };
+      }),
     );
+    // A path that failed to serve would pass the search below without being searched.
+    for (const { path, expected, status, body } of served) {
+      expect.soft(status, path).toBe(expected);
+      expect.soft(body.length, `${path} must serve a body`).toBeGreaterThan(0);
+    }
     const problems = served.flatMap(({ path, body }) =>
       unstated
         .filter(({ label }) => body.includes(label.toLowerCase()))
