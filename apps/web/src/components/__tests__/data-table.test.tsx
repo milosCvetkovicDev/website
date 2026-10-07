@@ -168,6 +168,17 @@ describe('DataTable', () => {
     }
 
     rerender(<DataTable {...NARROW} />);
+    // A narrow table never stacks: below 640px only its column headers change, wrapping their names
+    // and breaking a word too long for the line, as a wide table's (hidden there) do too.
+    const columnHeaders = [...container.querySelectorAll('th[scope="col"]')];
+    for (const header of columnHeaders) {
+      expect(classes(header).filter((name) => name.startsWith('max-sm:'))).toEqual([
+        'max-sm:wrap-anywhere',
+        'max-sm:whitespace-normal',
+      ]);
+      header.remove();
+    }
+    expect(columnHeaders).toHaveLength(NARROW.columns.length);
     expect(container.innerHTML).not.toContain('max-sm:');
   });
 
