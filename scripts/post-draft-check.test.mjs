@@ -986,6 +986,23 @@ describe('the publish check', () => {
       });
     }
 
+    const STRAY = 'a `](` with no link before it: escape the `]` as `\\]`';
+    for (const [name, approved] of [
+      ['an escaped bracket before it', 'Write \\[text](url) for a link.'],
+      ['no bracket before it', 'The list ends](here) mid-sentence.'],
+      ['a bracket only in code before it', 'Run `ls [a` then b](c) here.'],
+      ['a link before it', 'See [the docs](/work) and b](c) here.'],
+    ]) {
+      it(`reports a \`](\` with ${name} by its own message`, () => {
+        const problems = differences(draft([...BODY, '', approved]), twin(), 'own');
+        assert.ok(problems.includes(`line 29: ${STRAY}`), problems.join('\n'));
+        assert.deepEqual(
+          problems.filter((problem) => problem.includes('a link title')),
+          [],
+        );
+      });
+    }
+
     for (const [approved, served] of [
       ['- [ ] write the post', '- \\[ \\] write the post'],
       ['- [x] done', '- \\[x\\] done'],

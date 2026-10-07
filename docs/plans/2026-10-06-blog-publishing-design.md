@@ -117,7 +117,8 @@ Not allowed, and caught by the check when present: bold or italics, strikethroug
 lone `~` is text), images, raw HTML or HTML
 comments, entity references such as `&amp;`, footnotes, `#` or `####` and deeper headings, setext
 headings, code or links in a heading, a table caption or a table cell, code or a link in a link's
-text, a link with a title or spaces around its destination, nested lists, a task list item such as
+text, a link with a title or spaces around its destination, a `]` straight before a `(` with no
+`[` before them (escape the `]` as `\]`), nested lists, a task list item such as
 `- [ ]`, a heading, list, quote, table, code block or rule inside a list item or quote (such as
 `> ## Results`), an ordered list that does not start at 1, a list that changes its bullet or its
 `.` or `)` between items, a blank line between two items of one kind (one loose list in Markdown,
@@ -139,7 +140,7 @@ publish check below now says. Corrected 2026-10-07: the final review of P1-P4 he
 155 characters, not 300, because the post's page uses it as its meta description, which
 `page-metadata.test.ts` caps at 155. `posts.test.ts` now refuses a longer summary on the published
 index; its 300 cap is only the shape rule its fixtures exercise. The same review added
-strikethrough and an indented code fence to the list above.
+strikethrough, an indented code fence and a stray `]` before a `(` to the list above.
 
 ## The publish check
 

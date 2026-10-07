@@ -727,6 +727,26 @@ function prose(tokens, labels) {
 }
 
 /**
+ * The unescaped `](` in running text as written, by kind: `opened` when an unescaped `[` comes
+ * before one, so that CommonMark may read it as a link's end, and `stray` when none does.
+ * @param {string} text
+ */
+function linkCloses(text) {
+  const found = { opened: false, stray: false };
+  let open = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '\\') index += 1;
+    else if (char === '[') open = true;
+    else if (char === ']' && text[index + 1] === '(') {
+      if (open) found.opened = true;
+      else found.stray = true;
+    }
+  }
+  return found;
+}
+
+/**
  * Running text or a link's label as written, its escapes kept and each code span or link a space,
  * for reading it again for links. `prose()` drops each escape whole, which would read `[b]\!(c)` as
  * a link.
@@ -762,12 +782,19 @@ function refusedInline(source, at, block) {
   if (reread.some((label) => label.some((token) => 'label' in token))) {
     problems.push(`${at}: a link inside a link's text`);
   }
-  // A `](` that `linkAt()` did not take, as with a title or a space around the destination, stays
-  // text on both sides, while CommonMark makes it a link. An escaped `\]` is text.
-  if ([tokens, ...reread].some((run) => /(?<!\\)(?:\\\\)*\]\(/.test(written(run)))) {
+  // A `](` that `linkAt()` did not take stays text on both sides. After an unescaped `[`,
+  // CommonMark can still read it as the end of a link that `linkAt()` does not, one with a title
+  // or spaces around its destination. With no `[` before it, CommonMark leaves it text as well; it
+  // is refused anyway, by its own message, as escaping the `]` costs nothing. An escaped `\]` is
+  // text.
+  const closes = [tokens, ...reread].map((run) => linkCloses(written(run)));
+  if (closes.some(({ opened }) => opened)) {
     problems.push(
       `${at}: a link title or spaces around a link's destination; the post format has neither`,
     );
+  }
+  if (closes.some(({ stray }) => stray)) {
+    problems.push(`${at}: a \`](\` with no link before it: escape the \`]\` as \`\\]\``);
   }
   const text = prose(tokens, true);
   for (const [pattern, what] of REFUSED_INLINE) {
