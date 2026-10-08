@@ -275,9 +275,14 @@ const character = (entity: string, codePoint: number) =>
  * space.
  */
 export function servedText(html: string): string {
-  return html
-    .replace(DROPPED_ELEMENTS, '')
-    .replace(COMMENTS, '')
+  // Until nothing changes: one pass over `<scr<script></script>ipt>` would leave a `<script>` behind.
+  let text = html;
+  let previous: string;
+  do {
+    previous = text;
+    text = text.replace(DROPPED_ELEMENTS, '').replace(COMMENTS, '');
+  } while (text !== previous);
+  return text
     .replace(TAGS, (_tag, name: string) => (PHRASING.has(name.toLowerCase()) ? '' : BOUNDARY))
     .replace(ENTITIES, (entity, decimal?: string, hex?: string, name?: string) =>
       decimal !== undefined
