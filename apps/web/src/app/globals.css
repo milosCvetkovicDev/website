@@ -303,8 +303,11 @@ main {
    has not reached holds its entrance's from-state: transparent, offset or scaled down, Strategy's
    architecture lines dashed out of sight, Execution's code lines at opacity 0. Each element the
    story hides for an entrance carries data-story-reveal, and this puts it back for print. The
-   inline styles GSAP and the Execution count write outrank any rule that is not !important, and
-   GSAP writes one inline transform, so the rule overrides transform itself. Visibility only: rows,
+   inline styles GSAP and the Execution count write outrank any rule that is not !important. It
+   resets every property an entrance can hide or move an element with, not only the two the story
+   uses today (opacity and GSAP's one inline transform): visibility for an autoAlpha, Tailwind's
+   separate translate, scale and rotate, a filter and a clip-path. No marked element carries any of
+   them by design, and the rule reaches only the marked element itself. Visibility only: rows,
    widths and the pipeline's state print as they stand. Keyed on the attribute, never a class: the
    GSAP-against-CSS check in story-phases.test.tsx reads a class rule inside @media that sets a
    property GSAP tweens as a state rule fighting the tween, and this one is for paper only.
@@ -312,7 +315,20 @@ main {
 @media print {
   [data-story-reveal] {
     opacity: 1 !important;
+    visibility: visible !important;
     transform: none !important;
+    filter: none !important;
+    clip-path: none !important;
+  }
+
+  /* In a rule of their own, under a different selector: Lightning CSS folds translate, scale and
+     rotate that share a selector with transform into one transform (translate(0, 0) rotate(0)
+     scale(1)), which resets neither them nor transform. :where() adds no specificity, and
+     !important already outranks the inline styles. */
+  :where([data-story-reveal]) {
+    translate: none !important;
+    scale: none !important;
+    rotate: none !important;
   }
 
   /* Strategy's architecture lines, hidden by stroke dashing rather than by opacity. */

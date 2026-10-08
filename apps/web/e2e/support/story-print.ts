@@ -7,25 +7,38 @@
 
 /** An element that hides or moves a text: the text itself or one of its ancestors. */
 export interface StoryHider {
-  /** The element's place in the whole document, so two texts under one element share it. */
+  /** The element's identity in the page (see `StoryText.id`), so two texts under one element share it. */
   id: number;
-  /** Its tag, first class, own opacity when below 1 and computed transform when not the identity. */
+  /** Its tag, first class, and each property by which it hides or moves what it holds. */
   what: string;
 }
 
 /** One text element of a story section, as the page draws it at the moment of sampling. */
 export interface StoryText {
-  /** Its place among the section's text elements, in document order. */
-  index: number;
-  /** Its own text, whitespace collapsed, cut short for a failure message. */
+  /**
+   * The element's identity, kept for the life of the page in a `WeakMap` on `window`, so one element
+   * has the same id in every sample however the DOM around it changes between samples.
+   */
+  id: number;
+  /** Its own text, whitespace collapsed, cut short (by code point) for a failure message. */
   text: string;
   /** Its opacity times every ancestor's, up to `<html>`: what it is drawn at. */
   opacity: number;
   /**
-   * Every element from it up to `<html>` with an opacity below 1 or a computed `transform` that is
-   * neither `none` nor the identity matrix, outermost first. Empty for a text drawn in full, in place.
+   * Every element from it up to `<html>` that hides or moves it, outermost first: an opacity below
+   * 1, `visibility` other than `visible`, a computed `transform` that is not the identity, an
+   * individual `translate` or `rotate` other than zero, an individual `scale` that shrinks it, a
+   * `filter` or a `clip-path`. Empty for a text drawn in full, in place. The individual properties
+   * are Tailwind's (GSAP writes `transform` and pins them to `none`), and the story's design uses
+   * them only to enlarge (QuestItem's `scale-110` check mark), so only a shrink counts.
    */
   hiddenBy: StoryHider[];
+}
+
+/** One `.arch-line` path, as its computed stroke dashing stands. */
+export interface StoryArchLine {
+  dasharray: string;
+  offset: string;
 }
 
 /** One story section, sampled. */
@@ -33,19 +46,30 @@ export interface StorySample {
   texts: StoryText[];
   /** How many text elements matched an exclusion and were left out of `texts`. */
   excluded: number;
-  /** Each `.arch-line` path in the section: its computed `stroke-dashoffset`, as a number. */
-  archLineOffsets: number[];
+  /** Each `.arch-line` path in the section. */
+  archLines: StoryArchLine[];
+  /**
+   * Each element in the section, text or not, whose inline style sets an `opacity` or a
+   * `visibility` that, as computed now, hides it: every story entrance starts from `opacity: 0`,
+   * written inline by GSAP or, on the code lines, by the Execution count. Inline transforms are
+   * left out because the Gauntlet's pipeline fills draw their progress as an inline `scaleX()`,
+   * row state that prints as it stands. Meaningful in print, where every marked element is forced
+   * visible, so what is left is an element the story hides without `data-story-reveal`.
+   */
+  heldBack: string[];
 }
 
 /**
- * Samples every text element in `section`, and the section's `.arch-line` paths.
+ * Samples every text element in `section`, the section's `.arch-line` paths and every element in it
+ * that an inline style holds hidden.
  *
  * A text element is an element with a text node of its own that holds more than whitespace, and
  * that generates a box (`getClientRects()` is not empty, which an SVG `<text>` does too). The box is
  * not required to have a size: a from-state of `scale: 0`, as on Discovery's requirement tags,
  * collapses every rectangle inside it to nothing, and a text measured by its rectangle would drop
  * out of the sample exactly when it is hidden. `aria-hidden` subtrees are sampled with the rest,
- * because `SplitText`'s letters, HudPanel's ACTIVE label and the emoji are drawn text.
+ * because `SplitText`'s letters, HudPanel's ACTIVE label and the emoji are drawn text; `.sr-only`
+ * subtrees are not, because they are drawn neither on screen nor on paper, by design.
  *
  * `excludedTexts` names texts left out by their whole own text; the spec says why each one is.
  */
@@ -53,19 +77,84 @@ export function sampleStorySection(
   section: Element,
   excludedTexts: readonly string[],
 ): StorySample {
-  const isIdentity = (transform: string) =>
-    transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)';
-  const order = new Map([...document.querySelectorAll('*')].map((element, i) => [element, i]));
+  // One identity per element for the life of the page, shared by every call.
+  type Ids = { map: WeakMap<Element, number>; next: number };
+  const host = window as unknown as { __storyPrintIds?: Ids };
+  host.__storyPrintIds ??= { map: new WeakMap(), next: 0 };
+  const ids = host.__storyPrintIds;
+  const idOf = (element: Element) => {
+    let id = ids.map.get(element);
+    if (id === undefined) {
+      id = ids.next++;
+      ids.map.set(element, id);
+    }
+    return id;
+  };
+
+  const IDENTITY_TRANSFORMS = new Set([
+    'none',
+    'matrix(1, 0, 0, 1, 0, 0)',
+    'matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)',
+  ]);
+  const zeroLengths = (value: string) =>
+    value.split(/\s+/).every((part) => /^0[a-z%]*$/.test(part));
+  const shrinks = (value: string) =>
+    value.split(/\s+/).some((part) => Number.parseFloat(part) / (part.endsWith('%') ? 100 : 1) < 1);
+
+  /** How `style` hides or moves its element, one entry per property; empty when it does neither. */
+  const hidingOf = (style: CSSStyleDeclaration): string[] => {
+    const how: string[] = [];
+    const opacity = Number(style.opacity);
+    if (!(opacity >= 1)) how.push(`opacity ${style.opacity}`);
+    if (style.visibility !== 'visible') how.push(`visibility ${style.visibility}`);
+    if (!IDENTITY_TRANSFORMS.has(style.transform)) how.push(style.transform);
+    if (style.translate !== 'none' && !zeroLengths(style.translate))
+      how.push(`translate ${style.translate}`);
+    if (style.scale !== 'none' && shrinks(style.scale)) how.push(`scale ${style.scale}`);
+    if (style.rotate !== 'none' && !zeroLengths(style.rotate)) how.push(`rotate ${style.rotate}`);
+    if (style.filter !== 'none') how.push(`filter ${style.filter}`);
+    if (style.clipPath !== 'none') how.push(`clip-path ${style.clipPath}`);
+    return how;
+  };
+
+  const nameOf = (element: Element) => {
+    const firstClass = element.getAttribute('class')?.trim().split(/\s+/)[0];
+    const tag = element.tagName.toLowerCase();
+    return firstClass ? `${tag}.${firstClass}` : tag;
+  };
+
+  // Each element's opacity and hiding, read once per call however many texts it holds.
+  const seen = new Map<Element, { opacity: number; how: string[] }>();
+  const read = (element: Element) => {
+    let entry = seen.get(element);
+    if (!entry) {
+      const style = getComputedStyle(element);
+      entry = { opacity: Number(style.opacity), how: hidingOf(style) };
+      seen.set(element, entry);
+    }
+    return entry;
+  };
 
   const texts: StoryText[] = [];
+  const heldBack: string[] = [];
   let excluded = 0;
   for (const element of section.querySelectorAll('*')) {
+    const inline = (element as HTMLElement | SVGElement).style;
+    if (
+      inline &&
+      (inline.getPropertyValue('opacity') !== '' || inline.getPropertyValue('visibility') !== '')
+    ) {
+      const how = read(element).how.filter((entry) => /^(opacity|visibility) /.test(entry));
+      if (how.length > 0) heldBack.push(`${nameOf(element)} ${how.join(', ')}`);
+    }
+
     let own = '';
     for (const node of element.childNodes) {
       if (node.nodeType === Node.TEXT_NODE) own += node.textContent ?? '';
     }
     const text = own.replace(/\s+/g, ' ').trim();
-    if (text === '' || element.getClientRects().length === 0) continue;
+    if (text === '' || element.getClientRects().length === 0 || element.closest('.sr-only'))
+      continue;
     if (excludedTexts.includes(text)) {
       excluded += 1;
       continue;
@@ -74,29 +163,23 @@ export function sampleStorySection(
     let opacity = 1;
     const hiddenBy: StoryHider[] = [];
     for (let node: Element | null = element; node; node = node.parentElement) {
-      const style = getComputedStyle(node);
-      const ownOpacity = Number(style.opacity);
-      opacity *= ownOpacity;
-      if (ownOpacity < 1 || !isIdentity(style.transform)) {
-        const firstClass = node.getAttribute('class')?.trim().split(/\s+/)[0];
-        const what = [
-          firstClass ? `${node.tagName.toLowerCase()}.${firstClass}` : node.tagName.toLowerCase(),
-          ownOpacity < 1 ? `opacity ${ownOpacity}` : '',
-          isIdentity(style.transform) ? '' : style.transform,
-        ];
-        hiddenBy.unshift({ id: order.get(node) ?? -1, what: what.filter(Boolean).join(' ') });
-      }
+      const entry = read(node);
+      opacity *= entry.opacity;
+      if (entry.how.length > 0)
+        hiddenBy.unshift({ id: idOf(node), what: [nameOf(node), ...entry.how].join(' ') });
     }
+    const points = [...text];
     texts.push({
-      index: texts.length,
-      text: text.length > 48 ? `${text.slice(0, 47)}…` : text,
+      id: idOf(element),
+      text: points.length > 48 ? `${points.slice(0, 47).join('')}…` : text,
       opacity,
       hiddenBy,
     });
   }
 
-  const archLineOffsets = [...section.querySelectorAll('.arch-line')].map((line) =>
-    Number.parseFloat(getComputedStyle(line).strokeDashoffset),
-  );
-  return { texts, excluded, archLineOffsets };
+  const archLines = [...section.querySelectorAll('.arch-line')].map((line) => {
+    const style = getComputedStyle(line);
+    return { dasharray: style.strokeDasharray, offset: style.strokeDashoffset };
+  });
+  return { texts, excluded, archLines, heldBack };
 }

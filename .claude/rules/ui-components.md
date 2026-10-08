@@ -48,7 +48,9 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   An element the home page story hides for an entrance (a `fromTo()` target, a class-hidden closer,
   an Execution code line, a dashed architecture line) carries `data-story-reveal`, which the
   `@media print` rule in `globals.css` forces visible, so a print made after GSAP has built the
-  story shows it whole; `e2e/story-print.spec.ts` fails on one that does not.
+  story shows it whole. `e2e/story-print.spec.ts` fails on one that does not when it holds text or
+  is held at an inline `opacity` or `visibility`; a class-hidden element with no text is left to
+  review.
 - Status colours come from three theme tokens (ADR 0010): `--status-ok`, `--status-warn` and
   `--status-err`, used as `text-[var(--status-ok)]`, `bg-[var(--status-ok)]/10`,
   `border-[var(--status-ok)]/50` and so on for text, icons, borders, tints, bars, dots and glows
