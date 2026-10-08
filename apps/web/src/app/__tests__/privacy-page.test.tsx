@@ -3,10 +3,7 @@ import { describe, expect, it } from 'vitest';
 import PrivacyPage from '../privacy/page';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { formatContentDate } from '@/lib/content-date';
-
-/** A day as the case studies write theirs, spelled out here rather than read from the month table. */
-const DAY_AS_WRITTEN =
-  /^\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
+import { DAY_AS_WRITTEN } from '@/test/content-day';
 
 /**
  * The privacy notice's body. The metadata is pinned in `page-metadata.test.ts` and the page's

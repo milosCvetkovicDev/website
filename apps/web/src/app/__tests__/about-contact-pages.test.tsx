@@ -16,6 +16,7 @@ import { contactCopy, socialLinks } from '@/data/pages/contact';
 import { asSentence } from '@/data/pages/table';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { formatContentDate } from '@/lib/content-date';
+import { DAY_AS_WRITTEN } from '@/test/content-day';
 
 /**
  * `/about` and `/contact` map over their page records (#59), so a page and its Markdown twin read
@@ -151,10 +152,8 @@ describe('/about', () => {
     const time = line.querySelector('time');
     expect(time, 'the "Last updated" line dates itself with a <time>').not.toBeNull();
     expect(time?.textContent).toBe(formatContentDate(updated));
-    // Spelled out here rather than read from the month table, so the two cannot share a mistake.
-    expect(time?.textContent).toMatch(
-      /^\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/,
-    );
+    // Spelled out in the shared pattern rather than read from the month table (#57).
+    expect(time?.textContent).toMatch(DAY_AS_WRITTEN);
     expect(time).toHaveAttribute('dateTime', updated);
     expect(line.textContent).toBe(`Last updated ${time?.textContent}.`);
   });

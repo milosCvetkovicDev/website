@@ -120,6 +120,17 @@ describe('formatPageDate', () => {
     expect(formatPageDate('/about', '2026-10-07')).toBe('7 October 2026');
   });
 
+  it('writes the edges: the earliest day, a leap day, and the first and last of a month and year', () => {
+    expect(formatPageDate('/about', '2000-01-01')).toBe('1 January 2000');
+    expect(formatPageDate('/about', '2024-02-29')).toBe('29 February 2024');
+    expect(formatPageDate('/about', '2026-10-31')).toBe('31 October 2026');
+    expect(formatPageDate('/about', '2026-12-31')).toBe('31 December 2026');
+  });
+
+  it('names whichever page it is given', () => {
+    expect(() => formatPageDate('/about', '2026-10-32')).toThrow(/^\/about: /);
+  });
+
   // A static route's "Last updated" line used to print the stored value as it was, so a typo there
   // shipped as written, and formatContentDate alone would print nothing for it. Throwing fails the
   // prerender instead (#57).

@@ -20,7 +20,7 @@ import { workCopy } from '../src/data/pages/work';
 import { hasPublishedPosts, publishedPosts } from '../src/data/posts';
 import { RUNS_IN_PRODUCTION } from '../src/data/work-stats';
 import { restatedMetrics, wordCount } from '../src/test/answer-copy';
-import { formatContentDate } from '../src/lib/content-date';
+import { formatContentDate, formatPageDate } from '../src/lib/content-date';
 import { STATIC_ROUTE_UPDATED } from '../src/data/static-routes';
 import { fetchHead, first } from './support/served-head';
 import { TABLES, expectedTable, servedTables } from './support/tables';
@@ -687,23 +687,42 @@ test('/about shows the day its ProfilePage says it was modified (#57)', async ({
   const profile = nodes.find((node) => node['@type'] === 'ProfilePage');
   expect(profile, '/about serves a ProfilePage').toBeDefined();
   const dateModified = String(profile?.dateModified);
-  expect(dateModified, 'the ProfilePage dateModified').toMatch(/^\d{4}-\d{2}-\d{2}$/);
   expect(lastUpdated, 'one "Last updated" line, its <time> holding the dateModified').toEqual([
-    { text: `Last updated ${formatContentDate(dateModified)}.`, datetimes: [dateModified] },
+    { text: `Last updated ${writtenDay('/about', dateModified)}.`, datetimes: [dateModified] },
   ]);
 });
 
-test('/privacy shows its "Last updated" day as the case studies write theirs (#57)', async ({
+test('/privacy shows the day its sitemap lastmod names, as the case studies write theirs (#57)', async ({
   page,
   request,
 }) => {
-  // The line and the sitemap's lastmod read one value, the <time> holding it as stored.
+  // /privacy's WebPage carries no date, so its line answers to the stored value and the sitemap's
+  // lastmod, which read one entry of STATIC_ROUTE_UPDATED.
   const updated = STATIC_ROUTE_UPDATED['/privacy'];
   const { lastUpdated } = await servedGraph(request, page, '/privacy');
   expect(lastUpdated, 'one "Last updated" line, its <time> holding the stored day').toEqual([
-    { text: `Last updated ${formatContentDate(updated)}.`, datetimes: [updated] },
+    { text: `Last updated ${writtenDay('/privacy', updated)}.`, datetimes: [updated] },
   ]);
+  const xml = await (await request.get('/sitemap.xml')).text();
+  const entry = [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)]
+    .map(([, body]) => body)
+    .find((body) => /<loc>[^<]*\/privacy\/?<\/loc>/.test(body));
+  expect(entry?.match(/<lastmod>([^<]+)<\/lastmod>/)?.[1], "the sitemap's /privacy lastmod").toBe(
+    updated,
+  );
 });
+
+/**
+ * A static route's stored day as its "Last updated" line writes it. `formatPageDate` throws, naming
+ * the route and the value, where `formatContentDate` would give a null the expectation would print;
+ * the en-GB reader's `Intl` text then checks it against an oracle that shares none of the page's
+ * month table.
+ */
+function writtenDay(route: string, stored: string): string {
+  const written = formatPageDate(route, stored);
+  expect(written, `${route}: ${stored} as a reader writes it`).toBe(readerDate(stored));
+  return written;
+}
 
 test('the Person schema, the hero and the /about description carry one derived years figure, none of it framed as AI-native (#49)', async ({
   request,
