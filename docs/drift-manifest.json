@@ -2526,6 +2526,38 @@
       }
     },
     {
+      "id": "adr-readme-script-check-adr-history",
+      "doc": "docs/adr/README.md",
+      "anchor": "`pnpm check:adr-history",
+      "claim": "`pnpm check:adr-history` is a script in ./package.json and runs scripts/check-adr-history.mjs.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:adr-history"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:adr-history",
+        "runs": "scripts/check-adr-history.mjs"
+      }
+    },
+    {
+      "id": "adr-readme-check-adr-history-in-quality-job",
+      "doc": "docs/adr/README.md",
+      "anchor": "which the `quality` job also runs",
+      "claim": "The quality job runs pnpm check:adr-history against HEAD^1, the tip of the branch a pull request merges into.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": ".github/workflows/ci.yml",
+        "regex": "^  quality:\\r?$(?:\\n(?!  \\S)[^\\n]*)*?\\n\\s+run: (pnpm check:adr-history -- --base HEAD\\^1)\\r?$",
+        "equals": "pnpm check:adr-history -- --base HEAD^1"
+      }
+    },
+    {
       "id": "plan-portfolio-design-link-adr-0012-correcting-accepted-reco",
       "doc": "docs/plans/2026-01-27-portfolio-design.md",
       "anchor": "](../adr/0012-correcting-accepted-records.md)",
