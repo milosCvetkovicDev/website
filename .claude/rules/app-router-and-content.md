@@ -158,10 +158,13 @@ TechArticle and BreadcrumbList, as a post does with `PostWebPageJsonLd`, `PostAr
 its `generateMetadata` does: the same types, no BlogPosting (#61), and no `description` or
 `keywords` on a post's article, because its page prints neither its summary nor its tags
 (`techArticle()` requires both keys, `undefined` leaving one out, and throws on an empty one).
-A node names another by `{ '@id': … }` alone. A new route renders its page node, and
-`components/__tests__/json-ld.test.tsx` and `e2e/seo-surface.spec.ts` pin each route's types;
-with no post published, the e2e graph test reports how many post routes it covered in an
-annotation.
+A node names another by `{ '@id': … }` alone. Each builder's object ends with
+`satisfies WithContext<T>` from schema-dts, as does each conditional spread's own object
+(`Partial<…Leaf>`) and each ListItem (57c), so a misspelled predicate fails `pnpm typecheck`;
+`lib/__tests__/structured-data-types.test.ts` keeps schema-dts catching each kind. A new route
+renders its page node, and `components/__tests__/json-ld.test.tsx` and `e2e/seo-surface.spec.ts`
+pin each route's types; with no post published, the e2e graph test reports how many post routes it
+covered in an annotation.
 
 The Person asserts only what a page shows (57b):
 

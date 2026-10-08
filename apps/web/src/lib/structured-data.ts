@@ -1,3 +1,15 @@
+import type {
+  BreadcrumbList,
+  ListItem,
+  Person,
+  ProfilePage,
+  TechArticle,
+  TechArticleLeaf,
+  WebPage,
+  WebPageLeaf,
+  WebSite,
+  WithContext,
+} from 'schema-dts';
 import type { PageRecord } from '@/data/pages/types';
 import { CERTIFICATION, LOCATION, OCCUPATION, yearsOfExperience } from '@/data/profile';
 import { social, socialProfiles } from '@/data/social';
@@ -17,6 +29,15 @@ import { siteOrigin } from './site-origin';
  * route, the 404 included; each page adds its own WebPage (a ProfilePage on /about), and a case
  * study or a post adds its TechArticle and its BreadcrumbList. The blocks stay separate rather than
  * one `@graph`: the `@id` references are what join them.
+ *
+ * Every builder's object ends with `satisfies WithContext<T>`, `T` being its schema-dts type, so a
+ * misspelled predicate fails `pnpm typecheck` on the line that wrote it (#57 AC 8, 57c).
+ * `satisfies` rather than an annotation keeps the object's own type. The object around a
+ * conditional spread does not check the keys the spread adds, so each spread's own object carries
+ * `satisfies Partial<…Leaf>`; and `map` types its callback's object before the list it returns is
+ * checked, so each ListItem a trail maps to carries `satisfies ListItem`. The types change nothing
+ * at run time. `lib/__tests__/structured-data-types.test.ts` holds schema-dts to catching each kind
+ * of misspelling.
  *
  * Every URL is absolute on `siteOrigin()`, `NEXT_PUBLIC_SITE_URL` as a bare origin, falling back to
  * production, and a route's URL is its canonical, built from the same pathname its `buildMetadata()`
@@ -143,7 +164,7 @@ export function person() {
     // that node only on /about, so this is the one reference that names a node on another route;
     // the graph tests let it through by name and hold it to /about's node instead (57b).
     mainEntityOfPage: reference(webPageId(ABOUT_PATH)),
-  };
+  } satisfies WithContext<Person>;
 }
 
 export function website() {
@@ -158,7 +179,7 @@ export function website() {
     inLanguage: 'en',
     author: reference(PERSON_ID),
     publisher: reference(PERSON_ID),
-  };
+  } satisfies WithContext<WebSite>;
 }
 
 /**
@@ -183,8 +204,11 @@ export function webPage({
     name: titleText(name),
     isPartOf: reference(WEBSITE_ID),
     about: reference(PERSON_ID),
-    ...(breadcrumb && { breadcrumb: reference(routeNodeId(path, 'breadcrumb')) }),
-  };
+    ...(breadcrumb &&
+      ({
+        breadcrumb: reference(routeNodeId(path, 'breadcrumb')),
+      } satisfies Partial<WebPageLeaf>)),
+  } satisfies WithContext<WebPage>;
 }
 
 /**
@@ -203,7 +227,7 @@ export function profilePage({ path, dateModified }: { path: string; dateModified
     dateModified: contentDate(dateModified, 'profilePage'),
     isPartOf: reference(WEBSITE_ID),
     mainEntity: reference(PERSON_ID),
-  };
+  } satisfies WithContext<ProfilePage>;
 }
 
 /**
@@ -247,15 +271,15 @@ export function techArticle({
     '@type': 'TechArticle',
     '@id': routeNodeId(path, 'article'),
     headline,
-    ...(description !== undefined && { description }),
+    ...(description !== undefined && ({ description } satisfies Partial<TechArticleLeaf>)),
     image: `${canonicalUrl(path)}/og-image.png`,
     author: reference(PERSON_ID),
     mainEntityOfPage: reference(webPageId(path)),
     isPartOf: reference(WEBSITE_ID),
     datePublished: contentDate(datePublished, 'techArticle'),
     dateModified: contentDate(dateModified, 'techArticle'),
-    ...(keywords !== undefined && { keywords }),
-  };
+    ...(keywords !== undefined && ({ keywords } satisfies Partial<TechArticleLeaf>)),
+  } satisfies WithContext<TechArticle>;
 }
 
 /** One step of a breadcrumb trail: what it is called, and the route it links to. */
@@ -286,11 +310,23 @@ export function breadcrumbList({ path, trail }: { path: string; trail: readonly 
     '@context': CONTEXT,
     '@type': 'BreadcrumbList',
     '@id': routeNodeId(path, 'breadcrumb'),
-    itemListElement: trail.map((crumb, index) => ({
-      '@type': 'ListItem',
-      position: index + 1,
-      name: crumb.name,
-      item: canonicalUrl(crumb.path),
-    })),
-  };
+    itemListElement: trail.map(
+      (crumb, index) =>
+        ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: crumb.name,
+          item: canonicalUrl(crumb.path),
+        }) satisfies ListItem,
+    ),
+  } satisfies WithContext<BreadcrumbList>;
 }
+
+/** Any node a builder here returns: what `components/json-ld.tsx` renders. */
+export type JsonLdNode =
+  | WithContext<Person>
+  | WithContext<WebSite>
+  | WithContext<WebPage>
+  | WithContext<ProfilePage>
+  | WithContext<TechArticle>
+  | WithContext<BreadcrumbList>;
