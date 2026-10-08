@@ -190,7 +190,8 @@ export interface CaseStudy {
    * When the case study first went public and when its visible content last changed, as ISO dates
    * (`YYYY-MM-DD`). The page's visible Published and Updated line, the TechArticle's dates and the
    * sitemap's `lastmod` read them, so bump `updatedAt` in the commit that changes what the page
-   * says, and only then.
+   * says, and only then. A commit that changes either the copy or a date regenerates
+   * `content-dates.json` (`pnpm --filter web content-dates:update`), or `pnpm test` fails.
    */
   publishedAt: string;
   updatedAt: string;

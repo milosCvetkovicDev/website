@@ -147,6 +147,21 @@ or a pair updated before it was published, throws there and fails the prerender.
 future" is a unit-test check against the live clock, not a build check, and it counts a day as
 begun once UTC+14 has reached it: an accepted tolerance of up to 14 hours against the UTC date.
 
+`src/data/content-dates.json` pairs each route's content date with what it serves (#191): one line
+per static route (/blog's Coming Soon page included), case study and published post, holding its
+sitemap `lastmod` (/blog's own date while the sitemap leaves it out) and a fingerprint of its served
+text. `src/data/__tests__/content-dates.test.tsx` computes it and compares it with the file, so the
+commit that changes what a route says, or its date, regenerates it with
+`pnpm --filter web content-dates:update`, or `pnpm test` fails with the route's line in the diff.
+Served text is the page component's server render (no `script`, `style`, `template` or `time`,
+whitespace collapsed) plus its Markdown twin, with the route's own dates masked in both forms:
+comments, types and formatting cannot move a fingerprint, and a date bump alone moves only
+`updated`. `/` is rendered finished as well (reduced motion), since its server render leaves out
+the log events and deploy result the story reveals. Not covered: the layout's chrome, text in
+attributes (`alt`, `aria-label`) and strings shown only mid-animation (`Processing...`, the
+deploying label). The helper is `src/test/content-fingerprint.ts`. A conflicted manifest is
+regenerated, never merged by hand; adjacent routes' lines conflict too.
+
 The JSON-LD is one graph joined by `@id` (#57, ADR 0031): `src/lib/structured-data.ts` builds the
 nodes as plain objects and `components/json-ld.tsx` renders each in its own block through
 `serializeJsonLd`, the one `JSON.stringify` there. The root layout renders the Person and the
