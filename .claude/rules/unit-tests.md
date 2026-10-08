@@ -49,11 +49,14 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   (`app-router-and-content.md` says what it records). It pins the clock before any import, with
   `vi.useFakeTimers({ toFake: ['Date'], now })` inside `vi.hoisted`: `/` and `/about` print the years
   of experience, so on the live clock the committed file would go stale every 1 January. Only
-  `Date` is faked, because faked timers can leave the server renderer waiting. It renders pages
-  with `react-dom/static`'s `prerender` in the node environment and reads their text without a DOM.
+  `Date` is faked, because faked timers can leave the server renderer waiting. It also stubs
+  `NEXT_PUBLIC_SITE_URL` blank, since every twin prints absolute URLs. It renders pages with
+  `react-dom/static`'s `prerender` in the node environment and reads their text without a DOM.
   `/` is rendered twice, as served and finished (`usePrefersReducedMotion` mocked to true); copy
-  shown only mid-animation is in neither render. In CI Vitest refuses to write a snapshot, so a
-  stale or missing manifest fails; `pnpm --filter web content-dates:update` rewrites it locally.
+  shown only mid-animation is in neither render. Each test that renders every route, or imports
+  every page afresh, takes an explicit 60 s timeout for loaded machines. A stale or missing
+  manifest fails; only `pnpm --filter web content-dates:update`, which sets `CONTENT_DATES_UPDATE`,
+  writes it.
 - `testTimeout` stays at the 5s default. A test that genuinely needs longer takes an explicit
   timeout as `it`'s third argument, with a comment saying why, as the phase lifecycle test in
   `src/components/animated-hero/__tests__/story-phases.test.tsx` does. Raising the global default
