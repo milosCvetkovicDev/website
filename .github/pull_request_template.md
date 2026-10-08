@@ -8,6 +8,7 @@
 
 - [ ] `pnpm check:allowbuilds`
 - [ ] `pnpm check:adrs`
+- [ ] `pnpm check:adr-history` (accepted ADRs' Decision and Corrections against the merge base)
 - [ ] `pnpm test:scripts`
 - [ ] `pnpm format:check`
 - [ ] `pnpm lint`
