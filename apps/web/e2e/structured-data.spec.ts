@@ -28,12 +28,15 @@ import {
  * an annotation and a log line saying why: a network error, a timeout, a non-2xx answer, a body that
  * is not the JSON it returned when probed, an answer with a `fetchError`, and an answer with no
  * errors that says it read nothing. The only failure is a verdict: `totalNumErrors` above zero, or
- * another number of objects read than the route's graph has, which is how a partial read shows (the
- * owner's comment on #57). `readVerdict` and `objectCountProblem` in `support/schema-validator.ts`
- * draw those lines, and `src/test/schema-validator.test.ts` pins them. Failing open can hide a
- * check that has stopped working, a changed contract answering 4xx on every run for instance, so
- * `SCHEMA_VALIDATOR_STRICT=1` turns every no-verdict into a failure, for whoever wants to know that
- * the check still reaches a verdict.
+ * another number of objects read than the route's graph has, which is how a partial read can show
+ * (the owner's comment on #57 asked for exactly this: an unreachable validator annotates and
+ * passes, a wrong count from one that did answer fails). That count follows the validator's own,
+ * undocumented rule for folding `@id` references, so a change in that rule fails the run too, and
+ * the failure says to re-measure. `readVerdict` and `objectCountProblem` in
+ * `support/schema-validator.ts` draw those lines, and `src/test/schema-validator.test.ts` pins
+ * them. Failing open can hide a check that has stopped working, a changed contract answering 4xx
+ * on every run for instance, so `SCHEMA_VALIDATOR_STRICT=1` turns every no-verdict into a failure,
+ * for whoever wants to know that the check still reaches a verdict.
  *
  * What the probe of 2026-09-28 showed, and this spec relies on: a POST of the form field `html`
  * answers 200 with `)]}'` (a guard against cross-site script inclusion) and a newline before the
@@ -73,22 +76,36 @@ const VALIDATOR_TIMEOUT_MS = 10_000;
 const STRICT = process.env.SCHEMA_VALIDATOR_STRICT === '1';
 
 /**
- * The routes it sends, each node set once (the owner's choice on #57 AC 11), with the number of
- * objects the validator reads there (`numObjects` in `support/schema-validator.ts` says what it
- * counts and when it was measured). The home page, the root layout's Person and WebSite with a
- * WebPage; /about, whose page node is a ProfilePage; and one case study, which adds its TechArticle
- * and BreadcrumbList, taken from the data file so a renamed slug cannot leave this spec asking for
- * a page that is gone. One study stands for all: every study renders the same components with the
- * same predicates, and the offline gate parses every study's blocks; each further route is another
- * third-party call. A post's node set is its own, a TechArticle without `description` or
- * `keywords` and a Home > Writing trail, and no route here serves it: the first published post goes
- * unvalidated until its route is added.
+ * The routes it sends, one for each node set but a post's (the owner's choice on #57 AC 11), with
+ * the number of objects the validator reads there. The home page, the root layout's Person and
+ * WebSite with a WebPage; /about, whose page node is a ProfilePage; and one case study, which adds
+ * its TechArticle and BreadcrumbList, taken from the data file so a renamed slug cannot leave this
+ * spec asking for a page that is gone. One study stands for all: every study renders the same
+ * components with the same predicates, and the offline gate parses every study's blocks; each
+ * further route is another third-party call. A post's node set is its own, a TechArticle without
+ * `description` or `keywords` and a Home > Writing trail, and no route here serves it: the first
+ * published post goes unvalidated until its route is added with its measured count.
+ *
+ * The counts were measured 2026-10-07 on production at d0daec2, whose ld+json on these three routes
+ * is byte-identical to the build that pinned them (57c compared the two). They follow from the
+ * graph if the validator reads as one object each node that no other node names, and each reference
+ * with no node behind it in what was sent: the Person's `mainEntityOfPage` names /about's
+ * ProfilePage, which only /about serves, so `/` reads its WebPage and that reference, 2, a case
+ * study its TechArticle and that reference, 2, and /about, where every node is named by another, 1.
+ * That reading is inferred from the three numbers, not documented. By it, the count misses some
+ * lost blocks: without its WebPage, `/` still reads 2 (the WebSite and the reference), and so does
+ * a case study without its TechArticle. It is evidence of a whole read, not proof of one.
  */
 const ROUTES: readonly { path: string; objects: number }[] = [
   { path: '/', objects: 2 },
   ...CASE_STUDY_ROUTES.slice(0, 1).map((path) => ({ path, objects: 2 })),
   { path: '/about', objects: 1 },
 ];
+// With no case study, the slice above is empty and the TechArticle and BreadcrumbList would go
+// unsent without a word: refuse to load instead.
+if (CASE_STUDY_ROUTES.length === 0) {
+  throw new Error('structured-data.spec: no case study route to validate its node set on');
+}
 
 /** Posts the elements and reads the answer, or says why there is no answer to read. */
 async function validate(request: APIRequestContext, html: string): Promise<Verdict> {
@@ -107,7 +124,7 @@ async function validate(request: APIRequestContext, html: string): Promise<Verdi
 }
 
 for (const { path, objects } of ROUTES) {
-  test(`validator.schema.org finds no error in the JSON-LD served on ${path}`, async ({
+  test(`validator.schema.org reads ${objects} object(s) and finds no error in the JSON-LD served on ${path}`, async ({
     request,
   }) => {
     // The build under test is not the third party: a page that fails to serve is a real failure.
@@ -136,7 +153,7 @@ for (const { path, objects } of ROUTES) {
     test.info().annotations.push({
       type: 'validator.schema.org',
       description:
-        `${path}: ${scripts.length} blocks sent, ${numObjects} objects read ` +
+        `${path}: ${scripts.length} blocks sent, ${numObjects ?? 'no'} objects read ` +
         `(${objects} expected), ${totalNumErrors} errors, ${totalNumWarnings ?? 0} warnings`,
     });
     expect(

@@ -146,6 +146,16 @@ describe('objectCountProblem', () => {
       `validator.schema.org gave no object count, and 1 is expected: ${advice}`,
     );
   });
+
+  it('refuses an expected count that is no count of objects, a typo in the spec', () => {
+    // readVerdict already refuses a reported count that is not one (above); this is the other
+    // side. Zero can never match, since a clean answer that read nothing is no verdict.
+    for (const expected of [0, -1, 1.5, Number.NaN]) {
+      expect(() => objectCountProblem(expected, clean)).toThrow(
+        `objectCountProblem: ${expected} is not a count of objects to expect`,
+      );
+    }
+  });
 });
 
 describe('clip', () => {

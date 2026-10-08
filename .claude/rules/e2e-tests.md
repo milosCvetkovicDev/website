@@ -79,14 +79,16 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   Applebot (with Applebot's fallback to Googlebot's groups), and fails any one of them refused.
 - The e2e job calls one third party. `e2e/structured-data.spec.ts` posts the
   `<script type="application/ld+json">` elements served on `/`, the first case study and `/about`,
-  one route per node set, and nothing else of the page, to `validator.schema.org/validate`, one
-  request per route, from the `chromium` project only, so three times per run, with no retries. It
-  is advisory and fails open: a network error, a timeout, a non-2xx answer or an answer that read
-  nothing passes with an annotation. A validator that did answer decides: a verdict with errors
-  fails (`readVerdict` in `e2e/support/schema-validator.ts`), and so does one that read another
-  number of objects than the route's pinned count (`objectCountProblem`; `/` 2, a case study 2,
-  `/about` 1), which is how a partial read shows. A graph change that moves a count updates it in
-  the spec. `SCHEMA_VALIDATOR_STRICT=1` turns a missing verdict into a failure.
+  one route for each node set but a post's (no post route is sent until one is added with its
+  count), and nothing else of the page, to `validator.schema.org/validate`, one request per route,
+  from the `chromium` project only, so three times per run, with no retries. It is advisory and
+  fails open: a network error, a timeout, a non-2xx answer or an answer that read nothing passes
+  with an annotation. A validator that did answer decides: a verdict with errors fails
+  (`readVerdict` in `e2e/support/schema-validator.ts`), and so does one that read another number of
+  objects than the count `ROUTES` pins for the route (`objectCountProblem`), which catches some
+  partial reads, not all. A graph change that moves a count updates it in `ROUTES`, the one place
+  the counts and their derivation are written. `SCHEMA_VALIDATOR_STRICT=1` turns a missing verdict
+  into a failure.
 
 ## Testing
 

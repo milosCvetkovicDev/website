@@ -69,11 +69,13 @@ vi.mock('@/data/posts', async (importOriginal) => {
  * error on the line that wrote it: `jobTitel` fails with TS2561, "Did you mean to write
  * 'jobTitle'?", and a misspelled key in the nested PostalAddress with TS1360 naming it. Two places
  * the outer `satisfies` does not reach carry their own: the object each conditional spread adds
- * (`satisfies Partial<TechArticleLeaf>` or `Partial<WebPageLeaf>`) and each ListItem a trail maps
- * to (`satisfies ListItem`). `lib/__tests__/structured-data-types.test.ts` keeps schema-dts
- * catching each kind under `pnpm typecheck`, and `e2e/structured-data.spec.ts` still asks
- * validator.schema.org about what is served. This file imports nothing from schema-dts: the types
- * check what the code writes; this file checks what renders.
+ * (`satisfies SpreadPredicates<TechArticleLeaf>` or `<WebPageLeaf>`, which also refuse an `@type`
+ * or `@id`) and each ListItem a trail maps to (`satisfies ListItem`).
+ * `lib/__tests__/structured-data-types.test.ts` keeps schema-dts catching each kind under
+ * `pnpm typecheck` and fails `pnpm test` when one of those `satisfies` is removed, and
+ * `e2e/structured-data.spec.ts` still asks validator.schema.org about what is served. This file
+ * imports nothing from schema-dts: the types check what the code writes; this file checks what
+ * renders.
  */
 
 const ORIGINAL_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;

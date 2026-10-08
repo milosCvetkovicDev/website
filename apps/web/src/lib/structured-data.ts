@@ -34,10 +34,11 @@ import { siteOrigin } from './site-origin';
  * misspelled predicate fails `pnpm typecheck` on the line that wrote it (#57 AC 8, 57c).
  * `satisfies` rather than an annotation keeps the object's own type. The object around a
  * conditional spread does not check the keys the spread adds, so each spread's own object carries
- * `satisfies Partial<…Leaf>`; and `map` types its callback's object before the list it returns is
- * checked, so each ListItem a trail maps to carries `satisfies ListItem`. The types change nothing
- * at run time. `lib/__tests__/structured-data-types.test.ts` holds schema-dts to catching each kind
- * of misspelling.
+ * `satisfies SpreadPredicates<…Leaf>`, which also keeps it from setting the node's `@type` or
+ * `@id`; and `map` types its callback's object before the list it returns is checked, so each
+ * ListItem a trail maps to carries `satisfies ListItem`. The types change nothing at run time.
+ * `lib/__tests__/structured-data-types.test.ts` holds schema-dts to catching each kind of
+ * misspelling, and fails when a builder, a spread or a ListItem loses its `satisfies`.
  *
  * Every URL is absolute on `siteOrigin()`, `NEXT_PUBLIC_SITE_URL` as a bare origin, falling back to
  * production, and a route's URL is its canonical, built from the same pathname its `buildMetadata()`
@@ -61,6 +62,12 @@ export interface NodeReference {
 }
 
 const reference = (id: string): NodeReference => ({ '@id': id });
+
+/**
+ * What a conditional spread may add to a node of type `Leaf`: any of its predicates, but never the
+ * `@type` or `@id` the node's own literal sets, which a later spread would otherwise overwrite.
+ */
+export type SpreadPredicates<Leaf> = Partial<Omit<Leaf, '@type' | '@id'>>;
 
 /** The absolute URL of a route, as its canonical link writes it: the origin alone for `/`. */
 export function canonicalUrl(path: string): string {
@@ -207,7 +214,7 @@ export function webPage({
     ...(breadcrumb &&
       ({
         breadcrumb: reference(routeNodeId(path, 'breadcrumb')),
-      } satisfies Partial<WebPageLeaf>)),
+      } satisfies SpreadPredicates<WebPageLeaf>)),
   } satisfies WithContext<WebPage>;
 }
 
@@ -271,14 +278,14 @@ export function techArticle({
     '@type': 'TechArticle',
     '@id': routeNodeId(path, 'article'),
     headline,
-    ...(description !== undefined && ({ description } satisfies Partial<TechArticleLeaf>)),
+    ...(description !== undefined && ({ description } satisfies SpreadPredicates<TechArticleLeaf>)),
     image: `${canonicalUrl(path)}/og-image.png`,
     author: reference(PERSON_ID),
     mainEntityOfPage: reference(webPageId(path)),
     isPartOf: reference(WEBSITE_ID),
     datePublished: contentDate(datePublished, 'techArticle'),
     dateModified: contentDate(dateModified, 'techArticle'),
-    ...(keywords !== undefined && ({ keywords } satisfies Partial<TechArticleLeaf>)),
+    ...(keywords !== undefined && ({ keywords } satisfies SpreadPredicates<TechArticleLeaf>)),
   } satisfies WithContext<TechArticle>;
 }
 
@@ -322,7 +329,12 @@ export function breadcrumbList({ path, trail }: { path: string; trail: readonly 
   } satisfies WithContext<BreadcrumbList>;
 }
 
-/** Any node a builder here returns: what `components/json-ld.tsx` renders. */
+/**
+ * Any node a builder here returns: what `components/json-ld.tsx` renders. `WithContext<WebPage>`
+ * already holds the ProfilePage, so that member adds nothing to the type; it stays so the union
+ * names each builder's type, and tsc folds it away (`--extendedDiagnostics` reports the same type
+ * and instantiation counts for the web project with it and without it).
+ */
 export type JsonLdNode =
   | WithContext<Person>
   | WithContext<WebSite>
