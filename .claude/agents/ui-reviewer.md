@@ -60,8 +60,9 @@ catches it.
 
 - `apps/web/e2e/accessibility.spec.ts`: axe, with `label-content-name-mismatch` switched on, on the
   routes listed in `apps/web/e2e/routes.ts` at rest in both colour schemes at the desktop
-  viewport; on `/` after the whole story has scrolled; and on `/` with a header nav link hovered
-  and with one focused. Each desktop at-rest pass also holds `INCOMPLETE_CONTRAST_BUDGET` (see
+  viewport; on `/` after the whole story has scrolled; on `/` with a header nav link hovered
+  and with one focused; and on the site header alone at every scroll offset of `/`, which must be
+  opaque and unblurred. Each desktop at-rest pass also holds `INCOMPLETE_CONTRAST_BUDGET` (see
   Accessibility). Nothing else is measured: text that appears only on hover or focus elsewhere,
   inside an opened menu, or after scrolling a route other than `/` passes this gate whatever its
   contrast.

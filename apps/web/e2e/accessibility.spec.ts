@@ -11,6 +11,8 @@ import { TMUX_LOG_STREAM, tmuxLogStreamProblems } from './support/tmux-log-strea
 // register its tests twice, so they live in their own module.
 import {
   audit,
+  auditWithin,
+  type AxeResults,
   describeIncomplete,
   describeViolations,
   incompleteNodes,
@@ -21,8 +23,9 @@ import {
 /**
  * Accessibility regression gate: every page route must produce zero axe-core violations in both colour
  * schemes, at rest; `/` again after the whole story has been scrolled through, and again with a header
- * link hovered and with one focused. `e2e/mobile/accessibility.spec.ts` runs the at-rest pass on `/` and
- * one case study under the two phone projects.
+ * link hovered and with one focused; and the header alone at every scroll offset of `/` (#147).
+ * `e2e/mobile/accessibility.spec.ts` runs the at-rest pass on `/` and one case study under the two
+ * phone projects.
  *
  * The route list was `['/', '/work/self-healing-agent']` until 2026-09-12 — two of ten — which is why
  * every defect the audit found on `/about`, `/skills`, `/contact`, `/blog` or a 404 was invisible to a
@@ -350,6 +353,67 @@ async function scrollThroughStory(page: Page) {
 }
 
 /**
+ * The site header the root layout renders on every route. Scoped to a child of `<body>` because
+ * `/work/[slug]` and `/blog/[slug]` put a `<header>` of their own inside the article.
+ */
+const SITE_HEADER = 'body > header';
+
+/** Featured Work on `/`, the one section with a drawing that can sit under the sticky header. */
+const FEATURED_WORK = 'section[aria-labelledby="featured-work-heading"]';
+
+/**
+ * `--background` as the body computes it in each scheme (`globals.css`): `#fafafa` and `#0a0a0a`.
+ * Compared as the browser serialises the colour, never parsed: Tailwind v4 emits an
+ * alpha-modified colour as `oklab(L a b / A)`, which a hand-written parse misreads
+ * (`hero-contrast.spec.ts`, `installColorProbe`).
+ */
+const PAGE_BACKGROUND = { light: 'rgb(250, 250, 250)', dark: 'rgb(10, 10, 10)' } as const;
+
+/**
+ * Scrolls to `top` and reports where the page ended up, two animation frames later, against the
+ * offset it should be at: `top`, clamped to the bottom. `behavior: 'instant'` for the reason
+ * `scrollThroughStory` gives.
+ */
+const scrollToOffset = (page: Page, top: number) =>
+  page.evaluate(async (top) => {
+    window.scrollTo({ top, behavior: 'instant' });
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const bottom = document.documentElement.scrollHeight - window.innerHeight;
+    return { scrollY: window.scrollY, expected: Math.min(top, bottom) };
+  }, top);
+
+/**
+ * Where the header's About link sits against Featured Work's architecture diagram, in viewport
+ * coordinates. Measured by geometry because a hit test cannot see the diagram: its layer and both
+ * fades are `pointer-events-none`, which their descendants inherit, so `elementsFromPoint` leaves
+ * them out. `diagram` is the section's `aria-hidden` child that draws the svg, `hidden md:block`;
+ * the fades are its other `aria-hidden` children, 128 px gradients at the top and the bottom.
+ */
+const featuredWorkUnderHeader = (page: Page) =>
+  page.evaluate(
+    ({ header, section }) => {
+      const box = (element: Element | null | undefined) => {
+        if (!element) return null;
+        const { top, right, bottom, left } = element.getBoundingClientRect();
+        return { top, right, bottom, left };
+      };
+      const sectionElement = document.querySelector(section);
+      const hidden = [...(sectionElement?.children ?? [])].filter(
+        (child) => child.getAttribute('aria-hidden') === 'true',
+      );
+      const diagram = hidden.find((child) => child.querySelector(':scope > svg'));
+      const fades = hidden.filter((child) => child !== diagram).map((fade) => box(fade));
+      return {
+        link: box(document.querySelector(`${header} a[href="/about"]`)),
+        diagram: box(diagram),
+        diagramDisplay: diagram ? getComputedStyle(diagram).display : null,
+        fades,
+      };
+    },
+    { header: SITE_HEADER, section: FEATURED_WORK },
+  );
+
+/**
  * Navigates and proves the page is the one we mean and is ready to audit. `reducedMotion` is passed
  * through for the scrolled pass; the at-rest pass leaves it at Playwright's default of `no-preference`.
  */
@@ -484,13 +548,16 @@ test.describe('Accessibility', () => {
    *   mechanism as the hero island's, and the reason a scoped pass there would be a gate that cannot
    *   fail. The card's hover behaviour is covered instead by `featured-work.spec.ts` (`data-active`, the
    *   diagram) and its colours by `e2e/hero-contrast.spec.ts` (computed style).
-   * - Scrolling the section into view to hover it puts the sticky header over the architecture-diagram
-   *   background. The header is `bg-[var(--background)]/80` with `backdrop-blur-sm`, so axe composites
-   *   `--muted` (#636363) against #cbcbcd and reports every desktop nav link at 3.7:1. That is a real
-   *   violation, found by writing this pass, and it belongs to no row of this task's manifest: it
-   *   depends only on the scroll position and appears at neither offset the at-rest pass (top) or the
-   *   scrolled pass (bottom) samples. It is reported in this task's pull request as an out-of-scope
-   *   discovery rather than quietly gated or quietly excluded here.
+   * - Scrolling the section into view to hover it put the sticky header over the architecture-diagram
+   *   background. The header was then `bg-[var(--background)]/80` with `backdrop-blur-sm`, so axe
+   *   composited `--muted` (#636363) against #cbcbcd and reported every desktop nav link at 3.7:1.
+   *   That was a real violation, found by writing this pass, and it belonged to no row of this task's
+   *   manifest: it depended only on the scroll position and appeared at neither offset the at-rest
+   *   pass (top) or the scrolled pass (bottom) samples. It was reported in this task's pull request as
+   *   an out-of-scope discovery rather than quietly gated or quietly excluded here. #147 fixed it: the
+   *   header is opaque, and 'the header at every scroll offset' below gates it. Re-measured for #147
+   *   on 2026-10-08, the 3.7:1 came from the Session Complete terminal (#0d1117) just above Featured
+   *   Work, in the light theme only; over the diagram itself axe answered `incomplete`.
    *
    * So: whole document, at scroll 0, where the header overlaps only the hero. A nav link's hover moves
    * it from `--muted` to `--foreground` and its focus draws the focus-visible ring, both of which axe
@@ -603,6 +670,188 @@ test.describe('Accessibility', () => {
     }
   });
 
+  /**
+   * The sticky header, audited on its own at every scroll offset of `/` in both schemes (#147).
+   *
+   * What sits behind a sticky header changes with the scroll position, and every other pass samples
+   * the top or the bottom of the page only. The header used to be `bg-[var(--background)]/80` with
+   * `backdrop-blur-sm`, so the page showed through behind its `--muted` links. #68 measured them at
+   * 3.7:1 with Featured Work in view, in the light scheme, at an offset no pass visited. This pass,
+   * run on that header on 2026-10-08, put the 3.7:1 over the Session Complete terminal (#0d1117)
+   * just above Featured Work (offset 5400 at 1280x720) and found axe unable to decide the links at
+   * eight offsets in both schemes: over the hero's gradient, over the story's `tech-item` tiles and
+   * over the diagram's svg. The header is now an opaque `bg-[var(--background)]`.
+   *
+   * Two checks make "every offset" true and not only "every offset sampled". The computed style comes
+   * first: the header's background is the page's own opaque `--background` and it has no
+   * `backdrop-filter`, so nothing under it can show through between the steps. Then axe, scoped to
+   * the header, at 0, every half viewport down to the bottom, and once with the Featured Work
+   * diagram under the links, which the test proves by geometry before it audits. At each offset axe
+   * must decide every text node in the header (an undecidable header is a gate that cannot fail)
+   * and pass at least the five desktop links.
+   *
+   * Under `reduce`, as in the whole-story pass: every phase renders its finished state on mount, so
+   * nothing above Featured Work can move while the offsets are visited (`featured-work.spec.ts`
+   * records that slide under `no-preference`). `window.scrollY` is checked before and after each
+   * audit, so a scripted scroll that Chromium undoes (`hero.spec.ts`, 'scroll indicator fades on
+   * scroll') fails by name instead of auditing the top of the page again. Every offset's results are
+   * attached before the audits are judged, so one failing offset still leaves all of them in the
+   * report.
+   *
+   * About 20 offsets a scheme, each a header-sized axe run; 120 s for the reasons the whole-story
+   * pass gives.
+   */
+  test.describe('the header at every scroll offset', () => {
+    test.describe.configure({ retries: 0, timeout: 120_000 });
+
+    for (const colorScheme of colorSchemes) {
+      test(`/ has a measurable, passing header at every offset in the ${colorScheme} theme`, async ({
+        page,
+      }) => {
+        await openPage(page, '/', colorScheme, { reducedMotion: 'reduce' });
+        await expect(page.locator(SITE_HEADER)).toHaveCount(1);
+
+        // Soft, so that a translucent header still gets audited below and its measurements land in
+        // the report: they are what #147's first criterion asks for.
+        const surface = await page.locator(SITE_HEADER).evaluate((header) => ({
+          background: getComputedStyle(header).backgroundColor,
+          backdropFilter: getComputedStyle(header).backdropFilter,
+          page: getComputedStyle(document.body).backgroundColor,
+        }));
+        expect
+          .soft(surface.page, `the body should paint --background in the ${colorScheme} theme`)
+          .toBe(PAGE_BACKGROUND[colorScheme]);
+        expect
+          .soft(
+            surface.background,
+            'the header must paint the page background at full opacity, or whatever scrolls under ' +
+              'it shows through behind its links',
+          )
+          .toBe(surface.page);
+        expect
+          .soft(surface.backdropFilter, 'the header must not blur what scrolls under it')
+          .toBe('none');
+
+        const plan = await page.evaluate((section) => {
+          const element = document.querySelector(section);
+          if (!element) throw new Error(`${section} is not on /`);
+          const { top, height } = element.getBoundingClientRect();
+          return {
+            bottom: document.documentElement.scrollHeight - window.innerHeight,
+            step: Math.round(window.innerHeight / 2),
+            // About 40% of the way down the section: between its two 128 px fades, in the band
+            // where the diagram is drawn at full strength.
+            featuredWork: Math.round(window.scrollY + top + height * 0.4),
+          };
+        }, FEATURED_WORK);
+        if (plan.bottom <= 0 || plan.step <= 0)
+          throw new Error(`/ cannot be scrolled: bottom ${plan.bottom}, step ${plan.step}`);
+        const offsets: { top: number; featuredWork: boolean }[] = [];
+        for (let top = 0; top < plan.bottom; top += plan.step)
+          offsets.push({ top, featuredWork: false });
+        offsets.push({ top: plan.bottom, featuredWork: false });
+        offsets.push({ top: Math.min(plan.featuredWork, plan.bottom), featuredWork: true });
+        // The home page is about nine viewports, so about 20 offsets; this turns a page that grew
+        // without bound into a named failure rather than a timeout.
+        expect(offsets.length, 'far more offsets than / should need').toBeLessThan(80);
+
+        const audited: {
+          top: number;
+          scrollY: number;
+          featuredWork: boolean;
+          results: AxeResults;
+        }[] = [];
+        try {
+          for (const { top, featuredWork } of offsets) {
+            const before = await scrollToOffset(page, top);
+            expect(before.scrollY, `the page should be scrolled to ${top} before the audit`).toBe(
+              before.expected,
+            );
+            if (featuredWork) {
+              const { link, diagram, diagramDisplay, fades } = await featuredWorkUnderHeader(page);
+              const where = `at ${top}: link ${JSON.stringify(link)}, diagram ${JSON.stringify(diagram)}, fades ${JSON.stringify(fades)}`;
+              expect(
+                diagramDisplay,
+                `the diagram must be displayed at this viewport ${where}`,
+              ).toBe('block');
+              expect(
+                link && diagram,
+                `the About link and the diagram must exist ${where}`,
+              ).toBeTruthy();
+              expect(
+                fades,
+                `Featured Work should have a fade at its top and bottom ${where}`,
+              ).toHaveLength(2);
+              const [topFade, bottomFade] = [...fades].sort((a, b) => a!.top - b!.top);
+              expect(
+                link!.left >= diagram!.left &&
+                  link!.right <= diagram!.right &&
+                  link!.top >= diagram!.top &&
+                  link!.bottom <= diagram!.bottom,
+                `the About link must sit inside the diagram's box ${where}`,
+              ).toBe(true);
+              expect(
+                link!.top >= topFade!.bottom && link!.bottom <= bottomFade!.top,
+                `the About link must sit between the two fades, over the diagram itself ${where}`,
+              ).toBe(true);
+            }
+            const results = await auditWithin(page, SITE_HEADER);
+            const after = await page.evaluate(() => window.scrollY);
+            expect(
+              after,
+              `the page moved during the audit at ${top}: it is no longer the offset audited`,
+            ).toBe(before.expected);
+            audited.push({ top, scrollY: after, featuredWork, results });
+          }
+        } finally {
+          await test.info().attach('axe-results', {
+            body: JSON.stringify(
+              {
+                surface,
+                offsets: audited.map(({ top, scrollY, featuredWork, results }) => ({
+                  top,
+                  scrollY,
+                  featuredWork,
+                  passing: passingNodes(results, 'color-contrast'),
+                  violations: results.violations,
+                  incomplete: results.incomplete,
+                })),
+              },
+              null,
+              2,
+            ),
+            contentType: 'application/json',
+          });
+        }
+
+        for (const { top, featuredWork, results } of audited) {
+          const at = `the header at scroll ${top}${featuredWork ? ' (over Featured Work)' : ''} in the ${colorScheme} theme`;
+          expect
+            .soft(
+              describeViolations(results.violations),
+              `${at} must have no axe violations. Its links are --muted, measured against an ` +
+                'opaque --background: read docs/adr/0011-colour-roles-on-scoped-surfaces.md.',
+            )
+            .toEqual([]);
+          expect
+            .soft(
+              incompleteNodes(results, 'color-contrast'),
+              `${at} has text axe cannot decide, so this pass could not fail on it. Something ` +
+                'under the header shows through it.\nFirst few:\n' +
+                describeIncomplete(results, 'color-contrast'),
+            )
+            .toBe(0);
+          expect
+            .soft(
+              passingNodes(results, 'color-contrast'),
+              `${at} should measure at least the five desktop nav links`,
+            )
+            .toBeGreaterThanOrEqual(5);
+        }
+      });
+    }
+  });
+
   test('positive control: the rule set reports color-contrast and label-content-name-mismatch', async ({
     page,
   }) => {
@@ -624,6 +873,34 @@ test.describe('Accessibility', () => {
     expect(results.violations.map(({ id }) => id)).toEqual(
       expect.arrayContaining(['color-contrast', 'label-content-name-mismatch']),
     );
+  });
+
+  test('positive control: the header audit reports color-contrast in the header and only there', async ({
+    page,
+  }) => {
+    // The header pass above audits through `auditWithin`, so it needs the same proof the whole-page
+    // audit has: the old accent as text (4.1:1) fails inside the element, the same text outside it
+    // is left alone, and a selector that matches nothing, or more than one element, throws rather
+    // than auditing nothing or more than it names.
+    const content = `<!doctype html>
+      <html lang="en">
+        <head><title>Control</title></head>
+        <body>
+          <header><a href="/" style="color: #8b5cf6; background: #fafafa">The old accent</a></header>
+          <main>
+            <h1>Control</h1>
+            <p style="color: #8b5cf6; background: #fafafa">The same text outside the header</p>
+          </main>
+        </body>
+      </html>`;
+    await page.setContent(content);
+    const results = await auditWithin(page, SITE_HEADER);
+    const contrast = results.violations.find(({ id }) => id === 'color-contrast');
+    expect(contrast?.nodes.map(({ html }) => html)).toEqual([expect.stringMatching(/^<a /)]);
+
+    await expect(auditWithin(page, 'body > footer')).rejects.toThrow(/matches 0 elements/);
+    await page.evaluate(() => document.body.append(document.createElement('header')));
+    await expect(auditWithin(page, SITE_HEADER)).rejects.toThrow(/matches 2 elements/);
   });
 
   test('positive control: the incomplete-contrast budget fails when the count exceeds it', async ({

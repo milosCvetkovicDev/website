@@ -20,16 +20,16 @@ import { warmRoutes } from '../support/warm-routes';
  * failures against the menu as it first shipped, and they pass now that the menu is a native modal
  * `<dialog>`; each row keeps its manifest ID so the record can be followed back.
  *
- * Two of them are about the same single bug. `<header>` carries `backdrop-blur-sm`, and a
+ * Two of them are about the same single bug. `<header>` carried `backdrop-blur-sm` then, and a
  * `backdrop-filter` makes an element the containing block for its `position: fixed` descendants.
  * The menu used to render inside that header, so its `fixed inset-0` wrapper, backdrop and drawer
  * were all clipped to the header's own 375x72 box instead of filling the viewport: measured 256x72
  * for the drawer at 375x812. The links painted over the page text with no drawer behind them (R2)
  * and the backdrop covered nothing, so a tap below the header landed on the page and the menu
  * stayed open (R3). A modal dialog renders in the top layer, which no ancestor can clip, and it
- * renders after `</header>` besides. WebKit runs here too because whether a `backdrop-filter`
- * ancestor becomes that containing block, and how a modal dialog handles focus, are
- * engine-specific.
+ * renders after `</header>` besides. The header itself has had no `backdrop-filter` since #147
+ * made it opaque. WebKit runs here too because whether a `backdrop-filter` ancestor becomes that
+ * containing block, and how a modal dialog handles focus, are engine-specific.
  */
 
 /** Every test here interacts, on `/` and on other routes alike, so each one starts hydrated. */

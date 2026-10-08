@@ -88,8 +88,9 @@ describe('the Playwright projects', () => {
       expect(use?.viewport?.width, `${name}'s viewport must be phone sized`).toBeLessThan(500);
     }
     // Two engines, deliberately: whether a `backdrop-filter` ancestor becomes the containing block
-    // for a `fixed` descendant differs between Blink and WebKit, and that is the mechanism the
-    // mobile-menu rows measure.
+    // for a `fixed` descendant differs between Blink and WebKit, which is the mechanism the
+    // mobile-menu rows were written against (the header has had no filter since #147), and so does
+    // how a modal dialog handles focus.
     expect(byName('mobile-chrome')?.use?.defaultBrowserType).toBe('chromium');
     expect(byName('mobile-safari')?.use?.defaultBrowserType).toBe('webkit');
   });

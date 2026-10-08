@@ -67,13 +67,12 @@ test.describe('the desktop header', () => {
     await expect(logo).toHaveAttribute('href', '/');
   });
 
-  test('keeps the menu dialog out of the blurred header, closed at this width', async ({
-    page,
-  }) => {
+  test('keeps the menu dialog out of the header, closed at this width', async ({ page }) => {
     await page.goto('/about');
-    // A `backdrop-filter` on the sticky header makes it the containing block of its `fixed`
-    // descendants, which is what once clipped the menu to the header's 72px. The dialog renders in
-    // the top layer when open, and after the header rather than inside it either way.
+    // A `backdrop-filter` on the sticky header made it the containing block of its `fixed`
+    // descendants, which is what once clipped the menu to the header's 72px. The header has had no
+    // filter since #147; the dialog renders in the top layer when open, and after the header rather
+    // than inside it either way, so a filter that came back could not clip it.
     await expect(page.locator('header dialog')).toHaveCount(0);
     const dialog = page.locator('dialog');
     await expect(dialog).toHaveCount(1);

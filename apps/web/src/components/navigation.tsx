@@ -195,7 +195,11 @@ export function Navigation() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur-sm">
+      {/* Opaque, with no backdrop-filter, so the --muted links always sit on --background. Until
+          #147 the header was translucent and blurred, and whatever scrolled under it set their
+          contrast: 3.7:1 over the closing terminal on `/` in the light theme. The accessibility
+          gate holds the surface at every scroll offset ('the header at every scroll offset'). */}
+      <header className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--background)]">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           {/* The mark is aria-hidden, so the link carries the name. It starts with "MC", the visible
               "mc" (WCAG 2.5.3), and says where the link goes; e2e/client-navigation.spec.ts finds
@@ -265,8 +269,9 @@ export function Navigation() {
 
       {/* The phone menu: a native modal dialog, always rendered, closed until the button above opens
           it with showModal(). Open, it sits in the top layer, which no ancestor can clip: inside the
-          header, whose backdrop-filter makes it the containing block of its `fixed` descendants,
-          the old menu was cut to the header's 72px. It renders after the header all the same. The
+          header, whose backdrop-filter then made it the containing block of its `fixed`
+          descendants, the old menu was cut to the header's 72px. The header has had no
+          backdrop-filter since #147, and the dialog renders after it all the same. The
           browser supplies the dialog role, Escape and an inert page behind it; a closed dialog is
           `display: none`, outside the accessibility tree and the tab order.
 

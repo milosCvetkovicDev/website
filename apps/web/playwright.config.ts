@@ -73,9 +73,9 @@ export default defineConfig({
   },
   // Three projects. The desktop one is the original and still runs everything that is not phone
   // specific; the two phone ones run only `e2e/mobile/`, which is where a spec goes when the defect
-  // it measures needs a real phone viewport and a real `isMobile` (a tap rather than a click, and a
-  // `<header>` whose `backdrop-blur-sm` becomes the containing block for the `fixed` menu panel it
-  // renders — the whole of pages-1).
+  // it measures needs a real phone viewport and a real `isMobile` (a tap rather than a click, and,
+  // until the menu became a modal dialog, a `<header>` whose `backdrop-blur-sm` became the containing
+  // block for the `fixed` menu panel it rendered — the whole of pages-1; #147 later dropped the blur).
   //
   // WebKit rather than Firefox for the second engine, for two reasons that both matter here:
   // Playwright's `isMobile` is unsupported on Firefox, and whether a `backdrop-filter` ancestor

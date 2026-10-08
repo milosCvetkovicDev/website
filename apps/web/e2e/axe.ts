@@ -97,6 +97,31 @@ export const audit = async (page: Page, exclude: readonly string[] = []) => {
   return builder.analyze();
 };
 
+/**
+ * Runs the same rule set over one element and what it contains, with the same dev-server exclusion
+ * as `audit`. Rules that judge the whole page, such as `document-title`, do not run on a part of it.
+ * The selector must match exactly one element: none would audit nothing and pass, and a second
+ * match would put more in the audit than the caller names. The header pass in
+ * `accessibility.spec.ts` is the caller, scoped to `body > header` because `/work/[slug]` and
+ * `/blog/[slug]` render a `<header>` of their own.
+ */
+export const auditWithin = async (page: Page, selector: string) => {
+  const matches = await page.locator(selector).count();
+  if (matches !== 1) {
+    throw new Error(
+      `auditWithin: ${selector} matches ${matches} elements on ${page.url()}, not exactly one`,
+    );
+  }
+  return (
+    new AxeBuilder({ page })
+      // A clone for the reason `audit` gives: AxeBuilder writes into the object it is handed.
+      .options(structuredClone(LIGHTHOUSE_AXE_OPTIONS))
+      .include(selector)
+      .exclude('nextjs-portal')
+      .analyze()
+  );
+};
+
 export const passingNodes = (results: AxeResults, ruleId: string) =>
   results.passes.find(({ id }) => id === ruleId)?.nodes.length ?? 0;
 
