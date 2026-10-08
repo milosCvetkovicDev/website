@@ -139,7 +139,15 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   `--depth Infinity`, whatever the documented default says. A refresh aimed at an advisory in a transitive package will add the
   patched version for some dependents and silently leave the vulnerable copy pinned under others
   whose own ranges admitted the fix. Always pass `--depth Infinity` and re-run `pnpm audit` to confirm
-  the count actually moved.
+  the count actually moved. Whatever the depth, a version in a pattern stops it reaching them:
+  pnpm 10.34.5's `update()` matches transitive copies by name only when no pattern carries
+  `@<version>`. On 2026-10-08 (#211),
+  `pnpm update -r source-map-js@1.2.2 --depth Infinity --lockfile-only` left `@tailwindcss/node`'s
+  `source-map-js` at 1.2.1, while `pnpm update -r source-map-js --lockfile-only` lifted it to 1.2.2.
+  Dependabot's security updater runs the versioned form (run 37623928748:
+  `pnpm update source-map-js@1.2.2 --lockfile-only --no-save -r`), so an advisory in a transitive
+  package whose parent's range admits the fix arrives as a failed "Dependabot Updates" run, not a
+  pull request, and needs the bare-name refresh by hand.
 - pnpm resolves an optional peer when the package is already in the dependency graph, and keeps
   it: a lockfile that once resolved it holds it in the graph by itself. vite 8.3.1 kept
   `esbuild@0.27.2` as its optional peer that way after nothing else needed esbuild, and neither
