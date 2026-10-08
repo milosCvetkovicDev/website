@@ -13,15 +13,22 @@
 //
 //   - a record deleted at the head, or one whose status went back to Proposed or Withdrawn there
 //     (ADR 0012 withdraws a record only before it is accepted, and an exemption reached in one pull
-//     request would free the Decision in the next);
-//   - a `## Decision` whose text differs from the base's. Runs of whitespace count as one space, so
-//     a re-wrap or a re-padded table passes and any other change, a word or a Markdown mark, fails;
+//     request would free the Decision in the next), and a superseded record accepted again or
+//     pointed at another successor;
+//   - a `## Decision` whose text differs from the base's. Outside a code fence, runs of whitespace,
+//     line breaks and blank lines included, count as one space, and a table's delimiter cell counts
+//     as `---` whatever its width, so a re-wrap or a re-padded table passes, and so does a change
+//     of whitespace alone, which keeps every word and mark in order. Any other change, a word or a
+//     Markdown mark, fails. Inside a fence whitespace is content, so a fenced line is compared whole;
+//   - a `## Decision` that sits inside an HTML block opened before its heading, which hides it;
 //   - a `## Corrections` whose text above its first `###` entry differs, or whose base entries are
 //     not, in order and unchanged, the first entries at the head: an entry reworded, removed, or with
 //     another inserted before it. Removing the whole section is the same failure.
 //
 // A record that was Proposed or Withdrawn at the base, or did not exist there, is exempt: its
-// Decision has not been accepted yet. The rest of a record (Context, Consequences, Alternatives
+// Decision has not been accepted yet. If it is Accepted or Superseded at the head, though, it must
+// be readable there (one `## Decision`, at most one `## Corrections`, every fence closed), or the
+// next pull request could not compare it. The rest of a record (Context, Consequences, Alternatives
 // considered) ADR 0012 lets a correction edit, and whether an edit there is a correction is a
 // reviewer's call, not this check's.
 //
@@ -31,13 +38,18 @@
 // records are read from its `docs/adr` unless the argument names another directory. The base is
 // `--base`, or else the merge base of the head and origin/main; the head is `--head`, a commit, or
 // else the working tree, uncommitted edits included. CI passes `--base HEAD^1` (ci.yml says why).
+// The default base is only as fresh as the local origin/main: `git fetch origin` first.
 //
 // Exit codes follow check-adr-index.mjs: 0 when every protected record kept its Decision and its
 // Corrections, with one line naming the base and how many records were compared; 1 when one did
 // not, with every problem listed; 2 when the check could not run (no repository, a ref git cannot
-// resolve, such as a parent a shallow clone lacks, a git failure) or on a usage error. It never
-// exits 0 because it could not see: a status, section or fence it cannot read on either side is a
-// problem, never a skip. And it never rewrites anything.
+// resolve, such as a parent a shallow clone lacks, a git failure, an error it did not expect) or on
+// a usage error. It never exits 0 because it could not see: a status, section or fence it cannot
+// read is a problem, never a skip. The one exception is a pull request that repairs it: a record
+// the base cannot read in full passes when the head reads in full, and is then held to what both
+// sides show, because a check that compared the repair with the broken base would fail the repair
+// and every pull request after it. The success line counts such records. And it never rewrites
+// anything.
 
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
@@ -66,6 +78,25 @@ const RECORD = /^(\d{4})-[^/]*\.md$/;
 const ENTRY = /^###(?:\s|$)/;
 /** The base statuses whose Decision and Corrections are frozen: both were accepted. */
 const PROTECTED = new Set(['Accepted', 'Superseded']);
+/**
+ * A table's delimiter cell. Prettier sizes its dashes to the column, so a re-padded table changes
+ * them and nothing else; the colons, which set the alignment, are kept.
+ */
+const DELIMITER = /^(:?)-{3,}(:?)$/;
+/**
+ * The HTML blocks that CommonMark ends at a terminator rather than at a blank line (its kinds 1 to
+ * 5): opened before a heading and closed after it, one swallows the heading and its section.
+ */
+const HTML_BLOCKS = [
+  {
+    open: /^ {0,3}<(?:script|pre|style|textarea)(?:[\s>]|$)/i,
+    close: /<\/(?:script|pre|style|textarea)>/i,
+  },
+  { open: /^ {0,3}<!--/, close: /-->/ },
+  { open: /^ {0,3}<\?/, close: /\?>/ },
+  { open: /^ {0,3}<!\[CDATA\[/, close: /\]\]>/ },
+  { open: /^ {0,3}<![A-Za-z]/, close: />/ },
+];
 
 /** @typedef {import('./check-adr-index.mjs').MarkdownLine} MarkdownLine */
 
@@ -74,6 +105,7 @@ const PROTECTED = new Set(['Accepted', 'Superseded']);
  * sections and its status line, or null when no single status line can be read.
  *
  * @typedef {{
+ *   lines: MarkdownLine[],
  *   unclosedFence: number | null,
  *   sections: Map<string, { line: number, body: MarkdownLine[] }[]>,
  *   status: string | null,
@@ -132,11 +164,19 @@ function git(cwd, args) {
  */
 function resolveCommit(top, ref, flag) {
   try {
-    return git(top, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]).trim();
-  } catch {
+    return git(top, ['rev-parse', '--verify', `${ref}^{commit}`]).trim();
+  } catch (error) {
+    let shallow = false;
+    try {
+      shallow = git(top, ['rev-parse', '--is-shallow-repository']).trim() === 'true';
+    } catch {
+      // The failure worth reporting is the first one.
+    }
     throw new CheckError(
-      `cannot resolve ${flag} ${ref} to a commit in ${top} (a shallow clone lacks the history ` +
-        'before its depth: fetch more of it)',
+      `cannot resolve ${flag} ${ref} to a commit in ${top} (${messageOf(error)})` +
+        (shallow
+          ? '; this is a shallow clone, which lacks the history before its depth: fetch more of it'
+          : ''),
     );
   }
 }
@@ -209,6 +249,7 @@ function filesInWorkingTree(dir) {
 function readSide(name, source) {
   const { lines, unclosedFence } = markdownLines(source);
   return {
+    lines,
     unclosedFence,
     sections: sectionsOf(lines),
     status: readRecord(name, source).record.status,
@@ -237,17 +278,21 @@ function statusOf(side) {
 
 /**
  * The words of some lines, each with the line it sits on. Comparing these is comparing the text
- * with every run of whitespace, line breaks included, taken as one space.
+ * with every run of whitespace, line breaks included, taken as one space, and a table's delimiter
+ * cell taken as `---`. A line inside a code fence is one word, whole but for trailing blanks,
+ * because there whitespace is content; its leading line break keeps it from equalling a word.
  *
  * @param {MarkdownLine[]} lines
  * @returns {{ word: string, line: MarkdownLine }[]}
  */
 function wordsOf(lines) {
   return lines.flatMap((line) =>
-    line.text
-      .split(/\s+/)
-      .filter((word) => word !== '')
-      .map((word) => ({ word, line })),
+    line.fenced
+      ? [{ word: `\n${line.text.trimEnd()}`, line }]
+      : line.text
+          .split(/\s+/)
+          .filter((word) => word !== '')
+          .map((word) => ({ word: word.replace(DELIMITER, '$1---$2'), line })),
   );
 }
 
@@ -343,7 +388,9 @@ function correctionsProblem(baseBody, headBody) {
     const heading = firstDifference([entry.lines[0]], [at.lines[0]]);
     if (heading === null) {
       const difference = firstDifference(entry.lines, at.lines);
-      return `the entry ${name} was reworded (${difference ? describe(difference) : ''})`;
+      // `same` said they differ, so they do.
+      if (difference === null) throw new Error(`the entry ${name} both differs and does not`);
+      return `the entry ${name} was reworded (${describe(difference)})`;
     }
     return (
       `the entry ${name} was removed or its heading reworded: ` +
@@ -354,19 +401,107 @@ function correctionsProblem(baseBody, headBody) {
 }
 
 /**
- * Compares the records at the base with those at the head, and returns every problem and how many
- * records the base protected.
+ * The line on which an HTML block that is still open at `headingLine` was opened, or null. Such a
+ * block runs over the heading, which then renders as raw HTML or not at all.
+ *
+ * @param {MarkdownLine[]} lines
+ * @param {number} headingLine
+ * @returns {number | null}
+ */
+function htmlBlockAround(lines, headingLine) {
+  /** @type {{ close: RegExp, line: number } | null} */
+  let open = null;
+  for (const line of lines) {
+    if (line.number === headingLine) return open === null ? null : open.line;
+    if (open !== null) {
+      if (open.close.test(line.text)) open = null;
+      continue;
+    }
+    if (line.fenced) continue;
+    for (const block of HTML_BLOCKS) {
+      const opener = block.open.exec(line.text);
+      if (!opener) continue;
+      if (!block.close.test(line.text.slice(opener[0].length))) {
+        open = { close: block.close, line: line.number };
+      }
+      break;
+    }
+  }
+  return null;
+}
+
+/**
+ * What keeps one side of a record from being compared in full: a fence that never closes, which
+ * hides every section after it, a `## Decision` missing, doubled or inside an HTML block, or a
+ * doubled `## Corrections`.
+ *
+ * @param {Side} side
+ * @param {'base' | 'head'} which
+ * @param {string} missing what to say when the side has no `## Decision`
+ * @returns {string[]}
+ */
+function defectsOf(side, which, missing) {
+  if (side.unclosedFence !== null) {
+    return [
+      `the code fence opened on line ${side.unclosedFence} at the ${which} is never closed, so ` +
+        'no section after it can be read',
+    ];
+  }
+  /**
+   * @param {string} heading
+   * @param {{ line: number }[]} found
+   */
+  const several = (heading, found) =>
+    `has ${found.length} \`## ${heading}\` sections at the ${which} ` +
+    `(lines ${found.map((s) => s.line).join(', ')}); this check compares one`;
+  /** @type {string[]} */
+  const defects = [];
+  const decisions = side.sections.get('Decision') ?? [];
+  if (decisions.length === 0) {
+    defects.push(`has no \`## Decision\` section at the ${which}; ${missing}`);
+  } else if (decisions.length > 1) {
+    defects.push(several('Decision', decisions));
+  } else {
+    const opened = htmlBlockAround(side.lines, decisions[0].line);
+    if (opened !== null) {
+      defects.push(
+        `\`## Decision\` sits inside the HTML block opened on line ${opened} at the ${which}, ` +
+          'so it does not render as a section',
+      );
+    }
+  }
+  const corrections = side.sections.get('Corrections') ?? [];
+  if (corrections.length > 1) defects.push(several('Corrections', corrections));
+  return defects;
+}
+
+/**
+ * The one `## <heading>` section of a side, or null when it has none or several.
+ *
+ * @param {Side} side
+ * @param {string} heading
+ */
+function onlySection(side, heading) {
+  const found = side.sections.get(heading) ?? [];
+  return found.length === 1 ? found[0] : null;
+}
+
+/**
+ * Compares the records at the base with those at the head, and returns every problem, how many
+ * records the base protected and were compared, how many it exempted, and how many of those
+ * compared the base could not read in full and the head repairs.
  *
  * @param {Map<string, string>} baseFiles the base's record files, by name
  * @param {Map<string, string>} headFiles the head's record files, by name
  * @param {string} dir the directory relative to the top level, for the messages
- * @returns {{ problems: string[], compared: number, exempt: number }}
+ * @returns {{ problems: string[], compared: number, exempt: number, repaired: number }}
  */
 export function compareRecords(baseFiles, headFiles, dir) {
   /** @type {string[]} */
   const problems = [];
   let compared = 0;
   let exempt = 0;
+  let repaired = 0;
   /** @param {string} name */
   const path = (name) => (dir === '' ? name : `${dir}/${name}`);
 
@@ -382,33 +517,56 @@ export function compareRecords(baseFiles, headFiles, dir) {
   };
   const baseNumbers = byNumber(baseFiles);
   const headNumbers = byNumber(headFiles);
+  /** The numbers whose head this loop has checked; the next one checks the rest. */
+  const checked = new Set();
+  /**
+   * @param {string[]} names
+   * @param {string} number
+   * @param {'base' | 'head'} which
+   */
+  const severalFiles = (names, number, which) =>
+    `${names.map(path).join(', ')}: ADR ${number} has ${names.length} files at the ${which}; ` +
+    'this check compares one';
+  const repairable = ' (a pull request that repairs it passes)';
 
   for (const [number, names] of baseNumbers) {
+    const headNames = headNumbers.get(number) ?? [];
+    const head =
+      headNames.length === 1 ? readSide(headNames[0], headFiles.get(headNames[0]) ?? '') : null;
+    const headStatus = head === null ? null : statusOf(head);
+    // The head reads in full: one file, a status, and every section this check compares.
+    const headReads =
+      head !== null &&
+      headStatus !== null &&
+      !('error' in headStatus) &&
+      defectsOf(head, 'head', '').length === 0;
+
     if (names.length > 1) {
-      problems.push(
-        `${names.map(path).join(', ')}: ADR ${number} has ${names.length} files at the base; ` +
-          'this check compares one',
-      );
+      checked.add(number);
+      if (headReads) repaired += 1;
+      else problems.push(severalFiles(names, number, 'base') + repairable);
       continue;
     }
     const [baseName] = names;
     const base = readSide(baseName, baseFiles.get(baseName) ?? '');
     const baseStatus = statusOf(base);
-    if ('error' in baseStatus) {
-      problems.push(
-        `${path(baseName)}: \`## Status\` at the base cannot be read, so this check cannot tell ` +
-          `whether its Decision is frozen: ${baseStatus.error}`,
-      );
-      continue;
-    }
-    if (!PROTECTED.has(baseStatus.status.kind)) {
+    if (!('error' in baseStatus) && !PROTECTED.has(baseStatus.status.kind)) {
       exempt += 1;
       continue;
     }
+    checked.add(number);
+    if ('error' in baseStatus && !headReads) {
+      problems.push(
+        `${path(baseName)}: \`## Status\` at the base cannot be read, so this check cannot tell ` +
+          `whether its Decision is frozen: ${baseStatus.error}${repairable}`,
+      );
+      continue;
+    }
+    // From here the record is protected, or its status cannot be read at the base and the head
+    // repairs it, and it is then held to everything both sides show.
     compared += 1;
     const was = `"${base.status}" at the base`;
 
-    const headNames = headNumbers.get(number) ?? [];
     if (headNames.length === 0) {
       problems.push(
         `${path(baseName)}: ADR ${number} was ${was} and is deleted at the head; an accepted ` +
@@ -416,11 +574,8 @@ export function compareRecords(baseFiles, headFiles, dir) {
       );
       continue;
     }
-    if (headNames.length > 1) {
-      problems.push(
-        `${headNames.map(path).join(', ')}: ADR ${number} has ${headNames.length} files at the ` +
-          'head; this check compares one',
-      );
+    if (head === null || headStatus === null) {
+      problems.push(severalFiles(headNames, number, 'head'));
       continue;
     }
     const [headName] = headNames;
@@ -428,69 +583,51 @@ export function compareRecords(baseFiles, headFiles, dir) {
       headName === baseName ? path(headName) : `${path(headName)} (${baseName} at the base)`;
     /** @param {string} message */
     const say = (message) => problems.push(`${shown}: ${message}`);
-    const head = readSide(headName, headFiles.get(headName) ?? '');
 
-    /**
-     * @param {'base' | 'head'} which
-     * @param {number} line
-     */
-    const unclosed = (which, line) =>
-      say(
-        `the code fence opened on line ${line} at the ${which} is never closed, so no section ` +
-          'after it can be read',
-      );
-    if (base.unclosedFence !== null) unclosed('base', base.unclosedFence);
-    if (head.unclosedFence !== null) unclosed('head', head.unclosedFence);
-    if (base.unclosedFence !== null || head.unclosedFence !== null) continue;
+    const baseDefects = defectsOf(base, 'base', 'there is no accepted Decision to hold it to');
+    if ('error' in baseStatus || baseDefects.length > 0) {
+      if (headReads) repaired += 1;
+      else for (const defect of baseDefects) say(defect + repairable);
+    }
+    const missing =
+      onlySection(base, 'Decision') === null
+        ? 'an accepted record has one'
+        : 'it was renamed, removed or put inside a code fence, and an accepted Decision is never ' +
+          'edited (ADR 0012)';
+    for (const defect of defectsOf(head, 'head', missing)) say(defect);
 
-    const headStatus = statusOf(head);
     if ('error' in headStatus) {
       say(
         `\`## Status\` at the head cannot be read, so this check cannot tell whether the record ` +
           `still stands: ${headStatus.error}`,
       );
-    } else if (!PROTECTED.has(headStatus.status.kind)) {
-      say(
-        `\`## Status\` reads "${head.status}" at the head, where it was ${was}; an accepted ` +
-          'record never goes back to Proposed or Withdrawn (ADR 0012)',
-      );
+    } else if (!('error' in baseStatus)) {
+      const from = baseStatus.status;
+      const to = headStatus.status;
+      if (!PROTECTED.has(to.kind)) {
+        say(
+          `\`## Status\` reads "${head.status}" at the head, where it was ${was}; an accepted ` +
+            'record never goes back to Proposed or Withdrawn (ADR 0012)',
+        );
+      } else if (from.kind === 'Superseded' && to.kind !== 'Superseded') {
+        say(
+          `\`## Status\` reads "${head.status}" at the head, where it was ${was}; a superseded ` +
+            'record stays superseded, and a decision that returns is a new record that ' +
+            'supersedes the one in force (ADR 0012)',
+        );
+      } else if (from.kind === 'Superseded' && to.supersededBy !== from.supersededBy) {
+        say(
+          `\`## Status\` points at ADR-${to.supersededBy} at the head, where it was ${was}; ` +
+            'the record that replaced it stays named, and a later change supersedes that record ' +
+            '(ADR 0012)',
+        );
+      }
     }
 
-    /**
-     * The one `## <heading>` section of a side, or null with a problem when it has none or several.
-     *
-     * @param {Side} side
-     * @param {'base' | 'head'} which
-     * @param {string} heading
-     * @param {string} missing what to say when the side has none
-     */
-    const only = (side, which, heading, missing) => {
-      const found = side.sections.get(heading) ?? [];
-      if (found.length === 1) return found[0];
-      say(
-        found.length === 0
-          ? `has no \`## ${heading}\` section at the ${which}; ${missing}`
-          : `has ${found.length} \`## ${heading}\` sections at the ${which} ` +
-              `(lines ${found.map((s) => s.line).join(', ')}); this check compares one`,
-      );
-      return null;
-    };
+    if (base.unclosedFence !== null || head.unclosedFence !== null) continue;
 
-    const baseDecision = only(
-      base,
-      'base',
-      'Decision',
-      'there is no accepted Decision to hold it to',
-    );
-    const headDecision =
-      baseDecision &&
-      only(
-        head,
-        'head',
-        'Decision',
-        'it was renamed, removed or put inside a code fence, and an accepted Decision is never ' +
-          'edited (ADR 0012)',
-      );
+    const baseDecision = onlySection(base, 'Decision');
+    const headDecision = onlySection(head, 'Decision');
     if (baseDecision && headDecision) {
       const difference = firstDifference(baseDecision.body, headDecision.body);
       if (difference) {
@@ -502,29 +639,49 @@ export function compareRecords(baseFiles, headFiles, dir) {
       }
     }
 
-    const baseCorrections = base.sections.get('Corrections') ?? [];
-    if (baseCorrections.length === 0) continue;
-    const baseSection = only(base, 'base', 'Corrections', '');
-    const headSection =
-      baseSection &&
-      only(
-        head,
-        'head',
-        'Corrections',
-        'it was removed, and `## Corrections` is append-only (ADR 0012)',
+    const baseSection = onlySection(base, 'Corrections');
+    if (baseSection === null) continue;
+    const headCount = (head.sections.get('Corrections') ?? []).length;
+    if (headCount === 0) {
+      say(
+        'has no `## Corrections` section at the head; it was removed, and `## Corrections` is ' +
+          'append-only (ADR 0012)',
       );
-    if (baseSection && headSection) {
-      const problem = correctionsProblem(baseSection.body, headSection.body);
-      if (problem) {
-        say(
-          `\`## Corrections\`: ${problem}; it is append-only (ADR 0012): an error in an ` +
-            'entry is fixed by a further entry after the last one',
-        );
-      }
+      continue;
+    }
+    const headSection = onlySection(head, 'Corrections');
+    if (headSection === null) continue;
+    const problem = correctionsProblem(baseSection.body, headSection.body);
+    if (problem) {
+      say(
+        `\`## Corrections\`: ${problem}; it is append-only (ADR 0012): an error in an ` +
+          'entry is fixed by a further entry after the last one',
+      );
     }
   }
 
-  return { problems, compared, exempt };
+  // A record accepted or superseded at the head that the base did not protect: new, or accepted
+  // here. The next pull request compares it, so it has to be readable now.
+  for (const [number, names] of headNumbers) {
+    if (checked.has(number)) continue;
+    if (names.length > 1) {
+      problems.push(severalFiles(names, number, 'head'));
+      continue;
+    }
+    const [name] = names;
+    const head = readSide(name, headFiles.get(name) ?? '');
+    const status = statusOf(head);
+    if ('error' in status || !PROTECTED.has(status.status.kind)) continue;
+    for (const defect of defectsOf(
+      head,
+      'head',
+      'a record is accepted with one, or the next pull request has no Decision to hold it to',
+    )) {
+      problems.push(`${path(name)}: ${defect}`);
+    }
+  }
+
+  return { problems, compared, exempt, repaired };
 }
 
 /**
@@ -601,10 +758,21 @@ function check(options) {
   const baseFiles = filesAt(top, baseCommit, dir);
   const headFiles =
     headCommit === null ? filesInWorkingTree(adrDir) : filesAt(top, headCommit, dir);
+  // On main just after a fetch the merge base is HEAD, and nothing committed is compared. A HEAD
+  // with no commit yet is not the base either.
+  let baseIsHead = false;
+  if (headCommit === null) {
+    try {
+      baseIsHead = baseCommit === git(top, ['rev-parse', '--verify', '--quiet', 'HEAD']).trim();
+    } catch {
+      baseIsHead = false;
+    }
+  }
   return {
     ...compareRecords(baseFiles, headFiles, dir),
     baseCommit,
     head: headCommit ?? 'the working tree',
+    baseIsHead,
   };
 }
 
@@ -620,18 +788,24 @@ function main() {
   try {
     result = check(options);
   } catch (error) {
-    if (!(error instanceof CheckError)) throw error;
-    console.error(`ADR history check could not run: ${error.message}`);
+    // Exit 1 says a record broke a rule, so a crash must not reach Node's own exit 1.
+    if (error instanceof CheckError) {
+      console.error(`ADR history check could not run: ${error.message}`);
+    } else {
+      console.error('ADR history check could not run, on an error it did not expect:', error);
+    }
     process.exitCode = 2;
     return;
   }
 
-  const { problems, compared, exempt, baseCommit, head } = result;
+  const { problems, compared, exempt, repaired, baseCommit, head, baseIsHead } = result;
   if (problems.length === 0) {
     const records = `${compared} record${compared === 1 ? '' : 's'}`;
+    const counts = repaired === 0 ? `${exempt} exempt` : `${exempt} exempt, ${repaired} repaired`;
     console.log(
       `ADR history check: base ${baseCommit}, head ${head}: ${records} accepted or superseded ` +
-        `at the base kept their Decision and earlier Corrections (${exempt} exempt).`,
+        `at the base kept their Decision and earlier Corrections (${counts}).` +
+        (baseIsHead ? ' The base is HEAD itself, so only uncommitted changes were compared.' : ''),
     );
     return;
   }
@@ -656,4 +830,9 @@ function startedAsCommand() {
   return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
 }
 
-if (startedAsCommand()) main();
+try {
+  if (startedAsCommand()) main();
+} catch (error) {
+  console.error('ADR history check could not run, on an error it did not expect:', error);
+  process.exitCode = 2;
+}

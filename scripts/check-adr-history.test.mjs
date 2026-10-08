@@ -6,7 +6,9 @@
 // runs the real script with that repository as its working directory, the way CI runs it in a
 // checkout. Each rule gets a change it must refuse and one it must let through, because a check
 // that has only ever been seen passing may be a check that cannot fail. The repositories sign
-// nothing (`commit.gpgsign false`), since this machine signs every commit by default.
+// nothing (`commit.gpgsign false`), since this machine signs every commit by default, and every git
+// and every run of the script gets ENV: no global or system git config (hooks, templates, signing)
+// and no inherited GIT_* variable, which inside a git hook would point git at the outer repository.
 
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -17,16 +19,26 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+import { compareRecords } from './check-adr-history.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, 'check-adr-history.mjs');
+
+/** The environment of every git and script run here: see the header. */
+const ENV = {
+  ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_NOSYSTEM: '1',
+};
 
 const DECISION = [
   'We keep the widget in one package. It ships with the site and nowhere else, so a reader never',
@@ -46,6 +58,26 @@ const CORRECTIONS = [
   '### 2026-09-03: the second one',
   '',
   'The context named the wrong package; `git show abc1234` settles it.',
+].join('\n');
+
+/** A Decision whose YAML block means something else when its indentation changes. */
+const FENCED_DECISION = [
+  'Only these packages run their build scripts:',
+  '',
+  '```yaml',
+  'allowBuilds:',
+  '  packages:',
+  '    - lib',
+  '```',
+].join('\n');
+
+/** A Decision holding a table, padded the way Prettier pads one. */
+const TABLE_DECISION = [
+  'Each role has one token:',
+  '',
+  '| Role | Token           |',
+  '| :--- | --------------- |',
+  '| Text | `--accent-text` |',
 ].join('\n');
 
 /**
@@ -138,7 +170,7 @@ let base;
  * @returns {string}
  */
 function gitIn(args, cwd = repo) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  return execFileSync('git', args, { cwd, encoding: 'utf8', env: ENV }).trim();
 }
 
 /** @param {...string} args */
@@ -150,7 +182,7 @@ const git = (...args) => gitIn(args);
  * @param {string} dir
  */
 function initRepo(dir) {
-  execFileSync('git', ['init', '-q', '-b', 'main', dir]);
+  execFileSync('git', ['init', '-q', '-b', 'main', dir], { env: ENV });
   for (const [key, value] of [
     ['user.name', 'test'],
     ['user.email', 'test@example.com'],
@@ -203,7 +235,7 @@ function commit(message) {
  * @param {string} [cwd]
  */
 const run = (args, cwd = repo) =>
-  spawnSync(process.execPath, [SCRIPT, ...args], { cwd, encoding: 'utf8' });
+  spawnSync(process.execPath, [SCRIPT, ...args], { cwd, encoding: 'utf8', env: ENV });
 
 /** @param {string[]} [args] */
 const check = (args = []) => run(['--base', base, ...args]);
@@ -359,6 +391,59 @@ describe('a record accepted or superseded at the base', () => {
     assertProblem(check(), '0004-delta.md', 'fence');
   });
 
+  it('fails when a superseded record is accepted again, or pointed at another successor', () => {
+    write('0003-gamma.md', record({ number: '0003', title: 'Gamma', status: 'Accepted' }));
+    assertProblem(check(), '0003-gamma.md', '## Status', 'superseded');
+    write(
+      '0003-gamma.md',
+      record({
+        number: '0003',
+        title: 'Gamma',
+        status: 'Superseded by ADR-0005',
+        pointer: 'Its widget rule no longer applies; see [ADR 0005](0005-epsilon.md).',
+      }),
+    );
+    assertProblem(check(), '0003-gamma.md', '## Status', 'ADR-0005', 'ADR-0004');
+  });
+
+  it('fails when a fenced line of its Decision changes only its indentation', () => {
+    write(
+      '0007-eta.md',
+      record({ number: '0007', title: 'Eta', status: 'Accepted', decision: FENCED_DECISION }),
+    );
+    base = commit('docs(adr): a Decision with a YAML block');
+    edit('0007-eta.md', '    - lib\n', '  - lib\n');
+    assertProblem(check(), '0007-eta.md', '## Decision', '- lib');
+  });
+
+  it('fails when only the heading of a correction changes', () => {
+    edit('0002-beta.md', '### 2026-09-02\n', '### 2026-09-01\n');
+    assertProblem(check(), '0002-beta.md', '## Corrections', '### 2026-09-02', 'heading reworded');
+  });
+
+  it('fails when its Decision is put inside an HTML comment opened before it', () => {
+    // Context and Consequences may be edited, and the Decision's own words stay as they were.
+    edit('0001-alpha.md', '## Decision', '<!--\n\n## Decision');
+    edit('0001-alpha.md', 'Some consequences.', 'Some consequences.\n\n-->');
+    assertProblem(check(), '0001-alpha.md', '## Decision', 'HTML');
+  });
+
+  it('names the base file of a renamed record whose Decision is edited', () => {
+    renameSync(adrPath('0001-alpha.md'), adrPath('0001-alpha-renamed.md'));
+    edit('0001-alpha-renamed.md', 'so a reader never', 'so nobody ever');
+    assertProblem(check(), '0001-alpha-renamed.md', '(0001-alpha.md at the base)', '## Decision');
+  });
+
+  it('fails when the record is replaced by a symbolic link, which neither side follows', () => {
+    mkdirSync(join(repo, 'docs', 'kept'));
+    writeFileSync(join(repo, 'docs', 'kept', 'alpha.md'), read('0001-alpha.md'));
+    unlinkSync(adrPath('0001-alpha.md'));
+    symlinkSync('../kept/alpha.md', adrPath('0001-alpha.md'));
+    assertProblem(check(), '0001-alpha.md', 'deleted');
+    const linked = commit('docs(adr): the record as a link');
+    assertProblem(check(['--head', linked]), '0001-alpha.md', 'deleted');
+  });
+
   it('reports every record that broke a rule, not just the first', () => {
     edit('0001-alpha.md', 'so a reader never', 'so nobody ever');
     edit('0003-gamma.md', 'so a reader never', 'so nobody ever');
@@ -403,6 +488,97 @@ describe('a base the check must refuse to trust', () => {
     const result = check();
     assertProblem(result, '0007-eta.md', '## Status');
     assertProblem(result, '0001-alpha.md', '## Decision');
+  });
+
+  it('fails on a number with two files at the base or at the head', () => {
+    write('0001-alpha-copy.md', read('0001-alpha.md'));
+    assertProblem(check(), '0001-alpha-copy.md', '2 files at the head');
+    base = commit('docs(adr): a number with two files');
+    assertProblem(check(), '0001-alpha-copy.md', '2 files at the base');
+  });
+
+  it('passes the pull request that repairs what the base could not read', () => {
+    // Compared with the broken base, the repair itself would fail, and the required check would
+    // stay red on every pull request after it.
+    write('0001-alpha-copy.md', read('0001-alpha.md'));
+    edit('0002-beta.md', '## Decision', '## The decision');
+    edit('0004-delta.md', 'Some consequences.', '```text\nSome consequences.');
+    write(
+      '0007-eta.md',
+      record({ number: '0007', title: 'Eta', status: 'Accepted, though not yet carried out' }),
+    );
+    base = commit('docs(adr): four records this check cannot read in full');
+    unlinkSync(adrPath('0001-alpha-copy.md'));
+    for (const name of ['0002-beta.md', '0004-delta.md']) write(name, BASE.get(name) ?? '');
+    write('0007-eta.md', record({ number: '0007', title: 'Eta', status: 'Accepted' }));
+    const result = check();
+    assertPasses(result, 4);
+    assert.match(result.stdout, /4 repaired/);
+  });
+
+  it('still holds a repaired record to what the base could read: its Decision', () => {
+    write('0007-eta.md', record({ number: '0007', title: 'Eta', status: 'Accepted, mostly' }));
+    base = commit('docs(adr): a record whose status cannot be read');
+    write(
+      '0007-eta.md',
+      record({
+        number: '0007',
+        title: 'Eta',
+        status: 'Accepted',
+        decision: DECISION.replace('so a reader never', 'so nobody ever'),
+      }),
+    );
+    assertProblem(check(), '0007-eta.md', '## Decision');
+  });
+});
+
+describe('a record accepted at the head that the next comparison could not read', () => {
+  it('fails on a new or newly accepted record without one `## Decision`', () => {
+    write(
+      '0007-eta.md',
+      record({ number: '0007', title: 'Eta', status: 'Accepted' }).replace(
+        '## Decision',
+        '## The decision',
+      ),
+    );
+    edit('0005-epsilon.md', '\nProposed\n', '\nAccepted\n');
+    edit('0005-epsilon.md', '## Consequences', '## Decision\n\nA second one.\n\n## Consequences');
+    const result = check();
+    assertProblem(result, '0007-eta.md', '## Decision');
+    assertProblem(result, '0005-epsilon.md', '## Decision');
+  });
+
+  it('fails on a new accepted record with two `## Corrections` or a fence that never closes', () => {
+    write(
+      '0007-eta.md',
+      record({
+        number: '0007',
+        title: 'Eta',
+        status: 'Accepted (corrected 2026-09-05)',
+        corrections: '### 2026-09-05\n\nOne.\n\n## Corrections\n\n### 2026-09-06\n\nTwo.',
+      }),
+    );
+    write(
+      '0008-theta.md',
+      record({ number: '0008', title: 'Theta', status: 'Superseded by ADR-0007' }).replace(
+        'Some consequences.',
+        '```text\nSome consequences.',
+      ),
+    );
+    const result = check();
+    assertProblem(result, '0007-eta.md', '## Corrections');
+    assertProblem(result, '0008-theta.md', 'fence');
+  });
+
+  it('passes a new Proposed record that has no Decision yet', () => {
+    write(
+      '0007-eta.md',
+      record({ number: '0007', title: 'Eta', status: 'Proposed' }).replace(
+        '## Decision',
+        '## Options',
+      ),
+    );
+    assertPasses(check());
   });
 });
 
@@ -467,6 +643,27 @@ describe('changes ADR 0012 allows', () => {
     assertPasses(check());
   });
 
+  it('passes a superseded record whose status gains a correction date', () => {
+    edit(
+      '0003-gamma.md',
+      'Superseded by ADR-0004',
+      'Superseded by ADR-0004 (corrected 2026-09-05)',
+    );
+    assertPasses(check());
+  });
+
+  it('passes a table in its Decision re-padded, delimiter dashes included', () => {
+    write(
+      '0007-eta.md',
+      record({ number: '0007', title: 'Eta', status: 'Accepted', decision: TABLE_DECISION }),
+    );
+    base = commit('docs(adr): a Decision with a table');
+    edit('0007-eta.md', '| Role | Token           |', '| Role   | Token             |');
+    edit('0007-eta.md', '| :--- | --------------- |', '| :----- | ----------------- |');
+    edit('0007-eta.md', '| Text | `--accent-text` |', '| Text   | `--accent-text`   |');
+    assertPasses(check(), 5);
+  });
+
   it('passes a renamed record file, matched by its number', () => {
     renameSync(adrPath('0001-alpha.md'), adrPath('0001-alpha-renamed.md'));
     assertPasses(check());
@@ -508,7 +705,7 @@ describe('the base and the head', () => {
   it('takes the base from the merge base with origin/main by default', () => {
     // origin/main moves on with a record the branch lacks: compared with the origin's tip, that
     // record would read as deleted.
-    execFileSync('git', ['init', '-q', '--bare', join(root, 'origin.git')]);
+    execFileSync('git', ['init', '-q', '--bare', join(root, 'origin.git')], { env: ENV });
     git('remote', 'add', 'origin', join(root, 'origin.git'));
     git('push', '-q', 'origin', 'main');
     git('switch', '-q', '-c', 'feature');
@@ -537,13 +734,82 @@ describe('the base and the head', () => {
       const result = run(args);
       assert.equal(result.status, 2, `${args.join(' ')}: ${result.stderr}`);
       assert.match(result.stderr, /no-such-ref/);
+      assert.match(result.stderr, /fatal: /, "git's own reason is kept");
+      assert.doesNotMatch(result.stderr, /shallow/, 'this repository is not a shallow clone');
     }
   });
 
-  it('exits 2 when the base is a parent a shallow clone does not have', () => {
-    // A one-commit repository has no HEAD^1, as a depth-1 checkout has none: CI fails closed.
-    const result = run(['--base', 'HEAD^1']);
+  it('exits 2 in a depth-1 clone, and reads HEAD^1 of a merge commit cloned two deep', () => {
+    // CI's checkout for a pull request: GitHub's merge commit, fetched with fetch-depth 2.
+    git('switch', '-q', '-c', 'feature');
+    edit('0005-epsilon.md', 'Some context', 'Some newer context');
+    commit('docs(adr): a branch change');
+    git('switch', '-q', 'main');
+    write('0007-eta.md', record({ number: '0007', title: 'Eta', status: 'Accepted' }));
+    const tip = commit('docs(adr): main moves on');
+    git('merge', '-q', '--no-ff', '--no-edit', 'feature');
+    const url = pathToFileURL(repo).href;
+
+    const deep = join(root, 'depth-2');
+    gitIn(['clone', '-q', '--depth', '2', '--branch', 'main', url, deep], root);
+    assertPasses(run(['--base', 'HEAD^1'], deep), 5, tip);
+
+    const shallow = join(root, 'depth-1');
+    gitIn(['clone', '-q', '--depth', '1', '--branch', 'main', url, shallow], root);
+    const result = run(['--base', 'HEAD^1'], shallow);
     assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /HEAD\^1/);
+    assert.match(result.stderr, /shallow clone/);
+  });
+
+  it('exits 2 on a base commit without the records directory', () => {
+    const emptyTree = execFileSync('git', ['hash-object', '-t', 'tree', '-w', '--stdin'], {
+      cwd: repo,
+      input: '',
+      encoding: 'utf8',
+      env: ENV,
+    }).trim();
+    const empty = git('commit-tree', emptyTree, '-m', 'an empty tree');
+    const result = run(['--base', empty]);
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /docs\/adr/);
+  });
+
+  it('takes --base=<ref> and --head=<ref>', () => {
+    edit('0001-alpha.md', 'so a reader never', 'so nobody ever');
+    const edited = commit('docs(adr): edit an accepted decision');
+    assertProblem(run([`--base=${base}`, `--head=${edited}`]), '0001-alpha.md', '## Decision');
+    assertPasses(run([`--base=${base}`, `--head=${base}`]));
+  });
+
+  it('says so when the base is HEAD itself and only uncommitted changes were compared', () => {
+    const result = run(['--base', 'HEAD']);
+    assertPasses(result);
+    assert.match(result.stdout, /only uncommitted changes/);
+    assert.doesNotMatch(run(['--base', base, '--head', 'HEAD']).stdout, /uncommitted/);
+  });
+
+  it('exits 2, not 1, on an error it did not expect', () => {
+    // Exit 1 means a record broke a rule; a crash is a check that could not run.
+    const preload = join(root, 'throw.mjs');
+    writeFileSync(
+      preload,
+      [
+        "import path from 'node:path';",
+        "import { syncBuiltinESMExports } from 'node:module';",
+        "path.relative = () => { throw new TypeError('an unexpected failure'); };",
+        'syncBuiltinESMExports();',
+        '',
+      ].join('\n'),
+    );
+    const result = spawnSync(
+      process.execPath,
+      ['--import', pathToFileURL(preload).href, SCRIPT, '--base', base],
+      { cwd: repo, encoding: 'utf8', env: ENV },
+    );
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /could not run/);
+    assert.match(result.stderr, /an unexpected failure/);
   });
 
   it('exits 2 outside a git repository', () => {
@@ -552,7 +818,7 @@ describe('the base and the head', () => {
     const result = spawnSync(process.execPath, [SCRIPT, '--base', 'HEAD'], {
       cwd: outside,
       encoding: 'utf8',
-      env: { ...process.env, GIT_CEILING_DIRECTORIES: root },
+      env: { ...ENV, GIT_CEILING_DIRECTORIES: root },
     });
     assert.equal(result.status, 2, result.stderr);
   });
@@ -585,5 +851,33 @@ describe('the base and the head', () => {
       assert.equal(result.status, 2, `${JSON.stringify(args)}: ${result.stderr}`);
       assert.match(result.stderr, /usage: node scripts\/check-adr-history\.mjs/);
     }
+  });
+});
+
+describe('compareRecords, called directly', () => {
+  const accepted = record({ number: '0001', title: 'Alpha', status: 'Accepted' });
+  const proposed = record({ number: '0002', title: 'Beta', status: 'Proposed' });
+
+  it('counts each record compared, exempt or repaired', () => {
+    const result = compareRecords(
+      new Map([
+        ['0001-alpha.md', accepted],
+        ['0002-beta.md', proposed],
+        ['0003-gamma.md', record({ number: '0003', title: 'Gamma', status: 'Accepted, mostly' })],
+      ]),
+      new Map([
+        ['0001-alpha.md', accepted],
+        ['0002-beta.md', proposed],
+        ['0003-gamma.md', record({ number: '0003', title: 'Gamma', status: 'Accepted' })],
+      ]),
+      'docs/adr',
+    );
+    assert.deepEqual(result, { problems: [], compared: 2, exempt: 1, repaired: 1 });
+  });
+
+  it('names the directory it was given, and none for the top level', () => {
+    const deleted = compareRecords(new Map([['0001-alpha.md', accepted]]), new Map(), '');
+    assert.equal(deleted.problems.length, 1);
+    assert.match(deleted.problems[0], /^0001-alpha\.md: ADR 0001 was "Accepted" at the base/);
   });
 });

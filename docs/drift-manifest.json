@@ -2553,8 +2553,21 @@
       "evaluation": "live",
       "check": {
         "file": ".github/workflows/ci.yml",
-        "regex": "^  quality:\\r?$(?:\\n(?!  \\S)[^\\n]*)*?\\n\\s+run: (pnpm check:adr-history -- --base HEAD\\^1)\\r?$",
+        "regex": "^  quality:\\r?$(?:\\n(?!  \\S)[^\\n]*)*?\\n\\s+run: (pnpm check:adr-history\\b[^\\n]*?)\\r?$",
         "equals": "pnpm check:adr-history -- --base HEAD^1"
+      }
+    },
+    {
+      "id": "adr-readme-check-adr-history-fetch-depth",
+      "doc": "docs/adr/README.md",
+      "anchor": "in CI, the tip of the branch the pull request merges into",
+      "claim": "The quality job checks out two commits deep, so the merge commit's first parent, the base branch's tip, is there for --base HEAD^1.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": ".github/workflows/ci.yml",
+        "regex": "^  quality:\\r?$(?:\\n(?!  \\S)[^\\n]*)*?\\n\\s+fetch-depth: (\\d+)\\r?$",
+        "equals": "2"
       }
     },
     {

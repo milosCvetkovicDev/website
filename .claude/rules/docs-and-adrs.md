@@ -64,9 +64,12 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   (`scripts/check-adr-history.mjs`, the next step of the `quality` job) holds the records to the
   base, the merge base with `origin/main` unless `--base` names another: for each record accepted
   or superseded there, it fails when the record is deleted, goes back to `Proposed` or `Withdrawn`,
-  or changes its `## Decision` or an existing `## Corrections` entry by more than whitespace, while
-  an entry appended after the last passes. Records `Proposed` or `Withdrawn` at the base are exempt.
-  Whether an edit to the other sections is a correction ADR 0012 allows stays a reviewer's call.
+  is accepted again or re-pointed once superseded, or changes its `## Decision` or an existing
+  `## Corrections` entry by more than whitespace outside a code fence, while an entry appended after
+  the last passes. Records `Proposed` or `Withdrawn` at the base are exempt, but one accepted at the
+  head must have one `## Decision`. A record the base cannot read in full passes when the head
+  repairs it, so a broken `main` never blocks its own fix. Whether an edit to the other sections is
+  a correction ADR 0012 allows stays a reviewer's call.
 - Before editing a document that describes repository or CI settings, check each claim against the
   live settings (`gh api repos/milosCvetkovicDev/website`, `.../branches/main/protection`) rather
   than trusting the existing text, and cite code as a path with line numbers checked against
