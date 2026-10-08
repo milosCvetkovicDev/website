@@ -116,7 +116,7 @@ Always finish with `pnpm lint`.
   live there too: each study's `publishedAt` and `updatedAt`, and `STATIC_ROUTE_UPDATED` in
   `static-routes.ts` for the static routes. They are the sitemap's `lastmod`, and the case studies'
   TechArticle dates and visible Published and Updated line, so the commit that changes what a page
-  visibly says bumps its date, and no other commit does.
+  visibly says bumps its date, and no other commit does (checked by `Content dates`, ADR 0035).
 - Server components by default. Add `'use client'` only where browser APIs, React state or GSAP are
   actually needed.
 - Tailwind v4 is CSS-first: the theme is declared in `apps/web/src/app/globals.css` and compiled by
