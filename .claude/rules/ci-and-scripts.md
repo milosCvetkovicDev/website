@@ -26,7 +26,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   cache, never does), `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22 runs
   directly), `docs-drift-patch.mjs` (the docs drift workflow's check on what its agent changed),
   `check-content-dates.mjs` (`pnpm check:content-dates`, the `Content dates` workflow's pairing of
-  each route's served text with its content date, ADR 0035),
+  each route's served text with its content date, ADR 0036),
   `agent-resume.sh` (the briefing for agent checkpoints, under Working with this repo in Claude
   Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates),
   `flake-sweep.sh` (`pnpm test:e2e:sweep`, see `e2e-tests.md`), `verify-flake.sh` (runs one e2e spec N
@@ -212,7 +212,7 @@ splits the versions again, and `pnpm typecheck` is the reference for `scripts/` 
   background one with `kill -TERM <pid>`, which exits 143 and still writes the report.
 - `.github/workflows/content-dates.yml` runs on the `opened`, `edited`, `synchronize` and
   `reopened` pull request events, and its one job, `Content dates`, is not a required check
-  (ADR 0035). It checks out the whole history without keeping the token, sets up Node and installs
+  (ADR 0036). It checks out the whole history without keeping the token, sets up Node and installs
   nothing, then runs `scripts/check-content-dates.mjs` with the base branch as fetched
   (`origin/<base>`, not the event's base SHA, which can lag it), the head SHA and the event
   payload. That compares `apps/web/src/data/content-dates.json` at the head with the file at the

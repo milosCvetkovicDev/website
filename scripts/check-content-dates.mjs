@@ -34,7 +34,7 @@
 // step, 1 out of step, 2 when the check could not run (no or a malformed manifest at the head or the
 // merge base, a revision git cannot resolve, no merge base, an unreadable event, a usage error, or
 // any other failure). It never exits 0 because it could not see, and it uses Node built-ins only, so
-// the workflow installs nothing. See docs/adr/0035-content-dates-move-with-served-text.md.
+// the workflow installs nothing. See docs/adr/0036-content-dates-move-with-served-text.md.
 
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
