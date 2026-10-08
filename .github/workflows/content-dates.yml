@@ -13,7 +13,12 @@ name: Content dates
 # required (ADR 0035), so it cannot sit in either file.
 #
 # It trusts the manifest at the head. The required `quality` job keeps that file true: its unit
-# tests fail when the manifest disagrees with what the routes render.
+# tests fail when the manifest disagrees with what the routes render. It also runs the pull
+# request's own copy of the script, as ci.yml runs the pull request's own tests: a pull request
+# that edits the script or this file is read as any change to CI is (ADR 0035).
+#
+# GitHub runs no `pull_request` workflow while the pull request conflicts with its base, so the
+# check is absent, not failing, until the conflict is resolved.
 #
 # No push trigger and no `workflow_dispatch`: neither has a pull request body or a merge base.
 
@@ -43,8 +48,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The merge base can be any distance back, so the whole history has to be there.
+          # The merge base can be any distance back, so the whole history has to be there, and with
+          # it every branch, the base branch's current tip included.
           fetch-depth: 0
+          # The token is not needed after the fetch, and the job runs code from the pull request.
+          persist-credentials: false
 
       - name: Set up Node (version from .nvmrc)
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -52,11 +60,13 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Compare each route's content date with its served text
-        # The body is attacker-controlled input, so it arrives through the environment and is never
-        # interpolated into the script; the two SHAs come the same way. The script uses Node
-        # built-ins only, so nothing is installed.
+        # The body is attacker-controlled input: the script reads it from the event payload, so it
+        # is never interpolated into the script, and an environment variable's 128 KiB cap cannot
+        # fail the step. The base is the base branch as just fetched, because the payload's base
+        # SHA can lag it: a head that has merged newer base commits would be charged with their
+        # changes. The branch name and the head SHA come through the environment. The script uses
+        # Node built-ins only, so nothing is installed.
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: node scripts/check-content-dates.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
+        run: node scripts/check-content-dates.mjs --base "origin/$BASE_REF" --head "$HEAD_SHA" --event "$GITHUB_EVENT_PATH"

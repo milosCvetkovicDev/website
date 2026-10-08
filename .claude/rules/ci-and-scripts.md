@@ -60,7 +60,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `pnpm check:allowbuilds`                                                 | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                                                     |
 | `pnpm check:adrs`                                                        | Checks each ADR's status, H1 title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules; exit 1 on a disagreement, 2 if it could not run                         |
 | `pnpm check:build-output [<distDir>]`                                    | After `pnpm --filter web build`: every route, and each one in `REQUIRED_ROUTES`, is prerendered with its body file, none a function outside `ALLOWED_FUNCTIONS`; exit 1 on a finding, 2 if it could not run |
-| `pnpm check:content-dates -- --base <rev> [--head <rev>]`                | Compares `content-dates.json` at the head (`HEAD` by default) with its merge base: a route whose text and date moved apart fails unless `PR_BODY` excuses it; exit 1 on a finding, 2 if it could not run    |
+| `pnpm check:content-dates -- --base <rev> [--head <rev>]`                | Pairs `content-dates.json`'s dates and text at the head (`HEAD` by default) and its merge base unless the body (`--event`, else `PR_BODY`) excuses a route; exit 1 on a finding, 2 if it could not run      |
 | `pnpm check:docs-drift`                                                  | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                                         |
 | `node scripts/post-draft-check.mjs --kind own\|jev <draft.md> <twin.md>` | Compares an approved draft with the post's served twin: 0 equal, 1 differences or refused syntax, 2 could not run                                                                                           |
 | `pnpm test:scripts`                                                      | `node:test` tests for the root `scripts/`                                                                                                                                                                   |
@@ -212,18 +212,26 @@ splits the versions again, and `pnpm typecheck` is the reference for `scripts/` 
   background one with `kill -TERM <pid>`, which exits 143 and still writes the report.
 - `.github/workflows/content-dates.yml` runs on the `opened`, `edited`, `synchronize` and
   `reopened` pull request events, and its one job, `Content dates`, is not a required check
-  (ADR 0035). It checks out the whole history, sets up Node and installs nothing, then runs
-  `scripts/check-content-dates.mjs` on the pull request's base and head SHAs. That compares
-  `apps/web/src/data/content-dates.json` at the head with the file at the merge base and fails, by
-  route, a route whose served text moved without its content date, whose date moved without its
-  text, or whose date moved backwards, unless the body excuses it with a
+  (ADR 0035). It checks out the whole history without keeping the token, sets up Node and installs
+  nothing, then runs `scripts/check-content-dates.mjs` with the base branch as fetched
+  (`origin/<base>`, not the event's base SHA, which can lag it), the head SHA and the event
+  payload. That compares `apps/web/src/data/content-dates.json` at the head with the file at the
+  merge base and fails, by route, a route whose served text moved without its content date, whose
+  date moved without its text, or whose date moved backwards, unless the body excuses it with a
   `Content-Date-Exception: <route> <reason>` line: at the very start of a line, outside fenced code
-  and HTML comments, any letter case for the key. The body reaches the script through `PR_BODY`,
-  never interpolated. Every exception is listed as needed or not needed, and one that names a route
-  the head manifest lacks, or gives no reason, fails the check. A route only at the head or only at
-  the merge base is listed and passes, a merge base without the manifest passes with a notice, and
-  a missing or malformed manifest at the head exits 2. Editing the body re-runs this workflow
-  alone. It trusts the head manifest, which the `quality` job's `pnpm test` keeps true. Making it
+  and HTML comments, any letter case for the key, the route bare or in backticks. The script reads
+  the body from the event payload (`--event`), never interpolated and never through an environment
+  variable, whose 128 KiB cap a long body of multi-byte text can pass; `PR_BODY` serves a run by
+  hand. Every exception is listed as needed or not needed, and one that names a route the head
+  manifest lacks, or gives no reason, fails the check. A route only at the head or only at the
+  merge base is listed and passes, a merge base without the manifest passes with a notice, and a
+  missing or malformed manifest at the head, a malformed one at the merge base, or any other failure
+  exits 2. In Actions the report sits between `::stop-commands::` and its token, so nothing the
+  body says runs as a workflow command, and each route out of step gets an error annotation.
+  Editing the body re-runs this workflow alone. GitHub runs no `pull_request` workflow while a pull
+  request conflicts with its base, so the check is absent, not failing, until the conflict is
+  resolved. It trusts the head manifest, which the `quality` job's `pnpm test` keeps true, and it
+  runs the pull request's own copy of the script, as `ci.yml` runs its own tests. Making it
   required follows ADR 0021's order for adding a context, in a record that supersedes ADR 0021,
   whose agreement check reads only `ci.yml` and `commitlint.yml`.
 - `main` has branch protection on, and three checks are required: both CI jobs and

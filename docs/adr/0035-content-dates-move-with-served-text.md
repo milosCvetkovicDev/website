@@ -43,8 +43,9 @@ latest of its own date and its published posts' `publishedAt`.
 Content dates move with served text, and two halves hold them together.
 
 1. **A manifest, kept true by the unit suite.** `apps/web/src/data/content-dates.json` has one line
-   per route: every `STATIC_ROUTE_UPDATED` key (/blog included while no post is published), every
-   case study and every published post. Each line holds the route's sitemap `lastmod` (`updated`)
+   per route: every `STATIC_ROUTE_UPDATED` key (/blog included, with its posts masked, even while
+   the sitemap leaves it out because no post is published), every case study and every published
+   post. Each line holds the route's sitemap `lastmod` (`updated`)
    and a fingerprint of its served text (`text`, the first 16 hex digits of a sha256). Served text
    is the page component's server render, without `script`, `style`, `template` or `time` elements,
    each block element a line of its own and whitespace collapsed, plus the route's Markdown twin,
@@ -58,11 +59,13 @@ Content dates move with served text, and two halves hold them together.
    `pnpm --filter web content-dates:update` writes it.
 2. **A pairing check on every pull request.** `scripts/check-content-dates.mjs`
    (`pnpm check:content-dates`) reads the manifest at the pull request's head and at its merge base
-   with the base branch. For every route in both, it fails when the text moved and the date did
-   not, when the date moved and the text did not, or when the date moved backwards, and names the
-   route. A route only at the head is listed as new and a route only at the merge base as removed,
-   and both pass. A merge base without a manifest passes with a notice. A missing or malformed
-   manifest at the head, or a revision git cannot resolve, means the check could not run (exit 2).
+   with the base branch as fetched when the check runs, not the event's base SHA, which can lag
+   it. For every route in both, it fails when the text moved and the date did not, when the date
+   moved and the text did not, or when the date moved backwards, and names the route. A route only
+   at the head is listed as new and a route only at the merge base as removed, and both pass. A
+   merge base without a manifest passes with a notice. A missing or malformed manifest at the head,
+   a malformed one at the merge base, or a revision git cannot resolve, means the check could not
+   run (exit 2).
 3. **The escape is a line in the pull request body:** `Content-Date-Exception: <route> <reason>`,
    at the start of a line the rendered body shows, so not in a fenced code block or an HTML
    comment. It excuses every finding on its route. An exception that names a route the head
@@ -104,7 +107,18 @@ Content dates move with served text, and two halves hold them together.
 - Dating a change the day it is expected to merge now costs a date-only follow-up with an exception
   when the merge slips.
 - Two pull requests that change the same route, or neighbouring routes, conflict on the manifest.
-  The file is regenerated, never merged by hand.
+  The file is regenerated, never merged by hand. GitHub runs no `pull_request` workflow while a
+  pull request conflicts with its base, so until the conflict is resolved the check is absent, not
+  failing.
+- Dates are days. When a second pull request changes a route's text on the day an earlier one
+  already moved its date to, the date cannot move again, and the change needs an exception.
+- The check runs the pull request's own copy of the script and the workflow, as `ci.yml` runs the
+  pull request's own tests, so a pull request could weaken the check that judges it. Running the
+  base branch's copy of the script would not close that: a `pull_request` workflow is itself read
+  from the pull request. A change to either file is reviewed as any change to CI is, and the same
+  holds once the check is required.
+- The fingerprint's algorithm is not recorded in the manifest. A pull request that changes how
+  served text is read moves the fingerprint of every route, and needs an exception for each.
 - Every pull request that changes served copy now moves its date or carries an exception. While the
   check is advisory, one can still merge with it failing.
 
