@@ -234,10 +234,9 @@ export async function renderRoute(path: string): Promise<RenderedRoute> {
   throw new Error(`renderRoute: no page renders ${JSON.stringify(path)}`);
 }
 
-// Elements whose content is not text a reader is shown as copy: scripts (the JSON-LD among them),
-// styles, inert templates, and `time`, which holds a content date.
-const DROPPED_ELEMENTS = /<(script|style|template|time)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
-const COMMENTS = /<!--[\s\S]*?-->/g;
+// Comments, and the elements whose content is not text a reader is shown as copy: scripts (the
+// JSON-LD among them), styles, inert templates, and `time`, which holds a content date.
+const DROPPED = /<!--[\s\S]*?-->|<(script|style|template|time)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
 const TAGS = /<\/?([A-Za-z][\w-]*)[^>]*>/g;
 // Phrasing elements, which sit inside a line of text: their tags read as nothing, so wrapping a word
 // in one moves no fingerprint. Every other tag ends a line, as a reader sees a heading, a paragraph,
@@ -280,7 +279,7 @@ export function servedText(html: string): string {
   let previous: string;
   do {
     previous = text;
-    text = text.replace(DROPPED_ELEMENTS, '').replace(COMMENTS, '');
+    text = text.replace(DROPPED, '');
   } while (text !== previous);
   return text
     .replace(TAGS, (_tag, name: string) => (PHRASING.has(name.toLowerCase()) ? '' : BOUNDARY))
