@@ -55,8 +55,9 @@ There is no shared ESLint or TypeScript config package (ADR 0018): `apps/web` li
 
 `/`, `/about`, `/blog`, `/blog/[slug]`, `/contact`, `/privacy`, `/skills`, `/work`, `/work/[slug]`.
 Handlers include an `/index.md` twin per page, `/case-studies.json`, `/work/<slug>/index.json`,
-the Atom feed `/feed.xml` and `/mcp` (`POST` only, the one server function); every handler but
-`/mcp` exports `dynamic = 'force-static'`, and there is no middleware (ADR 0017, 0030).
+the feed `/feed.xml` and `/mcp` (`POST` only, the one server function). Every `route.ts` but
+`/mcp`'s exports `dynamic = 'force-static'`, there is no middleware or `proxy.ts` (ADR 0017,
+0030), and `pnpm check:build-output` fails any other server function.
 
 Every route's head comes from `buildMetadata()` in `apps/web/src/lib/metadata.ts`, and every
 static route folder needs its own `opengraph-image`; see `app-router-and-content.md`.
@@ -103,8 +104,8 @@ Always finish with `pnpm lint`.
   to quieten a failure.
 - Machine-readable gates (#55): `no-js-text`, `crawlability`, `structured-data`,
   `lighthouse-audits`, `served-html` and `machine-readable` (`e2e/<name>.spec.ts`),
-  `json-ld.test.tsx`, `schema-validator.test.ts` and `lighthouse.test.ts` in `pnpm test`,
-  `pnpm check:build-output`, and `pnpm test:scripts` for `ai-refusals.test.mjs` (ADR 0017).
+  `src/components/__tests__/json-ld.test.tsx` and `src/test/{schema-validator,lighthouse}.test.ts`,
+  `pnpm check:build-output`, and `pnpm test:scripts` for `scripts/ai-refusals.test.mjs`.
 - `eslint-disable` is not an acceptable fix for the React Hooks rules. `react-hooks/set-state-in-effect`
   in particular is pointing at a real hydration problem: restructure the component instead. See
   `docs/adr/0006-hydration-safe-client-state.md` and `apps/web/src/hooks/use-is-hydrated.ts`.
@@ -124,8 +125,8 @@ Always finish with `pnpm lint`.
   visibly says bumps its date, and no other commit does.
 - Server components by default. Add `'use client'` only where browser APIs, React state or GSAP are
   actually needed.
-- `src/lib/serialise.ts` turns `src/data` into the twins, the JSON and the MCP payloads, and
-  `src/lib/atom.ts` into the feed: no fact is written twice.
+- In `apps/web/src/lib`, `serialise.ts` turns `src/data` into the twins, the JSON and the MCP
+  payloads, and `atom.ts` turns `src/data/posts` into the feed: no fact is written twice.
 - Tailwind v4 is CSS-first: the theme is declared in `apps/web/src/app/globals.css` and compiled by
   `@tailwindcss/postcss`. There is no `tailwind.config.js` and there should not be one.
 - Colour: `--accent` paints surfaces and `--accent-text` is the only accent allowed as text, status
@@ -201,8 +202,8 @@ Always finish with `pnpm lint`.
   than trusting the existing text, and cite code as a path with line numbers checked against
   current `main`.
 - Read `docs/adr/0017-ai-discoverability-policy.md` before adding any AI-facing or machine-readable
-  file: adding one it refuses means superseding the record and deleting its assertion in
-  `scripts/ai-refusals.test.mjs`.
+  file (`llms.txt`, `.well-known`, crawler rules, JSON-LD types): adding one it refuses means
+  superseding the record and deleting the refusal's assertion in `scripts/ai-refusals.test.mjs`.
 - `docs/runbooks` — operational procedures. `docs/runbooks/deploy.md` is the deployment procedure.
 - `README.md` addresses a reader landing on GitHub; this file addresses an agent about to change
   code. Keep them consistent without duplicating each other.
@@ -226,5 +227,6 @@ Always finish with `pnpm lint`.
   and run `gh pr list --head <branch>` before each retry, because the pull request may have been
   created anyway. Set a body that did not land over REST:
   `gh api -X PATCH repos/{owner}/{repo}/pulls/<N> -F body=@<file>`.
-- A `[slug].md` folder is a literal segment with no params, so a twin is `<route>/index.md`, and
-  `force-static` goes away only if `cacheComponents` is enabled (ADR 0030).
+- A `[slug].md` folder is literal: its handler gets no `params`, so a twin is `<route>/index.md`
+  (ADR 0030).
+- Keep `force-static`: only enabling `cacheComponents` drops it and `dynamicParams` (ADR 0030).
