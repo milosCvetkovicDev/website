@@ -72,19 +72,13 @@ async function sampleStory(page: Page): Promise<Sampled[]> {
 }
 
 /**
- * The three kinds of hiding that are not a GSAP from-state on a wrapper, each of which the per-phase
- * check below could miss behind the wrappers it does find hidden: the four class-hidden closers and
- * the code lines, which are React state set inside the build callbacks, and the architecture lines,
- * hidden by stroke dashing rather than opacity. Each is looked up inside the story's own sections,
- * never the whole page. The loaded mark follows the last build callback, not React's commit of what
- * those callbacks set, so the spec polls this before it trusts the page.
- *
- * The poll also waits for every phase's own from-state, for the same reason one step down: GSAP can
- * initialise a `fromTo()`'s start lazily. A build that lands between ticker frames parses the
- * target's transform (writing GSAP's `translate/rotate/scale: none` pins) and leaves the from-values
- * themselves, `opacity: 0` and the offset, to its next tick. GameComplete builds last, right before
- * the loaded mark, so its terminal and CTA can sit at the pins alone when the mark is seen, until
- * that tick runs; a sample taken in between finds the section un-hidden.
+ * The phases with no text below full opacity yet. The spec polls this too, for the same reason as
+ * `hidingInForce` one step down: GSAP can initialise a `fromTo()`'s start lazily. A build that
+ * lands between ticker frames parses the target's transform (writing GSAP's
+ * `translate/rotate/scale: none` pins) and leaves the from-values themselves, `opacity: 0` and the
+ * offset, to its next tick. GameComplete builds last, right before the loaded mark, so its terminal
+ * and CTA can sit at the pins alone when the mark is seen, until that tick runs; a sample taken in
+ * between finds the section un-hidden.
  */
 async function phasesWithoutFromState(page: Page): Promise<string[]> {
   const sampled = await sampleStory(page);
@@ -93,6 +87,14 @@ async function phasesWithoutFromState(page: Page): Promise<string[]> {
     .map(({ label }) => label);
 }
 
+/**
+ * The three kinds of hiding that are not a GSAP from-state on a wrapper, each of which the per-phase
+ * check below could miss behind the wrappers it does find hidden: the four class-hidden closers and
+ * the code lines, which are React state set inside the build callbacks, and the architecture lines,
+ * hidden by stroke dashing rather than opacity. Each is looked up inside the story's own sections,
+ * never the whole page. The loaded mark follows the last build callback, not React's commit of what
+ * those callbacks set, so the spec polls this before it trusts the page.
+ */
 async function hidingInForce(page: Page) {
   const story = await Promise.all(
     PHASES.map(({ name }) =>
