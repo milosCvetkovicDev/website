@@ -197,8 +197,8 @@ export function Navigation() {
     <>
       {/* Opaque, with no backdrop-filter, so the --muted links always sit on --background. Until
           #147 the header was translucent and blurred, and whatever scrolled under it set their
-          contrast: 3.7:1 over the closing terminal on `/` in the light theme. The accessibility
-          gate holds the surface at every scroll offset ('the header at every scroll offset'). */}
+          contrast. e2e/accessibility.spec.ts holds the surface at every scroll offset of `/`, and
+          `scroll-margin-top` in globals.css keeps focus from landing behind it. */}
       <header className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--background)]">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           {/* The mark is aria-hidden, so the link carries the name. It starts with "MC", the visible

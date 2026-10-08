@@ -28,8 +28,9 @@ import { warmRoutes } from '../support/warm-routes';
  * and the backdrop covered nothing, so a tap below the header landed on the page and the menu
  * stayed open (R3). A modal dialog renders in the top layer, which no ancestor can clip, and it
  * renders after `</header>` besides. The header itself has had no `backdrop-filter` since #147
- * made it opaque. WebKit runs here too because whether a `backdrop-filter` ancestor becomes that
- * containing block, and how a modal dialog handles focus, are engine-specific.
+ * made it opaque. WebKit runs here too because how a modal dialog handles focus is engine-specific
+ * ('Tab and Shift+Tab from the Close button keep focus in the menu, in both engines'); whether a
+ * `backdrop-filter` ancestor becomes that containing block was too, when the header had one.
  */
 
 /** Every test here interacts, on `/` and on other routes alike, so each one starts hydrated. */

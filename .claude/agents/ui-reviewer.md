@@ -62,10 +62,13 @@ catches it.
   routes listed in `apps/web/e2e/routes.ts` at rest in both colour schemes at the desktop
   viewport; on `/` after the whole story has scrolled; on `/` with a header nav link hovered
   and with one focused; and on the site header alone at every scroll offset of `/`, which must be
-  opaque and unblurred. Each desktop at-rest pass also holds `INCOMPLETE_CONTRAST_BUDGET` (see
-  Accessibility). Nothing else is measured: text that appears only on hover or focus elsewhere,
+  opaque and unblurred and may hold no text axe cannot decide. Each desktop at-rest pass also holds
+  `INCOMPLETE_CONTRAST_BUDGET` (see Accessibility). Nothing else is measured: text that appears only on hover or focus elsewhere,
   inside an opened menu, or after scrolling a route other than `/` passes this gate whatever its
   contrast.
+- `apps/web/e2e/navigation.spec.ts`: Shift+Tab onto a link scrolled behind the sticky header on
+  `/work` must bring it out from under the header (WCAG 2.4.11), which `scroll-margin-top` in
+  `globals.css` provides, and focusing a header link must not scroll the page. Focus behind any other fixed or sticky layer is review's to catch.
 - `apps/web/e2e/mobile/accessibility.spec.ts`: the at-rest axe pass on `/` and
   `/work/self-healing-agent` under the phone projects.
 - `apps/web/e2e/hero-contrast.spec.ts`: the computed colour, alpha and contrast of the hero's

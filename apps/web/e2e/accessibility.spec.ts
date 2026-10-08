@@ -370,24 +370,104 @@ const FEATURED_WORK = 'section[aria-labelledby="featured-work-heading"]';
 const PAGE_BACKGROUND = { light: 'rgb(250, 250, 250)', dark: 'rgb(10, 10, 10)' } as const;
 
 /**
+ * Everything about the header's own surface, and its ancestors', that would let the page under it
+ * show through behind its links. Read at every offset, not once: a style that a scroll position
+ * switches on would otherwise go unseen between the offsets axe visits.
+ */
+const headerSurface = (page: Page) =>
+  page.locator(SITE_HEADER).evaluate((header) => {
+    const style = getComputedStyle(header);
+    const ancestors: string[] = [];
+    for (let element = header.parentElement; element; element = element.parentElement) {
+      const { opacity, filter, mixBlendMode } = getComputedStyle(element);
+      if (opacity !== '1' || filter !== 'none' || mixBlendMode !== 'normal')
+        ancestors.push(
+          `<${element.localName}> opacity ${opacity}, filter ${filter}, mix-blend-mode ${mixBlendMode}`,
+        );
+    }
+    return {
+      page: getComputedStyle(document.body).backgroundColor,
+      background: style.backgroundColor,
+      backgroundImage: style.backgroundImage,
+      backdropFilter: style.backdropFilter,
+      filter: style.filter,
+      opacity: style.opacity,
+      mixBlendMode: style.mixBlendMode,
+      ancestors,
+    };
+  });
+
+/**
+ * What in `surface` lets the page show through the header, one message each; empty for an opaque
+ * header on the page's own `--background`. Values are compared as the browser serialises them.
+ */
+const surfaceProblems = (
+  surface: Awaited<ReturnType<typeof headerSurface>>,
+  colorScheme: (typeof colorSchemes)[number],
+) => {
+  const problems: string[] = [];
+  if (surface.page !== PAGE_BACKGROUND[colorScheme])
+    problems.push(
+      `the body paints ${surface.page}, not --background ${PAGE_BACKGROUND[colorScheme]}`,
+    );
+  if (surface.background !== surface.page)
+    problems.push(
+      `the header paints ${surface.background}, not the page background ${surface.page} at full opacity`,
+    );
+  const expected = {
+    backgroundImage: 'none',
+    backdropFilter: 'none',
+    filter: 'none',
+    opacity: '1',
+    mixBlendMode: 'normal',
+  } as const;
+  for (const [property, value] of Object.entries(expected) as [keyof typeof expected, string][])
+    if (surface[property] !== value)
+      problems.push(`the header's ${property} is ${surface[property]}, not ${value}`);
+  for (const ancestor of surface.ancestors) problems.push(`an ancestor composites it: ${ancestor}`);
+  return problems;
+};
+
+/**
  * Scrolls to `top` and reports where the page ended up, two animation frames later, against the
  * offset it should be at: `top`, clamped to the bottom. `behavior: 'instant'` for the reason
- * `scrollThroughStory` gives.
+ * `scrollThroughStory` gives. Issued once: a scroll the page undoes is a finding, not something to
+ * repeat until it sticks. The bottom is `scrollHeight - clientHeight`, not `innerHeight`, which
+ * would count a horizontal scrollbar as page.
  */
 const scrollToOffset = (page: Page, top: number) =>
   page.evaluate(async (top) => {
     window.scrollTo({ top, behavior: 'instant' });
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const bottom = document.documentElement.scrollHeight - window.innerHeight;
+    const bottom = document.documentElement.scrollHeight - document.documentElement.clientHeight;
     return { scrollY: window.scrollY, expected: Math.min(top, bottom) };
   }, top);
+
+/**
+ * The offsets the header pass visits, measured at the moment of the call: the bottom of the page,
+ * half a viewport, and about 40% of the way down Featured Work, between its two 128 px fades, in
+ * the band where the diagram is drawn at full strength.
+ */
+const scrollPlan = (page: Page) =>
+  page.evaluate((section) => {
+    const element = document.querySelector(section);
+    if (!element) throw new Error(`${section} is not on /`);
+    const { top, height } = element.getBoundingClientRect();
+    return {
+      bottom: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      step: Math.round(document.documentElement.clientHeight / 2),
+      featuredWork: Math.round(window.scrollY + top + height * 0.4),
+    };
+  }, FEATURED_WORK);
 
 /**
  * Where the header's About link sits against Featured Work's architecture diagram, in viewport
  * coordinates. Measured by geometry because a hit test cannot see the diagram: its layer and both
  * fades are `pointer-events-none`, which their descendants inherit, so `elementsFromPoint` leaves
- * them out. `diagram` is the section's `aria-hidden` child that draws the svg, `hidden md:block`;
- * the fades are its other `aria-hidden` children, 128 px gradients at the top and the bottom.
+ * them out. `diagram` is the section's `aria-hidden` child that draws an svg, `hidden md:block`;
+ * the fades are its `aria-hidden` children painted with a gradient, 128 px at the top and the
+ * bottom. Each is told apart by what it is rather than by being the one left over, so a decorative
+ * child added later is not taken for either.
  */
 const featuredWorkUnderHeader = (page: Page) =>
   page.evaluate(
@@ -401,13 +481,16 @@ const featuredWorkUnderHeader = (page: Page) =>
       const hidden = [...(sectionElement?.children ?? [])].filter(
         (child) => child.getAttribute('aria-hidden') === 'true',
       );
-      const diagram = hidden.find((child) => child.querySelector(':scope > svg'));
-      const fades = hidden.filter((child) => child !== diagram).map((fade) => box(fade));
+      const diagrams = hidden.filter((child) => child.querySelector(':scope > svg'));
+      const fades = hidden.filter((child) =>
+        getComputedStyle(child).backgroundImage.startsWith('linear-gradient('),
+      );
       return {
         link: box(document.querySelector(`${header} a[href="/about"]`)),
-        diagram: box(diagram),
-        diagramDisplay: diagram ? getComputedStyle(diagram).display : null,
-        fades,
+        diagrams: diagrams.length,
+        diagram: box(diagrams[0]),
+        diagramDisplay: diagrams[0] ? getComputedStyle(diagrams[0]).display : null,
+        fades: fades.map((fade) => box(fade)!),
       };
     },
     { header: SITE_HEADER, section: FEATURED_WORK },
@@ -683,23 +766,27 @@ test.describe('Accessibility', () => {
    * over the diagram's svg. The header is now an opaque `bg-[var(--background)]`.
    *
    * Two checks make "every offset" true and not only "every offset sampled". The computed style comes
-   * first: the header's background is the page's own opaque `--background` and it has no
-   * `backdrop-filter`, so nothing under it can show through between the steps. Then axe, scoped to
-   * the header, at 0, every half viewport down to the bottom, and once with the Featured Work
-   * diagram under the links, which the test proves by geometry before it audits. At each offset axe
-   * must decide every text node in the header (an undecidable header is a gate that cannot fail)
-   * and pass at least the five desktop links.
+   * first, read again at every offset: the header's background is the page's own opaque
+   * `--background`, with no background image, `backdrop-filter`, `filter`, partial opacity or blend
+   * mode on it or on an ancestor, so nothing under it can show through between the steps. Then axe,
+   * scoped to the header, at 0, every half viewport down to the bottom, and once with the Featured
+   * Work diagram under the links, which the test proves by geometry before it audits. At each offset
+   * axe must decide every text node in the header (an undecidable header is a gate that cannot
+   * fail) and pass at least the five desktop links. Content painted over the header is axe's to
+   * find: it reports such text as partially obscured, and every element above the header's `z-40`
+   * is `fixed`, so it sits in the same place at every offset.
    *
    * Under `reduce`, as in the whole-story pass: every phase renders its finished state on mount, so
    * nothing above Featured Work can move while the offsets are visited (`featured-work.spec.ts`
-   * records that slide under `no-preference`). `window.scrollY` is checked before and after each
-   * audit, so a scripted scroll that Chromium undoes (`hero.spec.ts`, 'scroll indicator fades on
-   * scroll') fails by name instead of auditing the top of the page again. Every offset's results are
-   * attached before the audits are judged, so one failing offset still leaves all of them in the
-   * report.
+   * records that slide under `no-preference`), and the offsets are measured again afterwards to
+   * prove it. `window.scrollY` is checked before and after each audit, so a scripted scroll that
+   * Chromium undoes (`hero.spec.ts`, 'scroll indicator fades on scroll') fails by name instead of
+   * passing as the offset it was meant to be. Every check inside the loop is soft, so a failing
+   * offset is still audited and every offset's results are attached before the audits are judged;
+   * only an audit that throws ends the pass early, with what was gathered up to it attached.
    *
-   * About 20 offsets a scheme, each a header-sized axe run; 120 s for the reasons the whole-story
-   * pass gives.
+   * About 20 offsets a scheme, each a header-sized axe run of about a second; 120 s for the reasons
+   * the whole-story pass gives.
    */
   test.describe('the header at every scroll offset', () => {
     test.describe.configure({ retries: 0, timeout: 120_000 });
@@ -711,39 +798,7 @@ test.describe('Accessibility', () => {
         await openPage(page, '/', colorScheme, { reducedMotion: 'reduce' });
         await expect(page.locator(SITE_HEADER)).toHaveCount(1);
 
-        // Soft, so that a translucent header still gets audited below and its measurements land in
-        // the report: they are what #147's first criterion asks for.
-        const surface = await page.locator(SITE_HEADER).evaluate((header) => ({
-          background: getComputedStyle(header).backgroundColor,
-          backdropFilter: getComputedStyle(header).backdropFilter,
-          page: getComputedStyle(document.body).backgroundColor,
-        }));
-        expect
-          .soft(surface.page, `the body should paint --background in the ${colorScheme} theme`)
-          .toBe(PAGE_BACKGROUND[colorScheme]);
-        expect
-          .soft(
-            surface.background,
-            'the header must paint the page background at full opacity, or whatever scrolls under ' +
-              'it shows through behind its links',
-          )
-          .toBe(surface.page);
-        expect
-          .soft(surface.backdropFilter, 'the header must not blur what scrolls under it')
-          .toBe('none');
-
-        const plan = await page.evaluate((section) => {
-          const element = document.querySelector(section);
-          if (!element) throw new Error(`${section} is not on /`);
-          const { top, height } = element.getBoundingClientRect();
-          return {
-            bottom: document.documentElement.scrollHeight - window.innerHeight,
-            step: Math.round(window.innerHeight / 2),
-            // About 40% of the way down the section: between its two 128 px fades, in the band
-            // where the diagram is drawn at full strength.
-            featuredWork: Math.round(window.scrollY + top + height * 0.4),
-          };
-        }, FEATURED_WORK);
+        const plan = await scrollPlan(page);
         if (plan.bottom <= 0 || plan.step <= 0)
           throw new Error(`/ cannot be scrolled: bottom ${plan.bottom}, step ${plan.step}`);
         const offsets: { top: number; featuredWork: boolean }[] = [];
@@ -751,67 +806,83 @@ test.describe('Accessibility', () => {
           offsets.push({ top, featuredWork: false });
         offsets.push({ top: plan.bottom, featuredWork: false });
         offsets.push({ top: Math.min(plan.featuredWork, plan.bottom), featuredWork: true });
-        // The home page is about nine viewports, so about 20 offsets; this turns a page that grew
-        // without bound into a named failure rather than a timeout.
-        expect(offsets.length, 'far more offsets than / should need').toBeLessThan(80);
+        // The home page is about nine viewports, so 21 offsets at 1280x720. Twice that still runs
+        // in about half the timeout on CI; past it, the page grew and this fails by name, not as a
+        // timeout.
+        expect(offsets.length, 'far more offsets than / should need').toBeLessThanOrEqual(40);
 
         const audited: {
           top: number;
           scrollY: number;
           featuredWork: boolean;
+          surface: Awaited<ReturnType<typeof headerSurface>>;
           results: AxeResults;
         }[] = [];
         try {
           for (const { top, featuredWork } of offsets) {
+            const at = `at ${top}${featuredWork ? ' (over Featured Work)' : ''}`;
             const before = await scrollToOffset(page, top);
-            expect(before.scrollY, `the page should be scrolled to ${top} before the audit`).toBe(
-              before.expected,
-            );
+            expect
+              .soft(before.scrollY, `the page should be scrolled to ${top} before the audit`)
+              .toBe(before.expected);
+            const surface = await headerSurface(page);
+            expect
+              .soft(
+                surfaceProblems(surface, colorScheme),
+                `the header ${at} must paint the page background at full opacity, or whatever ` +
+                  'scrolls under it shows through behind its links',
+              )
+              .toEqual([]);
             if (featuredWork) {
-              const { link, diagram, diagramDisplay, fades } = await featuredWorkUnderHeader(page);
-              const where = `at ${top}: link ${JSON.stringify(link)}, diagram ${JSON.stringify(diagram)}, fades ${JSON.stringify(fades)}`;
-              expect(
-                diagramDisplay,
-                `the diagram must be displayed at this viewport ${where}`,
-              ).toBe('block');
-              expect(
-                link && diagram,
-                `the About link and the diagram must exist ${where}`,
-              ).toBeTruthy();
-              expect(
-                fades,
-                `Featured Work should have a fade at its top and bottom ${where}`,
-              ).toHaveLength(2);
-              const [topFade, bottomFade] = [...fades].sort((a, b) => a!.top - b!.top);
-              expect(
-                link!.left >= diagram!.left &&
-                  link!.right <= diagram!.right &&
-                  link!.top >= diagram!.top &&
-                  link!.bottom <= diagram!.bottom,
-                `the About link must sit inside the diagram's box ${where}`,
-              ).toBe(true);
-              expect(
-                link!.top >= topFade!.bottom && link!.bottom <= bottomFade!.top,
-                `the About link must sit between the two fades, over the diagram itself ${where}`,
-              ).toBe(true);
+              const { link, diagrams, diagram, diagramDisplay, fades } =
+                await featuredWorkUnderHeader(page);
+              const where = `${at}: link ${JSON.stringify(link)}, diagram ${JSON.stringify(diagram)}, fades ${JSON.stringify(fades)}`;
+              expect.soft(diagrams, `Featured Work should have one diagram layer ${where}`).toBe(1);
+              expect.soft(link, `the header should have an About link ${where}`).not.toBeNull();
+              expect
+                .soft(diagramDisplay, `the diagram must be displayed at this viewport ${where}`)
+                .toBe('block');
+              expect
+                .soft(fades, `Featured Work should have a fade at its top and bottom ${where}`)
+                .toHaveLength(2);
+              if (link && diagram && fades.length === 2) {
+                const [topFade, bottomFade] = [...fades].sort((a, b) => a.top - b.top);
+                expect
+                  .soft(
+                    link.left >= diagram.left &&
+                      link.right <= diagram.right &&
+                      link.top >= diagram.top &&
+                      link.bottom <= diagram.bottom,
+                    `the About link must sit inside the diagram's box ${where}`,
+                  )
+                  .toBe(true);
+                expect
+                  .soft(
+                    link.top >= topFade.bottom && link.bottom <= bottomFade.top,
+                    `the About link must sit between the two fades, over the diagram itself ${where}`,
+                  )
+                  .toBe(true);
+              }
             }
             const results = await auditWithin(page, SITE_HEADER);
             const after = await page.evaluate(() => window.scrollY);
-            expect(
-              after,
-              `the page moved during the audit at ${top}: it is no longer the offset audited`,
-            ).toBe(before.expected);
-            audited.push({ top, scrollY: after, featuredWork, results });
+            expect
+              .soft(
+                after,
+                `the page moved during the audit ${at}: it is no longer the offset audited`,
+              )
+              .toBe(before.scrollY);
+            audited.push({ top, scrollY: before.scrollY, featuredWork, surface, results });
           }
         } finally {
           await test.info().attach('axe-results', {
             body: JSON.stringify(
               {
-                surface,
-                offsets: audited.map(({ top, scrollY, featuredWork, results }) => ({
+                offsets: audited.map(({ top, scrollY, featuredWork, surface, results }) => ({
                   top,
                   scrollY,
                   featuredWork,
+                  surface,
                   passing: passingNodes(results, 'color-contrast'),
                   violations: results.violations,
                   incomplete: results.incomplete,
@@ -823,6 +894,14 @@ test.describe('Accessibility', () => {
             contentType: 'application/json',
           });
         }
+
+        // The offsets were planned before the first scroll. Measured again now, they show whether
+        // the page grew or shrank while it was audited, which would leave its new bottom unvisited
+        // or the Featured Work offset off the diagram, rather than letting that pass unseen.
+        await scrollToOffset(page, 0);
+        expect
+          .soft(await scrollPlan(page), 'the page changed height while its offsets were audited')
+          .toEqual(plan);
 
         for (const { top, featuredWork, results } of audited) {
           const at = `the header at scroll ${top}${featuredWork ? ' (over Featured Work)' : ''} in the ${colorScheme} theme`;
@@ -901,6 +980,43 @@ test.describe('Accessibility', () => {
     await expect(auditWithin(page, 'body > footer')).rejects.toThrow(/matches 0 elements/);
     await page.evaluate(() => document.body.append(document.createElement('header')));
     await expect(auditWithin(page, SITE_HEADER)).rejects.toThrow(/matches 2 elements/);
+  });
+
+  test('positive control: the header pass fails a translucent header over a gradient', async ({
+    page,
+  }) => {
+    // The two checks the header pass adds besides axe's violations must be able to fail: the
+    // surface check on the old header's `/80` and blur, and the undecidable-node count on what a
+    // translucent header puts in front of a gradient. The same page with an opaque header passes
+    // both, so neither check fails on everything.
+    const header = (surface: string) => `<!doctype html>
+      <html lang="en">
+        <head><title>Control</title></head>
+        <body style="margin: 0; background: #fafafa">
+          <header style="position: fixed; inset: 0 0 auto; height: 72px; ${surface}">
+            <a href="/" style="color: #636363">About</a>
+          </header>
+          <main style="height: 2000px; background: linear-gradient(#cbcbcd, #0d1117)">
+            <h1 style="margin: 0; padding-top: 96px">Control</h1>
+          </main>
+        </body>
+      </html>`;
+
+    await page.setContent(
+      header('background-color: rgb(250 250 250 / 0.8); backdrop-filter: blur(8px)'),
+    );
+    const translucent = surfaceProblems(await headerSurface(page), 'light');
+    expect(translucent).toEqual([
+      expect.stringMatching(/^the header paints rgba\(250, 250, 250, 0\.8\)/),
+      "the header's backdropFilter is blur(8px), not none",
+    ]);
+    expect(incompleteNodes(await auditWithin(page, SITE_HEADER), 'color-contrast')).toBe(1);
+
+    await page.setContent(header('background-color: #fafafa'));
+    expect(surfaceProblems(await headerSurface(page), 'light')).toEqual([]);
+    const opaque = await auditWithin(page, SITE_HEADER);
+    expect(incompleteNodes(opaque, 'color-contrast')).toBe(0);
+    expect(passingNodes(opaque, 'color-contrast')).toBe(1);
   });
 
   test('positive control: the incomplete-contrast budget fails when the count exceeds it', async ({

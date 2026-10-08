@@ -78,10 +78,13 @@ export default defineConfig({
   // block for the `fixed` menu panel it rendered — the whole of pages-1; #147 later dropped the blur).
   //
   // WebKit rather than Firefox for the second engine, for two reasons that both matter here:
-  // Playwright's `isMobile` is unsupported on Firefox, and whether a `backdrop-filter` ancestor
-  // becomes the containing block for a `fixed` descendant is exactly the class of behaviour that
-  // differs between Blink and WebKit. A mobile-menu geometry assertion that only ever ran on
-  // Chromium would say nothing about what an iPhone visitor sees.
+  // Playwright's `isMobile` is unsupported on Firefox, and the menu is engine-specific. Today that
+  // is how a modal dialog handles focus: WebKit leaves links out of the tab order, which
+  // `e2e/mobile/navigation.spec.ts` ('Tab and Shift+Tab from the Close button keep focus in the
+  // menu, in both engines') runs against. The engine was chosen when the bug was a
+  // `backdrop-filter` ancestor turning into the containing block of a `fixed` descendant, which
+  // also differs between Blink and WebKit. A mobile-menu assertion that only ever ran on Chromium
+  // would say nothing about what an iPhone visitor sees.
   //
   // `resolvePort` and the `webServer` block below are untouched: one server, started by this run,
   // never reused, whichever projects are selected (ADR 0014).

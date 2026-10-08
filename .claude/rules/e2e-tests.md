@@ -60,8 +60,9 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   `e2e/routes.ts` (eleven while no post is published, one more per published post), in both colour
   schemes at the desktop viewport, at rest; again on `/` after the whole story has been scrolled;
   again on `/` with a header nav link hovered and with one focused; and on the header alone at every
-  scroll offset of `/`, which also holds the header to an opaque `--background` with no
-  `backdrop-filter` and allows no undecidable node in it (#147).
+  scroll offset of `/`, which also holds the header to an opaque `--background` that nothing
+  under it shows through (no `backdrop-filter`, partial opacity or blend) and allows no undecidable
+  node in it (#147).
   `e2e/mobile/accessibility.spec.ts` runs the at-rest pass on `/` and `/work/self-healing-agent`
   under both phone projects. Any violation fails the `e2e` job. Each pass asserts a floor on how many
   nodes it measured, so content that stops being rendered or goes transparent fails too. Each

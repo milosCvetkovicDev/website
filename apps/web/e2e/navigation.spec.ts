@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { gotoHydrated } from './support/hydration';
 
 /**
  * The desktop header: which nav link says it is the current page, and what the logo link is called.
@@ -7,9 +8,9 @@ import { expect, test } from '@playwright/test';
  * which only the two phone projects run. This file sits outside `e2e/mobile/`, so the desktop
  * `chromium` project runs it at 1280x720, where the desktop nav is the one on screen.
  *
- * Nothing here interacts, so no test waits for hydration: `aria-current` and the logo's name are in
- * the server-rendered markup, and hydration must not change them (a mismatch fails
- * `console-clean.spec.ts`).
+ * Only the focus test at the end interacts, so only it waits for hydration: `aria-current` and the
+ * logo's name are in the server-rendered markup, and hydration must not change them (a mismatch
+ * fails `console-clean.spec.ts`).
  */
 
 test.describe('the desktop header', () => {
@@ -78,5 +79,59 @@ test.describe('the desktop header', () => {
     await expect(dialog).toHaveCount(1);
     await expect(dialog).toBeHidden();
     await expect(page.getByRole('button', { name: 'Open menu' })).toBeHidden();
+  });
+
+  test('scrolls a link that keyboard focus reaches out from under the header', async ({ page }) => {
+    // The header is opaque since #147, so a control that sits behind it is hidden entirely, not
+    // merely dimmed. A browser scrolls focus into view only when the control is outside the
+    // viewport, and one under a sticky header is inside it: without room reserved for the header,
+    // Shift+Tab up the page lands on a link nobody can see (WCAG 2.4.11 Focus Not Obscured).
+    await gotoHydrated(page, '/work');
+    const pair = await page.evaluate(() => {
+      const tabbable = [
+        ...document.querySelectorAll<HTMLElement>('main a[href], main button, main [tabindex]'),
+      ].filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0);
+      const bottom = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+      // A link that can be scrolled to 20px from the top of the viewport, behind the 69px header,
+      // and the control after it, from which Shift+Tab goes back to it.
+      const index = tabbable.findIndex((element, i) => {
+        const top = element.getBoundingClientRect().top + window.scrollY;
+        return i + 1 < tabbable.length && top >= 300 && top - 20 <= bottom;
+      });
+      if (index < 0) return null;
+      const [target, next] = [tabbable[index], tabbable[index + 1]];
+      target.dataset.focusTarget = '';
+      window.scrollTo({
+        top: target.getBoundingClientRect().top + window.scrollY - 20,
+        behavior: 'instant',
+      });
+      next.focus({ preventScroll: true });
+      return { target: target.outerHTML.slice(0, 120), top: target.getBoundingClientRect().top };
+    });
+    expect(pair, 'no link on /work can be scrolled under the header').not.toBeNull();
+    const header = await page.locator('body > header').boundingBox();
+    expect(header).not.toBeNull();
+    expect(pair!.top, `${pair!.target} should start behind the header`).toBeLessThan(
+      header!.y + header!.height,
+    );
+
+    await page.keyboard.press('Shift+Tab');
+    const target = page.locator('[data-focus-target]');
+    await expect(target, `Shift+Tab should move focus to ${pair!.target}`).toBeFocused();
+    const box = await target.boundingBox();
+    expect(
+      box!.y,
+      `${pair!.target} took focus behind the header, which ends at ${header!.y + header!.height}`,
+    ).toBeGreaterThanOrEqual(header!.y + header!.height);
+
+    // The room is reserved for the page's content only. The header's own links always sit in that
+    // strip, so reserving it for them too would scroll the page to the top whenever one took focus.
+    const scrolled = await page.evaluate(() => window.scrollY);
+    expect(scrolled, 'the Shift+Tab above should leave the page scrolled').toBeGreaterThan(0);
+    await page.locator('body > header a[href="/about"]').focus();
+    expect(
+      await page.evaluate(() => window.scrollY),
+      'focusing a header link must not scroll the page',
+    ).toBe(scrolled);
   });
 });

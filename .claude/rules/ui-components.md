@@ -20,8 +20,9 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   `e2e/routes.ts` (eleven while no post is published, one more per published post), in both colour
   schemes at the desktop viewport, at rest; again on `/` after the whole story has been scrolled;
   again on `/` with a header nav link hovered and with one focused; and on the header alone at every
-  scroll offset of `/`, which also holds the header to an opaque `--background` with no
-  `backdrop-filter` and allows no undecidable node in it (#147).
+  scroll offset of `/`, which also holds the header to an opaque `--background` that nothing
+  under it shows through (no `backdrop-filter`, partial opacity or blend) and allows no undecidable
+  node in it (#147).
   `e2e/mobile/accessibility.spec.ts` runs the at-rest pass on `/` and `/work/self-healing-agent`
   under both phone projects. Any violation fails the `e2e` job. Each pass asserts a floor on how many
   nodes it measured, so content that stops being rendered or goes transparent fails too. Each
@@ -32,6 +33,12 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   text there fails; never widen a budget or lower a floor to quieten a failure. A new
   `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
   Conventions and ADR 0011, which superseded 0008.
+- Focus never lands behind the sticky header (WCAG 2.4.11). The header is opaque, so
+  `scroll-margin-top: 5rem` on `main`, `footer` and everything in them (`globals.css`) keeps its
+  69px clear of whatever the browser scrolls into view, and `e2e/navigation.spec.ts` fails when
+  Shift+Tab leaves a link behind it. Never `scroll-padding-top` on `html`: the header's own controls
+  sit in that strip, so focusing one scrolled the page to the top (the phone's menu button failed
+  `e2e/mobile/navigation.spec.ts`). A taller header raises the margin.
 
 ## Conventions
 
