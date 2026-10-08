@@ -18,8 +18,10 @@ export interface ValidatorReport {
   totalNumWarnings?: number;
   /**
    * The top-level entities it read, not the blocks: a node another one names by `@id` is read as part
-   * of it. 1 for the two blocks on `/`, whose WebSite names the Person as its author, and 2 for the
-   * four on a case study, measured 2026-09-28.
+   * of it, so the count moves when the graph's references do. Measured 2026-10-07 on production
+   * (d0daec2, #57's graph): 2 for the three blocks on `/`, 1 for the three on `/about` and 2 for
+   * the five on a case study. `e2e/structured-data.spec.ts` pins those through
+   * `objectCountProblem`.
    */
   numObjects?: number;
   fetchError?: string;
@@ -95,6 +97,27 @@ export function readVerdict(status: number, body: string): Verdict {
     return { reached: false, why: `it read no object (numObjects ${numObjects ?? 'none'})` };
   }
   return { reached: true, report: report as ValidatorReport };
+}
+
+/**
+ * Why a verdict read another number of objects than the route's graph has, or null when it read
+ * exactly `expected` (the owner's comment on #57). A clean verdict can still be a partial read, two
+ * of five blocks for instance, and only the count tells. The count is the validator's own, so a
+ * change in how it counts fails too, and the message says to re-measure either way.
+ */
+export function objectCountProblem(
+  expected: number,
+  { numObjects }: ValidatorReport,
+): string | null {
+  if (numObjects === expected) return null;
+  const read =
+    numObjects === undefined
+      ? 'gave no object count'
+      : `read ${numObjects} object${numObjects === 1 ? '' : 's'}`;
+  return (
+    `validator.schema.org ${read}, and ${expected} ${expected === 1 ? 'is' : 'are'} expected: ` +
+    'a block went unread, or the graph changed: re-measure and update the expected count'
+  );
 }
 
 /** The errors a report lists, as `errorType(args)`, read defensively: the shape is undocumented. */
