@@ -135,6 +135,8 @@ export function ExecutionPhase() {
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
+    // Every element the entrance hides carries data-story-reveal, which a print shows in full
+    // (the @media print rule in globals.css).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap }) => {
@@ -310,7 +312,7 @@ export function ExecutionPhase() {
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Code Streaming */}
-          <div ref={codeRef}>
+          <div ref={codeRef} data-story-reveal="">
             <Terminal className="h-full">
               {/* Scrolls sideways on a phone rather than widening the page, so it is a named
                   region the keyboard can reach and scroll. */}
@@ -327,6 +329,7 @@ export function ExecutionPhase() {
                       ref={(el) => {
                         codeSpansRef.current[i] = el;
                       }}
+                      data-story-reveal=""
                       className={getTokenColor(line.type)}
                       style={{
                         opacity: codeLinesShown ? 1 : 0,
@@ -349,7 +352,7 @@ export function ExecutionPhase() {
           </div>
 
           {/* Stats HUD - using refs for direct DOM manipulation */}
-          <div ref={statsRef} className="space-y-4">
+          <div ref={statsRef} data-story-reveal="" className="space-y-4">
             <HudPanel title="BUILD STATS">
               <div className="space-y-4">
                 <AnimatedProgressBar
@@ -382,6 +385,7 @@ export function ExecutionPhase() {
             {/* Combo Counter */}
             <div
               ref={comboRef}
+              data-story-reveal=""
               className="flex items-center justify-center gap-2 rounded-lg border border-[var(--status-warn)]/30 bg-[var(--status-warn)]/10 p-4"
             >
               <span ref={comboCountRef} className="text-3xl font-bold text-[var(--status-warn)]">
@@ -393,7 +397,7 @@ export function ExecutionPhase() {
         </div>
 
         {/* Activity Feed */}
-        <div ref={activityRef} className="mt-8">
+        <div ref={activityRef} data-story-reveal="" className="mt-8">
           <HudPanel title="ACTIVITY LOG">
             <div className="grid gap-2 md:grid-cols-2">
               {activities.map((activity, i) => (
@@ -407,7 +411,7 @@ export function ExecutionPhase() {
         </div>
 
         {/* Headline */}
-        <div ref={headlineRef} className="mt-16 text-center">
+        <div ref={headlineRef} data-story-reveal="" className="mt-16 text-center">
           <h3 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="scatter">{storyClosings.execution.heading}</AnimatedText>
           </h3>

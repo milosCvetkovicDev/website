@@ -148,6 +148,8 @@ export function LoopPhase() {
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
+    // Every element the entrance hides carries data-story-reveal, which a print shows in full
+    // (the @media print rule in globals.css).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap, ScrollTrigger }) => {
@@ -238,7 +240,7 @@ export function LoopPhase() {
         </h2>
 
         {/* Dashboard */}
-        <div ref={dashboardRef}>
+        <div ref={dashboardRef} data-story-reveal="">
           <HudPanel title="MONITORING DASHBOARD">
             <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
               <div className="rounded-lg bg-[var(--background)] p-2 text-center sm:p-3">
@@ -259,6 +261,7 @@ export function LoopPhase() {
                 data-loop marks it for the tests to find. */}
             <div
               ref={alertRef}
+              data-story-reveal=""
               data-loop="alert"
               className={`rounded-lg border p-4 transition-colors duration-500 ${
                 shownAlertStatus === 'error'
@@ -312,6 +315,7 @@ export function LoopPhase() {
         {/* Protocol Active */}
         <div
           ref={protocolRef}
+          data-story-reveal=""
           data-reveal="protocol"
           className={`mt-6 ${protocolVisible ? '' : 'opacity-0'}`}
         >
@@ -333,6 +337,7 @@ export function LoopPhase() {
         {/* Headline */}
         <div
           ref={headlineRef}
+          data-story-reveal=""
           data-reveal="headline"
           className={`mt-16 text-center ${protocolVisible ? '' : 'opacity-0'}`}
         >

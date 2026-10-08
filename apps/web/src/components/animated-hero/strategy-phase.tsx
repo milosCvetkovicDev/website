@@ -64,6 +64,8 @@ export function StrategyPhase() {
     // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached).
+    // Every element the entrance hides carries data-story-reveal, which a print shows in full
+    // (the @media print rule in globals.css).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(({ gsap }) => {
       // The element, read once, never the ref: a soft navigation away from `/` nulls the ref
@@ -182,7 +184,7 @@ export function StrategyPhase() {
               // The timeline animates this wrapper and the card inside it keeps hover-lift: on one
               // element its transform transition re-eases GSAP's entrance, and GSAP's inline
               // transform cancels the lift.
-              <div key={tech.category} className="tech-reveal">
+              <div key={tech.category} data-story-reveal="" className="tech-reveal">
                 <div className="tech-item group hover-lift relative flex cursor-default items-center gap-3 overflow-hidden rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3 sm:gap-4 sm:p-4">
                   {/* Selection indicator */}
                   <div className="absolute top-0 bottom-0 left-0 w-1 bg-[var(--accent)] transition-all duration-300 group-hover:w-1.5" />
@@ -232,7 +234,7 @@ export function StrategyPhase() {
                 SYNERGIES DETECTED
               </h3>
               {synergies.map((synergy) => (
-                <div key={synergy.combo} className="synergy-item">
+                <div key={synergy.combo} data-story-reveal="" className="synergy-item">
                   <NotificationToast type="success">
                     <span className="flex items-center gap-2">
                       <span>+</span>
@@ -246,7 +248,7 @@ export function StrategyPhase() {
             </div>
 
             {/* Simple Architecture Diagram */}
-            <div ref={architectureRef}>
+            <div ref={architectureRef} data-story-reveal="">
               <HudPanel title="ARCHITECTURE">
                 <div className="relative h-40 sm:h-48">
                   <svg
@@ -310,12 +312,14 @@ export function StrategyPhase() {
                     {/* Connecting Lines */}
                     <path
                       d="M90 90 L110 90"
+                      data-story-reveal=""
                       className="arch-line stroke-[var(--accent)]"
                       strokeWidth="2"
                       markerEnd="url(#arrowhead)"
                     />
                     <path
                       d="M190 90 L210 90"
+                      data-story-reveal=""
                       className="arch-line stroke-[var(--accent)]"
                       strokeWidth="2"
                       markerEnd="url(#arrowhead)"
@@ -360,7 +364,7 @@ export function StrategyPhase() {
         </div>
 
         {/* Headline */}
-        <div ref={headlineRef} className="mt-16 text-center">
+        <div ref={headlineRef} data-story-reveal="" className="mt-16 text-center">
           <h3 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="magnetic">{storyClosings.strategy.heading}</AnimatedText>
           </h3>
