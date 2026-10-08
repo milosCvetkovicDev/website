@@ -349,7 +349,13 @@ export function formatReport(result, { head, mergeBase }) {
   for (const problem of result.invalid) lines.push(`Invalid exception: ${problem}.`);
 
   if (result.ok) {
-    lines.push('Every route compared moves its content date with its served text.');
+    // With no manifest at the merge base, nothing was compared, and the notice says so.
+    if (result.baseMissing) return lines;
+    lines.push(
+      result.findings.length === 0
+        ? 'Every route compared moves its content date with its served text.'
+        : 'Every route compared moves its content date with its served text, or has an exception.',
+    );
     return lines;
   }
   lines.push(

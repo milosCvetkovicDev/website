@@ -518,6 +518,25 @@ describe('formatReport', () => {
     assert.match(text, /^\/about: .*\(excused\)$/m);
   });
 
+  it('ends a pass by saying whether an exception carried it', () => {
+    const paired = withRoute('/about', { updated: '2026-10-08', text: B });
+    const clean = formatReport(compareManifests(BASE, paired, []), context);
+    assert.equal(clean.at(-1), 'Every route compared moves its content date with its served text.');
+
+    const dateOnly = withRoute('/about', { updated: '2026-10-08', text: A });
+    const excused = formatReport(
+      compareManifests(BASE, dateOnly, exceptionsIn('Content-Date-Exception: /about why')),
+      context,
+    );
+    assert.equal(
+      excused.at(-1),
+      'Every route compared moves its content date with its served text, or has an exception.',
+    );
+
+    const first = formatReport(compareManifests(null, BASE, []), context);
+    assert.equal(first.length, 1, first.join('\n'));
+  });
+
   it('lists new and removed routes, and the commits it compared', () => {
     const head = new Map(BASE);
     head.delete('/work');
