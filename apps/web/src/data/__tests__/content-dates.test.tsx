@@ -494,4 +494,9 @@ describe('servedText, maskDates and fingerprint', () => {
       '<!-- -->\n  <span>&lt;tag&gt; &quot;q&quot; &#169;</span></div>';
     expect(servedText(html)).toBe('Tom & Jerry\'s\n<tag> "q" ©');
   });
+
+  it('removes a script or comment that one pass would leave behind', () => {
+    expect(servedText('<p>a<scr<script></script>ipt>x</script>b</p>')).toBe('ab');
+    expect(servedText('<p>a<!<!-- x -->-- y -->b</p>')).toBe('ab');
+  });
 });
