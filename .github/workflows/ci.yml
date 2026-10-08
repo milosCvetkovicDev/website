@@ -104,12 +104,112 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Key the apt archive cache
+        id: apt-key
+        # The system packages `playwright install --with-deps` adds depend on the runner's OS
+        # release and architecture and on the Playwright version, so those make the key (#210). The
+        # month comes last, so an exact hit is replaced at least monthly and the packages Ubuntu has
+        # updated since are not downloaded on every run; the restore keys fall back to this
+        # version's newest entry, then to any for this OS. pnpm can print a notice before
+        # Playwright's `Version x.y.z` line, hence the match. Runner facts only, no event data.
+        shell: bash
+        run: |
+          . /etc/os-release
+          version="$(pnpm --filter web exec playwright --version | sed -n 's/^Version \([0-9][0-9A-Za-z.-]*\)$/\1/p')"
+          if [ -z "$version" ]; then
+            echo "::error::Could not read the Playwright version for the apt archive cache key"
+            exit 1
+          fi
+          prefix="playwright-apt-${ID:?}${VERSION_ID:?}-$(dpkg --print-architecture)-"
+          {
+            echo "prefix=$prefix"
+            echo "version=$version"
+            echo "key=$prefix$version-$(date -u +%Y-%m)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore the apt archive cache
+        id: apt-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/playwright-apt-archives
+          key: ${{ steps.apt-key.outputs.key }}
+          restore-keys: |
+            ${{ steps.apt-key.outputs.prefix }}${{ steps.apt-key.outputs.version }}-
+            ${{ steps.apt-key.outputs.prefix }}
+
+      - name: Seed apt's archive directory
+        # apt installs a file it finds in /var/cache/apt/archives under the expected name whenever
+        # the size matches the index, without hashing it (pkgAcqArchive in apt 2.7 and 3.1). So a
+        # restored archive goes there only when its SHA-256 is the one the signed index, refreshed
+        # first, lists for that package and version: a stale or tampered one is downloaded again,
+        # never installed. An empty or missing cache seeds nothing.
+        shell: bash
+        run: |
+          shopt -s nullglob
+          debs=(~/.cache/playwright-apt-archives/*.deb)
+          if [ "${#debs[@]}" -eq 0 ]; then
+            echo "No cached archives to seed."
+            exit 0
+          fi
+          sudo apt-get update
+          seeded=0
+          for deb in "${debs[@]}"; do
+            IFS=_ read -r name version _ <<< "$(basename "$deb" .deb)"
+            sum="$(sha256sum < "$deb" | cut -d ' ' -f 1)"
+            records="$(apt-cache show "$name=${version//%3a/:}" 2>/dev/null || true)"
+            if grep -qxF "SHA256: $sum" <<< "$records"; then
+              sudo cp "$deb" /var/cache/apt/archives/
+              seeded=$((seeded + 1))
+            fi
+          done
+          echo "Seeded $seeded of ${#debs[@]} cached archives; apt downloads the rest."
+
       - name: Install Playwright browsers
         # webkit as well as chromium: the two phone projects in apps/web/playwright.config.ts are
         # Pixel 7 (chromium) and iPhone 13 (webkit). A missing browser makes the whole suite fail in
         # milliseconds, so a run that dies immediately after a Playwright bump is this step, not a
         # broken spec.
+        #
+        # The slow part is not the browsers, about 11 s from Playwright's CDN, but the ~125 MB of
+        # system packages `--with-deps` fetches through apt: a slow mirror once took 11 minutes of
+        # the job's 20 over them (#210), which is why the steps around this one cache the archives.
         run: pnpm --filter web exec playwright install --with-deps chromium webkit
+
+      - name: Collect the downloaded archives
+        id: apt-collect
+        # Skipped on an exact hit, which has nothing new to save. `autoclean` first drops the
+        # archives the index no longer offers, such as a restored version Ubuntu has since replaced,
+        # so the entry does not grow with dead versions. The cache directory is emptied, so what is
+        # saved is what apt kept: archives it checked on download and the ones the seed step
+        # checked. apt's `partial/` and lock stay behind.
+        if: steps.apt-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          sudo apt-get autoclean
+          cache=~/.cache/playwright-apt-archives
+          rm -rf "$cache"
+          mkdir -p "$cache"
+          shopt -s nullglob
+          debs=(/var/cache/apt/archives/*.deb)
+          if [ "${#debs[@]}" -eq 0 ]; then
+            echo "::warning::apt kept no archives in /var/cache/apt/archives, so there is nothing to cache (#210)"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sudo cp "${debs[@]}" "$cache"/
+          sudo chown -R "$(id -u):$(id -g)" "$cache"
+          echo "Collected ${#debs[@]} archives."
+          echo "found=true" >> "$GITHUB_OUTPUT"
+
+      - name: Save the apt archive cache
+        # Before the build and the tests, because the combined actions/cache saves only when the
+        # whole job succeeds: a run cancelled during the tests, the case #210 is about, would never
+        # save what it downloaded. Another run saving the same key first is a warning, not a failure.
+        if: steps.apt-cache.outputs.cache-hit != 'true' && steps.apt-collect.outputs.found == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/playwright-apt-archives
+          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
 
       - name: Build web
         run: pnpm --filter web build
