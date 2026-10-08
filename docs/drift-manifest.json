@@ -7794,6 +7794,23 @@
       }
     },
     {
+      "id": "adr-readme-link-0035-owner-placeholder-convention",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0035-owner-placeholder-convention.md)",
+      "claim": "The link to 0035-owner-placeholder-convention.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0035-owner-placeholder-convention.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0035-owner-placeholder-convention.md"
+      }
+    },
+    {
       "id": "adr-index-0031-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0031 |",
@@ -8025,6 +8042,84 @@
         "file": "docs/adr/README.md",
         "regex": "^\\| 0034 \\| \\[(.+?)\\]\\(0034-",
         "equals": "Blog posts are drafted with Claude and approved by the owner, line by line"
+      }
+    },
+    {
+      "id": "adr-index-0035-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0035's record carries the status line \"Proposed\".",
+      "check": {
+        "file": "docs/adr/0035-owner-placeholder-convention.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0035-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0035 gives the record's status line, \"Proposed\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0035 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0035-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0035's record carries the Date \"2026-09-29\".",
+      "check": {
+        "file": "docs/adr/0035-owner-placeholder-convention.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-29"
+      }
+    },
+    {
+      "id": "adr-index-0035-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0035 gives the record's Date, \"2026-09-29\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0035 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-29"
+      }
+    },
+    {
+      "id": "adr-index-0035-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0035's record carries the H1 title \"A value only the owner can supply is a registered placeholder with a deadline the owner sets\".",
+      "check": {
+        "file": "docs/adr/0035-owner-placeholder-convention.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "A value only the owner can supply is a registered placeholder with a deadline the owner sets"
+      }
+    },
+    {
+      "id": "adr-index-0035-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0035 gives the record's H1 title, \"A value only the owner can supply is a registered placeholder with a deadline the owner sets\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0035 \\| \\[(.+?)\\]\\(0035-",
+        "equals": "A value only the owner can supply is a registered placeholder with a deadline the owner sets"
       }
     },
     {
@@ -8313,6 +8408,296 @@
       ],
       "check": {
         "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
+      "id": "adr-0035-link-rules-app-router-and-content",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "](../../.claude/rules/app-router-and-content.md)",
+      "claim": "The link to ../../.claude/rules/app-router-and-content.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../../.claude/rules/app-router-and-content.md"
+        }
+      ],
+      "check": {
+        "path": ".claude/rules/app-router-and-content.md"
+      }
+    },
+    {
+      "id": "adr-0035-link-0028-blog-posts-as-typed-data",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "](0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to 0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "adr-0035-link-0034-blog-posts-drafted-with-claude",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to 0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "adr-0035-link-owner-todo-module",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "](../../apps/web/src/data/owner-todo.ts)",
+      "claim": "The link to ../../apps/web/src/data/owner-todo.ts resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../../apps/web/src/data/owner-todo.ts"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts"
+      }
+    },
+    {
+      "id": "adr-0035-link-0021-squash-only-merges-and-required-checks",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "](0021-squash-only-merges-and-required-checks.md)",
+      "claim": "The link to 0021-squash-only-merges-and-required-checks.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0021-squash-only-merges-and-required-checks.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0021-squash-only-merges-and-required-checks.md"
+      }
+    },
+    {
+      "id": "adr-0035-script-test",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`pnpm test`",
+      "claim": "`pnpm test` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "test"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "test"
+      }
+    },
+    {
+      "id": "adr-0035-script-typecheck",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`pnpm typecheck`",
+      "claim": "`pnpm typecheck` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "typecheck"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "typecheck"
+      }
+    },
+    {
+      "id": "adr-0035-cite-owner-todo-79-105",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "apps/web/src/data/owner-todo.ts:79-105",
+      "claim": "At d0daec2 the register, unfilledOwnerFields, spans owner-todo.ts:79-105.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "covers": [
+        {
+          "kind": "citation",
+          "token": "apps/web/src/data/owner-todo.ts:79-105"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "line": 79,
+        "contains": "export const unfilledOwnerFields",
+        "lineEnd": 105
+      },
+      "asOf": "d0daec24174a3720937bd5997966ff6fb6e12696"
+    },
+    {
+      "id": "adr-0035-cite-owner-todo-111",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "apps/web/src/data/owner-todo.ts:111",
+      "claim": "At d0daec2 MAX_EXPIRY_DAYS is declared as 366 at owner-todo.ts:111.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "covers": [
+        {
+          "kind": "citation",
+          "token": "apps/web/src/data/owner-todo.ts:111"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "line": 111,
+        "contains": "export const MAX_EXPIRY_DAYS = 366;"
+      },
+      "asOf": "d0daec24174a3720937bd5997966ff6fb6e12696"
+    },
+    {
+      "id": "adr-0035-cite-owner-todo-test-237",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "apps/web/src/data/__tests__/owner-todo.test.ts:237",
+      "claim": "At d0daec2 the test that a deadline ends at midnight UTC is at owner-todo.test.ts:237.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "covers": [
+        {
+          "kind": "citation",
+          "token": "apps/web/src/data/__tests__/owner-todo.test.ts:237"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/data/__tests__/owner-todo.test.ts",
+        "line": 237,
+        "contains": "counts the day in UTC, so a deadline ends at midnight UTC"
+      },
+      "asOf": "d0daec24174a3720937bd5997966ff6fb6e12696"
+    },
+    {
+      "id": "adr-0035-marker-constant",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "exported as `OWNER_TODO`",
+      "claim": "owner-todo.ts exports the marker OWNER-TODO as OWNER_TODO.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "export const OWNER_TODO = 'OWNER-TODO';"
+      }
+    },
+    {
+      "id": "adr-0035-one-spelling-test",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "The `one spelling` test in `owner-todo.test.ts`",
+      "claim": "owner-todo.test.ts has the one-spelling test, which allows the literal marker under src and public in owner-todo.ts only.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/__tests__/owner-todo.test.ts",
+        "contains": "it('spells the marker out in owner-todo.ts and in no other file under src or public'"
+      }
+    },
+    {
+      "id": "adr-0035-served-output-seo-surface",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`e2e/seo-surface.spec.ts` and `e2e/machine-readable.spec.ts` fail",
+      "claim": "seo-surface.spec.ts fails when a route, the sitemap, robots.txt or the manifest serves the marker.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e/seo-surface.spec.ts",
+        "contains": "serves an owner placeholder"
+      }
+    },
+    {
+      "id": "adr-0035-served-output-machine-readable",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`e2e/seo-surface.spec.ts` and `e2e/machine-readable.spec.ts` fail",
+      "claim": "machine-readable.spec.ts fails when a JSON endpoint serves the marker.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e/machine-readable.spec.ts",
+        "contains": "serves no owner placeholder`).not.toContain(OWNER_TODO);"
+      }
+    },
+    {
+      "id": "adr-0035-register-export",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`unfilledOwnerFields` holds a row for each field",
+      "claim": "owner-todo.ts exports the register unfilledOwnerFields.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "export const unfilledOwnerFields: readonly UnfilledOwnerField[]"
+      }
+    },
+    {
+      "id": "adr-0035-renders-only",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "nor named in `RENDERS_ONLY`",
+      "claim": "owner-todo.test.ts names the importers it does not walk in RENDERS_ONLY.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/__tests__/owner-todo.test.ts",
+        "contains": "const RENDERS_ONLY: Record<string, string> = {"
+      }
+    },
+    {
+      "id": "adr-0035-real-clock",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "The live test reads the real clock",
+      "claim": "The live gate runs findOwnerTodoProblems over OWNER_TODO_SOURCES and the register on new Date(), the real clock.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/__tests__/owner-todo.test.ts",
+        "contains": "findOwnerTodoProblems(OWNER_TODO_SOURCES, unfilledOwnerFields, new Date())"
+      }
+    },
+    {
+      "id": "adr-0035-utc-day",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "The deadline counts the UTC day",
+      "claim": "findOwnerTodoProblems takes today as the UTC day of now.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "const today = now.toISOString().slice(0, 10);"
+      }
+    },
+    {
+      "id": "adr-0035-max-expiry-days",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "at most `MAX_EXPIRY_DAYS` days after the current UTC day",
+      "claim": "owner-todo.ts exports MAX_EXPIRY_DAYS, the furthest ahead an expires may be.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "export const MAX_EXPIRY_DAYS"
       }
     },
     {
