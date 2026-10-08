@@ -78,7 +78,21 @@ async function sampleStory(page: Page): Promise<Sampled[]> {
  * hidden by stroke dashing rather than opacity. Each is looked up inside the story's own sections,
  * never the whole page. The loaded mark follows the last build callback, not React's commit of what
  * those callbacks set, so the spec polls this before it trusts the page.
+ *
+ * The poll also waits for every phase's own from-state, for the same reason one step down: GSAP can
+ * initialise a `fromTo()`'s start lazily. A build that lands between ticker frames parses the
+ * target's transform (writing GSAP's `translate/rotate/scale: none` pins) and leaves the from-values
+ * themselves, `opacity: 0` and the offset, to its next tick. GameComplete builds last, right before
+ * the loaded mark, so its terminal and CTA can sit at the pins alone when the mark is seen, until
+ * that tick runs; a sample taken in between finds the section un-hidden.
  */
+async function phasesWithoutFromState(page: Page): Promise<string[]> {
+  const sampled = await sampleStory(page);
+  return sampled
+    .filter(({ sample }) => !sample.texts.some(({ opacity }) => opacity < 1))
+    .map(({ label }) => label);
+}
+
 async function hidingInForce(page: Page) {
   const story = await Promise.all(
     PHASES.map(({ name }) =>
@@ -142,6 +156,12 @@ test('a print made after GSAP has built the story shows every phase fully reveal
       archLines: 2,
       archLinesDashed: 2,
     });
+  await expect
+    .poll(() => phasesWithoutFromState(page), {
+      message: "every phase has a text GSAP's from-state holds below full opacity",
+      timeout: 15_000,
+    })
+    .toEqual([]);
   const onScreen = await sampleStory(page);
   for (const { label, minTexts, sample } of onScreen) {
     expect(sample.texts.length, `${label}: text elements found`).toBeGreaterThanOrEqual(minTexts);
