@@ -146,6 +146,9 @@ fails when the served line and the TechArticle disagree. A date that is not a re
 or a pair updated before it was published, throws there and fails the prerender. "Not in the
 future" is a unit-test check against the live clock, not a build check, and it counts a day as
 begun once UTC+14 has reached it: an accepted tolerance of up to 14 hours against the UTC date.
+The "Last updated" lines on /about and /privacy write their day the same way, through
+`formatPageDate()` in the same module, with the stored `STATIC_ROUTE_UPDATED` value in `dateTime`,
+and a value that is not a real day throws there too.
 
 The JSON-LD is one graph joined by `@id` (#57, ADR 0031): `src/lib/structured-data.ts` builds the
 nodes as plain objects and `components/json-ld.tsx` renders each in its own block through

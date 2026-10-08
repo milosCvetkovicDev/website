@@ -7,6 +7,7 @@ import { publishedPosts } from '@/data/posts';
 import { yearsOfExperience } from '@/data/profile';
 import { socialProfiles } from '@/data/social';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
+import { formatContentDate } from '@/lib/content-date';
 import { yearsClausesAboutAi, yearsFigures } from '@/test/experience-claims';
 import { hostileTitlePost } from '@/test/fixtures/posts';
 
@@ -1263,7 +1264,10 @@ describe('the JSON-LD graph on every route (#57)', () => {
     expect(time?.getAttribute('dateTime') ?? time?.getAttribute('datetime')).toBe(
       profile.dateModified,
     );
-    expect(lines[0].textContent).toBe(`Last updated ${String(profile.dateModified)}.`);
+    // The attribute holds the stored day and the text writes it as the case studies do (#57).
+    expect(lines[0].textContent).toBe(
+      `Last updated ${formatContentDate(String(profile.dateModified))}.`,
+    );
   });
 
   it('refuses a node without an @id, a repeated @id, a dangling reference and a padded one', () => {

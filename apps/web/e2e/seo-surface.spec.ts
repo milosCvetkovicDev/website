@@ -21,6 +21,7 @@ import { hasPublishedPosts, publishedPosts } from '../src/data/posts';
 import { RUNS_IN_PRODUCTION } from '../src/data/work-stats';
 import { restatedMetrics, wordCount } from '../src/test/answer-copy';
 import { formatContentDate } from '../src/lib/content-date';
+import { STATIC_ROUTE_UPDATED } from '../src/data/static-routes';
 import { fetchHead, first } from './support/served-head';
 import { TABLES, expectedTable, servedTables } from './support/tables';
 import { PAGE_HEADINGS } from './support/page-headings';
@@ -680,14 +681,27 @@ test('/about shows the day its ProfilePage says it was modified (#57)', async ({
   request,
 }) => {
   // Markup that asserts a date the page does not show breaks the structured-data rule this graph is
-  // held to (ADR 0031), so /about prints its date as /privacy does, and the two must agree.
+  // held to (ADR 0031), so /about prints its date as /privacy does, and the two must agree. The
+  // <time> holds the stored day and its text writes that day as the case studies do.
   const { nodes, lastUpdated } = await servedGraph(request, page, '/about');
   const profile = nodes.find((node) => node['@type'] === 'ProfilePage');
   expect(profile, '/about serves a ProfilePage').toBeDefined();
   const dateModified = String(profile?.dateModified);
   expect(dateModified, 'the ProfilePage dateModified').toMatch(/^\d{4}-\d{2}-\d{2}$/);
   expect(lastUpdated, 'one "Last updated" line, its <time> holding the dateModified').toEqual([
-    { text: `Last updated ${dateModified}.`, datetimes: [dateModified] },
+    { text: `Last updated ${formatContentDate(dateModified)}.`, datetimes: [dateModified] },
+  ]);
+});
+
+test('/privacy shows its "Last updated" day as the case studies write theirs (#57)', async ({
+  page,
+  request,
+}) => {
+  // The line and the sitemap's lastmod read one value, the <time> holding it as stored.
+  const updated = STATIC_ROUTE_UPDATED['/privacy'];
+  const { lastUpdated } = await servedGraph(request, page, '/privacy');
+  expect(lastUpdated, 'one "Last updated" line, its <time> holding the stored day').toEqual([
+    { text: `Last updated ${formatContentDate(updated)}.`, datetimes: [updated] },
   ]);
 });
 
