@@ -60,7 +60,7 @@ perform an operation.
 | 0032 | [Playwright's Chromium keeps V8's garbage collector on the main thread](0032-e2e-chromium-single-threaded-gc.md)                         | Accepted                                      | 2026-10-05 |
 | 0033 | [Dependabot's catch-all groups exclude the packages that have groups of their own](0033-dependabot-group-exclusions.md)                  | Accepted                                      | 2026-10-06 |
 | 0034 | [Blog posts are drafted with Claude and approved by the owner, line by line](0034-blog-posts-drafted-with-claude.md)                     | Accepted                                      | 2026-10-06 |
-| 0035 | [A value only the owner can supply is a registered placeholder with a deadline the owner sets](0035-owner-placeholder-convention.md)     | Proposed                                      | 2026-09-29 |
+| 0035 | [A value only the owner can supply is a registered placeholder with a deadline the owner sets](0035-owner-placeholder-convention.md)     | Accepted                                      | 2026-09-29 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see

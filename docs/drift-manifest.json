@@ -8050,11 +8050,11 @@
       "anchor": "| 0035 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0035's record carries the status line \"Proposed\".",
+      "claim": "ADR 0035's record carries the status line \"Accepted\".",
       "check": {
         "file": "docs/adr/0035-owner-placeholder-convention.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Proposed"
+        "equals": "Accepted"
       }
     },
     {
@@ -8063,11 +8063,11 @@
       "anchor": "| 0035 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0035 gives the record's status line, \"Proposed\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0035 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0035 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Proposed"
+        "equals": "Accepted"
       }
     },
     {
@@ -8089,7 +8089,7 @@
       "anchor": "| 0035 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0035 gives the record's Date, \"2026-09-29\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0035 gives the record's Date, \"2026-09-29\" (the date in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0035 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
@@ -8115,7 +8115,7 @@
       "anchor": "| 0035 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0035 gives the record's H1 title, \"A value only the owner can supply is a registered placeholder with a deadline the owner sets\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0035 gives the record's H1 title, \"A value only the owner can supply is a registered placeholder with a deadline the owner sets\" (the title in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0035 \\| \\[(.+?)\\]\\(0035-",
@@ -8620,12 +8620,12 @@
       "id": "adr-0035-served-output-seo-surface",
       "doc": "docs/adr/0035-owner-placeholder-convention.md",
       "anchor": "`e2e/seo-surface.spec.ts` and `e2e/machine-readable.spec.ts` fail",
-      "claim": "seo-surface.spec.ts fails when a route, the sitemap, robots.txt or the manifest serves the marker.",
+      "claim": "seo-surface.spec.ts has the test that no route, nor the sitemap, robots.txt or the manifest, serves the marker.",
       "method": "file-line",
       "evaluation": "live",
       "check": {
         "path": "apps/web/e2e/seo-surface.spec.ts",
-        "contains": "serves an owner placeholder"
+        "contains": "test('no route, nor the sitemap, robots.txt or the manifest, serves an owner placeholder'"
       }
     },
     {
@@ -8699,6 +8699,193 @@
         "path": "apps/web/src/data/owner-todo.ts",
         "contains": "export const MAX_EXPIRY_DAYS"
       }
+    },
+    {
+      "id": "adr-0035-seo-surface-search",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`e2e/seo-surface.spec.ts` and `e2e/machine-readable.spec.ts` fail",
+      "claim": "seo-surface.spec.ts searches each served body for every occurrence of the marker.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e/seo-surface.spec.ts",
+        "contains": "body.matchAll(new RegExp(OWNER_TODO, 'g'))"
+      }
+    },
+    {
+      "id": "adr-0035-hint-throws",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`ownerTodo` throws on a hint that is blank",
+      "claim": "ownerTodo throws on a blank hint and on one with a bracket or a line break.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "matches": "if \\(hint\\.trim\\(\\) === '' \\|\\| /\\[\\(\\)\\\\r\\\\n\\]/\\.test\\(hint\\)\\)"
+      }
+    },
+    {
+      "id": "adr-0035-sources-list",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "runs it over every source in `OWNER_TODO_SOURCES`",
+      "claim": "owner-todo.test.ts declares the source list OWNER_TODO_SOURCES the live gate walks.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/__tests__/owner-todo.test.ts",
+        "contains": "const OWNER_TODO_SOURCES: OwnerTodoSource[] = ["
+      }
+    },
+    {
+      "id": "adr-0035-gate-function",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`findOwnerTodoProblems` is the gate",
+      "claim": "owner-todo.ts exports the gate, findOwnerTodoProblems.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "export function findOwnerTodoProblems("
+      }
+    },
+    {
+      "id": "adr-0035-problem-kinds",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "on a source id that is not one path segment or is used twice",
+      "claim": "The gate reports source, unwalkable, unregistered, duplicate, stale, why and expiry problems.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "kind: 'source' | 'unwalkable' | 'unregistered' | 'duplicate' | 'stale' | 'why' | 'expiry';"
+      }
+    },
+    {
+      "id": "adr-0035-why-marker",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "row whose `why` is blank or holds the marker",
+      "claim": "The gate reports a row whose why is blank or holds the marker.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "if (typeof why !== 'string' || why.trim() === '' || why.includes(OWNER_TODO)) {"
+      }
+    },
+    {
+      "id": "adr-0035-one-field-per-name",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "is counted once",
+      "claim": "Unfilled fields are collected in a Map keyed by field name, so a repeated name is counted once.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "found.set(field, null);"
+      }
+    },
+    {
+      "id": "adr-0035-horizon-inclusive",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "that last day\n   included",
+      "claim": "An expires on the last allowed day passes: only one after the horizon fails.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "if (expires > horizon) {"
+      }
+    },
+    {
+      "id": "adr-0035-utc-day-used",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "The deadline counts the UTC day",
+      "claim": "Every row's expires is judged against that UTC day.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "const expiry = expiryProblem(expires, today);"
+      }
+    },
+    {
+      "id": "adr-0035-rows-at-d0daec2",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "holds those five rows",
+      "claim": "At d0daec2 the register holds five rows, each expiring on 2026-10-31.",
+      "method": "config-value",
+      "evaluation": "historical",
+      "check": {
+        "file": "apps/web/src/data/owner-todo.ts",
+        "regex": "^    expires: '(\\d{4}-\\d\\d-\\d\\d)',$",
+        "equalsAll": ["2026-10-31", "2026-10-31", "2026-10-31", "2026-10-31", "2026-10-31"]
+      },
+      "asOf": "d0daec24174a3720937bd5997966ff6fb6e12696"
+    },
+    {
+      "id": "adr-0035-first-rows-at-a0331e4",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "merged the same day as a0331e4",
+      "claim": "At a0331e4 (#167) the register holds the first three rows, each expiring on 2026-10-31.",
+      "method": "config-value",
+      "evaluation": "historical",
+      "check": {
+        "file": "apps/web/src/data/owner-todo.ts",
+        "regex": "^    expires: '(\\d{4}-\\d\\d-\\d\\d)',$",
+        "equalsAll": ["2026-10-31", "2026-10-31", "2026-10-31"]
+      },
+      "asOf": "a0331e4f5525385d295f94ca0762970d195104ad"
+    },
+    {
+      "id": "adr-0035-built-at-55fb8b9",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "merged on 2026-09-29 as 55fb8b9",
+      "claim": "At 55fb8b9 (#155) owner-todo.ts exists and sets MAX_EXPIRY_DAYS to 366.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "export const MAX_EXPIRY_DAYS = 366;"
+      },
+      "asOf": "55fb8b995b7a2a1c9701f3dc8fa034c83bab09ba"
+    },
+    {
+      "id": "adr-0035-expiry-problem-at-55fb8b9",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "a one-line change in `expiryProblem`",
+      "claim": "At 55fb8b9 (#155) owner-todo.ts judges a row's expires in expiryProblem.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "function expiryProblem(expires: unknown, today: string): string | null {"
+      },
+      "asOf": "55fb8b995b7a2a1c9701f3dc8fa034c83bab09ba"
+    },
+    {
+      "id": "adr-0035-allowbuilds-script-at-55fb8b9",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "beside `check-allowbuilds-drift.mjs`",
+      "claim": "At 55fb8b9 scripts/check-allowbuilds-drift.mjs exists.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "check": {
+        "path": "scripts/check-allowbuilds-drift.mjs"
+      },
+      "asOf": "55fb8b995b7a2a1c9701f3dc8fa034c83bab09ba"
+    },
+    {
+      "id": "adr-0035-quality-job-at-d0daec2",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "CI's required `quality` job",
+      "claim": "At d0daec2 ci.yml has the quality job.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "check": {
+        "path": ".github/workflows/ci.yml",
+        "matches": "^  quality:$"
+      },
+      "asOf": "d0daec24174a3720937bd5997966ff6fb6e12696"
     },
     {
       "id": "adr-index-0025-cell-date",

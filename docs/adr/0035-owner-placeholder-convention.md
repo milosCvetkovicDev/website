@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -27,8 +27,8 @@ built it: `apps/web/src/data/owner-todo.ts`, the gate in its test, the served-ou
 [the app router and content rule](../../.claude/rules/app-router-and-content.md). It added no record
 and no `CLAUDE.md` line. Its review bounded how far ahead a deadline may be, since a row expiring on
 `9999-12-31` would switch the gate off for its field while looking like a deadline, and set
-`MAX_EXPIRY_DAYS` to 366. The gate counts the UTC day, and the pull request put a local day to the
-owner as a one-line change.
+`MAX_EXPIRY_DAYS` to 366. #155 offered the owner a local-day deadline as a one-line change, and the
+owner kept the UTC day (see Alternatives considered).
 
 [#167](https://github.com/milosCvetkovicDev/website/pull/167), merged the same day as a0331e4,
 registered the first rows: one `metricDefinition` per case study, each expiring on 2026-10-31, the
@@ -47,6 +47,9 @@ rule file; a scoped rule is loaded only when a session reads a file in its area.
 Claude and approved by the owner line by line, so the rule that an agent invents no owner value has
 to say which values it covers.
 
+The record is dated 2026-09-29, the day #155 merged and the convention took effect. It was written
+on 2026-10-08, which is why its Context reaches past that day.
+
 ## Decision
 
 A value only the owner can supply is left as a registered placeholder, never invented, through the
@@ -57,9 +60,10 @@ one convention in [`apps/web/src/data/owner-todo.ts`](../../apps/web/src/data/ow
    reaches it through the constant or through `ownerTodo(hint)`. A typed placeholder is a union
    branch `{ state: typeof OWNER_TODO }`, so `pnpm typecheck` fails on code that reads the value
    without narrowing the union first. A gap in prose is `ownerTodo(hint)`, whose hint is plain words
-   saying what the owner has to supply, and `ownerTodo` throws on a hint that a finding could not
-   name the gap by. The `one spelling` test in `owner-todo.test.ts` fails on any other file under
-   those two directories that contains the literal.
+   saying what the owner has to supply, and `ownerTodo` throws on a hint that is blank or that the
+   marker cannot carry intact, such as one with a bracket or a line break. The `one spelling` test
+   in `owner-todo.test.ts` fails on any other file under those two directories that contains the
+   literal.
 2. **A marker never reaches served output.** Whatever renders a field omits the whole sentence, row
    or block while its marker survives, rather than printing a half-filled one.
    `e2e/seo-surface.spec.ts` and `e2e/machine-readable.spec.ts` fail when a served body they check
@@ -67,13 +71,17 @@ one convention in [`apps/web/src/data/owner-todo.ts`](../../apps/web/src/data/ow
 3. **One register row per unfilled field.** `unfilledOwnerFields` holds a row for each field:
    `field`, named as the gate names it (`<source>.<path>` for a typed placeholder, and
    `<source>.<path>#<hint>` for each marker in a string); `why`, what the owner supplies and why no
-   one else can; and `expires`, a `YYYY-MM-DD` day. A row goes in with the commit that leaves the
-   placeholder and comes out with the commit that fills it. `findOwnerTodoProblems` is the gate, and
-   the live test in `owner-todo.test.ts` runs it over every source in `OWNER_TODO_SOURCES` against
-   the register. It fails on an unfilled field without a row, on a row that matches no unfilled
-   field or repeats another, on a row with no `why`, and on an `expires` that is no deadline under
-   decision 6. The same file fails on a module under `apps/web/src` that imports `owner-todo.ts`
-   and is neither walked through `OWNER_TODO_SOURCES` nor named in `RENDERS_ONLY`.
+   one else can; and `expires`, a `YYYY-MM-DD` day. Two markers in one string carry distinct hints:
+   a repeated hint, or a second bare marker, names the same field again and is counted once. A row
+   goes in with the commit that leaves the placeholder and comes out with the commit that fills it.
+   `findOwnerTodoProblems` is the gate, and the live test in `owner-todo.test.ts` runs it over every
+   source in `OWNER_TODO_SOURCES` against the register. It fails on a source id that is not one
+   path segment or is used twice, on a value the walk cannot see into (a function, a `Map`, a
+   `Set`, a class instance, a symbol key), on an unfilled field without a row, on a row that
+   matches no unfilled field or repeats another, on a row whose `why` is blank or holds the marker,
+   and on an `expires` that is no deadline under decision 6. The same file fails on a module under
+   `apps/web/src` that imports `owner-todo.ts` and is neither walked through `OWNER_TODO_SOURCES`
+   nor named in `RENDERS_ONLY`.
 4. **Only the owner sets a date.** Only the owner sets or moves an `expires`. For a register field,
    an agent leaves the marker in place, invents no value for it and never picks or moves its date.
    This covers the fields of `unfilledOwnerFields`; how posts are written is decided by ADR 0034,
@@ -83,8 +91,8 @@ one convention in [`apps/web/src/data/owner-todo.ts`](../../apps/web/src/data/ow
    the row, until the owner fills the value or moves the date in a pull request. That pull request
    is green on its own head.
 6. **The deadline counts the UTC day.** A row fails from 00:00 UTC on its `expires` day, and an
-   `expires` may be at most `MAX_EXPIRY_DAYS` days after the current UTC day. An `expires` that is
-   missing, a placeholder or not a real day fails as well.
+   `expires` may be at most `MAX_EXPIRY_DAYS` days after the current UTC day, that last day
+   included. An `expires` that is missing, a placeholder or not a real day fails as well.
 
 ## Consequences
 
@@ -99,11 +107,24 @@ one convention in [`apps/web/src/data/owner-todo.ts`](../../apps/web/src/data/ow
 
 ### Trade-offs
 
-- When a deadline passes, every open pull request fails `pnpm test`, and with it CI's required
-  `quality` job, whatever it changes, until the owner's pull request merges. Rows that share a day
+- When a deadline passes, `pnpm test` fails, and with it CI's required `quality` job, on every
+  branch that carries the row, whatever it changes. Once the owner's pull request merges, each open
+  branch has to take in `main` and run `quality` again before it is green. Rows that share a day
   lapse together.
-- No agent can turn the gate green on its own: the only ways out are the owner's value and the
-  owner's date.
+- A check that went green before 00:00 UTC on a row's date stays green until CI runs again, so a
+  pull request can merge on it after the deadline and the first red appears on `main`. A run that
+  crosses midnight can go red partway, so one head commit can show both results.
+- Every commit that carries a row stays red after its date, and no later fix reaches it: a
+  `git bisect`, a rebuilt old tag or a hotfix on an old base fails `pnpm test` for that reason
+  alone. Such a run leaves the gate out with
+  `pnpm --filter web exec vitest run --exclude src/data/__tests__/owner-todo.test.ts`, which skips
+  the gate's own unit tests as well.
+- Nothing in code stops an agent from moving an `expires`, deleting a placeholder with its row, or
+  naming a module in `RENDERS_ONLY` on a branch, and each of those turns the gate green there.
+  Decision 4 is held by the owner's review at merge, because only the owner merges a pull request.
+  That is a practice, not a check: branch protection requires no approving review (ADR 0021). While
+  the owner is away nothing merges in any case, so a lapsed row freezes nothing that was not
+  already waiting.
 - A row lapses at 00:00 UTC on its date, whatever the time zone of the person or machine running
   the test.
 - The `one spelling` test is an exact byte search. It catches the literal typed by hand, not a
@@ -113,8 +134,11 @@ one convention in [`apps/web/src/data/owner-todo.ts`](../../apps/web/src/data/ow
   since one would match the constant wherever a client module imports it. The backstop is that
   every module importing `owner-todo.ts` is walked by the gate or named in `RENDERS_ONLY` with a
   reason.
-- Rows name array indices (`case-studies.0.metricDefinition`), so reordering a source fails the gate
-  as a stale row and an unregistered field until the rows are renamed.
+- Rows name array indices (`case-studies.0.metricDefinition`), so moving or inserting an entry
+  before an unfilled one fails the gate as a stale row and an unregistered field until the rows are
+  renamed. Unfilled entries that only trade places keep the same set of names and pass the gate,
+  each row now describing the other's field; for the case studies, #167's test that each row's
+  `why` names its study's current figure catches that, and no other source has such a test.
 
 ## Alternatives considered
 
