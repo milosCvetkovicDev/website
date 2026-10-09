@@ -59,7 +59,10 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   behind Lighthouse's accessibility category (kept in `e2e/axe.ts`) on every route in
   `e2e/routes.ts` (eleven while no post is published, one more per published post), in both colour
   schemes at the desktop viewport, at rest; again on `/` after the whole story has been scrolled;
-  and again on `/` with a header nav link hovered and with one focused.
+  again on `/` with a header nav link hovered and with one focused; and on the header alone at every
+  scroll offset of `/`, which also holds the header to an opaque `--background` that nothing
+  under it shows through (no `backdrop-filter`, partial opacity or blend) and allows no undecidable
+  node in it (#147).
   `e2e/mobile/accessibility.spec.ts` runs the at-rest pass on `/` and `/work/self-healing-agent`
   under both phone projects. Any violation fails the `e2e` job. Each pass asserts a floor on how many
   nodes it measured, so content that stops being rendered or goes transparent fails too. Each
@@ -78,13 +81,17 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   route's HTML names or its render requests against `/robots.txt`, for the `*` group, Googlebot and
   Applebot (with Applebot's fallback to Googlebot's groups), and fails any one of them refused.
 - The e2e job calls one third party. `e2e/structured-data.spec.ts` posts the
-  `<script type="application/ld+json">` elements served on `/` and on the first case study, and
-  nothing else of the page, to `validator.schema.org/validate`, one request per route, from the
-  `chromium` project only, so twice per run, with no retries. It is advisory and fails open: a
-  network error, a timeout, a non-2xx answer or an answer that read nothing passes with an
-  annotation, and only a verdict with errors fails (`readVerdict` in
-  `e2e/support/schema-validator.ts`). `SCHEMA_VALIDATOR_STRICT=1` turns a missing verdict into a
-  failure.
+  `<script type="application/ld+json">` elements served on `/`, the first case study and `/about`,
+  one route for each node set but a post's (no post route is sent until one is added with its
+  count), and nothing else of the page, to `validator.schema.org/validate`, one request per route,
+  from the `chromium` project only, so three times per run, with no retries. It is advisory and
+  fails open: a network error, a timeout, a non-2xx answer or an answer that read nothing passes
+  with an annotation. A validator that did answer decides: a verdict with errors fails
+  (`readVerdict` in `e2e/support/schema-validator.ts`), and so does one that read another number of
+  objects than the count `ROUTES` pins for the route (`objectCountProblem`), which catches some
+  partial reads, not all. A graph change that moves a count updates it in `ROUTES`, the one place
+  the counts and their derivation are written. `SCHEMA_VALIDATOR_STRICT=1` turns a missing verdict
+  into a failure.
 
 ## Testing
 

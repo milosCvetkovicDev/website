@@ -14,6 +14,7 @@ import {
   techArticle,
   webPage,
   website,
+  type JsonLdNode,
 } from '@/lib/structured-data';
 
 /**
@@ -24,7 +25,8 @@ export function serializeJsonLd(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-function JsonLd({ data }: { data: Record<string, unknown> }) {
+/** One block, for a node a builder in `lib/structured-data.ts` made and typed with schema-dts. */
+function JsonLd({ data }: { data: JsonLdNode }) {
   return (
     <script
       type="application/ld+json"

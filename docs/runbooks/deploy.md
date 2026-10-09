@@ -50,6 +50,7 @@ Before the first deploy, confirm the build is green locally from a clean checkou
 pnpm install --frozen-lockfile
 pnpm check:allowbuilds
 pnpm check:adrs
+pnpm check:adr-history
 pnpm test:scripts
 pnpm format:check
 pnpm lint
@@ -61,7 +62,7 @@ pnpm --filter web exec playwright install --with-deps chromium webkit   # once p
 pnpm --filter web test:e2e
 ```
 
-These are every gate in `.github/workflows/ci.yml`. The first ten commands are the `quality` job;
+These are every gate in `.github/workflows/ci.yml`. The first eleven commands are the `quality` job;
 the last two are the `e2e` job, which on CI runs Playwright against the production build
 (`next start`) on port 3000, while the same command locally starts a dev server on port 3210.
 Playwright always starts the server it tests and never attaches to one that is already running, so

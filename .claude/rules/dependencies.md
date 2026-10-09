@@ -139,7 +139,24 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   `--depth Infinity`, whatever the documented default says. A refresh aimed at an advisory in a transitive package will add the
   patched version for some dependents and silently leave the vulnerable copy pinned under others
   whose own ranges admitted the fix. Always pass `--depth Infinity` and re-run `pnpm audit` to confirm
-  the count actually moved.
+  the count actually moved. Do not put a version or a range in the pattern either: pnpm then
+  leaves those transitive copies where they are at any depth, and still exits 0. So the refresh for
+  an advisory in a transitive package is `pnpm update -r <name> --depth Infinity` with the bare
+  name, then `git diff pnpm-lock.yaml` (only `<name>`'s entries should move) and `pnpm audit`.
+  - Evidence, each run from main's lockfile on 2026-10-08 (#211): with
+    `--depth Infinity --lockfile-only`, the patterns `source-map-js@1.2.2`, `source-map-js@^1.2.2`
+    and `source-map-js@>=1.2.2` all left `@tailwindcss/node`'s `source-map-js` at 1.2.1. The bare
+    `pnpm update -r source-map-js --lockfile-only` lifted it to 1.2.2, and
+    `pnpm update -r brace-expansion --lockfile-only` lifted `minimatch`'s copy to 1.1.21. Neither
+    bare run passed `--depth Infinity`. The 2026-09-12 miss came from one command that also named
+    direct dependencies, so keep the flag until that case is re-tested.
+  - pnpm 10.34.5's `update()` builds its matcher for transitive copies only when no pattern has an
+    `@` after its first character. Re-run the pair above after any pnpm minor or major bump.
+  - On 2026-10-08, Dependabot's security updater ran the versioned form
+    (`pnpm update source-map-js@1.2.2 --lockfile-only --no-save -r`) and reported "Security update
+    not possible". Such an advisory produces a failed "Dependabot Updates" run and no pull request,
+    and needs the bare-name refresh by hand. Its alert stays open:
+    `gh api 'repos/{owner}/{repo}/dependabot/alerts?state=open'` lists it.
 - pnpm resolves an optional peer when the package is already in the dependency graph, and keeps
   it: a lockfile that once resolved it holds it in the graph by itself. vite 8.3.1 kept
   `esbuild@0.27.2` as its optional peer that way after nothing else needed esbuild, and neither
