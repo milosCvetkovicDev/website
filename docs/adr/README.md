@@ -60,6 +60,7 @@ perform an operation.
 | 0032 | [Playwright's Chromium keeps V8's garbage collector on the main thread](0032-e2e-chromium-single-threaded-gc.md)                         | Accepted                                      | 2026-10-05 |
 | 0033 | [Dependabot's catch-all groups exclude the packages that have groups of their own](0033-dependabot-group-exclusions.md)                  | Accepted                                      | 2026-10-06 |
 | 0034 | [Blog posts are drafted with Claude and approved by the owner, line by line](0034-blog-posts-drafted-with-claude.md)                     | Accepted                                      | 2026-10-06 |
+| 0035 | [A value only the owner can supply is a registered placeholder with a deadline the owner sets](0035-owner-placeholder-convention.md)     | Accepted                                      | 2026-09-29 |
 | 0036 | [Content dates move with served text, and a pull request check holds them together](0036-content-dates-move-with-served-text.md)         | Proposed                                      | 2026-10-08 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
@@ -131,3 +132,18 @@ that is untrue, which [ADR 0007](0007-dependency-build-scripts.md) carries an ex
    links inside a record, so check by hand that each of them resolves. Then run `pnpm format` and commit on a
    `docs/` branch with a `docs(adr): ...` message. The pre-commit hook runs lint-staged, which applies
    `prettier --write` to `*.md`, so a missed format is corrected before the commit lands.
+8. Before pushing, run `git fetch origin` and then `pnpm check:adr-history`,
+   which the `quality` job also runs. It compares each record with its text where the branch left
+   `origin/main`, their merge base (in CI, the tip of the branch the pull request merges into). For
+   a record that was `Accepted` or `Superseded` there, in any of their forms, it fails when the
+   record is deleted or set back to `Proposed` or `Withdrawn`, when a superseded record is accepted
+   again or points at another successor, when its `## Decision` changes by more than whitespace
+   (inside a code fence, whitespace counts), or when a `## Corrections` entry that already existed
+   is reworded, removed or has another inserted before it; an entry appended after the last one
+   passes. A record that was `Proposed` or `Withdrawn` at the base, or is new, is exempt, though one
+   accepted in the branch must have exactly one `## Decision`. What it cannot judge stays with the
+   reviewer: whether an in-place edit of `## Context`, `## Consequences` or
+   `## Alternatives considered` fixes a claim that was false when the record was accepted rather
+   than one overtaken since, whether it adds guidance the record did not carry, that no rejected
+   alternative was removed, that the status line matches the change, and that a new entry quotes
+   the text that was wrong and cites evidence that settles it.

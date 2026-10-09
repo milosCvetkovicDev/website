@@ -10,6 +10,7 @@ import {
 } from '@/data/pages/about';
 import { ProfilePageJsonLd } from '@/components/json-ld';
 import { DataTable } from '@/components/data-table';
+import { formatPageDate } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
@@ -181,9 +182,10 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* The line stays in the page with its date, as on /privacy. */}
+        {/* The line stays in the page with its date, as on /privacy: the stored day in dateTime,
+            written out as the case studies write theirs. */}
         <p className="mt-12 text-sm text-[var(--muted)]">
-          Last updated <time dateTime={updated}>{updated}</time>.
+          Last updated <time dateTime={updated}>{formatPageDate(aboutRecord.path, updated)}</time>.
         </p>
       </div>
     </div>

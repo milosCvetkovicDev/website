@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "check:allowbuilds": "node scripts/check-allowbuilds-drift.mjs",
     "check:adrs": "node scripts/check-adr-index.mjs",
+    "check:adr-history": "node scripts/check-adr-history.mjs",
     "check:build-output": "node scripts/check-build-output.mjs",
     "check:content-dates": "node scripts/check-content-dates.mjs",
     "check:docs-drift": "node scripts/check-docs-drift.ts",
