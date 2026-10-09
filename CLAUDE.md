@@ -78,7 +78,7 @@ means widening `contentSecurityPolicy()` and its test; see `deploy-and-next-conf
   in `ci-and-scripts.md` the options)
 - `pnpm format` / `pnpm format:check`: Prettier over the whole repo, writing or checking
 - `pnpm test:scripts` (`node:test` for `scripts/`), `pnpm check:allowbuilds`, `pnpm check:adrs`,
-  `pnpm check:docs-drift` (exit 1 on drift, 2 when a check could not run)
+  `pnpm check:adr-history`, `pnpm check:docs-drift` (exit 1 on drift, 2 when a check could not run)
 - `scripts/agent-resume.sh [task-id ...]`: briefs the `.agent-state` checkpoints against git and gh
 - `pnpm clean` (`turbo clean` in `apps/web`, then the root `node_modules`), `pnpm prepare` (`husky`)
 
@@ -90,10 +90,10 @@ Always finish with `pnpm lint`.
 - Pre-commit runs lint-staged (Prettier on the staged files, after ESLint on the apps' TS/JS files);
   commit-msg runs commitlint.
 - CI (`.github/workflows/ci.yml`) has two jobs: `quality` (dependency review on pull requests,
-  install, `check:allowbuilds`, `check:adrs`, `test:scripts`, `format:check`, `lint`, `typecheck`,
-  `test`, `build`, `check:build-output`) and `e2e` (Playwright on three projects, then the web-server
-  log check). `main` requires both jobs and `Commit messages`; renaming one of those jobs strands its
-  required check (ADR 0021).
+  install, `check:allowbuilds`, `check:adrs`, `check:adr-history`, `test:scripts`, `format:check`,
+  `lint`, `typecheck`, `test`, `build`, `check:build-output`) and `e2e` (Playwright on three
+  projects, then the web-server log check). `main` requires both jobs and `Commit messages`;
+  renaming one of those jobs strands its required check (ADR 0021).
 - Pull request titles are linted as the squash commit, with GitHub's ` (#NN)` suffix and without
   commitlint's default ignores, so keep them conventional and short.
 - Warnings are errors. Lint runs with `--max-warnings 0` in `apps/web`, so a warning fails CI.
@@ -129,6 +129,8 @@ Always finish with `pnpm lint`.
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.mts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`,
   and keep relative imports for siblings inside one folder.
+- An owner-only value is never invented: it waits in `unfilledOwnerFields` under a deadline only
+  the owner sets (ADR 0035, `app-router-and-content.md`).
 
 ## Testing
 

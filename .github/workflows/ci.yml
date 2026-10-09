@@ -28,6 +28,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The checked-out commit and its parents: the ADR history step compares with HEAD^1.
+          fetch-depth: 2
 
       - name: Dependency review (pull requests only)
         # Fails a pull request that introduces a dependency with a known advisory (ADR 0018), before
@@ -56,6 +59,16 @@ jobs:
 
       - name: Check ADR records against their index
         run: pnpm check:adrs
+
+      - name: Check accepted ADRs against the base
+        # ADR 0012's two history rules: an accepted record's Decision is never edited, and its
+        # Corrections are append-only (scripts/check-adr-history.mjs). HEAD^1 is the base: on a
+        # pull request the checkout is GitHub's merge commit, whose first parent is the base
+        # branch's tip; on a push to main it is the previous commit of main, which merges by squash
+        # only (ADR 0021); on a workflow_dispatch it is the branch's previous commit, so a dispatch
+        # checks only the branch's last commit. The step prints the base it read, and exits 2
+        # rather than passing when the checkout is too shallow to hold HEAD^1.
+        run: pnpm check:adr-history -- --base HEAD^1
 
       - name: Root script tests
         run: pnpm test:scripts
