@@ -7,6 +7,8 @@ import { publishedPosts } from '@/data/posts';
 import { yearsOfExperience } from '@/data/profile';
 import { socialProfiles } from '@/data/social';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
+import { formatPageDate } from '@/lib/content-date';
+import { DAY_AS_WRITTEN } from '@/test/content-day';
 import { yearsClausesAboutAi, yearsFigures } from '@/test/experience-claims';
 import { hostileTitlePost } from '@/test/fixtures/posts';
 
@@ -61,19 +63,21 @@ vi.mock('@/data/posts', async (importOriginal) => {
  * is the main entity of /about's ProfilePage, which only /about serves, so a row there holds it to
  * that node instead. `e2e/seo-surface.spec.ts` checks the same sets in the served HTML.
  *
- * Typing, a convention that is not enforced yet: no payload in `lib/structured-data.ts` is typed
- * today, and nothing offline catches a misspelled predicate. Until 57c lands, the only vocabulary
- * check is `e2e/structured-data.spec.ts`, and it fails open. 57c (with 55d, which installs
- * schema-dts) writes every payload object with `satisfies WithContext<T>`, `T` being its schema-dts
- * node type (`Person`, `WebSite`, `WebPage`, `ProfilePage`, `TechArticle`, `BreadcrumbList`), for
- * example
- * `{ '@context': 'https://schema.org', '@type': 'Person', … } satisfies WithContext<Person>`.
- * `satisfies` rather than a `: WithContext<Person>` annotation keeps the object's own literal type,
- * and it still checks excess properties, so from then on a misspelled predicate is a
- * `pnpm typecheck` error on the line that wrote it: with schema-dts 2.0.0 and TypeScript 6.0.3,
- * `jobTitel` fails with TS2561, "Did you mean to write 'jobTitle'?" (checked 2026-09-28 in a scratch
- * project, not here). This file imports nothing from schema-dts: the types will check what the code
- * writes; this file checks what renders.
+ * Typing (57c): every payload object in `lib/structured-data.ts` ends with
+ * `satisfies WithContext<T>`, `T` being its schema-dts 2.1.0 node type (`Person`, `WebSite`,
+ * `WebPage`, `ProfilePage`, `TechArticle`, `BreadcrumbList`), and `JsonLd` takes only their union,
+ * `JsonLdNode`. `satisfies` rather than a `: WithContext<Person>` annotation keeps the object's own
+ * literal type and still checks excess properties, so a misspelled predicate is a `pnpm typecheck`
+ * error on the line that wrote it: `jobTitel` fails with TS2561, "Did you mean to write
+ * 'jobTitle'?", and a misspelled key in the nested PostalAddress with TS1360 naming it. Two places
+ * the outer `satisfies` does not reach carry their own: the object each conditional spread adds
+ * (`satisfies SpreadPredicates<TechArticleLeaf>` or `<WebPageLeaf>`, which also refuse an `@type`
+ * or `@id`) and each ListItem a trail maps to (`satisfies ListItem`).
+ * `lib/__tests__/structured-data-types.test.ts` keeps schema-dts catching each kind under
+ * `pnpm typecheck` and fails `pnpm test` when one of those `satisfies` is removed, and
+ * `e2e/structured-data.spec.ts` still asks validator.schema.org about what is served. This file
+ * imports nothing from schema-dts: the types check what the code writes; this file checks what
+ * renders.
  */
 
 const ORIGINAL_SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
@@ -1263,7 +1267,11 @@ describe('the JSON-LD graph on every route (#57)', () => {
     expect(time?.getAttribute('dateTime') ?? time?.getAttribute('datetime')).toBe(
       profile.dateModified,
     );
-    expect(lines[0].textContent).toBe(`Last updated ${String(profile.dateModified)}.`);
+    // The attribute holds the stored day and the text writes it as the case studies do (#57):
+    // formatPageDate throws, naming the value, where formatContentDate would give a quiet null.
+    const shown = formatPageDate('/about', String(profile.dateModified));
+    expect(shown).toMatch(DAY_AS_WRITTEN);
+    expect(lines[0].textContent).toBe(`Last updated ${shown}.`);
   });
 
   it('refuses a node without an @id, a repeated @id, a dangling reference and a padded one', () => {

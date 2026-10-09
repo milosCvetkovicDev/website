@@ -137,6 +137,17 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* The sticky header is opaque (#147) and 69px tall, so a control scrolled behind it is hidden
+   entirely. Whatever the browser scrolls into view below the header (focus, an in-page link's
+   target, scrollIntoView) stops clear of it, so Shift+Tab up the page never lands behind it (WCAG
+   2.4.11). A margin on the page's content, not `scroll-padding-top` on `html`: the header's own
+   controls always sit in that strip, so the padding made focusing one, the phone's menu button
+   included, scroll the page to the top (e2e/navigation.spec.ts, e2e/mobile/navigation.spec.ts). */
+:is(main, footer),
+:is(main, footer) * {
+  scroll-margin-top: 5rem;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

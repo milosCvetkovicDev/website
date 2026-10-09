@@ -16,7 +16,9 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 
 - `scripts/` at the repository root holds the scripts that run outside the apps:
   `check-allowbuilds-drift.mjs` (`pnpm check:allowbuilds`), `check-adr-index.mjs`
-  (`pnpm check:adrs`, the ADR records against their index), `check-build-output.mjs`
+  (`pnpm check:adrs`, the ADR records against their index), `check-adr-history.mjs`
+  (`pnpm check:adr-history`, accepted ADRs' Decision and Corrections against a base commit),
+  `check-build-output.mjs`
   (`pnpm check:build-output`, that `/mcp` is the build's one function), `vercel-ignore-build.mjs`
   (Vercel's ignored build step, ADR 0016), `check-webserver-log.mjs` (the `e2e` job's server-log
   check), `post-draft-check.mjs` (the publish check for a blog post, run by hand when a post is
@@ -29,10 +31,12 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates),
   `flake-sweep.sh` (`pnpm test:e2e:sweep`, see `e2e-tests.md`), `verify-flake.sh` (runs one e2e spec N
   times into `.verify`), and the `node:test` suites that `pnpm test:scripts` runs, one for each of
-  those thirteen plus `docs-drift-workflow.test.mjs`, `ai-refusals.test.mjs`,
-  `commitlint-config.test.mjs`, `claude-hooks.test.mjs` (the session hooks in `.claude/hooks`),
-  `claude-guards.test.mjs` (the PreToolUse guards in `.claude/settings.json`; it needs `jq` on
-  `PATH` and fails without it, which the CI runner meets with its preinstalled `/usr/bin/jq`),
+  those fourteen plus `docs-drift-workflow.test.mjs`, `ci-workflow.test.mjs` (`ci.yml`'s two
+  required jobs and the `e2e` job's apt archive cache, whose scripts it runs against stubs),
+  `ai-refusals.test.mjs`, `commitlint-config.test.mjs`, `claude-hooks.test.mjs` (the session
+  hooks in `.claude/hooks`), `claude-guards.test.mjs` (the PreToolUse guards in
+  `.claude/settings.json`; it needs `jq` on `PATH` and fails without it, which the CI runner meets
+  with its preinstalled `/usr/bin/jq`),
   `claude-md-budget.test.mjs` (the byte budget of `CLAUDE.md` and the `paths` of every rule) and
   `vitest-coverage-pair.test.mjs` (the lockfile installs `@vitest/*` at vitest's exact version).
   It is a private workspace package, `@repo/scripts`, whose only task is `typecheck` (`tsc -p .`
@@ -57,6 +61,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `pnpm format:check`                                                      | Prettier in check mode, no writes                                                                                                                                                                           |
 | `pnpm check:allowbuilds`                                                 | Checks `allowBuilds` entries against the versions the lockfile resolves                                                                                                                                     |
 | `pnpm check:adrs`                                                        | Checks each ADR's status, H1 title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules; exit 1 on a disagreement, 2 if it could not run                         |
+| `pnpm check:adr-history [-- --base <ref>]`                               | Checks that each ADR accepted or superseded at the base (default: the merge base with `origin/main`) keeps its Decision and Corrections entries; exit 1 on a change, 2 if it could not run                  |
 | `pnpm check:build-output [<distDir>]`                                    | After `pnpm --filter web build`: every route, and each one in `REQUIRED_ROUTES`, is prerendered with its body file, none a function outside `ALLOWED_FUNCTIONS`; exit 1 on a finding, 2 if it could not run |
 | `pnpm check:docs-drift`                                                  | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                                         |
 | `node scripts/post-draft-check.mjs --kind own\|jev <draft.md> <twin.md>` | Compares an approved draft with the post's served twin: 0 equal, 1 differences or refused syntax, 2 could not run                                                                                           |
@@ -134,8 +139,8 @@ splits the versions again, and `pnpm typecheck` is the reference for `scripts/` 
   (`actions/dependency-review-action`, on pull requests only, straight after checkout; it fails a
   pull request that adds a dependency with a known advisory, dev tooling included, because GitHub's
   dependency graph scopes every `pnpm-lock.yaml` entry `runtime`, the action's default), then
-  install, `check:allowbuilds`, `check:adrs`, `test:scripts`, `format:check`, `lint`, `typecheck`,
-  `test`, `build`, `check:build-output`. The last reads what `build` left in `apps/web/.next`, the route manifests
+  install, `check:allowbuilds`, `check:adrs`, `check:adr-history`, `test:scripts`, `format:check`,
+  `lint`, `typecheck`, `test`, `build`, `check:build-output`. The last reads what `build` left in `apps/web/.next`, the route manifests
   and the prerendered bodies under `server/app`, not the route table Next prints, and fails when a
   route needs a server function (no prerendered path, a dynamic route whose params are not fixed,
   revalidation, or a partially prerendered page) unless it is in the script's `ALLOWED_FUNCTIONS`,
@@ -150,10 +155,25 @@ splits the versions again, and `pnpm typecheck` is the reference for `scripts/` 
   `/mcp` alone, the MCP server (#62), whose `POST` handler cannot be prerendered. A route handler
   without `export const dynamic = 'force-static'` is the failure it exists for: it still serves the
   right bytes, as a function billed per request. Its parsing is tested in `test:scripts`, which runs
-  before the build.
+  before the build. `check:adr-history` runs with `--base HEAD^1`: the base branch's tip in the
+  merge commit a pull request checks out, the previous commit on a push to `main`. So the job's
+  checkout fetches two commits deep (`fetch-depth: 2`); at depth 1 the step exits 2 rather than
+  passing.
   `e2e`: install chromium and webkit, build web, run the Playwright specs on all three projects with
   their output teed into a log, then check that log with `scripts/check-webserver-log.mjs` whenever
-  the suite ran; the report is uploaded as an artifact on failure or cancellation. Actions are
+  the suite ran; the report is uploaded as an artifact on failure or cancellation. Around the
+  install, the job caches the ~125 MB of `.deb` archives `playwright install --with-deps` fetches
+  through apt (#210: a slow mirror once took 11 minutes of the 20-minute budget; the browsers take
+  seconds). The key is the OS release, architecture, Playwright version and ISO week, with restore
+  keys falling back to the same version, then the same OS. Restored archives reach apt's archive
+  directory only when the refreshed, signed index lists their SHA-256 for the package, version and
+  architecture in their name, because apt reuses a file there whose size matches without hashing
+  it. Unless the key hit exactly, the archives of the package versions now installed are saved
+  after the install and before the build, since the combined `actions/cache` saves only when the
+  whole job succeeds and a run cancelled in the tests would never save. main saves every miss; a
+  pull request saves only when nothing was restored, because its entry is visible to it alone. The
+  cache only saves time: a key that cannot be made skips it with a warning, and the seed and
+  collect steps run with `continue-on-error`, so none of it can fail the check. Actions are
   SHA-pinned, `permissions: contents: read`, and concurrency cancels superseded runs on pull
   requests only.
   CodeQL default setup is on as well (ADR 0018): GitHub manages it, so it has no workflow file here,

@@ -12,6 +12,7 @@ import {
   XSSI_PREFIX,
   clip,
   describeErrors,
+  objectCountProblem,
   readVerdict,
   type ValidatorReport,
 } from '../../e2e/support/schema-validator';
@@ -111,6 +112,49 @@ describe('readVerdict', () => {
     expect([...why].filter((char) => isControl(char.codePointAt(0) ?? 0))).toEqual([]);
     expect(why).toMatch(/^its 200 body is not JSON: \[31m<html> busy <\/html>x+$/);
     expect(why.length).toBeLessThanOrEqual('its 200 body is not JSON: '.length + 120);
+  });
+});
+
+describe('objectCountProblem', () => {
+  const advice =
+    'a block went unread, or the graph changed: re-measure and update the expected count';
+
+  it('passes the count it expects', () => {
+    expect(objectCountProblem(2, clean)).toBeNull();
+    expect(objectCountProblem(1, { ...clean, numObjects: 1 })).toBeNull();
+  });
+
+  it('fails one object fewer, a partial read that a clean verdict passes, naming both', () => {
+    // A clean answer that read one object where two were sent is a verdict with no errors, so the
+    // error count alone passes it: only the count can tell.
+    const partial = readVerdict(200, answer({ ...clean, numObjects: 1 }));
+    expect(partial).toEqual({ reached: true, report: { ...clean, numObjects: 1 } });
+    expect(objectCountProblem(2, partial.reached ? partial.report : clean)).toBe(
+      `validator.schema.org read 1 object, and 2 are expected: ${advice}`,
+    );
+  });
+
+  it('fails one object more, naming both numbers', () => {
+    expect(objectCountProblem(2, { ...clean, numObjects: 3 })).toBe(
+      `validator.schema.org read 3 objects, and 2 are expected: ${advice}`,
+    );
+  });
+
+  it('fails a report with no object count', () => {
+    // A verdict can come without one: an answer with errors needs no object read to be one.
+    expect(objectCountProblem(1, { totalNumErrors: 1 })).toBe(
+      `validator.schema.org gave no object count, and 1 is expected: ${advice}`,
+    );
+  });
+
+  it('refuses an expected count that is no count of objects, a typo in the spec', () => {
+    // readVerdict already refuses a reported count that is not one (above); this is the other
+    // side. Zero can never match, since a clean answer that read nothing is no verdict.
+    for (const expected of [0, -1, 1.5, Number.NaN]) {
+      expect(() => objectCountProblem(expected, clean)).toThrow(
+        `objectCountProblem: ${expected} is not a count of objects to expect`,
+      );
+    }
   });
 });
 
