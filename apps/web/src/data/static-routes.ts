@@ -4,7 +4,10 @@ import { experienceFigureSince } from './profile';
  * When the visible content of each static route last changed, as ISO dates (`YYYY-MM-DD`). The
  * sitemap sends them as `lastmod`; a crawler that sees every page claim to change on every deploy
  * learns to ignore the field. Bump a route's date by hand in the commit that changes what it says.
- * A case study's dates live on its entry in `case-studies.ts`, and a post's in `posts.ts`.
+ * A case study's dates live on its entry in `case-studies.ts`, and a post's in `posts.ts`. A commit
+ * that changes what a route says, or its date, also regenerates `content-dates.json`
+ * (`pnpm --filter web content-dates:update`), which pairs each route's date with a fingerprint of
+ * the text it serves: `pnpm test` fails until it does.
  *
  * /blog's date covers what /blog itself says. Once a post is published, /blog lists each post's
  * title, summary and publication day, and its `lastmod` is the latest of this date and every

@@ -87,9 +87,10 @@ describe('the Playwright projects', () => {
       expect(use?.hasTouch, `${name} must have touch input`).toBe(true);
       expect(use?.viewport?.width, `${name}'s viewport must be phone sized`).toBeLessThan(500);
     }
-    // Two engines, deliberately: whether a `backdrop-filter` ancestor becomes the containing block
-    // for a `fixed` descendant differs between Blink and WebKit, and that is the mechanism the
-    // mobile-menu rows measure.
+    // Two engines, deliberately: how a modal dialog handles focus differs between Blink and
+    // WebKit, and 'Tab and Shift+Tab from the Close button keep focus in the menu, in both engines'
+    // in e2e/mobile/navigation.spec.ts runs on both. The mobile-menu rows were written against a
+    // `backdrop-filter` header that clipped the menu, which the header has not had since #147.
     expect(byName('mobile-chrome')?.use?.defaultBrowserType).toBe('chromium');
     expect(byName('mobile-safari')?.use?.defaultBrowserType).toBe('webkit');
   });
