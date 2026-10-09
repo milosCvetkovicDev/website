@@ -31,10 +31,12 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates),
   `flake-sweep.sh` (`pnpm test:e2e:sweep`, see `e2e-tests.md`), `verify-flake.sh` (runs one e2e spec N
   times into `.verify`), and the `node:test` suites that `pnpm test:scripts` runs, one for each of
-  those fourteen plus `docs-drift-workflow.test.mjs`, `ai-refusals.test.mjs`,
-  `commitlint-config.test.mjs`, `claude-hooks.test.mjs` (the session hooks in `.claude/hooks`),
-  `claude-guards.test.mjs` (the PreToolUse guards in `.claude/settings.json`; it needs `jq` on
-  `PATH` and fails without it, which the CI runner meets with its preinstalled `/usr/bin/jq`),
+  those fourteen plus `docs-drift-workflow.test.mjs`, `ci-workflow.test.mjs` (`ci.yml`'s two
+  required jobs and the `e2e` job's apt archive cache, whose scripts it runs against stubs),
+  `ai-refusals.test.mjs`, `commitlint-config.test.mjs`, `claude-hooks.test.mjs` (the session
+  hooks in `.claude/hooks`), `claude-guards.test.mjs` (the PreToolUse guards in
+  `.claude/settings.json`; it needs `jq` on `PATH` and fails without it, which the CI runner meets
+  with its preinstalled `/usr/bin/jq`),
   `claude-md-budget.test.mjs` (the byte budget of `CLAUDE.md` and the `paths` of every rule) and
   `vitest-coverage-pair.test.mjs` (the lockfile installs `@vitest/*` at vitest's exact version).
   It is a private workspace package, `@repo/scripts`, whose only task is `typecheck` (`tsc -p .`
@@ -159,7 +161,19 @@ splits the versions again, and `pnpm typecheck` is the reference for `scripts/` 
   passing.
   `e2e`: install chromium and webkit, build web, run the Playwright specs on all three projects with
   their output teed into a log, then check that log with `scripts/check-webserver-log.mjs` whenever
-  the suite ran; the report is uploaded as an artifact on failure or cancellation. Actions are
+  the suite ran; the report is uploaded as an artifact on failure or cancellation. Around the
+  install, the job caches the ~125 MB of `.deb` archives `playwright install --with-deps` fetches
+  through apt (#210: a slow mirror once took 11 minutes of the 20-minute budget; the browsers take
+  seconds). The key is the OS release, architecture, Playwright version and ISO week, with restore
+  keys falling back to the same version, then the same OS. Restored archives reach apt's archive
+  directory only when the refreshed, signed index lists their SHA-256 for the package, version and
+  architecture in their name, because apt reuses a file there whose size matches without hashing
+  it. Unless the key hit exactly, the archives of the package versions now installed are saved
+  after the install and before the build, since the combined `actions/cache` saves only when the
+  whole job succeeds and a run cancelled in the tests would never save. main saves every miss; a
+  pull request saves only when nothing was restored, because its entry is visible to it alone. The
+  cache only saves time: a key that cannot be made skips it with a warning, and the seed and
+  collect steps run with `continue-on-error`, so none of it can fail the check. Actions are
   SHA-pinned, `permissions: contents: read`, and concurrency cancels superseded runs on pull
   requests only.
   CodeQL default setup is on as well (ADR 0018): GitHub manages it, so it has no workflow file here,

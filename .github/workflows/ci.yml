@@ -117,12 +117,139 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Key the apt archive cache
+        id: apt-key
+        # The system packages `playwright install --with-deps` adds depend on the runner's OS
+        # release and architecture and on the Playwright version, so those make the key (#210). The
+        # ISO week comes last, after a `_` that no version contains: an exact hit saves nothing, so
+        # a package Ubuntu updates after the save is downloaded on every run until the key changes,
+        # at most a week. The restore keys fall back to this version's newest entry, then to any for
+        # this OS. pnpm can print a notice before Playwright's `Version x.y.z` line, hence the match.
+        # The cache only saves time: a key that cannot be made is a warning, and the steps below
+        # skip, so the run installs uncached instead of failing. Runner facts only, no event data.
+        shell: bash
+        run: |
+          if [ -r /etc/os-release ]; then . /etc/os-release; fi
+          version="$(pnpm --filter web exec playwright --version | sed -n 's/^Version \([0-9][0-9A-Za-z.-]*\)$/\1/p' | head -n 1)" || true
+          arch="$(dpkg --print-architecture)" || true
+          if [ -z "$version" ] || [ -z "${ID:-}" ] || [ -z "${VERSION_ID:-}" ] || [ -z "$arch" ]; then
+            echo "::warning::Could not key the apt archive cache (Playwright version, OS release or architecture), so this run installs without it (#210)"
+            exit 0
+          fi
+          prefix="playwright-apt-$ID$VERSION_ID-$arch-"
+          {
+            echo "prefix=$prefix"
+            echo "version=$version"
+            echo "key=${prefix}${version}_$(date -u +%G-W%V)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore the apt archive cache
+        id: apt-cache
+        if: steps.apt-key.outputs.key != ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/playwright-apt-archives
+          key: ${{ steps.apt-key.outputs.key }}
+          restore-keys: |
+            ${{ steps.apt-key.outputs.prefix }}${{ steps.apt-key.outputs.version }}_
+            ${{ steps.apt-key.outputs.prefix }}
+
+      - name: Seed apt's archive directory
+        # apt installs a file it finds in /var/cache/apt/archives under the expected name whenever
+        # the size matches the index, without hashing it (pkgAcqArchive in apt 2.7 and 3.1). So a
+        # restored archive goes there only when the signed index, refreshed first, lists its SHA-256
+        # in a record for the package, version and architecture its name carries: a stale or
+        # tampered one is downloaded again, never installed. An empty or missing cache seeds
+        # nothing. The refresh is the run's one full index download: the `apt-get update` that
+        # `--with-deps` runs next finds the lists current (`Hit:`). A failure here only loses the
+        # seeding, so it does not fail the check.
+        continue-on-error: true
+        shell: bash
+        run: |
+          shopt -s nullglob
+          debs=(~/.cache/playwright-apt-archives/*.deb)
+          if [ "${#debs[@]}" -eq 0 ]; then
+            echo "No cached archives to seed."
+            exit 0
+          fi
+          sudo apt-get update
+          seeded=0
+          for deb in "${debs[@]}"; do
+            IFS=_ read -r name version arch <<< "$(basename "$deb" .deb)"
+            sum="$(sha256sum < "$deb" | cut -d ' ' -f 1)"
+            records="$(apt-cache show "$name=${version//%3a/:}" 2>/dev/null || true)"
+            if awk -v sum="SHA256: $sum" -v arch="Architecture: $arch" '
+              BEGIN { RS = ""; FS = "\n" }
+              { s = 0; a = 0; for (i = 1; i <= NF; i++) { if ($i == sum) s = 1; if ($i == arch) a = 1 } }
+              s && a { ok = 1 }
+              END { exit !ok }' <<< "$records"; then
+              sudo cp "$deb" /var/cache/apt/archives/
+              seeded=$((seeded + 1))
+            fi
+          done
+          echo "Seeded $seeded of ${#debs[@]} cached archives; apt downloads the rest."
+          if [ "$seeded" -lt "${#debs[@]}" ]; then
+            echo "::notice::$((${#debs[@]} - seeded)) cached apt archives are stale or unverified; on an exact hit they are downloaded on every run until the weekly key changes (#210)"
+          fi
+
       - name: Install Playwright browsers
         # webkit as well as chromium: the two phone projects in apps/web/playwright.config.ts are
         # Pixel 7 (chromium) and iPhone 13 (webkit). A missing browser makes the whole suite fail in
         # milliseconds, so a run that dies immediately after a Playwright bump is this step, not a
         # broken spec.
+        #
+        # The slow part is not the browsers, about 11 s from Playwright's CDN, but the ~125 MB of
+        # system packages `--with-deps` fetches through apt: a slow mirror once took 11 minutes of
+        # the job's 20 over them (#210), which is why the steps around this one cache the archives.
         run: pnpm --filter web exec playwright install --with-deps chromium webkit
+
+      - name: Collect the archives the install used
+        id: apt-collect
+        # Skipped on an exact hit, which has nothing new to save, and without a key. The cache
+        # directory is emptied, then only the archives of package versions dpkg now has installed
+        # are copied in (`:` in a version is `%3a` in apt's file names): what apt downloaded and
+        # checked, and the seeded archives it used. A restored archive the install did not need,
+        # such as an older Playwright's dependency, stays out, so the entry does not grow with each
+        # bump. apt's `partial/` and lock stay behind. A failure here only loses the save.
+        if: steps.apt-key.outputs.key != '' && steps.apt-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          cache=~/.cache/playwright-apt-archives
+          rm -rf "$cache"
+          mkdir -p "$cache"
+          installed="$(mktemp)"
+          dpkg-query -W -f='${db:Status-Status} ${Package}_${Version}_${Architecture}.deb\n' \
+            | awk '$1 == "installed" { gsub(/:/, "%3a", $2); print $2 }' > "$installed"
+          shopt -s nullglob
+          debs=()
+          for deb in /var/cache/apt/archives/*.deb; do
+            if grep -qxF "$(basename "$deb")" "$installed"; then
+              debs+=("$deb")
+            fi
+          done
+          if [ "${#debs[@]}" -eq 0 ]; then
+            echo "::warning::apt kept no archive of an installed package in /var/cache/apt/archives, so there is nothing to cache (#210)"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sudo cp "${debs[@]}" "$cache"/
+          sudo chown -R "$(id -u):$(id -g)" "$cache"
+          echo "Collected ${#debs[@]} archives."
+          echo "found=true" >> "$GITHUB_OUTPUT"
+
+      - name: Save the apt archive cache
+        # Before the build and the tests, because the combined actions/cache saves only when the
+        # whole job succeeds: a run cancelled during the tests, the case #210 is about, would never
+        # save what it downloaded. Another run saving the same key first is a warning, not a failure.
+        # main saves every miss. An entry saved on a pull request is visible to that pull request
+        # alone and spends the repository's 10 GB of cache, which the pnpm store shares, so a pull
+        # request saves only when nothing at all was restored, such as the first run on a new OS.
+        if: steps.apt-cache.outputs.cache-hit != 'true' && steps.apt-collect.outputs.found == 'true' && (github.ref == 'refs/heads/main' || steps.apt-cache.outputs.cache-matched-key == '')
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/playwright-apt-archives
+          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
 
       - name: Build web
         run: pnpm --filter web build
