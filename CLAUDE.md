@@ -129,6 +129,8 @@ Always finish with `pnpm lint`.
 - `apps/web` resolves `@/*` to `src/*` (`paths` in `tsconfig.json`, mirrored by `resolve.alias` in
   `vitest.config.mts`). Import across folders as `@/components/...`, `@/data/...`, `@/hooks/...`,
   and keep relative imports for siblings inside one folder.
+- An owner-only value is never invented: it waits in `unfilledOwnerFields` under a deadline only
+  the owner sets (ADR 0035, `app-router-and-content.md`).
 
 ## Testing
 
