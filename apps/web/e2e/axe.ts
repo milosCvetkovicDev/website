@@ -74,6 +74,15 @@ export const LIGHTHOUSE_AXE_OPTIONS: AxeRunOptions = {
   },
 };
 
+/** What every audit here starts from, so the whole-page and the scoped audits cannot drift apart. */
+const axeBuilder = (page: Page) =>
+  new AxeBuilder({ page })
+    // AxeBuilder keeps the reference and its other setters write into it: never hand it the constant.
+    .options(structuredClone(LIGHTHOUSE_AXE_OPTIONS))
+    // The dev server's tools indicator, a custom element with a shadow root that never ships.
+    // Without this a local run against `next dev` audits a different DOM from CI.
+    .exclude('nextjs-portal');
+
 /**
  * Runs the rule set over the whole page. `exclude` takes more selectors out of every rule, on top of
  * the dev server's indicator, so whatever comes to sit under one goes unaudited: a caller that passes
@@ -87,14 +96,30 @@ export const audit = async (page: Page, exclude: readonly string[] = []) => {
       throw new Error(`audit: the exclusion ${selector} matches nothing on ${page.url()}`);
     }
   }
-  const builder = new AxeBuilder({ page })
-    // AxeBuilder keeps the reference and its other setters write into it: never hand it the constant.
-    .options(structuredClone(LIGHTHOUSE_AXE_OPTIONS))
-    // The dev server's tools indicator, a custom element with a shadow root that never ships.
-    // Without this a local run against `next dev` audits a different DOM from CI.
-    .exclude('nextjs-portal');
+  const builder = axeBuilder(page);
   for (const selector of exclude) builder.exclude(selector);
   return builder.analyze();
+};
+
+/**
+ * Runs the same rule set over one element and what it contains, from the same builder as `audit`.
+ * Rules that judge the whole page, such as `document-title`, do not run on a part of it. The
+ * selector must match exactly one element: none would audit nothing and pass, and a second
+ * match would put more in the audit than the caller names. The header pass in
+ * `accessibility.spec.ts` is the caller, scoped to `body > header` because `/work/[slug]` and
+ * `/blog/[slug]` render a `<header>` of their own.
+ */
+export const auditWithin = async (page: Page, selector: string) => {
+  // Counted as axe will resolve it, with the document's own `querySelectorAll`: a Playwright
+  // locator also pierces shadow roots and takes its own selector syntax, so it could count one
+  // element where axe would include none or several.
+  const matches = await page.evaluate((s) => document.querySelectorAll(s).length, selector);
+  if (matches !== 1) {
+    throw new Error(
+      `auditWithin: ${selector} matches ${matches} elements on ${page.url()}, not exactly one`,
+    );
+  }
+  return axeBuilder(page).include(selector).analyze();
 };
 
 export const passingNodes = (results: AxeResults, ruleId: string) =>
