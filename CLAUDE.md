@@ -54,8 +54,10 @@ There is no shared ESLint or TypeScript config package (ADR 0018): `apps/web` li
 ## Routes (App Router)
 
 `/`, `/about`, `/blog`, `/blog/[slug]`, `/contact`, `/privacy`, `/skills`, `/work`, `/work/[slug]`.
-Force-static JSON handlers: `/case-studies.json`, `/work/<slug>/index.json`; the Atom feed,
-`/feed.xml`. `/mcp` (the MCP server, `POST` only) is the one server function.
+Handlers: an `/index.md` twin per page, `/case-studies.json`, `/work/<slug>/index.json`,
+`/feed.xml` and `/mcp` (`POST` only). Every other `route.ts` exports `dynamic = 'force-static'`,
+there is no middleware or `proxy.ts` (ADR 0017, 0030), and `pnpm check:build-output` fails any
+server function but `/mcp`.
 
 Every route's head comes from `buildMetadata()` in `apps/web/src/lib/metadata.ts`, and every
 static route folder needs its own `opengraph-image`; see `app-router-and-content.md`.
@@ -100,6 +102,9 @@ Always finish with `pnpm lint`.
 - Every route must load with a clean browser console and pass axe in both colour schemes
   (`e2e/console-clean.spec.ts`, `e2e/accessibility.spec.ts`); never widen a budget or lower a floor
   to quieten a failure.
+- Machine-readable gates (#55): the e2e specs `no-js-text`, `crawlability`, `structured-data`,
+  `lighthouse-audits`, `served-html` and `machine-readable`, the unit tests `json-ld`,
+  `schema-validator` and `lighthouse`, `check:build-output` and `ai-refusals.test.mjs`.
 - `eslint-disable` is not an acceptable fix for the React Hooks rules. `react-hooks/set-state-in-effect`
   in particular is pointing at a real hydration problem: restructure the component instead. See
   `docs/adr/0006-hydration-safe-client-state.md` and `apps/web/src/hooks/use-is-hydrated.ts`.
@@ -119,6 +124,8 @@ Always finish with `pnpm lint`.
   visibly says bumps its date, and no other commit does.
 - Server components by default. Add `'use client'` only where browser APIs, React state or GSAP are
   actually needed.
+- `src/lib/serialise.ts` turns `src/data` into the twins, the JSON and MCP payloads, and
+  `atom.ts` the posts into the feed: no fact is written twice.
 - Tailwind v4 is CSS-first: the theme is declared in `apps/web/src/app/globals.css` and compiled by
   `@tailwindcss/postcss`. There is no `tailwind.config.js` and there should not be one.
 - Colour: `--accent` paints surfaces and `--accent-text` is the only accent allowed as text, status
@@ -195,13 +202,9 @@ Always finish with `pnpm lint`.
   live settings (`gh api repos/milosCvetkovicDev/website`, `.../branches/main/protection`) rather
   than trusting the existing text, and cite code as a path with line numbers checked against
   current `main`.
-- Before adding any AI-facing or machine-readable file — an `llms.txt` variant, a `.well-known`
-  descriptor, a crawler directive, a new JSON-LD type — read
-  `docs/adr/0017-ai-discoverability-policy.md`. It carries the crawler policy with its trade-off, what
-  each measure of the AI-discoverability work is for and who consumes it, and eighteen mechanisms that
-  were considered and refused, each with the source and date that settle it. Adding one of them means
-  superseding that record rather than editing it, and deleting the matching assertion in
-  `scripts/ai-refusals.test.mjs`.
+- Read `docs/adr/0017-ai-discoverability-policy.md` before adding any AI-facing or machine-readable
+  file (`llms.txt`, `.well-known`, crawler rules, JSON-LD types): a refused one needs a record
+  superseding it and its assertion deleted from `scripts/ai-refusals.test.mjs`.
 - `docs/runbooks` — operational procedures. `docs/runbooks/deploy.md` is the deployment procedure.
 - `README.md` addresses a reader landing on GitHub; this file addresses an agent about to change
   code. Keep them consistent without duplicating each other.
@@ -225,3 +228,5 @@ Always finish with `pnpm lint`.
   and run `gh pr list --head <branch>` before each retry, because the pull request may have been
   created anyway. Set a body that did not land over REST:
   `gh api -X PATCH repos/{owner}/{repo}/pulls/<N> -F body=@<file>`.
+- ADR 0030: a `[slug].md` folder is literal (no `params`), so a twin is `<route>/index.md`; only
+  enabling `cacheComponents` drops `force-static` and `dynamicParams`.
