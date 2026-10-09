@@ -3,6 +3,7 @@ import { COLLECTED, privacyCopy, privacyRecord } from '@/data/pages/privacy';
 import type { Paragraph } from '@/data/pages/types';
 import { linkKind } from '@/lib/links';
 import { WebPageJsonLd } from '@/components/json-ld';
+import { formatPageDate } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
@@ -65,10 +66,11 @@ export default function PrivacyPage() {
           </section>
         ))}
 
+        {/* The stored day in dateTime, written out as the case studies write theirs. */}
         <p className="text-sm text-[var(--muted)]">
           Last updated{' '}
           <time dateTime={STATIC_ROUTE_UPDATED['/privacy']}>
-            {STATIC_ROUTE_UPDATED['/privacy']}
+            {formatPageDate(privacyRecord.path, STATIC_ROUTE_UPDATED['/privacy'])}
           </time>
           .
         </p>

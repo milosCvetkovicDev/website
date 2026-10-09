@@ -146,6 +146,11 @@ fails when the served line and the TechArticle disagree. A date that is not a re
 or a pair updated before it was published, throws there and fails the prerender. "Not in the
 future" is a unit-test check against the live clock, not a build check, and it counts a day as
 begun once UTC+14 has reached it: an accepted tolerance of up to 14 hours against the UTC date.
+A static route that shows a "Last updated" line (today /about and /privacy) writes its day the
+same way, through `formatPageDate()` in the same module, with its stored `STATIC_ROUTE_UPDATED`
+value in `dateTime`, and a value that is not a real day throws there too. Every entry of
+`STATIC_ROUTE_UPDATED`, shown on its page or only sent as `lastmod`, is held to a real day on or
+before today by `src/data/__tests__/static-routes.test.ts`.
 
 `src/data/content-dates.json` pairs each route's content date with what it serves (#191): one line
 per static route (/blog's Coming Soon page included), case study and published post, holding its

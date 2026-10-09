@@ -7,6 +7,8 @@ import { publishedPosts } from '@/data/posts';
 import { yearsOfExperience } from '@/data/profile';
 import { socialProfiles } from '@/data/social';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
+import { formatPageDate } from '@/lib/content-date';
+import { DAY_AS_WRITTEN } from '@/test/content-day';
 import { yearsClausesAboutAi, yearsFigures } from '@/test/experience-claims';
 import { hostileTitlePost } from '@/test/fixtures/posts';
 
@@ -1265,7 +1267,11 @@ describe('the JSON-LD graph on every route (#57)', () => {
     expect(time?.getAttribute('dateTime') ?? time?.getAttribute('datetime')).toBe(
       profile.dateModified,
     );
-    expect(lines[0].textContent).toBe(`Last updated ${String(profile.dateModified)}.`);
+    // The attribute holds the stored day and the text writes it as the case studies do (#57):
+    // formatPageDate throws, naming the value, where formatContentDate would give a quiet null.
+    const shown = formatPageDate('/about', String(profile.dateModified));
+    expect(shown).toMatch(DAY_AS_WRITTEN);
+    expect(lines[0].textContent).toBe(`Last updated ${shown}.`);
   });
 
   it('refuses a node without an @id, a repeated @id, a dangling reference and a padded one', () => {
