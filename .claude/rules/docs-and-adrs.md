@@ -5,6 +5,8 @@ paths:
   - '.github/workflows/docs-drift.yml'
   - 'scripts/check-adr-index.mjs'
   - 'scripts/check-adr-index.test.mjs'
+  - 'scripts/check-adr-history.mjs'
+  - 'scripts/check-adr-history.test.mjs'
   - 'scripts/check-docs-drift.ts'
   - 'scripts/docs-drift-patch.mjs'
   - 'scripts/ai-refusals.test.mjs'
@@ -58,7 +60,16 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   ADR 0012's six forms, when a `(corrected …)` date is not the newest `## Corrections` heading, or
   when a superseded record's pointer does not link its successor or that successor is not an
   accepted, later record; it never rewrites either side. It exits 1 on a disagreement and 2 when it
-  could not run, as `pnpm check:docs-drift` does.
+  could not run, as `pnpm check:docs-drift` does. `pnpm check:adr-history`
+  (`scripts/check-adr-history.mjs`, the next step of the `quality` job) holds the records to the
+  base, the merge base with `origin/main` unless `--base` names another: for each record accepted
+  or superseded there, it fails when the record is deleted, goes back to `Proposed` or `Withdrawn`,
+  is accepted again or re-pointed once superseded, or changes its `## Decision` or an existing
+  `## Corrections` entry by more than whitespace outside a code fence, while an entry appended after
+  the last passes. Records `Proposed` or `Withdrawn` at the base are exempt, but one accepted at the
+  head must have one `## Decision`. A record the base cannot read in full passes when the head
+  repairs it, so a broken `main` never blocks its own fix. Whether an edit to the other sections is
+  a correction ADR 0012 allows stays a reviewer's call.
 - Before editing a document that describes repository or CI settings, check each claim against the
   live settings (`gh api repos/milosCvetkovicDev/website`, `.../branches/main/protection`) rather
   than trusting the existing text, and cite code as a path with line numbers checked against
