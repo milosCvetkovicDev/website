@@ -27,6 +27,8 @@ export function GameComplete() {
     // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached).
+    // Every element the entrance hides carries data-story-reveal, which a print shows in full
+    // (the @media print rule in globals.css).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(({ gsap }) => {
       // The element, read once, never the ref: a soft navigation away from `/` nulls the ref
@@ -118,7 +120,7 @@ export function GameComplete() {
       className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
     >
       <div className="w-full max-w-xl text-center">
-        <div ref={terminalRef}>
+        <div ref={terminalRef} data-story-reveal="">
           <Terminal className="text-left">
             <div className="space-y-4">
               {/* The closing section's heading and its name. */}
@@ -163,6 +165,7 @@ export function GameComplete() {
         {/* transition-colors only: GSAP tweens this link's opacity, transform and box-shadow. */}
         <a
           ref={ctaRef}
+          data-story-reveal=""
           href={social.linkedin.href}
           target="_blank"
           rel="noopener noreferrer"

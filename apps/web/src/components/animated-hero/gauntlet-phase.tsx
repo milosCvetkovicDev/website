@@ -194,6 +194,8 @@ export function GauntletPhase() {
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
+    // Every element the entrance hides carries data-story-reveal, which a print shows in full
+    // (the @media print rule in globals.css).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap, ScrollTrigger }) => {
@@ -276,7 +278,7 @@ export function GauntletPhase() {
         </h2>
 
         {/* Pipeline */}
-        <div ref={pipelineRef}>
+        <div ref={pipelineRef} data-story-reveal="">
           <HudPanel title="CI/CD PIPELINE">
             <div className="space-y-3">
               {pipelineStages.map((stage, index) => (
@@ -293,7 +295,7 @@ export function GauntletPhase() {
         </div>
 
         {/* Deployment Status. data-gauntlet marks the panels the tests look up. */}
-        <div ref={deployRef} data-gauntlet="deploy" className="mt-6">
+        <div ref={deployRef} data-story-reveal="" data-gauntlet="deploy" className="mt-6">
           {shownDeploymentStatus !== 'idle' && (
             <div
               className={`rounded-lg border p-6 text-center transition-all duration-500 ${
@@ -359,6 +361,7 @@ export function GauntletPhase() {
         {/* Achievement */}
         <div
           ref={achievementRef}
+          data-story-reveal=""
           data-reveal="achievement"
           data-gauntlet="achievement"
           className={`mt-6 ${achievementVisible ? '' : 'opacity-0'}`}
@@ -381,6 +384,7 @@ export function GauntletPhase() {
         {/* Headline */}
         <div
           ref={headlineRef}
+          data-story-reveal=""
           data-reveal="headline"
           className={`mt-16 text-center ${achievementVisible ? '' : 'opacity-0'}`}
         >
