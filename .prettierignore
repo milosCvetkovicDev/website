@@ -16,6 +16,8 @@ next-env.d.ts
 *.tsbuildinfo
 # Written in variant Markdown on purpose: the publish check's round-trip test reads it as it is.
 apps/web/src/test/fixtures/post-draft.md
+# Written by content-dates.test.tsx one route per line, and compared byte for byte: a re-wrap fails it.
+apps/web/src/data/content-dates.json
 
 # Personal / machine-local files
 .claude/settings.local.json

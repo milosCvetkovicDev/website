@@ -14,6 +14,9 @@ import {
 } from '@/data/pages/about';
 import { contactCopy, socialLinks } from '@/data/pages/contact';
 import { asSentence } from '@/data/pages/table';
+import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
+import { formatContentDate } from '@/lib/content-date';
+import { DAY_AS_WRITTEN } from '@/test/content-day';
 
 /**
  * `/about` and `/contact` map over their page records (#59), so a page and its Markdown twin read
@@ -138,6 +141,21 @@ describe('/about', () => {
       factsHeading.compareDocumentPosition(timelineHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
       'the timeline comes after the quick facts',
     ).toBeTruthy();
+  });
+
+  it('writes its "Last updated" day as the case studies write theirs, the stored day in dateTime (#57)', () => {
+    render(<AboutPage />);
+    const updated = STATIC_ROUTE_UPDATED['/about'];
+    const line = screen.getByText((_, element) =>
+      Boolean(element?.matches('p') && element.textContent?.startsWith('Last updated')),
+    );
+    const time = line.querySelector('time');
+    expect(time, 'the "Last updated" line dates itself with a <time>').not.toBeNull();
+    expect(time?.textContent).toBe(formatContentDate(updated));
+    // Spelled out in the shared pattern rather than read from the month table (#57).
+    expect(time?.textContent).toMatch(DAY_AS_WRITTEN);
+    expect(time).toHaveAttribute('dateTime', updated);
+    expect(line.textContent).toBe(`Last updated ${time?.textContent}.`);
   });
 
   it('renders two emphasised runs with the same text in one paragraph without a key clash', async () => {

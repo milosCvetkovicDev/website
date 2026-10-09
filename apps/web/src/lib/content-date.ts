@@ -67,6 +67,22 @@ export function formatContentDate(date: string): string | null {
 }
 
 /**
+ * A page's one stored date as a reader sees it, for a static route's "Last updated" line. Throws,
+ * naming `page` and the stored value, when it is not a real day, so a typo fails the prerender
+ * rather than printing a blank or a malformed date.
+ */
+export function formatPageDate(page: string, date: string): string {
+  const formatted = formatContentDate(date);
+  if (!formatted) {
+    throw new Error(
+      `${page}: a content date must be a real YYYY-MM-DD day from ${EARLIEST_YEAR} on, ` +
+        `got ${JSON.stringify(date)}`,
+    );
+  }
+  return formatted;
+}
+
+/**
  * A page's published and updated dates as a reader sees them. Throws, naming `page` and the stored
  * values, when either date is not a real day or the page was updated before it was published. The
  * page's TechArticle marks up the same two values, so a page must not quietly drop its visible

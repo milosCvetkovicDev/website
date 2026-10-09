@@ -51,7 +51,7 @@ const FORMS =
   '`Superseded by ADR-NNNN` or `Superseded by ADR-NNNN (corrected YYYY-MM-DD)`';
 
 /** A failure that stops the check outright, as opposed to a problem with a record. */
-class CheckError extends Error {}
+export class CheckError extends Error {}
 
 /**
  * A status line in one of the six forms ADR 0012 allows.
@@ -222,7 +222,7 @@ export function markdownLines(source) {
  * @param {MarkdownLine[]} lines
  * @returns {Map<string, { line: number, body: MarkdownLine[] }[]>}
  */
-function sectionsOf(lines) {
+export function sectionsOf(lines) {
   /** @type {Map<string, { line: number, body: MarkdownLine[] }[]>} */
   const sections = new Map();
   /** @type {MarkdownLine[] | null} */
