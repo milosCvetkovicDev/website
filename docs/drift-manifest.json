@@ -8090,6 +8090,101 @@
       }
     },
     {
+      "id": "adr-readme-link-0036-content-dates-move-with-served-text",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0036-content-dates-move-with-served-text.md)",
+      "claim": "The link to 0036-content-dates-move-with-served-text.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0036-content-dates-move-with-served-text.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0036-content-dates-move-with-served-text.md"
+      }
+    },
+    {
+      "id": "adr-index-0036-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0036's record carries the status line \"Proposed\".",
+      "check": {
+        "file": "docs/adr/0036-content-dates-move-with-served-text.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0036-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0036 gives the record's status line, \"Proposed\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0036 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0036-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0036's record carries the Date \"2026-10-08\".",
+      "check": {
+        "file": "docs/adr/0036-content-dates-move-with-served-text.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-08"
+      }
+    },
+    {
+      "id": "adr-index-0036-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0036 gives the record's Date, \"2026-10-08\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0036 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-08"
+      }
+    },
+    {
+      "id": "adr-index-0036-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0036's record carries the H1 title \"Content dates move with served text, and a pull request check holds them together\".",
+      "check": {
+        "file": "docs/adr/0036-content-dates-move-with-served-text.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Content dates move with served text, and a pull request check holds them together"
+      }
+    },
+    {
+      "id": "adr-index-0036-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0036 gives the record's H1 title, \"Content dates move with served text, and a pull request check holds them together\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0036 \\| \\[(.+?)\\]\\(0036-",
+        "equals": "Content dates move with served text, and a pull request check holds them together"
+      }
+    },
+    {
       "id": "adr-index-0035-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0035 |",
@@ -8453,6 +8548,132 @@
       ],
       "check": {
         "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
+      "id": "adr-0036-link-0021-squash-only-merges-and-required-checks",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "](0021-squash-only-merges-and-required-checks.md)",
+      "claim": "The link to 0021-squash-only-merges-and-required-checks.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0021-squash-only-merges-and-required-checks.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0021-squash-only-merges-and-required-checks.md"
+      }
+    },
+    {
+      "id": "adr-0036-script-test",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "`pnpm test`",
+      "claim": "`pnpm test` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "test"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "test"
+      }
+    },
+    {
+      "id": "adr-0036-script-web-content-dates-update",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "`pnpm --filter web content-dates:update`",
+      "claim": "`pnpm --filter web content-dates:update` is a script in apps/web/package.json and runs the content-date manifest's test file.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "web content-dates:update"
+        }
+      ],
+      "check": {
+        "package": "apps/web",
+        "script": "content-dates:update",
+        "runs": "src/data/__tests__/content-dates.test.tsx"
+      }
+    },
+    {
+      "id": "adr-0036-script-check-content-dates",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "`pnpm check:content-dates`",
+      "claim": "`pnpm check:content-dates` is a script in ./package.json and runs scripts/check-content-dates.mjs.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:content-dates"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:content-dates",
+        "runs": "scripts/check-content-dates.mjs"
+      }
+    },
+    {
+      "id": "adr-0036-pinned-day",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "The clock is pinned to 2026-07-01",
+      "claim": "The content-date manifest's test pins the clock to 2026-07-01.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "apps/web/src/data/__tests__/content-dates.test.tsx",
+        "regex": "const day = '(\\d{4}-\\d\\d-\\d\\d)';",
+        "equals": "2026-07-01"
+      }
+    },
+    {
+      "id": "adr-0036-workflow-job-name",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "whose one job is `Content dates`",
+      "claim": "The one job in .github/workflows/content-dates.yml is named Content dates.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": ".github/workflows/content-dates.yml",
+        "regex": "^ {4}name: (.+)$",
+        "equalsAll": ["Content dates"]
+      }
+    },
+    {
+      "id": "adr-0036-workflow-events",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "`synchronize` and `reopened` pull",
+      "claim": "The Content dates workflow runs on the opened, edited, synchronize and reopened pull request events.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": ".github/workflows/content-dates.yml",
+        "regex": "^ {2}pull_request:\\n(?: {4}#[^\\n]*\\n)* {4}types: (\\[[^\\]\\n]*\\])$",
+        "equals": "[opened, edited, synchronize, reopened]"
+      }
+    },
+    {
+      "id": "adr-0036-not-required",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "It is not a required status check.",
+      "method": "gh-api",
+      "evaluation": "live",
+      "requires": "admin",
+      "claim": "main's protection does not require the Content dates check.",
+      "check": {
+        "endpoint": "repos/{repo}/branches/main/protection",
+        "jq": "[.required_status_checks.contexts[] | select(. == \"Content dates\")] | length",
+        "equals": 0
       }
     },
     {

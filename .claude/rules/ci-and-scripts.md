@@ -27,11 +27,13 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   or `pnpm test --force`: a plain local `pnpm test` replays a cached green, which CI, with no turbo
   cache, never does), `check-docs-drift.ts` (`pnpm check:docs-drift`, TypeScript that Node 22 runs
   directly), `docs-drift-patch.mjs` (the docs drift workflow's check on what its agent changed),
+  `check-content-dates.mjs` (`pnpm check:content-dates`, the `Content dates` workflow's pairing of
+  each route's served text with its content date, ADR 0036),
   `agent-resume.sh` (the briefing for agent checkpoints, under Working with this repo in Claude
   Code), `flake-hunt.sh` and `flake-hunt-issue.sh` (the flake hunt, below under Quality gates),
   `flake-sweep.sh` (`pnpm test:e2e:sweep`, see `e2e-tests.md`), `verify-flake.sh` (runs one e2e spec N
   times into `.verify`), and the `node:test` suites that `pnpm test:scripts` runs, one for each of
-  those fourteen plus `docs-drift-workflow.test.mjs`, `ci-workflow.test.mjs` (`ci.yml`'s two
+  those fifteen plus `docs-drift-workflow.test.mjs`, `ci-workflow.test.mjs` (`ci.yml`'s two
   required jobs and the `e2e` job's apt archive cache, whose scripts it runs against stubs),
   `ai-refusals.test.mjs`, `commitlint-config.test.mjs`, `claude-hooks.test.mjs` (the session
   hooks in `.claude/hooks`), `claude-guards.test.mjs` (the PreToolUse guards in
@@ -63,6 +65,7 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 | `pnpm check:adrs`                                                        | Checks each ADR's status, H1 title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules; exit 1 on a disagreement, 2 if it could not run                         |
 | `pnpm check:adr-history [-- --base <ref>]`                               | Checks that each ADR accepted or superseded at the base (default: the merge base with `origin/main`) keeps its Decision and Corrections entries; exit 1 on a change, 2 if it could not run                  |
 | `pnpm check:build-output [<distDir>]`                                    | After `pnpm --filter web build`: every route, and each one in `REQUIRED_ROUTES`, is prerendered with its body file, none a function outside `ALLOWED_FUNCTIONS`; exit 1 on a finding, 2 if it could not run |
+| `pnpm check:content-dates -- --base <rev> [--head <rev>]`                | Pairs `content-dates.json`'s dates and text at the head (`HEAD` by default) and its merge base unless the body (`--event`, else `PR_BODY`) excuses a route; exit 1 on a finding, 2 if it could not run      |
 | `pnpm check:docs-drift`                                                  | Checks every claim in `docs/drift-manifest.json` against the repository and `gh api`; exit 1 on drift, 2 when a check could not run                                                                         |
 | `node scripts/post-draft-check.mjs --kind own\|jev <draft.md> <twin.md>` | Compares an approved draft with the post's served twin: 0 equal, 1 differences or refused syntax, 2 could not run                                                                                           |
 | `pnpm test:scripts`                                                      | `node:test` tests for the root `scripts/`                                                                                                                                                                   |
@@ -227,6 +230,30 @@ splits the versions again, and `pnpm typecheck` is the reference for `scripts/` 
   the whole time, so start it in the background from a worktree of its own, with `PLAYWRIGHT_PORT`
   set when another checkout runs e2e. Ctrl-C stops a hunt in the foreground only; stop a
   background one with `kill -TERM <pid>`, which exits 143 and still writes the report.
+- `.github/workflows/content-dates.yml` runs on the `opened`, `edited`, `synchronize` and
+  `reopened` pull request events, and its one job, `Content dates`, is not a required check
+  (ADR 0036). It checks out the whole history without keeping the token, sets up Node and installs
+  nothing, then runs `scripts/check-content-dates.mjs` with the base branch as fetched
+  (`origin/<base>`, not the event's base SHA, which can lag it), the head SHA and the event
+  payload. That compares `apps/web/src/data/content-dates.json` at the head with the file at the
+  merge base and fails, by route, a route whose served text moved without its content date, whose
+  date moved without its text, or whose date moved backwards, unless the body excuses it with a
+  `Content-Date-Exception: <route> <reason>` line: at the very start of a line, outside fenced code
+  and HTML comments, any letter case for the key, the route bare or in backticks. The script reads
+  the body from the event payload (`--event`), never interpolated and never through an environment
+  variable, whose 128 KiB cap a long body of multi-byte text can pass; `PR_BODY` serves a run by
+  hand. Every exception is listed as needed or not needed, and one that names a route the head
+  manifest lacks, or gives no reason, fails the check. A route only at the head or only at the
+  merge base is listed and passes, a merge base without the manifest passes with a notice, and a
+  missing or malformed manifest at the head, a malformed one at the merge base, or any other failure
+  exits 2. In Actions the report sits between `::stop-commands::` and its token, so nothing the
+  body says runs as a workflow command, and each route out of step gets an error annotation.
+  Editing the body re-runs this workflow alone. GitHub runs no `pull_request` workflow while a pull
+  request conflicts with its base, so the check is absent, not failing, until the conflict is
+  resolved. It trusts the head manifest, which the `quality` job's `pnpm test` keeps true, and it
+  runs the pull request's own copy of the script, as `ci.yml` runs its own tests. Making it
+  required follows ADR 0021's order for adding a context, in a record that supersedes ADR 0021,
+  whose agreement check reads only `ci.yml` and `commitlint.yml`.
 - `main` has branch protection on, and three checks are required: both CI jobs and
   `Commit messages`. A required check is stored as the job's display name, so the three required
   contexts are the `name:` values in `.github/workflows/ci.yml` and
