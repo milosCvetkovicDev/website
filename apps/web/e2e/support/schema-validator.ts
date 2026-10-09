@@ -18,8 +18,9 @@ export interface ValidatorReport {
   totalNumWarnings?: number;
   /**
    * The top-level entities it read, not the blocks: a node another one names by `@id` is read as part
-   * of it. 1 for the two blocks on `/`, whose WebSite names the Person as its author, and 2 for the
-   * four on a case study, measured 2026-09-28.
+   * of it, so the count moves when the graph's references do. `ROUTES` in
+   * `e2e/structured-data.spec.ts` pins it per route, says when it was measured and how its numbers
+   * follow from the graph, and `objectCountProblem` compares against them.
    */
   numObjects?: number;
   fetchError?: string;
@@ -95,6 +96,33 @@ export function readVerdict(status: number, body: string): Verdict {
     return { reached: false, why: `it read no object (numObjects ${numObjects ?? 'none'})` };
   }
   return { reached: true, report: report as ValidatorReport };
+}
+
+/**
+ * Why a verdict read another number of objects than the route's graph has, or null when it read
+ * exactly `expected` (the owner's comment on #57). A clean verdict can still be a partial read, and
+ * the error count alone passes it. The count catches a read that changes the number of top-level
+ * objects, not every one: a block whose loss leaves the count where it was goes unseen (what each
+ * route's count rests on is in `ROUTES` in `e2e/structured-data.spec.ts`). The count is the
+ * validator's own, so a change in how it counts fails too, and the message says to re-measure
+ * either way. An `expected` that is no count of objects is a typo in the spec, and throws.
+ */
+export function objectCountProblem(
+  expected: number,
+  { numObjects }: ValidatorReport,
+): string | null {
+  if (!Number.isInteger(expected) || expected < 1) {
+    throw new Error(`objectCountProblem: ${expected} is not a count of objects to expect`);
+  }
+  if (numObjects === expected) return null;
+  const read =
+    numObjects === undefined
+      ? 'gave no object count'
+      : `read ${numObjects} object${numObjects === 1 ? '' : 's'}`;
+  return (
+    `validator.schema.org ${read}, and ${expected} ${expected === 1 ? 'is' : 'are'} expected: ` +
+    'a block went unread, or the graph changed: re-measure and update the expected count'
+  );
 }
 
 /** The errors a report lists, as `errorType(args)`, read defensively: the shape is undocumented. */
