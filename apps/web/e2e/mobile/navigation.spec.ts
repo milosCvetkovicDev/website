@@ -119,7 +119,18 @@ const focusedControl = (page: Page) =>
     };
   });
 
-/** Console errors and warnings, and uncaught page errors, from here on. */
+/**
+ * Console errors and warnings, page errors and requests that failed at the network level (a 4xx or
+ * 5xx answer is a response, not a failed request), from here on, until the assertion reads them;
+ * what fails while the page closes afterwards is not checked.
+ *
+ * Playwright reports a WebKit console error from JavaScript as a page error, cut at its first
+ * colon (`splitErrorMessage` in playwright-core 1.63), so WebKit's "Fetch API cannot load http://…
+ * due to access control checks." for a fetch a navigation cancelled arrives as
+ * `pageerror: /localhost:…` (#263). Linux WebKit logs that only now and then and macOS WebKit not
+ * at all, while the cancelled request failed in every WebKit run measured: `requestfailed` turns
+ * the cause into a failure on each run rather than on the rare one.
+ */
 function collectProblems(page: Page): string[] {
   const problems: string[] = [];
   page.on('console', (message) => {
@@ -127,8 +138,21 @@ function collectProblems(page: Page): string[] {
     if (type === 'error' || type === 'warning') problems.push(`console.${type}: ${message.text()}`);
   });
   page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
+  page.on('requestfailed', (request) => {
+    const url = new URL(request.url());
+    // The host only when it is another one; the query's keys (`?_rsc` marks an RSC fetch), not
+    // its values, which change on every build.
+    const host = url.origin === new URL(page.url()).origin ? '' : url.origin;
+    const keys = [...new Set(url.searchParams.keys())].join('&');
+    problems.push(
+      `requestfailed: ${request.method()} ${request.resourceType()} ${host}${url.pathname}` +
+        `${keys ? `?${keys}` : ''} (${request.failure()?.errorText ?? 'no reason given'})`,
+    );
+  });
   return problems;
 }
+
+const PROBLEMS_MESSAGE = 'no console error, console warning, page error or failed request';
 
 test.describe('the mobile header', () => {
   // No retries. CI sets `retries: 2`, and a retry could hide an intermittent break in the menu's
@@ -585,20 +609,23 @@ test.describe('the mobile header', () => {
     await expect(current).toHaveAttribute('href', '/about');
   });
 
-  // Two ways the menu has to close without its own buttons, with a console listener across both. A
-  // modal dialog makes the rest of the page inert, so one left open behind a layout that no longer
-  // shows it would leave a desktop visitor with a page that ignores every click. `/work` is the
+  // Two ways the menu has to close without its own buttons, each on a page of its own under the
+  // problem listener. A modal dialog makes the rest of the page inert, so one left open behind a
+  // layout that no longer shows it would leave a desktop visitor with a page that ignores every
+  // click. They are separate tests because a `page.goto` from the first one's destination would
+  // cancel the link prefetches `/work` starts after a soft navigation: WebKit then sometimes logs
+  // "Fetch API cannot load … due to access control checks", which Playwright reports as a page
+  // error (#263), and the same goto once failed outright on WebKit (#209). `/work` is the
   // destination of both soft navigations, so the dev server compiles it first (warm-routes.ts).
   test.describe(() => {
     test.beforeAll(async ({ playwright }, testInfo) => {
       await warmRoutes(playwright, testInfo, ['/work']);
     });
 
-    test('the menu closes on a link tap and when the viewport grows past md', async ({ page }) => {
+    test('the menu closes on a link tap', async ({ page }) => {
       const problems = collectProblems(page);
       await page.setViewportSize(PHONE);
 
-      // 1. A link in the open menu navigates and closes it.
       await open(page, '/');
       await openMenu(page);
       await drawer(page).getByRole('link', { name: 'Work' }).tap();
@@ -606,7 +633,13 @@ test.describe('the mobile header', () => {
       await expect(menuDialog(page)).toHaveJSProperty('open', false);
       await expect(menuButton(page)).toHaveAttribute('aria-expanded', 'false');
 
-      // 2. Growing past Tailwind's `md` with the menu open closes it, and the desktop nav works.
+      expect(problems, PROBLEMS_MESSAGE).toEqual([]);
+    });
+
+    test('the menu closes when the viewport grows past md', async ({ page }) => {
+      const problems = collectProblems(page);
+      await page.setViewportSize(PHONE);
+
       await open(page, '/about');
       await openMenu(page);
       await page.setViewportSize({ width: 1024, height: PHONE.height });
@@ -614,11 +647,12 @@ test.describe('the mobile header', () => {
       // The menu button is `md:hidden` now, so focus cannot go back to it; it goes to the header's
       // first control rather than falling to <body>.
       await expect(page.getByRole('banner').getByRole('link', { name: 'MC, home' })).toBeFocused();
+      // The desktop nav that takes over from the menu button works.
       await page.getByRole('banner').getByRole('link', { name: 'Work' }).click();
       await expect(page).toHaveURL(/\/work$/);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
-      expect(problems, 'no console error, console warning or page error across both').toEqual([]);
+      expect(problems, PROBLEMS_MESSAGE).toEqual([]);
     });
   });
 });
