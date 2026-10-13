@@ -255,3 +255,11 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   deployed site, while an unmodified headless Chromium (Playwright from `apps/web`) reports none
   across schemes, viewports and reduced motion. Judge console cleanliness with Playwright, not the
   pane.
+- Under WebKit, Playwright (1.63) reports any console error WebKit attributes to JavaScript as a
+  `pageerror`, its text cut at the first colon. A `page.goto` from a production page whose link
+  prefetches (`?_rsc=`) are still in flight cancels them, and Linux WebKit sometimes logs each as
+  "Fetch API cannot load http://… due to access control checks.", which arrives as
+  `pageerror: /localhost:…`. macOS WebKit cancels them without logging, so a local run stays green
+  (#263). A console guard in `e2e/mobile/` therefore starts each test on a fresh page and never
+  spans a `page.goto` after a soft navigation, and it listens for `requestfailed` too, which fails
+  on the cancellation in every run and engine rather than on WebKit's rare message.
