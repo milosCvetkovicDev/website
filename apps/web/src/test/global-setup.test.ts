@@ -8,17 +8,18 @@ import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
-import { publishedPosts } from '@/data/posts';
-import { STATIC_PARAMS_ROUTES, staticParamsPaths } from '../../e2e/global-setup';
+import { posts } from '@/data/posts';
+import { NO_PUBLISHED_POST_SLUG } from '@/lib/post-static-params';
+import { STATIC_PARAMS_ROUTES, WARM_UP_SLUG, warmUpPath } from '../../e2e/static-params-routes';
 
 const APP_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'app');
 
-/** Every page or route handler file under `src/app`, outside `__tests__`. */
-function routeFiles(dir: string): string[] {
+/** Every source file under `src/app`, outside `__tests__`. */
+function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) return entry.name === '__tests__' ? [] : routeFiles(path);
-    return /^(page|route)\.tsx?$/.test(entry.name) ? [path] : [];
+    if (entry.isDirectory()) return entry.name === '__tests__' ? [] : sourceFiles(path);
+    return /\.(m?[jt]sx?|mdx)$/.test(entry.name) ? [path] : [];
   });
 }
 
@@ -30,11 +31,33 @@ function routePattern(file: string): string {
   return `/${segments.join('/')}`;
 }
 
-const EXPORTS_STATIC_PARAMS = /export\s+(async\s+)?(function|const)\s+generateStaticParams\b/;
+/** An export of `generateStaticParams` in any form, at the start of a line (not in a comment). */
+const EXPORTS_STATIC_PARAMS =
+  /^[ \t]*export\s+(?:(?:async\s+)?function\s*\*?\s*generateStaticParams\b|(?:const|let|var)\s+generateStaticParams\b|\{[^}]*\bgenerateStaticParams\b[^}]*\})/m;
 
-describe('global setup warm-up', () => {
-  it('lists exactly the routes that export generateStaticParams', () => {
-    const exporting = routeFiles(APP_DIR)
+describe('the dev-server warm-up route list', () => {
+  it('recognises every export form and ignores comments', () => {
+    const exporting = [
+      'export function generateStaticParams() {}',
+      'export async function generateStaticParams() {}',
+      'export const generateStaticParams = () => [];',
+      'export { generateStaticParams };',
+      "export { generateStaticParams } from '../page';",
+      "export { params as generateStaticParams } from './params';",
+    ];
+    const notExporting = [
+      '// export function generateStaticParams() {}',
+      ' * export function generateStaticParams() {}',
+      'function generateStaticParams() {}',
+      'export function generateStaticParamsFor() {}',
+    ];
+    for (const source of exporting) expect(EXPORTS_STATIC_PARAMS.test(source), source).toBe(true);
+    for (const source of notExporting)
+      expect(EXPORTS_STATIC_PARAMS.test(source), source).toBe(false);
+  });
+
+  it('lists exactly the routes under src/app that export generateStaticParams', () => {
+    const exporting = sourceFiles(APP_DIR)
       .filter((file) => EXPORTS_STATIC_PARAMS.test(readFileSync(file, 'utf8')))
       .map(routePattern)
       .sort();
@@ -44,18 +67,21 @@ describe('global setup warm-up', () => {
     expect([...STATIC_PARAMS_ROUTES].sort()).toEqual(exporting);
   });
 
-  it('serves one path per route that has entries, built from the first slug', () => {
-    const work = caseStudies[0]?.slug;
-    const post = publishedPosts[0]?.slug;
-    const expected = STATIC_PARAMS_ROUTES.flatMap((pattern) => {
-      const slug = pattern.startsWith('/work/') ? work : post;
-      return slug === undefined ? [] : [pattern.replace('[slug]', encodeURIComponent(slug))];
-    });
-    expect(staticParamsPaths()).toEqual(expected);
-    expect(
-      work,
-      'case-studies.ts has no study, so the /work routes would go unwarmed',
-    ).toBeDefined();
-    expect(staticParamsPaths().every((path) => !path.includes('['))).toBe(true);
+  it('requests each route at a slug of its own pattern that no case study or post has', () => {
+    expect(STATIC_PARAMS_ROUTES.map(warmUpPath)).toEqual([
+      '/work/does-not-exist',
+      '/work/does-not-exist/og-image.png',
+      '/work/does-not-exist/index.md',
+      '/work/does-not-exist/index.json',
+      '/blog/does-not-exist',
+      '/blog/does-not-exist/og-image.png',
+      '/blog/does-not-exist/index.md',
+    ]);
+    const taken = [
+      ...caseStudies.map(({ slug }) => slug),
+      ...posts.map(({ slug }) => slug),
+      NO_PUBLISHED_POST_SLUG,
+    ];
+    expect(taken).not.toContain(WARM_UP_SLUG);
   });
 });

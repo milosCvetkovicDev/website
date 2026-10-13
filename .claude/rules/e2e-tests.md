@@ -169,15 +169,18 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   back. The local dev server also builds into `.next-e2e` (`NEXT_DIST_DIR`, read by
   `apps/web/next.config.ts`), so it never fights a `pnpm dev` from the same checkout over
   `apps/web/.next`. See `docs/adr/0014-playwright-owns-its-server.md`.
-- Against the dev server only, `e2e/global-setup.ts` serves one path of every route that exports
-  `generateStaticParams` before any worker starts, one request at a time. `next dev` (16.3.8) adds
-  such a route to `prerender-manifest.json` on its first request with an unlocked read and rewrite,
-  and parallel workers caught it mid-write (vercel/next.js#96259, #264): a 500 with
-  `Unexpected end of JSON input`, and once the route's `index.md`, `index.json` and `og-image.png`
-  answered 404. Measured on the five specs of #182 under `next dev`, 6 of 10 runs failed without
-  it and 0 of 10 with it. Its `STATIC_PARAMS_ROUTES` must list exactly those routes;
-  `src/test/global-setup.test.ts` scans `src/app` and fails when a route is added or removed
-  without it. A warm-up request that fails stops the run before any test, naming the path.
+- Against the dev server only, `e2e/global-setup.ts` requests every route that exports
+  `generateStaticParams` once before any worker starts, one request at a time, at the unknown slug
+  `does-not-exist`, and requires the 404. `next dev` (16.3.8) adds such a route to
+  `prerender-manifest.json` on its first request with an unlocked read and rewrite, and parallel
+  workers caught it mid-write (vercel/next.js#96259, #264): a 500 with
+  `Unexpected end of JSON input`, and once the case studies' `index.md`, `index.json` and
+  `og-image.png` answered 404. It writes the static params before refusing a slug, so the unknown
+  slug warms the blog routes too while no post is published (`post-static-params.ts` gives them a
+  placeholder in development). The setup then reads the manifest back and fails, naming the
+  routes, if any is missing. Measured on the five specs of #182 under `next dev`, 6 of 10 runs
+  failed on the race without it and none of 20 with it. The route list is `e2e/static-params-routes.ts`;
+  `src/test/global-setup.test.ts` scans `src/app` and fails when it and the route files disagree.
 - A flaky e2e test is root-caused before it is patched: reproduce it repeatedly, tell a cold first
   request apart from a logic fault, and prefer warming the destination route on the dev server
   before the timed step (a route compiles on its first request) over an arbitrary wait or a retry.
