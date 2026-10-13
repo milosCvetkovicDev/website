@@ -120,13 +120,16 @@ const focusedControl = (page: Page) =>
   });
 
 /**
- * Console errors and warnings, page errors and failed requests, from here on.
+ * Console errors and warnings, page errors and requests that failed at the network level (a 4xx or
+ * 5xx answer is a response, not a failed request), from here on, until the assertion reads them;
+ * what fails while the page closes afterwards is not checked.
  *
  * Playwright reports a WebKit console error from JavaScript as a page error, cut at its first
- * colon, so WebKit's "Fetch API cannot load http://… due to access control checks." for a fetch a
- * navigation cancelled arrives as `pageerror: /localhost:…` (#263). WebKit logs that only some of
- * the time, while the cancelled request fails every time, in every engine: listening for
- * `requestfailed` makes the cause fail the test on each run rather than on the rare one.
+ * colon (`splitErrorMessage` in playwright-core 1.63), so WebKit's "Fetch API cannot load http://…
+ * due to access control checks." for a fetch a navigation cancelled arrives as
+ * `pageerror: /localhost:…` (#263). Linux WebKit logs that only now and then and macOS WebKit not
+ * at all, while the cancelled request failed in every WebKit run measured: `requestfailed` turns
+ * the cause into a failure on each run rather than on the rare one.
  */
 function collectProblems(page: Page): string[] {
   const problems: string[] = [];
@@ -136,9 +139,14 @@ function collectProblems(page: Page): string[] {
   });
   page.on('pageerror', (error) => problems.push(`pageerror: ${error.message}`));
   page.on('requestfailed', (request) => {
-    const { pathname, search } = new URL(request.url());
+    const url = new URL(request.url());
+    // The host only when it is another one; the query's keys (`?_rsc` marks an RSC fetch), not
+    // its values, which change on every build.
+    const host = url.origin === new URL(page.url()).origin ? '' : url.origin;
+    const keys = [...new Set(url.searchParams.keys())].join('&');
     problems.push(
-      `requestfailed: ${request.method()} ${pathname}${search ? '?…' : ''} (${request.failure()?.errorText})`,
+      `requestfailed: ${request.method()} ${request.resourceType()} ${host}${url.pathname}` +
+        `${keys ? `?${keys}` : ''} (${request.failure()?.errorText ?? 'no reason given'})`,
     );
   });
   return problems;
@@ -639,7 +647,7 @@ test.describe('the mobile header', () => {
       // The menu button is `md:hidden` now, so focus cannot go back to it; it goes to the header's
       // first control rather than falling to <body>.
       await expect(page.getByRole('banner').getByRole('link', { name: 'MC, home' })).toBeFocused();
-      // And the desktop nav works.
+      // The desktop nav that takes over from the menu button works.
       await page.getByRole('banner').getByRole('link', { name: 'Work' }).click();
       await expect(page).toHaveURL(/\/work$/);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
