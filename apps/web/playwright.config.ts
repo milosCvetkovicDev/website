@@ -67,9 +67,9 @@ export default defineConfig({
   workers: isCI ? 1 : undefined,
   expect: { timeout: isCI ? 10_000 : 5_000 },
   reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
-  // The dev server rewrites prerender-manifest.json on each dynamic route's first request, and
-  // parallel workers then catch it half-written (#264). Serving those routes one at a time first
-  // ends the writes; the production build never writes it.
+  // The dev server rewrites prerender-manifest.json on the first request of each route with
+  // generateStaticParams, and parallel workers then catch it half-written (#264). Requesting those
+  // routes one at a time first ends the writes; the production build never writes it.
   globalSetup: isCI ? undefined : './e2e/global-setup.ts',
   use: {
     baseURL: `http://localhost:${port}`,

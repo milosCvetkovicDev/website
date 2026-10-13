@@ -31,12 +31,16 @@ function routePattern(file: string): string {
   return `/${segments.join('/')}`;
 }
 
-/** An export of `generateStaticParams` in any form, at the start of a line (not in a comment). */
+/**
+ * A named export of `generateStaticParams` (declared, or in an `export { … }` list), at the start
+ * of a line, so a comment does not count. `export *` and destructured exports are not recognised;
+ * no route uses them.
+ */
 const EXPORTS_STATIC_PARAMS =
   /^[ \t]*export\s+(?:(?:async\s+)?function\s*\*?\s*generateStaticParams\b|(?:const|let|var)\s+generateStaticParams\b|\{[^}]*\bgenerateStaticParams\b[^}]*\})/m;
 
 describe('the dev-server warm-up route list', () => {
-  it('recognises every export form and ignores comments', () => {
+  it('recognises the named export forms and ignores comments', () => {
     const exporting = [
       'export function generateStaticParams() {}',
       'export async function generateStaticParams() {}',
@@ -57,14 +61,24 @@ describe('the dev-server warm-up route list', () => {
   });
 
   it('lists exactly the routes under src/app that export generateStaticParams', () => {
-    const exporting = sourceFiles(APP_DIR)
-      .filter((file) => EXPORTS_STATIC_PARAMS.test(readFileSync(file, 'utf8')))
-      .map(routePattern)
-      .sort();
+    // A set: a page and a sibling module it re-exports from both match, for one route.
+    const exporting = [
+      ...new Set(
+        sourceFiles(APP_DIR)
+          .filter((file) => EXPORTS_STATIC_PARAMS.test(readFileSync(file, 'utf8')))
+          .map(routePattern),
+      ),
+    ].sort();
     expect(exporting.length, 'the scan found no route at all: is APP_DIR right?').toBeGreaterThan(
       0,
     );
     expect([...STATIC_PARAMS_ROUTES].sort()).toEqual(exporting);
+  });
+
+  it('holds only patterns with one dynamic segment, [slug], which warmUpPath fills', () => {
+    for (const pattern of STATIC_PARAMS_ROUTES) {
+      expect(pattern.match(/\[[^\]]*\]/g), pattern).toEqual(['[slug]']);
+    }
   });
 
   it('requests each route at a slug of its own pattern that no case study or post has', () => {
