@@ -26,10 +26,10 @@ import { publishedPosts } from '@/data/posts';
 import { aboutCopy, beliefs, credentials, facts, shownFacts, timeline } from '@/data/pages/about';
 import { OWNER_TODO, unfilledOwnerFields } from '@/data/owner-todo';
 import { asSentence } from '@/data/pages/table';
-import { socialLinks } from '@/data/pages/contact';
+import { contactCopy, socialLinks } from '@/data/pages/contact';
 import { coreSkills, differentiators, skillCategories } from '@/data/pages/skills';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
-import { blogToMarkdown, caseStudyToMarkdown, pageToMarkdown } from '@/lib/serialise';
+import { absoluteUrl, blogToMarkdown, caseStudyToMarkdown, pageToMarkdown } from '@/lib/serialise';
 import { visible } from '@/test/markdown';
 import { isOnlyEmoji, pictographsIn } from '@/test/pictographs';
 
@@ -188,6 +188,17 @@ describe('the entries moved out of the page modules', () => {
     for (const { name, description, cta, href } of socialLinks) {
       expect(contact).toContain(`## ${name}\n\n${description}\n\n[${cta}](${href})`);
     }
+  });
+
+  // #62: the twin cannot carry the connector snippets, so it names the endpoint and points at the
+  // page that has them, and never tells its reader to paste something it does not hold.
+  it('names the MCP endpoint in the /contact twin and points at the snippets', () => {
+    const contact = twin('/contact');
+    const { heading, intro, endpoint } = contactCopy.agents;
+    expect(contact).toContain(
+      `## ${heading}\n\n${intro} ${endpoint}\n\nThe copy-paste snippets for Claude Code, Cursor and VS Code are on [the contact page](${absoluteUrl('/contact')}).`,
+    );
+    expect(contact).not.toMatch(/paste the snippet/i);
   });
 
   // The whole list in one module is for server code: a client component that imported it would

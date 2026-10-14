@@ -15,16 +15,18 @@ import { experienceFigureSince } from './profile';
  * needs no bump here. Changing a published post's title or summary, unpublishing a post or removing
  * one changes the list without a new `publishedAt`: bump /blog's date in that commit.
  *
- * From git, the last commit to change what each route visibly says: /about 2026-10-07 (58e, for
- * #58: the quick facts gained a Basis column saying what each figure counted, and leave out the two
- * facts whose basis the owner has yet to supply; dated the day it is expected to merge). `/`, /work,
- * /skills and /contact 2026-10-05 (#228, for #58: each one's h1 names the person or the page's
- * subject, with the hook it used to be as the largest line under it, and the line under the hero's
- * hook says only the specialisation; written and dated on 2026-10-03, it merged on 2026-10-05, and a
- * follow-up moved the five dates to the merge day), /about too until 58e. Before #228, /about and
- * /skills 2026-10-03 (#226, for #58, merged that day: the /about quick facts and timeline and the
- * /skills toolkit became captioned tables, whose wide ones stack into rows on a phone). Before
- * those, /about 2026-10-02
+ * From git, the last commit to change what each route visibly says: /contact 2026-10-14 (#62: the
+ * "Connect an agent" section and its connector snippets; dated the day the branch was brought up to
+ * date with main, to be moved to the day it merges). /about 2026-10-07 (58e, for #58: the quick
+ * facts gained a Basis column saying what each figure counted, and leave out the two facts whose
+ * basis the owner has yet to supply; dated the day it is expected to merge). `/`, /work and /skills
+ * 2026-10-05 (#228, for #58: each one's h1 names the person or the page's subject, with the hook it
+ * used to be as the largest line under it, and the line under the hero's hook says only the
+ * specialisation; written and dated on 2026-10-03, it merged on 2026-10-05, and a follow-up moved
+ * the five dates to the merge day), /about and /contact too until 58e and #62. Before #228,
+ * /about and /skills 2026-10-03 (#226, for #58, merged that day: the /about quick facts and
+ * timeline and the /skills toolkit became captioned tables, whose wide ones stack into rows on a
+ * phone). Before those, /about 2026-10-02
  * (#57's "Last updated" line at the foot of /about, which prints this date), `/` and /work
  * 2026-10-01 (#49: the self-healing agent's figure relabelled "errors resolved autonomously" on the
  * home and /work cards and in the About timeline, whose 2021 entry lost its unsourced 40%; #58: the
@@ -48,7 +50,7 @@ export const STATIC_ROUTE_UPDATED = {
   '/work': '2026-10-05',
   '/skills': '2026-10-05',
   '/blog': '2026-01-27',
-  '/contact': '2026-10-05',
+  '/contact': '2026-10-14',
   '/privacy': '2026-09-27',
 } as const satisfies Record<string, string>;
 

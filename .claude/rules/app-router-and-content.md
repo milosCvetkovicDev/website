@@ -72,6 +72,10 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   Vercel or on a loopback host (never a DNS-rebound name), and logs nothing.
   `mcp/__tests__/tools.test.ts` and `route.test.ts` call its `POST`, and `e2e/mcp.spec.ts` the
   served route; `/mcp` is kept out of `e2e/routes.ts`, whose walks GET every route.
+  `data/mcp-server.ts` builds the published URL from `absoluteUrl()` and the three copy-paste
+  connector snippets that `/contact` renders and the README carries between its
+  `connector-snippets` markers; `mcp/__tests__/connector-snippets.test.ts` fails when the README
+  copy differs or its `MCP_PATH` differs from `MCP` in `e2e/endpoints.ts`.
 
 A post's twin is written by `postToMarkdown()`: the opening, the dates, the body, then `---` and the
 kind's `FOOTER_LINES` when it has any (`own` has none). `/blog`'s twin is written by
