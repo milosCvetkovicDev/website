@@ -3,11 +3,16 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { publishedPosts } from '@/data/posts';
+import { pages } from '@/data/pages';
+import { FOOTER_LINES, publishedPosts } from '@/data/posts';
 import { formatContentDate } from '@/lib/content-date';
+import { blogToMarkdown, pageToMarkdown, postToMarkdown } from '@/lib/serialise';
+import { canonicalUrl } from '@/lib/structured-data';
 import { draftPost, everyBlockPost, hostileTitlePost } from '@/test/fixtures/posts';
 import PostPage, { dynamicParams, generateMetadata, generateStaticParams } from '../[slug]/page';
 import * as card from '../[slug]/og-image.png/route';
+import * as twin from '../[slug]/index.md/route';
+import * as blogTwin from '../index.md/route';
 
 /**
  * `/blog/[slug]`, the post page, and its card (#61, 61b).
@@ -29,7 +34,13 @@ vi.mock('@/data/posts', async (importOriginal) => {
     metaTitle: 'Fixture: a shorter title',
   };
   const list = [...fixturePosts, withMetaTitle];
-  return { ...actual, posts: list, ...actual.buildPostIndex(list) };
+  // Two closing lines rather than the real one, so that the footer test can tell one paragraph per
+  // line from the lines joined into one; `posts.test.ts` pins the real lines.
+  const FOOTER_LINES: typeof actual.FOOTER_LINES = {
+    own: [],
+    jev: ['Fixture: the first closing line.', 'Fixture: the second closing line.'],
+  };
+  return { ...actual, FOOTER_LINES, posts: list, ...actual.buildPostIndex(list) };
 });
 
 // The card is a PNG drawn by `next/og`; what this file checks is what the handler asks it to draw.
@@ -107,7 +118,8 @@ describe('the post page', () => {
   it('renders every block kind of the post, in its order', async () => {
     render(await PostPage(paramsOf(everyBlockPost.slug)));
     const body = document.querySelector('[data-post-body]')!;
-    // One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote.
+    // One element per block: paragraph, h2, list, h3, numbered list, two code blocks, a quote,
+    // a table.
     expect([...body.children].map((element) => element.tagName)).toEqual([
       'P',
       'H2',
@@ -117,6 +129,7 @@ describe('the post page', () => {
       'FIGURE',
       'FIGURE',
       'BLOCKQUOTE',
+      'DIV',
     ]);
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('A level-two heading');
     expect(screen.getByRole('heading', { level: 3 }).textContent).toBe('A level-three heading');
@@ -137,6 +150,28 @@ describe('the post page', () => {
     const back = screen.getByRole('link', { name: 'Back to Writing' });
     expect(back).toHaveAttribute('href', '/blog');
     expect(article.contains(back)).toBe(false);
+  });
+
+  it('ends a jev post with its footer lines, last inside the article, in --muted text', async () => {
+    // The control: with one line, a footer that joined its lines into one paragraph would pass.
+    expect(FOOTER_LINES.jev.length).toBeGreaterThan(1);
+    render(await PostPage(paramsOf(hostileTitlePost.slug)));
+    const footer = document.querySelector('article')!.lastElementChild!;
+    expect(footer.tagName).toBe('FOOTER');
+    expect([...footer.children].map((line) => [line.tagName, line.textContent])).toEqual(
+      FOOTER_LINES.jev.map((line) => ['P', line]),
+    );
+    expect(footer.className).toContain('border-t');
+    expect(footer.className).toContain('text-[var(--muted)]');
+    // Neither an opacity step nor a text alpha, numeric (`/60`) or arbitrary (`/[0.6]`).
+    for (const element of [footer, ...footer.children]) {
+      expect(element.className).not.toMatch(/opacity-|text-\S+\/[\d[]/);
+    }
+  });
+
+  it('gives an own post no footer', async () => {
+    render(await PostPage(paramsOf(everyBlockPost.slug)));
+    expect(document.querySelector('article footer')).toBeNull();
   });
 
   it('puts no text under aria-hidden, which the axe gate would measure anyway', async () => {
@@ -205,6 +240,106 @@ describe('its metadata', () => {
   });
 });
 
+/** The raw text of every ld+json script in a render, in document order. */
+function jsonLdSources(container: HTMLElement): string[] {
+  return [...container.querySelectorAll('script[type="application/ld+json"]')].map(
+    (script) => script.innerHTML,
+  );
+}
+
+// The page's own nodes; the root layout adds the Person and the WebSite, and
+// `components/__tests__/json-ld.test.tsx` joins the two into one graph per route.
+/** A render's ld+json nodes, parsed. */
+function jsonLdNodes(container: HTMLElement): Record<string, unknown>[] {
+  return jsonLdSources(container).map((source) => JSON.parse(source) as Record<string, unknown>);
+}
+
+/** The one node of `type` among `nodes`; none, or two, throws. */
+function nodeOfType(nodes: Record<string, unknown>[], type: string): Record<string, unknown> {
+  const found = nodes.filter((node) => node['@type'] === type);
+  if (found.length !== 1) throw new Error(`${found.length} ${type} nodes, not 1`);
+  return found[0];
+}
+
+describe('its JSON-LD (61f)', () => {
+  it('has the published posts the rows below need', () => {
+    // The controls: every row below walks `publishedPosts`, so an empty list would pass them all;
+    // the metaTitle row needs a post whose head title is not its h1, and the date row a post never
+    // updated, whose `dateModified` is its publication day and whose Updated line still shows.
+    expect(publishedPosts.length).toBeGreaterThan(0);
+    expect(publishedPosts.some((post) => post.metaTitle && post.metaTitle !== post.title)).toBe(
+      true,
+    );
+    expect(publishedPosts.some((post) => post.updatedAt === post.publishedAt)).toBe(true);
+  });
+
+  it.each(publishedPosts.map((post) => [post.slug, post] as const))(
+    '%s serves a WebPage, a TechArticle and a BreadcrumbList, outside its article',
+    async (_slug, post) => {
+      const { container } = render(await PostPage(paramsOf(post.slug)));
+      const nodes = jsonLdNodes(container);
+      // #57's types, as a case study serves them: no new node type, not even BlogPosting (#61).
+      expect(nodes.map((node) => node['@type'])).toEqual([
+        'WebPage',
+        'TechArticle',
+        'BreadcrumbList',
+      ]);
+      // An extractor that reads the article gets the post, and nothing about the page around it.
+      expect(container.querySelector('article script')).toBeNull();
+    },
+  );
+
+  it.each(publishedPosts.map((post) => [post.slug, post] as const))(
+    '%s dates its article with the days its line shows, and heads it with its h1',
+    async (_slug, post) => {
+      const { container } = render(await PostPage(paramsOf(post.slug)));
+      const article = nodeOfType(jsonLdNodes(container), 'TechArticle');
+      // The post's own dates (#61), which the visible Published and Updated line reads too: the
+      // page prints both terms for every post, one never updated included.
+      expect(article.datePublished).toBe(post.publishedAt);
+      expect(article.dateModified).toBe(post.updatedAt);
+      expect(article.datePublished).toBe(dateLabelled('Published').getAttribute('dateTime'));
+      expect(article.dateModified).toBe(dateLabelled('Updated').getAttribute('dateTime'));
+      expect(article.headline).toBe(screen.getByRole('heading', { level: 1 }).textContent);
+    },
+  );
+
+  it.each(publishedPosts.map((post) => [post.slug, post] as const))(
+    '%s names its page node with the title its head carries, at its canonical',
+    async (_slug, post) => {
+      const { container } = render(await PostPage(paramsOf(post.slug)));
+      const nodes = jsonLdNodes(container);
+      const page = nodeOfType(nodes, 'WebPage');
+      const crumbs = nodeOfType(nodes, 'BreadcrumbList');
+      const metadata = await generateMetadata(paramsOf(post.slug));
+      // `metaTitle` when the post sets one, as the head's title is: the fixture added by the mock
+      // above (its control is the first row) is the one a `name={post.title}` would get wrong.
+      expect(page.name).toBe(metadata.title);
+      expect(page.url).toBe(canonicalUrl(`/blog/${post.slug}`));
+      expect(page.breadcrumb).toEqual({ '@id': crumbs['@id'] });
+    },
+  );
+
+  it('keeps the hostile title inside its scripts, and reads it back as written', async () => {
+    const { container } = render(await PostPage(paramsOf(hostileTitlePost.slug)));
+    const sources = jsonLdSources(container);
+    expect(sources).toHaveLength(3);
+    // The control: the title carries a `<`, so the check below proves it was escaped.
+    expect(hostileTitlePost.title).toContain('<');
+    // `serializeJsonLd` writes every `<` as `\u003c`, so no `</script>` can end a block early.
+    for (const source of sources) expect(source).not.toContain('<');
+    const nodes = jsonLdNodes(container);
+    const page = nodeOfType(nodes, 'WebPage');
+    const article = nodeOfType(nodes, 'TechArticle');
+    const crumbs = nodeOfType(nodes, 'BreadcrumbList');
+    expect(page.name).toBe(hostileTitlePost.title);
+    expect(article.headline).toBe(hostileTitlePost.title);
+    expect((crumbs.itemListElement as { name: string }[]).at(-1)?.name).toBe(
+      hostileTitlePost.title,
+    );
+  });
+});
+
 describe('its card', () => {
   it('is prerendered, for published posts only', () => {
     // A GET handler is dynamic by default since Next 15 and would deploy as a function.
@@ -231,6 +366,44 @@ describe('its card', () => {
     await expect(
       card.GET(new Request('http://localhost/'), paramsOf(draftPost.slug)),
     ).rejects.toThrow(JSON.stringify(draftPost.slug));
+  });
+});
+
+describe('the post twin', () => {
+  it('prerenders one twin per published post, and no other', async () => {
+    expect(twin.dynamic).toBe('force-static');
+    expect(twin.dynamicParams).toBe(false);
+    // The page's list is async; the twin's, like the card's, is not.
+    expect(twin.generateStaticParams()).toEqual(await generateStaticParams());
+  });
+
+  it("serves the post's Markdown, as postToMarkdown writes it", async () => {
+    const response = await twin.GET(
+      new Request('http://localhost/'),
+      paramsOf(hostileTitlePost.slug),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/markdown; charset=utf-8');
+    expect(await response.text()).toBe(postToMarkdown(hostileTitlePost));
+  });
+
+  it('refuses a draft, as dynamicParams would before it', async () => {
+    await expect(
+      twin.GET(new Request('http://localhost/'), paramsOf(draftPost.slug)),
+    ).rejects.toThrow(`unknown post ${JSON.stringify(draftPost.slug)}`);
+  });
+});
+
+// Here rather than beside the other twin handlers in `pages.test.ts`, which reads the real list:
+// while it is empty, `blogToMarkdown` falls back to `pageToMarkdown`, and a handler that ignored
+// the posts would pass there.
+describe("/blog's twin", () => {
+  it('lists the published posts, which the page record alone does not', async () => {
+    // The control: with no post published, the two expectations below would describe one body.
+    expect(publishedPosts.length).toBeGreaterThan(0);
+    const body = await blogTwin.GET().text();
+    expect(body).toBe(blogToMarkdown(pages['/blog'], publishedPosts));
+    expect(body).not.toBe(pageToMarkdown(pages['/blog']));
   });
 });
 

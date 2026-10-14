@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, NotificationToast } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { useStoryVisibility } from '@/hooks/use-story-visibility';
 import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const healingTimeline = [
@@ -27,10 +28,11 @@ const healingTimeline = [
 
 export function LoopPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  // Pauses the section's endless CSS animations while it is out of view (globals.css).
+  useStoryVisibility(sectionRef);
   const titleId = useId();
   const dashboardRef = useRef<HTMLDivElement>(null);
   const alertRef = useRef<HTMLDivElement>(null);
-  const timelineRef = useRef<HTMLDivElement>(null);
   const protocolRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLDivElement>(null);
 
@@ -146,6 +148,8 @@ export function LoopPhase() {
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
+    // Every element the entrance hides carries data-story-reveal, which a print shows in full
+    // (the @media print rule in globals.css).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap, ScrollTrigger }) => {
@@ -236,7 +240,7 @@ export function LoopPhase() {
         </h2>
 
         {/* Dashboard */}
-        <div ref={dashboardRef}>
+        <div ref={dashboardRef} data-story-reveal="">
           <HudPanel title="MONITORING DASHBOARD">
             <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-4">
               <div className="rounded-lg bg-[var(--background)] p-2 text-center sm:p-3">
@@ -257,6 +261,7 @@ export function LoopPhase() {
                 data-loop marks it for the tests to find. */}
             <div
               ref={alertRef}
+              data-story-reveal=""
               data-loop="alert"
               className={`rounded-lg border p-4 transition-colors duration-500 ${
                 shownAlertStatus === 'error'
@@ -287,7 +292,7 @@ export function LoopPhase() {
         </div>
 
         {/* Healing Timeline */}
-        <div ref={timelineRef} className="mt-6">
+        <div className="mt-6">
           <HudPanel title="SELF-HEALING LOG">
             <div className="space-y-2 font-mono text-sm">
               {healingTimeline.slice(0, shownEvents).map((event, index) => (
@@ -310,12 +315,17 @@ export function LoopPhase() {
         {/* Protocol Active */}
         <div
           ref={protocolRef}
+          data-story-reveal=""
           data-reveal="protocol"
           className={`mt-6 ${protocolVisible ? '' : 'opacity-0'}`}
         >
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
-              <span className="text-xl">🔄</span>
+              {/* Decoration: the self-healing protocol line beside it carries the meaning, so a
+                  screen reader skips the emoji. */}
+              <span aria-hidden="true" className="text-xl">
+                🔄
+              </span>
               <div>
                 <div className="font-semibold">SELF-HEALING PROTOCOL ACTIVE</div>
                 <div className="text-sm">System diagnosed and fixed the issue autonomously</div>
@@ -327,6 +337,7 @@ export function LoopPhase() {
         {/* Headline */}
         <div
           ref={headlineRef}
+          data-story-reveal=""
           data-reveal="headline"
           className={`mt-16 text-center ${protocolVisible ? '' : 'opacity-0'}`}
         >

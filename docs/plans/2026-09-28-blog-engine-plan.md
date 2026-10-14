@@ -104,13 +104,13 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
   `apps/web/e2e/seo-surface.spec.ts`, `apps/web/e2e/blog.spec.ts`
 - Create: `apps/web/src/app/blog/__tests__/blog-page.test.tsx`
 
-- [ ] **Step 1:** Tests over the fixtures: one list item per published post with its title and
+- [x] **Step 1:** Tests over the fixtures: one list item per published post with its title and
       labelled date, no draft, no placeholder; the sitemap lists `/blog` and each post with
       `lastmod` equal to its `updatedAt`. They fail.
-- [ ] **Step 2:** `/blog` lists `publishedPosts` and keeps the placeholder only while
+- [x] **Step 2:** `/blog` lists `publishedPosts` and keeps the placeholder only while
       `hasPublishedPosts` is false; its metadata becomes `index: hasPublishedPosts`; the sitemap
       follows the same switch (D4, D5).
-- [ ] **Step 3:** #48's two rows, the `/blog` robots meta and the sitemap's `/blog` entry, are
+- [x] **Step 3:** #48's two rows, the `/blog` robots meta and the sitemap's `/blog` entry, are
       rewritten to the conditional contract with a comment naming #61.
 
 ### Task 4: The Atom feed (61d)
@@ -122,14 +122,16 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
 - Modify: `apps/web/src/lib/metadata.ts` and its test, `apps/web/e2e/machine-readable.spec.ts`, the
   build-output gate under `scripts/`, `.claude/rules/app-router-and-content.md`
 
-- [ ] **Step 1:** `feed.test.ts` in jsdom, for its `DOMParser`: well-formed output, entries newest
+- [x] **Step 1:** `feed.test.ts` in jsdom, for its `DOMParser`: well-formed output, entries newest
       first with no draft, the fixture title with `&`, `<` and `"` still parsing, an empty feed, and
       `force-static`. It fails.
-- [ ] **Step 2:** `buildAtomFeed` and the route (D9, D12); the Atom alternate in `buildMetadata()`
+- [x] **Step 2:** `buildAtomFeed` and the route (D9, D12); the Atom alternate in `buildMetadata()`
       only while `hasPublishedPosts`.
-- [ ] **Step 3:** `feed.spec.ts`: `/feed.xml` answers 200 with the Atom type, and each page carries
+- [x] **Step 3:** `feed.spec.ts`: `/feed.xml` answers 200 with the Atom type, and each page carries
       one Atom alternate when a post is published and none otherwise. The `/feed.xml` expected
       failure in the machine-readable spec is removed and the gate expects the feed's body file.
+      (The gate requires `feed.xml.body` as it does every prerendered path's body, with fixtures in
+      its test; it has no list of routes that must exist, so `/feed.xml` joins one when there is.)
 
 ### Task 5: Markdown twins (61e)
 
@@ -139,14 +141,19 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
 - Modify: `apps/web/src/lib/serialise.ts` and its test, `apps/web/src/app/blog/index.md/route.ts`,
   `apps/web/e2e/blog.spec.ts`, `.claude/rules/app-router-and-content.md`
 
-- [ ] **Step 1:** Serialiser tests: every block and inline kind of every fixture post appears in its
+- [x] **Step 1:** Serialiser tests: every block and inline kind of every fixture post appears in its
       Markdown, which opens with `# <title>`; the route exports `force-static`. A fixture code
       block and an inline code piece hold a run of backticks, and the fence and the code span are
-      longer than the run. They fail.
-- [ ] **Step 2:** `postToMarkdown`, the twin route over `publishedPosts` (D10), and the `/blog` twin
+      longer than the run. They fail. (The backtick runs are built in
+      `apps/web/src/lib/__tests__/serialise.test.ts`, in the test "fences code longer than its
+      longest backtick run…", not in the fixture posts.)
+- [x] **Step 2:** `postToMarkdown`, the twin route over `publishedPosts` (D10), and the `/blog` twin
       listing the published posts.
-- [ ] **Step 3:** `blog.spec.ts` checks each twin and the post page's one Markdown alternate. This
-      task lands before the first published post.
+- [x] **Step 3:** `blog.spec.ts` checks each twin and the post page's one Markdown alternate. This
+      task lands before the first published post. (Met by `apps/web/e2e/markdown-twins.spec.ts`
+      rather than `blog.spec.ts`: `MARKDOWN_TWINS` has an entry for each published post, so once a
+      post is published the spec checks that its page advertises exactly one Markdown twin, served
+      as Markdown. While none is, it checks no post twin.)
 
 ### Task 6: Post JSON-LD (61f)
 
@@ -156,7 +163,12 @@ pnpm check:docs-drift --skip-requires admin                          # nothing u
   test, `apps/web/src/app/blog/[slug]/page.tsx`, `apps/web/src/app/blog/__tests__/post-page.test.tsx`,
   `apps/web/e2e/seo-surface.spec.ts`
 
-- [ ] **Step 1:** Tests: each block parses, the fixture title stays inside its script, the dates
+- [x] **Step 1:** Tests: each block parses, the fixture title stays inside its script, the dates
       equal the post's. They fail.
-- [ ] **Step 2:** Post TechArticle and BreadcrumbList builders on #57's graph, rendered from the post
-      page (D11), and the served type set checked on the post routes.
+- [x] **Step 2:** Post TechArticle and BreadcrumbList builders on #57's graph, rendered from the post
+      page (D11), and the served type set checked on the post routes. (#57's own `techArticle()`
+      and `breadcrumbList()` build them, through `PostArticleJsonLd` and `PostBreadcrumbJsonLd` in
+      `json-ld.tsx`, beside the post's `PostWebPageJsonLd`. The article leaves out `description` and
+      `keywords`, because the post page prints neither its summary nor its tags (ADR 0031's fifth
+      decision). With no post published, the served check covers no post route and says so in its
+      report.)

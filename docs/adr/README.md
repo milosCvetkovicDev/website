@@ -43,7 +43,7 @@ perform an operation.
 | 0015 | [Case-study slugs are fixed at build time, so unknown ones 404 at the router](0015-static-case-study-params.md)                          | Accepted (corrected 2026-09-12)               | 2026-09-10 |
 | 0016 | [Dependabot branches never deploy, and commits that change nothing the site is built from never build](0016-vercel-deployment-budget.md) | Accepted                                      | 2026-09-12 |
 | 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)                                       | Accepted                                      | 2026-09-12 |
-| 0018 | [Dependency update policy](0018-dependency-update-policy.md)                                                                             | Accepted                                      | 2026-09-12 |
+| 0018 | [Dependency update policy](0018-dependency-update-policy.md)                                                                             | Accepted (corrected 2026-10-06)               | 2026-09-12 |
 | 0019 | [Next.js does not generate agent instruction files](0019-next-agent-rules-disabled.md)                                                   | Accepted                                      | 2026-09-27 |
 | 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)                                   | Superseded by ADR-0021                        | 2026-09-12 |
 | 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)                   | Accepted                                      | 2026-09-13 |
@@ -53,9 +53,15 @@ perform an operation.
 | 0025 | [The public `vercel.app` production alias answers `X-Robots-Tag: noindex`](0025-production-alias-noindex.md)                             | Accepted                                      | 2026-09-25 |
 | 0026 | [Vercel Web Analytics loads in Vercel deployments only](0026-vercel-web-analytics.md)                                                    | Accepted (corrected 2026-09-27)               | 2026-09-26 |
 | 0027 | [vite 8 is declared in `apps/web`, and `allowBuilds` keeps one entry](0027-vite-8-in-apps-web.md)                                        | Accepted                                      | 2026-09-28 |
-| 0028 | [Blog posts are typed data, and the owner writes every one](0028-blog-posts-as-typed-data.md)                                            | Accepted                                      | 2026-09-29 |
+| 0028 | [Blog posts are typed data, and the owner writes every one](0028-blog-posts-as-typed-data.md)                                            | Superseded by ADR-0034                        | 2026-09-29 |
 | 0029 | [A read-only, unauthenticated MCP server at /mcp is the site's one server function](0029-read-only-mcp-server.md)                        | Proposed                                      | 2026-09-30 |
-| 0030 | [Generated endpoints are static route handlers; pages negotiate twins by rewrite](0030-generated-endpoints-as-static-route-handlers.md)  | Accepted                                      | 2026-10-01 |
+| 0030 | [Generated endpoints are static route handlers; pages negotiate twins by rewrite](0030-generated-endpoints-as-static-route-handlers.md)  | Accepted (corrected 2026-10-07)               | 2026-10-01 |
+| 0031 | [Structured data is one graph joined by @id, in separate blocks, asserting only what a page shows](0031-structured-data-graph.md)        | Accepted                                      | 2026-10-02 |
+| 0032 | [Playwright's Chromium keeps V8's garbage collector on the main thread](0032-e2e-chromium-single-threaded-gc.md)                         | Accepted                                      | 2026-10-05 |
+| 0033 | [Dependabot's catch-all groups exclude the packages that have groups of their own](0033-dependabot-group-exclusions.md)                  | Accepted                                      | 2026-10-06 |
+| 0034 | [Blog posts are drafted with Claude and approved by the owner, line by line](0034-blog-posts-drafted-with-claude.md)                     | Accepted                                      | 2026-10-06 |
+| 0035 | [A value only the owner can supply is a registered placeholder with a deadline the owner sets](0035-owner-placeholder-convention.md)     | Accepted                                      | 2026-09-29 |
+| 0036 | [Content dates move with served text, and a pull request check holds them together](0036-content-dates-move-with-served-text.md)         | Proposed                                      | 2026-10-08 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
@@ -126,3 +132,18 @@ that is untrue, which [ADR 0007](0007-dependency-build-scripts.md) carries an ex
    links inside a record, so check by hand that each of them resolves. Then run `pnpm format` and commit on a
    `docs/` branch with a `docs(adr): ...` message. The pre-commit hook runs lint-staged, which applies
    `prettier --write` to `*.md`, so a missed format is corrected before the commit lands.
+8. Before pushing, run `git fetch origin` and then `pnpm check:adr-history`,
+   which the `quality` job also runs. It compares each record with its text where the branch left
+   `origin/main`, their merge base (in CI, the tip of the branch the pull request merges into). For
+   a record that was `Accepted` or `Superseded` there, in any of their forms, it fails when the
+   record is deleted or set back to `Proposed` or `Withdrawn`, when a superseded record is accepted
+   again or points at another successor, when its `## Decision` changes by more than whitespace
+   (inside a code fence, whitespace counts), or when a `## Corrections` entry that already existed
+   is reworded, removed or has another inserted before it; an entry appended after the last one
+   passes. A record that was `Proposed` or `Withdrawn` at the base, or is new, is exempt, though one
+   accepted in the branch must have exactly one `## Decision`. What it cannot judge stays with the
+   reviewer: whether an in-place edit of `## Context`, `## Consequences` or
+   `## Alternatives considered` fixes a claim that was false when the record was accepted rather
+   than one overtaken since, whether it adds guidance the record did not carry, that no rejected
+   alternative was removed, that the status line matches the change, and that a new entry quotes
+   the text that was wrong and cites evidence that settles it.

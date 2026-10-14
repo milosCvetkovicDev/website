@@ -55,7 +55,7 @@ VS Code, in `.vscode/mcp.json`:
 
 | Layer     | Choice                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------- |
-| Framework | Next.js 16 (App Router, server components by default), React 19, TypeScript 5                           |
+| Framework | Next.js 16 (App Router, server components by default), React 19, TypeScript 6                           |
 | Styling   | Tailwind CSS 4 (CSS-first config), Geist fonts                                                          |
 | Motion    | GSAP 3 + ScrollTrigger for the scroll story, SMIL and CSS for decorative details                        |
 | Monorepo  | Turborepo 2, pnpm 10 workspaces, Node 22                                                                |
@@ -96,14 +96,15 @@ The site runs on `http://localhost:3000`.
 
 ## Quality gates
 
-CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, commitlint runs in a workflow of its own, `.github/workflows/commitlint.yml`, over the pull request title (as written, and with the ` (#NN)` suffix the squash commit gets) and every commit on the branch, or over every commit a push to `main` lands. The title and the push to `main` are linted without commitlint's default ignores, so a title such as `revert everything` or `Merge branch x into y` fails there although the local hook would accept it as a commit. Of the rest, the `quality` job runs the first ten in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last two. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message.
+CI runs on every pull request and every push to `main` (`.github/workflows/ci.yml` limits its `push` trigger to `main`). Of the rows marked CI below, commitlint runs in a workflow of its own, `.github/workflows/commitlint.yml`, over the pull request title (as written, and with the ` (#NN)` suffix the squash commit gets) and every commit on the branch, or over every commit a push to `main` lands. The title and the push to `main` are linted without commitlint's default ignores, so a title such as `revert everything` or `Merge branch x into y` fails there although the local hook would accept it as a commit. Of the rest, the `quality` job runs the first eleven in the order listed, dependency review only on pull requests because a push has no base to compare with, and the `e2e` job runs the last two. On each commit, Husky runs Prettier and ESLint over the staged files and commitlint over the commit message.
 
 | Command                           | What it checks                                                                                                                      | Pre-commit         | CI  |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --- |
 | dependency review                 | Lockfile dependencies a pull request adds with a known advisory                                                                     | -                  | yes |
 | `pnpm check:allowbuilds`          | `allowBuilds` entries against the versions the lockfile resolves                                                                    | -                  | yes |
 | `pnpm check:adrs`                 | Each ADR's status, title, date and link against its row in `docs/adr/README.md`, and ADR 0012's status and pointer rules            | -                  | yes |
-| `pnpm test:scripts`               | `node:test` suites in `scripts/`: allowBuilds drift, AI refusals, Vercel build step, commitlint configs, web server log, flake hunt | -                  | yes |
+| `pnpm check:adr-history`          | Each ADR accepted or superseded at the merge base: its Decision and existing Corrections entries unchanged, new entries at the end  | -                  | yes |
+| `pnpm test:scripts`               | Every `node:test` suite in `scripts/`, such as allowBuilds drift, AI refusals, Vercel build, commitlint, web server log, flake hunt | -                  | yes |
 | `pnpm format:check`               | Prettier, shared config, Tailwind class order                                                                                       | yes (staged files) | yes |
 | `pnpm lint`                       | ESLint with `--max-warnings 0` in `apps/web`                                                                                        | yes (staged files) | yes |
 | commitlint                        | Conventional Commits (`feat`, `fix`, `chore`, `docs`, `test`, ...); in CI, the PR title and every commit                            | yes                | yes |
@@ -119,6 +120,8 @@ CodeQL default setup is on as well. GitHub manages it outside `.github/workflows
 `.github/workflows/flake-hunt.yml` is not a check: every night it runs the e2e suite 30 times with `scripts/flake-hunt.sh` and opens an issue for flaky tests no open `flake-hunt` issue tracks yet.
 
 `.github/workflows/live-check.yml` is not a check either: after each production deployment and every morning it loads every page of the live site with `apps/web/playwright.live.config.ts`, fails when a page does not load the Web Analytics tracker, logs an error or warning to the console, or stores a cookie or a storage entry, or when a page's URL, asked in both orders, serves a browser Markdown or an agent that asks for Markdown the HTML page, and opens an issue when it fails. It cannot see a page view reach Vercel: the tracker sends none to an automated browser.
+
+`.github/workflows/content-dates.yml` reports on every pull request that has no merge conflict (GitHub runs no pull request workflow on one that has) but is not a required check: it fails when, since the pull request's merge base, a route's served text changed without its content date, its date changed without its text, or its date moved backwards, as `apps/web/src/data/content-dates.json` records them, unless a `Content-Date-Exception: <route> <reason>` line in the pull request body excuses that route ([ADR 0036](docs/adr/0036-content-dates-move-with-served-text.md)).
 
 Useful extras: `pnpm lint:fix`, `pnpm format`, `pnpm clean`.
 

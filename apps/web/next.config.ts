@@ -11,6 +11,7 @@ import { PRODUCTION_ALIAS_HOST } from './production-alias';
 // beside this file. No module these reach may use the alias (`src/test/next-config.test.ts` loads
 // this file through that loader to prove it).
 import { caseStudies } from './src/data/case-studies';
+import { publishedPosts } from './src/data/posts';
 import { STATIC_ROUTE_UPDATED } from './src/data/static-routes';
 import { markdownTwinPath } from './src/lib/pathname';
 
@@ -152,12 +153,14 @@ export const PRODUCTION_ALIAS_HEADERS = [{ key: 'X-Robots-Tag', value: 'noindex'
 
 /**
  * Every route that has a Markdown twin (#59): the static routes, which are the keys of
- * `STATIC_ROUTE_UPDATED` (`data/pages` holds a record for each), and one route per case study. The
- * same list the twins' route handlers are built from, so a route gains its rewrite with its twin.
+ * `STATIC_ROUTE_UPDATED` (`data/pages` holds a record for each), one route per case study and one
+ * per published post. The same list the twins' route handlers are built from, so a route gains its
+ * rewrite with its twin.
  */
 export const MARKDOWN_ROUTES: readonly string[] = [
   ...Object.keys(STATIC_ROUTE_UPDATED),
   ...caseStudies.map(({ slug }) => `/work/${slug}`),
+  ...publishedPosts.map(({ slug }) => `/blog/${slug}`),
 ];
 
 /**
@@ -204,11 +207,16 @@ export function markdownRewrites() {
 /**
  * `Vary: Accept` on each route that negotiates, so a shared or browser cache keeps the two
  * representations of one URL apart. Next matches `headers()` against the requested path, before
- * the rewrite, so the negotiated Markdown answer carries it. The twin's own URL is left out: it
- * serves one representation whatever the request accepts, and varying it would only split caches
- * by `Accept` string. Its own entries, over exactly these paths: the key is one ADR 0023's and
- * ADR 0025's entries do not set. On an HTML page Next replaces this `Vary` with its own after
- * `headers()` has run (ADR 0030).
+ * the rewrite, so under `next start` the negotiated Markdown answer carries it. The twin's own URL
+ * is left out: it serves one representation whatever the request accepts, and varying it would
+ * only split caches by `Accept` string. Its own entries, over exactly these paths: the key is one
+ * ADR 0023's and ADR 0025's entries do not set. On an HTML page Next replaces this `Vary` with its
+ * own after `headers()` has run (ADR 0030). On Vercel the negotiated Markdown answer loses it too,
+ * while the other `headers()` entries arrive: the platform sends the prerendered answer's own
+ * `Vary`, Next's (measured 2026-10-07, ADR 0030's correction of that date). There Vercel's
+ * default `Cache-Control: public, max-age=0, must-revalidate`, which nothing here sets, and a
+ * different ETag per representation keep a downstream cache from handing the twin to a browser,
+ * which `e2e-live/markdown-negotiation.spec.ts` checks after every production deployment.
  */
 export function varyOnAccept() {
   return MARKDOWN_ROUTES.map((source) => ({

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Inline, PostBlock } from '@/data/posts';
 import { linkKind } from '@/lib/links';
+import { DataTable } from './data-table';
 
 /**
  * A post's body, block by block, as plain elements (#61, ADR 0028). A server component with no
@@ -92,8 +93,17 @@ function Block({ block }: { block: PostBlock }) {
           </p>
         </blockquote>
       );
+    case 'table':
+      // `DataTable` gives the caption, the column and row headers, and the stacked layout a table
+      // of three or more columns takes on a phone (#226), where its column headers are hidden from
+      // sight, as on every other page with a table.
+      return (
+        <div className="mb-6">
+          <DataTable caption={block.caption} columns={block.columns} rows={block.rows} />
+        </div>
+      );
     default: {
-      // A sixth `PostBlock` kind fails typecheck here until it has a renderer, rather than
+      // A seventh `PostBlock` kind fails typecheck here until it has a renderer, rather than
       // returning nothing and dropping its block from the page.
       const unhandled: never = block;
       throw new Error(`PostBody: no renderer for ${JSON.stringify(unhandled)}`);

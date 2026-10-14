@@ -7,7 +7,7 @@
  */
 
 /** The version pinned in `apps/web/package.json`, whose source the spec's docblock describes. */
-export const LIGHTHOUSE_VERSION = '13.4.1';
+export const LIGHTHOUSE_VERSION = '13.5.0';
 
 /** The part of an audit result the spec reads, in the shape both runners return it. */
 export interface LighthouseAudit {

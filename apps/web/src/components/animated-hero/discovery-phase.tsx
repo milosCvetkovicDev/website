@@ -5,17 +5,20 @@ import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, QuestItem, TypingCursor } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { useStoryVisibility } from '@/hooks/use-story-visibility';
 import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const requirements = [
-  { id: 'monitoring', label: 'monitoring', delay: 0 },
-  { id: 'autonomous', label: 'autonomous', delay: 0.2 },
-  { id: 'pr-creation', label: 'PR creation', delay: 0.4 },
-  { id: 'safety', label: 'safety limits', delay: 0.6 },
+  { id: 'monitoring', label: 'monitoring' },
+  { id: 'autonomous', label: 'autonomous' },
+  { id: 'pr-creation', label: 'PR creation' },
+  { id: 'safety', label: 'safety limits' },
 ];
 
 export function DiscoveryPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  // Pauses the section's endless CSS animations while it is out of view (globals.css).
+  useStoryVisibility(sectionRef);
   const titleId = useId();
   const chatRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<HTMLDivElement>(null);
@@ -32,6 +35,8 @@ export function DiscoveryPhase() {
     // server-rendered state. The cleanup covers both orders: before the load it cancels the build,
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached).
+    // Every element the entrance hides carries data-story-reveal, which a print shows in full
+    // (the @media print rule in globals.css).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(({ gsap }) => {
       // The element, read once, never the ref: a soft navigation away from `/` nulls the ref
@@ -127,7 +132,7 @@ export function DiscoveryPhase() {
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Chat Interface */}
-          <div ref={chatRef}>
+          <div ref={chatRef} data-story-reveal="">
             <Terminal>
               <div className="space-y-4">
                 <div className="flex gap-3">
@@ -172,11 +177,12 @@ export function DiscoveryPhase() {
                   // The timeline animates this wrapper and the tag inside it keeps the hover: on one
                   // element a transition re-eases every frame GSAP writes, and GSAP's inline
                   // `scale: none` cancels hover:scale-105.
-                  <span key={req.id} className="requirement-reveal inline-block">
-                    <span
-                      className="requirement-tag block cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent-text)] transition-[scale,color,background-color,border-color,box-shadow] duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]"
-                      style={{ animationDelay: `${index * 0.1}s` }}
-                    >
+                  <span
+                    key={req.id}
+                    data-story-reveal=""
+                    className="requirement-reveal inline-block"
+                  >
+                    <span className="requirement-tag block cursor-default rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1.5 font-mono text-sm text-[var(--accent-text)] transition-[scale,color,background-color,border-color,box-shadow] duration-300 hover:scale-105 hover:bg-[var(--accent)]/20 hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]">
                       <span className="mr-1 text-[var(--muted)]">#{index + 1}</span>
                       {req.label}
                     </span>
@@ -187,16 +193,16 @@ export function DiscoveryPhase() {
 
             <HudPanel title="QUEST LOG">
               <div ref={questRef} className="space-y-2">
-                <div className="quest-item">
+                <div data-story-reveal="" className="quest-item">
                   <QuestItem completed={true}>Requirements captured</QuestItem>
                 </div>
-                <div className="quest-item">
+                <div data-story-reveal="" className="quest-item">
                   <QuestItem completed={true}>Constraints identified</QuestItem>
                 </div>
-                <div className="quest-item">
+                <div data-story-reveal="" className="quest-item">
                   <QuestItem completed={true}>Scope locked</QuestItem>
                 </div>
-                <div className="quest-item">
+                <div data-story-reveal="" className="quest-item">
                   <QuestItem completed={false}>Architecture designed</QuestItem>
                 </div>
               </div>
@@ -205,7 +211,7 @@ export function DiscoveryPhase() {
         </div>
 
         {/* Headline */}
-        <div ref={headlineRef} className="mt-16 text-center">
+        <div ref={headlineRef} data-story-reveal="" className="mt-16 text-center">
           <h3 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="wave">{storyClosings.discovery.heading}</AnimatedText>
           </h3>

@@ -6,8 +6,8 @@
 export const NO_PUBLISHED_POST_SLUG = '_no-published-post';
 
 /**
- * `generateStaticParams` for the post page and its card: one entry per published post (ADR 0028),
- * so with `dynamicParams = false` any other slug is a routing-level 404 (ADR 0015).
+ * `generateStaticParams` for the post page, its card and its twin: one entry per published post
+ * (ADR 0028), so with `dynamicParams = false` any other slug is a routing-level 404 (ADR 0015).
  *
  * Plus one exception, for `next dev` only. Next 16's development server enforces
  * `dynamicParams = false` only for a route whose list holds at least one entry

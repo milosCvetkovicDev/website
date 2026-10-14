@@ -44,10 +44,11 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
 
 - Dependabot runs weekly on Mondays for npm and github-actions. Minor and patch npm updates are
   grouped into one `minor-and-patch` pull request, except those of the `vite` and `lighthouse`
-  groups below, a major outside those two groups arrives as a pull request of its own, and open npm
-  pull requests are capped at five; github-actions bumps are not grouped. Dependabot alerts and
-  automated security updates are both on. Security updates are triggered by alerts rather than the
-  Monday schedule, and a `security` group
+  groups below, a major outside those two groups arrives as a pull request of its own, though not
+  while a `minor-and-patch` pull request is open, which marks every package it covers as handled
+  (ADR 0033), and open npm pull requests are capped at five; github-actions bumps are not grouped.
+  Dependabot alerts and automated security updates are both on. Security updates are triggered by
+  alerts rather than the Monday schedule, and a `security` group
   (`applies-to: security-updates`, `patterns: ['*']`) batches the security updates of each run into
   one pull request so they cannot fill the five-slot cap. Three majors are ignored, each with the
   upstream event that reopens it: `eslint` and `@eslint/js` (eslint-config-next pulls an
@@ -56,9 +57,17 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   majors (they follow `.nvmrc` by hand). Adding one is a policy change, so read
   `docs/adr/0018-dependency-update-policy.md` first; deleting one without the trigger having fired
   puts the red pull request back. A `vite` group (`vite`, `@vitejs/*`, `vitest`, `@vitest/*`, majors
-  included) sits ahead of `minor-and-patch`, because Dependabot puts a dependency in the first group
-  that matches it, so a vite major arrives in one pull request with the `@vitejs/plugin-react` and
-  vitest releases that peer on it. The group relies on `apps/web` declaring `vite` directly (ADR
+  included) brings a vite major in one pull request with the `@vitejs/plugin-react` and vitest
+  releases that peer on it. The order of the groups does not, by itself, keep a package in its own
+  group (it decides only between two groups that both keep it, neither with an open pull request): a
+  group with no patterns, as `minor-and-patch` is, never gives a dependency up, even to a group that
+  names it exactly, and outranks a wildcard; a group with an open pull request claims its members
+  first; and a refresh of that pull request takes every member. So every package a group owns is
+  also in the `exclude-patterns` of the catch-all group with the same `applies-to`
+  (`minor-and-patch` for version updates, `security` for security updates), which Dependabot reads
+  before any pattern, and a new group adds its patterns there in the same change, if its
+  `update-types` include minor and patch (ADR 0033, #232). The group relies on `apps/web` declaring
+  `vite` directly (ADR
   0027): without that, a plugin-react major would arrive without the vite major it needs and fail
   as #9 did. Keep the declaration while the group exists. The major is not pinned by any decision:
   `scripts/vitest-coverage-pair.test.mjs` fails `pnpm test:scripts` when the installed vite's major
@@ -66,18 +75,19 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   security update that moves one without the other.
 - `lighthouse` is pinned exactly in `apps/web/package.json`, and a bump, Dependabot's included,
   means re-reading the audit ids and scoring rules `apps/web/e2e/lighthouse-audits.spec.ts` asserts
-  and its docblock records at 13.4.1. The spec fails on any other version until `LIGHTHOUSE_VERSION`
+  and its docblock records for the version `LIGHTHOUSE_VERSION` names. The spec fails on any other version until `LIGHTHOUSE_VERSION`
   in `apps/web/e2e/support/lighthouse.ts` is updated, because a changed `notApplicable` or scoring
-  rule would not fail it by itself. So Dependabot raises lighthouse bumps alone: a `lighthouse`
-  group (`patterns: ['lighthouse']`, majors included) sits after `vite` and ahead of
-  `minor-and-patch`, and a `lighthouse-security` group (`applies-to: security-updates`) sits ahead
-  of `security`, so a red lighthouse pull request bumps no other direct dependency. The pattern
+  rule would not fail it by itself. So Dependabot raises lighthouse bumps alone, in a `lighthouse`
+  group (`patterns: ['lighthouse']`, majors included) or a `lighthouse-security` one for security
+  updates, and `minor-and-patch` and `security` both exclude it, so a red lighthouse pull request
+  bumps no other direct dependency. The pattern
   matches the exact name only; `lighthouse-logger` and the rest of its tree are transitive and
   change only when the new lighthouse requires it, which can include `@opentelemetry/api` below:
   check its version and the peer suffix on `next` in the lockfile diff. To land one, check out the
   Dependabot branch, re-read the audits against the release notes, then update `LIGHTHOUSE_VERSION`
-  and the docblock's version in one commit (`grep -rn '13\.4\.1' apps/web/e2e` lists every place
-  that cites the release). Dependabot stops rebasing a branch once someone else commits to it, and
+  and the docblock's version in one commit (`git grep -nF` with the old version, over `apps/web`,
+  lists every place that cites the release; a dated measurement keeps the version it was taken
+  with, and `src/test/lighthouse.test.ts` derives its versions from the pin). Dependabot stops rebasing a branch once someone else commits to it, and
   the open pull request holds one of the five version-update slots until it is merged or closed.
   Lighthouse's tree brings `@opentelemetry/api`, which pnpm then resolves as `next`'s optional peer
   (the `(@opentelemetry/api@1.9.1)` suffix on `next`, `@vercel/analytics` and `vitest`), so the
@@ -129,7 +139,24 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   `--depth Infinity`, whatever the documented default says. A refresh aimed at an advisory in a transitive package will add the
   patched version for some dependents and silently leave the vulnerable copy pinned under others
   whose own ranges admitted the fix. Always pass `--depth Infinity` and re-run `pnpm audit` to confirm
-  the count actually moved.
+  the count actually moved. Do not put a version or a range in the pattern either: pnpm then
+  leaves those transitive copies where they are at any depth, and still exits 0. So the refresh for
+  an advisory in a transitive package is `pnpm update -r <name> --depth Infinity` with the bare
+  name, then `git diff pnpm-lock.yaml` (only `<name>`'s entries should move) and `pnpm audit`.
+  - Evidence, each run from main's lockfile on 2026-10-08 (#211): with
+    `--depth Infinity --lockfile-only`, the patterns `source-map-js@1.2.2`, `source-map-js@^1.2.2`
+    and `source-map-js@>=1.2.2` all left `@tailwindcss/node`'s `source-map-js` at 1.2.1. The bare
+    `pnpm update -r source-map-js --lockfile-only` lifted it to 1.2.2, and
+    `pnpm update -r brace-expansion --lockfile-only` lifted `minimatch`'s copy to 1.1.21. Neither
+    bare run passed `--depth Infinity`. The 2026-09-12 miss came from one command that also named
+    direct dependencies, so keep the flag until that case is re-tested.
+  - pnpm 10.34.5's `update()` builds its matcher for transitive copies only when no pattern has an
+    `@` after its first character. Re-run the pair above after any pnpm minor or major bump.
+  - On 2026-10-08, Dependabot's security updater ran the versioned form
+    (`pnpm update source-map-js@1.2.2 --lockfile-only --no-save -r`) and reported "Security update
+    not possible". Such an advisory produces a failed "Dependabot Updates" run and no pull request,
+    and needs the bare-name refresh by hand. Its alert stays open:
+    `gh api 'repos/{owner}/{repo}/dependabot/alerts?state=open'` lists it.
 - pnpm resolves an optional peer when the package is already in the dependency graph, and keeps
   it: a lockfile that once resolved it holds it in the graph by itself. vite 8.3.1 kept
   `esbuild@0.27.2` as its optional peer that way after nothing else needed esbuild, and neither

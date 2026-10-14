@@ -72,10 +72,21 @@ const mediaType = (value: string) => value.split(';')[0].trim().toLowerCase();
  * by the whole `rel` and drops the `type`, so this reads the tags again.
  */
 export function alternates(head: Head, type: string): string[] {
+  return alternateLinks(head, type).flatMap(({ href }) => href ?? []);
+}
+
+/**
+ * The same `<link>` tags as `alternates`, each as its raw `href` and `title`, `undefined` where the
+ * tag has none: for a link whose name a reader shows, such as a feed's.
+ */
+export function alternateLinks(
+  head: Head,
+  type: string,
+): { href: string | undefined; title: string | undefined }[] {
   return (head.raw.match(/<link\b[^>]*>/gi) ?? [])
     .filter((tag) => (attribute(tag, 'rel') ?? '').toLowerCase().split(/\s+/).includes('alternate'))
     .filter((tag) => mediaType(attribute(tag, 'type') ?? '') === mediaType(type))
-    .flatMap((tag) => attribute(tag, 'href') ?? []);
+    .map((tag) => ({ href: attribute(tag, 'href'), title: attribute(tag, 'title') }));
 }
 
 /**

@@ -50,6 +50,7 @@ Before the first deploy, confirm the build is green locally from a clean checkou
 pnpm install --frozen-lockfile
 pnpm check:allowbuilds
 pnpm check:adrs
+pnpm check:adr-history
 pnpm test:scripts
 pnpm format:check
 pnpm lint
@@ -61,7 +62,7 @@ pnpm --filter web exec playwright install --with-deps chromium webkit   # once p
 pnpm --filter web test:e2e
 ```
 
-These are every gate in `.github/workflows/ci.yml`. The first ten commands are the `quality` job;
+These are every gate in `.github/workflows/ci.yml`. The first eleven commands are the `quality` job;
 the last two are the `e2e` job, which on CI runs Playwright against the production build
 (`next start`) on port 3000, while the same command locally starts a dev server on port 3210.
 Playwright always starts the server it tests and never attaches to one that is already running, so
@@ -432,8 +433,10 @@ Then walk the site by hand. The route items below are every page the App Router 
 with a `page.tsx` under `apps/web/src/app`, and one page per entry in
 `apps/web/src/data/case-studies.ts` (three today). `sitemap.ts` lists all of them except `/blog`,
 which is left out, and served `noindex`, while it is a Coming Soon placeholder;
-`apps/web/src/app/__tests__/sitemap.test.ts` fails if the sitemap drifts from that set. When a route
-or a case study is added, add its item here.
+`apps/web/src/app/__tests__/sitemap.test.ts` fails if the sitemap drifts from that set. Once a post
+in `apps/web/src/data/posts.ts` is published (none is yet), `/blog` lists the posts, is indexable
+and is in the sitemap, and so is each published post's `/blog/<slug>` (#61). When a route or a
+case study is added, add its item here.
 
 - [ ] `/` loads, the hero animation runs, and scrolling does not stall
 - [ ] `/about`
@@ -446,8 +449,13 @@ or a case study is added, add its item here.
 - [ ] `/contact`
 - [ ] `/privacy`, reached from the footer's **Privacy** link, names Vercel Web Analytics as what
       counts page views
-- [ ] `/sitemap.xml` lists exactly those URLs except `/blog`, all on the apex origin
-- [ ] `/blog` serves `<meta name="robots" content="noindex, follow">`
+- [ ] `/sitemap.xml` lists exactly those URLs except `/blog`, all on the apex origin; once a post is
+      published, `/blog` and each published post too, the post's `<lastmod>` its `updatedAt`
+- [ ] `/blog` serves `<meta name="robots" content="noindex, follow">` and Coming Soon while no post
+      is published; once one is, it lists the posts and serves neither
+- [ ] Once a post is published, each published `/blog/<slug>` loads with its title as the one `h1`,
+      its labelled Published and Updated days, and a robots meta without `noindex`; a draft's slug
+      and `/blog/does-not-exist` answer `404`, and `/sitemap.xml` names no draft
 - [ ] `/robots.txt` allows `/`, disallows nothing (`/_next/` holds the CSS, scripts and fonts a
       crawler renders with), and points at the apex sitemap
 - [ ] `/work/does-not-exist` answers `404` and renders the site not-found page
@@ -458,8 +466,9 @@ or a case study is added, add its item here.
       the body: `curl -s -o /dev/null -w '%{http_code}\n' https://miloscvetkovic.dev/work/does-not-exist`
       must print `404`, and the body must contain "Page not found"
 - [ ] `/no-such-page` renders that same page with the same `404`
-- [ ] JSON-LD is present: `view-source` on `/` contains two `application/ld+json` blocks (Person and
-      WebSite, from `apps/web/src/components/json-ld.tsx`) and their `url` fields are the apex
+- [ ] JSON-LD is present: `view-source` on `/` contains three `application/ld+json` blocks (Person,
+      WebSite and WebPage, built by `apps/web/src/lib/structured-data.ts`) and their `url` fields
+      are the apex
 - [ ] The theme toggle in the navigation switches light and dark, the choice survives a reload, and
       there is no light-to-dark flash on first paint
 - [ ] Browser console is clean on every page. `apps/web/e2e/console-clean.spec.ts` covers this in
@@ -750,12 +759,13 @@ Detail on the less obvious rows:
   `dig +short www.miloscvetkovic.dev` rather than a browser. Remove any leftover apex `A`, `www`
   `CNAME` or URL redirect record, turn the Namecheap parking page off on the Domain tab, wait out the
   TTL, then use **Refresh** on each domain in Vercel.
-- **Environment variable.** All four readers, `apps/web/src/app/layout.tsx`, `sitemap.ts`,
-  `robots.ts` and `components/json-ld.tsx`, fall back to the hard-coded `https://miloscvetkovic.dev`,
-  so a missing variable is invisible everywhere, Production and Preview alike. Setting it for Preview
-  to the same value changes nothing. The variable exists to make the origin explicit, not to change
-  behaviour, and because the value is inlined at build time, saving it in Vercel does nothing until
-  the next deploy.
+- **Environment variable.** Every reader, `apps/web/src/app/layout.tsx`, `sitemap.ts`, `robots.ts`,
+  `feed.xml/route.ts` and `lib/site-origin.ts` (for `lib/serialise.ts` and
+  `lib/structured-data.ts`), falls back to the hard-coded `https://miloscvetkovic.dev`, so a
+  missing variable is invisible everywhere, Production and
+  Preview alike. Setting it for Preview to the same value changes nothing. The variable exists to
+  make the origin explicit, not to change behaviour, and because the value is inlined at build
+  time, saving it in Vercel does nothing until the next deploy.
 - **Ignored build scripts.** A warning naming a package that `pnpm why -r <name>` does not find is
   the same stale `.modules.yaml` record, for a package the lockfile no longer resolves. The first
   Vercel deploys after the vite 8 migration can report `esbuild@0.27.2` that way: esbuild left the

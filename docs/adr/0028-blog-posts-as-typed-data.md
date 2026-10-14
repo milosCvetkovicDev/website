@@ -2,7 +2,12 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0034
+
+Two of the decisions below no longer apply, and
+[ADR 0034](0034-blog-posts-drafted-with-claude.md) replaces both. Decision 5 goes, because posts
+are now drafted with Claude and approved by the owner line by line. Decision 1's list of block kinds
+gains a `table`. The rest of this record still applies.
 
 ## Date
 

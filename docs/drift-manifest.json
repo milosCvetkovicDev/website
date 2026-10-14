@@ -1920,6 +1920,26 @@
       }
     },
     {
+      "id": "adr-0018-link-0012-correcting-accepted-records",
+      "doc": "docs/adr/0018-dependency-update-policy.md",
+      "anchor": "](0012-correcting-accepted-records.md)",
+      "claim": "The link to 0012-correcting-accepted-records.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0012-correcting-accepted-records.md" }],
+      "check": { "path": "docs/adr/0012-correcting-accepted-records.md" }
+    },
+    {
+      "id": "adr-0018-link-0033-dependabot-group-exclusions",
+      "doc": "docs/adr/0018-dependency-update-policy.md",
+      "anchor": "](0033-dependabot-group-exclusions.md)",
+      "claim": "The link to 0033-dependabot-group-exclusions.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0033-dependabot-group-exclusions.md" }],
+      "check": { "path": "docs/adr/0033-dependabot-group-exclusions.md" }
+    },
+    {
       "id": "adr-0020-link-0021-squash-only-merges-and-required-checks",
       "doc": "docs/adr/0020-branch-protection-on-main.md",
       "anchor": "](0021-squash-only-merges-and-required-checks.md)",
@@ -2503,6 +2523,51 @@
         "file": ".github/workflows/ci.yml",
         "regex": "^  quality:\\r?$(?:\\n(?!  \\S)[^\\n]*)*?\\n\\s+run: (pnpm check:adrs)\\r?$",
         "equals": "pnpm check:adrs"
+      }
+    },
+    {
+      "id": "adr-readme-script-check-adr-history",
+      "doc": "docs/adr/README.md",
+      "anchor": "`pnpm check:adr-history",
+      "claim": "`pnpm check:adr-history` is a script in ./package.json and runs scripts/check-adr-history.mjs.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:adr-history"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:adr-history",
+        "runs": "scripts/check-adr-history.mjs"
+      }
+    },
+    {
+      "id": "adr-readme-check-adr-history-in-quality-job",
+      "doc": "docs/adr/README.md",
+      "anchor": "which the `quality` job also runs",
+      "claim": "The quality job runs pnpm check:adr-history against HEAD^1, the tip of the branch a pull request merges into.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": ".github/workflows/ci.yml",
+        "regex": "^  quality:\\r?$(?:\\n(?!  \\S)[^\\n]*)*?\\n\\s+run: (pnpm check:adr-history\\b[^\\n]*?)\\r?$",
+        "equals": "pnpm check:adr-history -- --base HEAD^1"
+      }
+    },
+    {
+      "id": "adr-readme-check-adr-history-fetch-depth",
+      "doc": "docs/adr/README.md",
+      "anchor": "in CI, the tip of the branch the pull request merges into",
+      "claim": "The quality job checks out two commits deep, so the merge commit's first parent, the base branch's tip, is there for --base HEAD^1.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": ".github/workflows/ci.yml",
+        "regex": "^  quality:\\r?$(?:\\n(?!  \\S)[^\\n]*)*?\\n\\s+fetch-depth: (\\d+)\\r?$",
+        "equals": "2"
       }
     },
     {
@@ -6030,24 +6095,24 @@
       "anchor": "| 0018 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0018's record carries the status line \"Accepted\".",
+      "claim": "ADR 0018's record carries the status line \"Accepted (corrected 2026-10-06)\".",
       "check": {
         "file": "docs/adr/0018-dependency-update-policy.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-10-06)"
       }
     },
     {
       "id": "adr-index-0018-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0018 |",
-      "claim": "The index row for ADR 0018 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0018 gives the record's status line, \"Accepted (corrected 2026-10-06)\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0018 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-10-06)"
       }
     },
     {
@@ -7121,11 +7186,11 @@
       "anchor": "| 0028 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0028's record carries the status line \"Accepted\".",
+      "claim": "ADR 0028's record carries the status line \"Superseded by ADR-0034\".",
       "check": {
         "file": "docs/adr/0028-blog-posts-as-typed-data.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0034"
       }
     },
     {
@@ -7134,11 +7199,11 @@
       "anchor": "| 0028 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0028 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0028 gives the record's status line, \"Superseded by ADR-0034\" (ADR 0012: the status in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0028 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0034"
       }
     },
     {
@@ -7208,6 +7273,23 @@
       ],
       "check": {
         "path": "docs/plans/2026-09-28-blog-engine-design.md"
+      }
+    },
+    {
+      "id": "adr-0028-link-0034-blog-posts-drafted-with-claude",
+      "doc": "docs/adr/0028-blog-posts-as-typed-data.md",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to 0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
       }
     },
     {
@@ -7488,11 +7570,11 @@
       "anchor": "| 0030 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0030's record carries the status line \"Accepted\".",
+      "claim": "ADR 0030's record carries the status line \"Accepted (corrected 2026-10-07)\".",
       "check": {
         "file": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-10-07)"
       }
     },
     {
@@ -7501,11 +7583,11 @@
       "anchor": "| 0030 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0030 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0030 gives the record's status line, \"Accepted (corrected 2026-10-07)\" (ADR 0012: the status in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0030 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Accepted (corrected 2026-10-07)"
       }
     },
     {
@@ -7611,6 +7693,16 @@
       "check": { "path": "docs/adr/0026-vercel-web-analytics.md" }
     },
     {
+      "id": "adr-0030-link-0012-correcting-accepted-records",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "](0012-correcting-accepted-records.md)",
+      "claim": "The link to 0012-correcting-accepted-records.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0012-correcting-accepted-records.md" }],
+      "check": { "path": "docs/adr/0012-correcting-accepted-records.md" }
+    },
+    {
       "id": "adr-0030-script-check-build-output",
       "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
       "anchor": "`pnpm check:build-output`",
@@ -7660,6 +7752,30 @@
       }
     },
     {
+      "id": "adr-0030-correction-cache-control-rules",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "The rules are `apps/web/e2e/support/cache-control.ts`",
+      "claim": "The live negotiation spec takes its revalidation rules from e2e/support/cache-control.ts, which refuses stale-while-revalidate and stale-if-error.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e/support/cache-control.ts",
+        "contains": "directives.has('stale-while-revalidate') || directives.has('stale-if-error')"
+      }
+    },
+    {
+      "id": "adr-0030-correction-live-spec-uses-rules",
+      "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
+      "anchor": "The rules are `apps/web/e2e/support/cache-control.ts`",
+      "claim": "The live negotiation spec imports its cache bound, entity tag and Vary rules from e2e/support/cache-control.ts.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e-live/markdown-negotiation.spec.ts",
+        "contains": "import { cacheBound, entityTag, variesOnAccept } from '../e2e/support/cache-control';"
+      }
+    },
+    {
       "id": "adr-0030-relative-import",
       "doc": "docs/adr/0030-generated-endpoints-as-static-route-handlers.md",
       "anchor": "`content-date.ts` by relative path",
@@ -7670,6 +7786,1372 @@
         "path": "apps/web/src/data/case-studies.ts",
         "contains": "from '../lib/content-date'"
       }
+    },
+    {
+      "id": "adr-readme-link-0031-structured-data-graph",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0031-structured-data-graph.md)",
+      "claim": "The link to 0031-structured-data-graph.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0031-structured-data-graph.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0031-structured-data-graph.md"
+      }
+    },
+    {
+      "id": "adr-readme-link-0032-e2e-chromium-single-threaded-gc",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0032-e2e-chromium-single-threaded-gc.md)",
+      "claim": "The link to 0032-e2e-chromium-single-threaded-gc.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0032-e2e-chromium-single-threaded-gc.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0032-e2e-chromium-single-threaded-gc.md"
+      }
+    },
+    {
+      "id": "adr-readme-link-0034-blog-posts-drafted-with-claude",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to 0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "adr-readme-link-0035-owner-placeholder-convention",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0035-owner-placeholder-convention.md)",
+      "claim": "The link to 0035-owner-placeholder-convention.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0035-owner-placeholder-convention.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0035-owner-placeholder-convention.md"
+      }
+    },
+    {
+      "id": "adr-index-0031-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0031 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0031's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0031-structured-data-graph.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0031-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0031 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0031 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0031 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0031-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0031 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0031's record carries the Date \"2026-10-02\".",
+      "check": {
+        "file": "docs/adr/0031-structured-data-graph.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-02"
+      }
+    },
+    {
+      "id": "adr-index-0031-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0031 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0031 gives the record's Date, \"2026-10-02\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0031 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-02"
+      }
+    },
+    {
+      "id": "adr-index-0031-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0031 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0031's record carries the H1 title \"Structured data is one graph joined by @id, in separate blocks, asserting only what a page shows\".",
+      "check": {
+        "file": "docs/adr/0031-structured-data-graph.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Structured data is one graph joined by @id, in separate blocks, asserting only what a page shows"
+      }
+    },
+    {
+      "id": "adr-index-0031-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0031 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0031 gives the record's H1 title, \"Structured data is one graph joined by @id, in separate blocks, asserting only what a page shows\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0031 \\| \\[(.+?)\\]\\(0031-",
+        "equals": "Structured data is one graph joined by @id, in separate blocks, asserting only what a page shows"
+      }
+    },
+    {
+      "id": "adr-index-0032-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0032 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0032's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0032-e2e-chromium-single-threaded-gc.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0032-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0032 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0032 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0032 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0032-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0032 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0032's record carries the Date \"2026-10-05\".",
+      "check": {
+        "file": "docs/adr/0032-e2e-chromium-single-threaded-gc.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-05"
+      }
+    },
+    {
+      "id": "adr-index-0032-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0032 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0032 gives the record's Date, \"2026-10-05\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0032 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-05"
+      }
+    },
+    {
+      "id": "adr-index-0032-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0032 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0032's record carries the H1 title \"Playwright's Chromium keeps V8's garbage collector on the main thread\".",
+      "check": {
+        "file": "docs/adr/0032-e2e-chromium-single-threaded-gc.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Playwright's Chromium keeps V8's garbage collector on the main thread"
+      }
+    },
+    {
+      "id": "adr-index-0032-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0032 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0032 gives the record's H1 title, \"Playwright's Chromium keeps V8's garbage collector on the main thread\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0032 \\| \\[(.+?)\\]\\(0032-",
+        "equals": "Playwright's Chromium keeps V8's garbage collector on the main thread"
+      }
+    },
+    {
+      "id": "adr-index-0034-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0034's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0034-blog-posts-drafted-with-claude.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0034-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0034 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0034 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0034-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0034's record carries the Date \"2026-10-06\".",
+      "check": {
+        "file": "docs/adr/0034-blog-posts-drafted-with-claude.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-06"
+      }
+    },
+    {
+      "id": "adr-index-0034-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0034 gives the record's Date, \"2026-10-06\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0034 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-06"
+      }
+    },
+    {
+      "id": "adr-index-0034-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0034's record carries the H1 title \"Blog posts are drafted with Claude and approved by the owner, line by line\".",
+      "check": {
+        "file": "docs/adr/0034-blog-posts-drafted-with-claude.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Blog posts are drafted with Claude and approved by the owner, line by line"
+      }
+    },
+    {
+      "id": "adr-index-0034-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0034 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0034 gives the record's H1 title, \"Blog posts are drafted with Claude and approved by the owner, line by line\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0034 \\| \\[(.+?)\\]\\(0034-",
+        "equals": "Blog posts are drafted with Claude and approved by the owner, line by line"
+      }
+    },
+    {
+      "id": "adr-readme-link-0036-content-dates-move-with-served-text",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0036-content-dates-move-with-served-text.md)",
+      "claim": "The link to 0036-content-dates-move-with-served-text.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0036-content-dates-move-with-served-text.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0036-content-dates-move-with-served-text.md"
+      }
+    },
+    {
+      "id": "adr-index-0036-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0036's record carries the status line \"Proposed\".",
+      "check": {
+        "file": "docs/adr/0036-content-dates-move-with-served-text.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0036-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0036 gives the record's status line, \"Proposed\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0036 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0036-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0036's record carries the Date \"2026-10-08\".",
+      "check": {
+        "file": "docs/adr/0036-content-dates-move-with-served-text.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-08"
+      }
+    },
+    {
+      "id": "adr-index-0036-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0036 gives the record's Date, \"2026-10-08\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0036 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-08"
+      }
+    },
+    {
+      "id": "adr-index-0036-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0036's record carries the H1 title \"Content dates move with served text, and a pull request check holds them together\".",
+      "check": {
+        "file": "docs/adr/0036-content-dates-move-with-served-text.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Content dates move with served text, and a pull request check holds them together"
+      }
+    },
+    {
+      "id": "adr-index-0036-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0036 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0036 gives the record's H1 title, \"Content dates move with served text, and a pull request check holds them together\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0036 \\| \\[(.+?)\\]\\(0036-",
+        "equals": "Content dates move with served text, and a pull request check holds them together"
+      }
+    },
+    {
+      "id": "adr-index-0035-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0035's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0035-owner-placeholder-convention.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0035-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0035 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0035 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0035-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0035's record carries the Date \"2026-09-29\".",
+      "check": {
+        "file": "docs/adr/0035-owner-placeholder-convention.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-09-29"
+      }
+    },
+    {
+      "id": "adr-index-0035-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0035 gives the record's Date, \"2026-09-29\" (the date in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0035 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-09-29"
+      }
+    },
+    {
+      "id": "adr-index-0035-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0035's record carries the H1 title \"A value only the owner can supply is a registered placeholder with a deadline the owner sets\".",
+      "check": {
+        "file": "docs/adr/0035-owner-placeholder-convention.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "A value only the owner can supply is a registered placeholder with a deadline the owner sets"
+      }
+    },
+    {
+      "id": "adr-index-0035-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0035 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0035 gives the record's H1 title, \"A value only the owner can supply is a registered placeholder with a deadline the owner sets\" (the title in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0035 \\| \\[(.+?)\\]\\(0035-",
+        "equals": "A value only the owner can supply is a registered placeholder with a deadline the owner sets"
+      }
+    },
+    {
+      "id": "adr-0031-link-0017-ai-discoverability-policy",
+      "doc": "docs/adr/0031-structured-data-graph.md",
+      "anchor": "](0017-ai-discoverability-policy.md)",
+      "claim": "The link to 0017-ai-discoverability-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0017-ai-discoverability-policy.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0017-ai-discoverability-policy.md"
+      }
+    },
+    {
+      "id": "adr-0031-script-typecheck",
+      "doc": "docs/adr/0031-structured-data-graph.md",
+      "anchor": "`pnpm typecheck`",
+      "claim": "`pnpm typecheck` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "typecheck"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "typecheck"
+      }
+    },
+    {
+      "id": "adr-0031-one-stringify",
+      "doc": "docs/adr/0031-structured-data-graph.md",
+      "anchor": "the one `JSON.stringify` there",
+      "claim": "json-ld.tsx renders every block through serializeJsonLd, whose JSON.stringify call is the module's only one.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/components/json-ld.tsx",
+        "contains": "return JSON.stringify(value).replace(/</g, '\\\\u003c');"
+      }
+    },
+    {
+      "id": "adr-0031-refusals-guard",
+      "doc": "docs/adr/0031-structured-data-graph.md",
+      "anchor": "`scripts/ai-refusals.test.mjs` fails on any of them",
+      "claim": "The refusals test lists the refused structured-data strings it fails on under apps/web/src.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "scripts/ai-refusals.test.mjs",
+        "contains": "SearchAction"
+      }
+    },
+    {
+      "id": "adr-0032-script-web-build",
+      "doc": "docs/adr/0032-e2e-chromium-single-threaded-gc.md",
+      "anchor": "after `pnpm --filter web build`",
+      "claim": "`pnpm --filter web build` is a script in apps/web/package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "web build"
+        }
+      ],
+      "check": {
+        "package": "apps/web",
+        "script": "build"
+      }
+    },
+    {
+      "id": "adr-readme-link-0033-dependabot-group-exclusions",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0033-dependabot-group-exclusions.md)",
+      "claim": "The link to 0033-dependabot-group-exclusions.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0033-dependabot-group-exclusions.md" }],
+      "check": { "path": "docs/adr/0033-dependabot-group-exclusions.md" }
+    },
+    {
+      "id": "adr-index-0033-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0033's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0033-dependabot-group-exclusions.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0033-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0033 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0033 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0033-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0033's record carries the Date \"2026-10-06\".",
+      "check": {
+        "file": "docs/adr/0033-dependabot-group-exclusions.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-06"
+      }
+    },
+    {
+      "id": "adr-index-0033-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0033 gives the record's Date, \"2026-10-06\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0033 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-06"
+      }
+    },
+    {
+      "id": "adr-index-0033-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0033's record carries the H1 title \"Dependabot's catch-all groups exclude the packages that have groups of their own\".",
+      "check": {
+        "file": "docs/adr/0033-dependabot-group-exclusions.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Dependabot's catch-all groups exclude the packages that have groups of their own"
+      }
+    },
+    {
+      "id": "adr-index-0033-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0033 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0033 gives the record's H1 title, \"Dependabot's catch-all groups exclude the packages that have groups of their own\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0033 \\| \\[(.+?)\\]\\(0033-",
+        "equals": "Dependabot's catch-all groups exclude the packages that have groups of their own"
+      }
+    },
+    {
+      "id": "adr-0033-link-0018-dependency-update-policy",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "](0018-dependency-update-policy.md)",
+      "claim": "The link to 0018-dependency-update-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0018-dependency-update-policy.md" }],
+      "check": { "path": "docs/adr/0018-dependency-update-policy.md" }
+    },
+    {
+      "id": "adr-0033-minor-and-patch-exclusions",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "`exclude-patterns: ['vite', '@vitejs/*', 'vitest', '@vitest/*', 'lighthouse']`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The minor-and-patch group excludes ['vite', '@vitejs/*', 'vitest', '@vitest/*', 'lighthouse'], the patterns of the vite and lighthouse groups.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "\\n {6}minor-and-patch:\\n {8}update-types: \\[minor, patch\\]\\n {8}exclude-patterns: (\\[[^\\]\\n]*\\])",
+        "equals": "['vite', '@vitejs/*', 'vitest', '@vitest/*', 'lighthouse']"
+      }
+    },
+    {
+      "id": "adr-0033-security-exclusion",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "`exclude-patterns: ['lighthouse']`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The security group excludes ['lighthouse'], the pattern of the lighthouse-security group.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "\\n {6}security:\\n {8}applies-to: security-updates\\n {8}patterns: \\['\\*'\\]\\n {8}exclude-patterns: (\\[[^\\]\\n]*\\])",
+        "equals": "['lighthouse']"
+      }
+    },
+    {
+      "id": "adr-0033-vite-patterns",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "`vite` and `lighthouse` groups, and `security` carries",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The vite group's patterns are ['vite', '@vitejs/*', 'vitest', '@vitest/*'], the list minor-and-patch excludes.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "\\n {6}vite:\\n {8}patterns: (\\[[^\\]\\n]*\\])",
+        "equals": "['vite', '@vitejs/*', 'vitest', '@vitest/*']"
+      }
+    },
+    {
+      "id": "adr-0033-lighthouse-patterns",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "`vite` and `lighthouse` groups, and `security` carries",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The lighthouse group's patterns are ['lighthouse'], which minor-and-patch excludes.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "\\n {6}lighthouse:\\n {8}patterns: (\\[[^\\]\\n]*\\])",
+        "equals": "['lighthouse']"
+      }
+    },
+    {
+      "id": "adr-0033-lighthouse-security-patterns",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "pattern of `lighthouse-security`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The lighthouse-security group applies to security updates with the patterns ['lighthouse'], which security excludes.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "\\n {6}lighthouse-security:\\n {8}applies-to: security-updates\\n {8}patterns: (\\[[^\\]\\n]*\\])",
+        "equals": "['lighthouse']"
+      }
+    },
+    {
+      "id": "adr-0033-script-check-docs-drift",
+      "doc": "docs/adr/0033-dependabot-group-exclusions.md",
+      "anchor": "`pnpm check:docs-drift`",
+      "claim": "`pnpm check:docs-drift` is a script in the root package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [{ "kind": "script", "token": "check:docs-drift" }],
+      "check": {
+        "package": ".",
+        "script": "check:docs-drift",
+        "runs": "scripts/check-docs-drift.ts"
+      }
+    },
+    {
+      "id": "adr-0034-link-0028-blog-posts-as-typed-data",
+      "doc": "docs/adr/0034-blog-posts-drafted-with-claude.md",
+      "anchor": "](0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to 0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "adr-0034-link-plans-2026-10-06-blog-publishing-design",
+      "doc": "docs/adr/0034-blog-posts-drafted-with-claude.md",
+      "anchor": "](../plans/2026-10-06-blog-publishing-design.md)",
+      "claim": "The link to ../plans/2026-10-06-blog-publishing-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../plans/2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
+      "id": "adr-0036-link-0021-squash-only-merges-and-required-checks",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "](0021-squash-only-merges-and-required-checks.md)",
+      "claim": "The link to 0021-squash-only-merges-and-required-checks.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0021-squash-only-merges-and-required-checks.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0021-squash-only-merges-and-required-checks.md"
+      }
+    },
+    {
+      "id": "adr-0036-script-test",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "`pnpm test`",
+      "claim": "`pnpm test` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "test"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "test"
+      }
+    },
+    {
+      "id": "adr-0036-script-web-content-dates-update",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "`pnpm --filter web content-dates:update`",
+      "claim": "`pnpm --filter web content-dates:update` is a script in apps/web/package.json and runs the content-date manifest's test file.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "web content-dates:update"
+        }
+      ],
+      "check": {
+        "package": "apps/web",
+        "script": "content-dates:update",
+        "runs": "src/data/__tests__/content-dates.test.tsx"
+      }
+    },
+    {
+      "id": "adr-0036-script-check-content-dates",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "`pnpm check:content-dates`",
+      "claim": "`pnpm check:content-dates` is a script in ./package.json and runs scripts/check-content-dates.mjs.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "check:content-dates"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "check:content-dates",
+        "runs": "scripts/check-content-dates.mjs"
+      }
+    },
+    {
+      "id": "adr-0036-pinned-day",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "The clock is pinned to 2026-07-01",
+      "claim": "The content-date manifest's test pins the clock to 2026-07-01.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": "apps/web/src/data/__tests__/content-dates.test.tsx",
+        "regex": "const day = '(\\d{4}-\\d\\d-\\d\\d)';",
+        "equals": "2026-07-01"
+      }
+    },
+    {
+      "id": "adr-0036-workflow-job-name",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "whose one job is `Content dates`",
+      "claim": "The one job in .github/workflows/content-dates.yml is named Content dates.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": ".github/workflows/content-dates.yml",
+        "regex": "^ {4}name: (.+)$",
+        "equalsAll": ["Content dates"]
+      }
+    },
+    {
+      "id": "adr-0036-workflow-events",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "`synchronize` and `reopened` pull",
+      "claim": "The Content dates workflow runs on the opened, edited, synchronize and reopened pull request events.",
+      "method": "config-value",
+      "evaluation": "live",
+      "check": {
+        "file": ".github/workflows/content-dates.yml",
+        "regex": "^ {2}pull_request:\\n(?: {4}#[^\\n]*\\n)* {4}types: (\\[[^\\]\\n]*\\])$",
+        "equals": "[opened, edited, synchronize, reopened]"
+      }
+    },
+    {
+      "id": "adr-0036-not-required",
+      "doc": "docs/adr/0036-content-dates-move-with-served-text.md",
+      "anchor": "It is not a required status check.",
+      "method": "gh-api",
+      "evaluation": "live",
+      "requires": "admin",
+      "claim": "main's protection does not require the Content dates check.",
+      "check": {
+        "endpoint": "repos/{repo}/branches/main/protection",
+        "jq": "[.required_status_checks.contexts[] | select(. == \"Content dates\")] | length",
+        "equals": 0
+      }
+    },
+    {
+      "id": "adr-0035-link-rules-app-router-and-content",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "](../../.claude/rules/app-router-and-content.md)",
+      "claim": "The link to ../../.claude/rules/app-router-and-content.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../../.claude/rules/app-router-and-content.md"
+        }
+      ],
+      "check": {
+        "path": ".claude/rules/app-router-and-content.md"
+      }
+    },
+    {
+      "id": "adr-0035-link-0028-blog-posts-as-typed-data",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "](0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to 0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "adr-0035-link-0034-blog-posts-drafted-with-claude",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to 0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "adr-0035-link-owner-todo-module",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "](../../apps/web/src/data/owner-todo.ts)",
+      "claim": "The link to ../../apps/web/src/data/owner-todo.ts resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../../apps/web/src/data/owner-todo.ts"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts"
+      }
+    },
+    {
+      "id": "adr-0035-link-0021-squash-only-merges-and-required-checks",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "](0021-squash-only-merges-and-required-checks.md)",
+      "claim": "The link to 0021-squash-only-merges-and-required-checks.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0021-squash-only-merges-and-required-checks.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0021-squash-only-merges-and-required-checks.md"
+      }
+    },
+    {
+      "id": "adr-0035-script-test",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`pnpm test`",
+      "claim": "`pnpm test` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "test"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "test"
+      }
+    },
+    {
+      "id": "adr-0035-script-typecheck",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`pnpm typecheck`",
+      "claim": "`pnpm typecheck` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "typecheck"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "typecheck"
+      }
+    },
+    {
+      "id": "adr-0035-cite-owner-todo-79-105",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "apps/web/src/data/owner-todo.ts:79-105",
+      "claim": "At d0daec2 the register, unfilledOwnerFields, spans owner-todo.ts:79-105.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "covers": [
+        {
+          "kind": "citation",
+          "token": "apps/web/src/data/owner-todo.ts:79-105"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "line": 79,
+        "contains": "export const unfilledOwnerFields",
+        "lineEnd": 105
+      },
+      "asOf": "d0daec24174a3720937bd5997966ff6fb6e12696"
+    },
+    {
+      "id": "adr-0035-cite-owner-todo-111",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "apps/web/src/data/owner-todo.ts:111",
+      "claim": "At d0daec2 MAX_EXPIRY_DAYS is declared as 366 at owner-todo.ts:111.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "covers": [
+        {
+          "kind": "citation",
+          "token": "apps/web/src/data/owner-todo.ts:111"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "line": 111,
+        "contains": "export const MAX_EXPIRY_DAYS = 366;"
+      },
+      "asOf": "d0daec24174a3720937bd5997966ff6fb6e12696"
+    },
+    {
+      "id": "adr-0035-cite-owner-todo-test-237",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "apps/web/src/data/__tests__/owner-todo.test.ts:237",
+      "claim": "At d0daec2 the test that a deadline ends at midnight UTC is at owner-todo.test.ts:237.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "covers": [
+        {
+          "kind": "citation",
+          "token": "apps/web/src/data/__tests__/owner-todo.test.ts:237"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/data/__tests__/owner-todo.test.ts",
+        "line": 237,
+        "contains": "counts the day in UTC, so a deadline ends at midnight UTC"
+      },
+      "asOf": "d0daec24174a3720937bd5997966ff6fb6e12696"
+    },
+    {
+      "id": "adr-0035-marker-constant",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "exported as `OWNER_TODO`",
+      "claim": "owner-todo.ts exports the marker OWNER-TODO as OWNER_TODO.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "export const OWNER_TODO = 'OWNER-TODO';"
+      }
+    },
+    {
+      "id": "adr-0035-one-spelling-test",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "The `one spelling` test in `owner-todo.test.ts`",
+      "claim": "owner-todo.test.ts has the one-spelling test, which allows the literal marker under src and public in owner-todo.ts only.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/__tests__/owner-todo.test.ts",
+        "contains": "it('spells the marker out in owner-todo.ts and in no other file under src or public'"
+      }
+    },
+    {
+      "id": "adr-0035-served-output-seo-surface",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`e2e/seo-surface.spec.ts` and `e2e/machine-readable.spec.ts` fail",
+      "claim": "seo-surface.spec.ts has the test that no route, nor the sitemap, robots.txt or the manifest, serves the marker.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e/seo-surface.spec.ts",
+        "contains": "test('no route, nor the sitemap, robots.txt or the manifest, serves an owner placeholder'"
+      }
+    },
+    {
+      "id": "adr-0035-served-output-machine-readable",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`e2e/seo-surface.spec.ts` and `e2e/machine-readable.spec.ts` fail",
+      "claim": "machine-readable.spec.ts fails when a JSON endpoint serves the marker.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e/machine-readable.spec.ts",
+        "contains": "serves no owner placeholder`).not.toContain(OWNER_TODO);"
+      }
+    },
+    {
+      "id": "adr-0035-register-export",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`unfilledOwnerFields` holds a row for each field",
+      "claim": "owner-todo.ts exports the register unfilledOwnerFields.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "export const unfilledOwnerFields: readonly UnfilledOwnerField[]"
+      }
+    },
+    {
+      "id": "adr-0035-renders-only",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "nor named in `RENDERS_ONLY`",
+      "claim": "owner-todo.test.ts names the importers it does not walk in RENDERS_ONLY.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/__tests__/owner-todo.test.ts",
+        "contains": "const RENDERS_ONLY: Record<string, string> = {"
+      }
+    },
+    {
+      "id": "adr-0035-real-clock",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "The live test reads the real clock",
+      "claim": "The live gate runs findOwnerTodoProblems over OWNER_TODO_SOURCES and the register on new Date(), the real clock.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/__tests__/owner-todo.test.ts",
+        "contains": "findOwnerTodoProblems(OWNER_TODO_SOURCES, unfilledOwnerFields, new Date())"
+      }
+    },
+    {
+      "id": "adr-0035-utc-day",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "The deadline counts the UTC day",
+      "claim": "findOwnerTodoProblems takes today as the UTC day of now.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "const today = now.toISOString().slice(0, 10);"
+      }
+    },
+    {
+      "id": "adr-0035-max-expiry-days",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "at most `MAX_EXPIRY_DAYS` days after the current UTC day",
+      "claim": "owner-todo.ts exports MAX_EXPIRY_DAYS, the furthest ahead an expires may be.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "export const MAX_EXPIRY_DAYS"
+      }
+    },
+    {
+      "id": "adr-0035-seo-surface-search",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`e2e/seo-surface.spec.ts` and `e2e/machine-readable.spec.ts` fail",
+      "claim": "seo-surface.spec.ts searches each served body for every occurrence of the marker.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/e2e/seo-surface.spec.ts",
+        "contains": "body.matchAll(new RegExp(OWNER_TODO, 'g'))"
+      }
+    },
+    {
+      "id": "adr-0035-hint-throws",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`ownerTodo` throws on a hint that is blank",
+      "claim": "ownerTodo throws on a blank hint and on one with a bracket or a line break.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "matches": "if \\(hint\\.trim\\(\\) === '' \\|\\| /\\[\\(\\)\\\\r\\\\n\\]/\\.test\\(hint\\)\\)"
+      }
+    },
+    {
+      "id": "adr-0035-sources-list",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "runs it over every source in `OWNER_TODO_SOURCES`",
+      "claim": "owner-todo.test.ts declares the source list OWNER_TODO_SOURCES the live gate walks.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/__tests__/owner-todo.test.ts",
+        "contains": "const OWNER_TODO_SOURCES: OwnerTodoSource[] = ["
+      }
+    },
+    {
+      "id": "adr-0035-gate-function",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "`findOwnerTodoProblems` is the gate",
+      "claim": "owner-todo.ts exports the gate, findOwnerTodoProblems.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "export function findOwnerTodoProblems("
+      }
+    },
+    {
+      "id": "adr-0035-problem-kinds",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "on a source id that is not one path segment or is used twice",
+      "claim": "The gate reports source, unwalkable, unregistered, duplicate, stale, why and expiry problems.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "kind: 'source' | 'unwalkable' | 'unregistered' | 'duplicate' | 'stale' | 'why' | 'expiry';"
+      }
+    },
+    {
+      "id": "adr-0035-why-marker",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "row whose `why` is blank or holds the marker",
+      "claim": "The gate reports a row whose why is blank or holds the marker.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "if (typeof why !== 'string' || why.trim() === '' || why.includes(OWNER_TODO)) {"
+      }
+    },
+    {
+      "id": "adr-0035-one-field-per-name",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "is counted once",
+      "claim": "Unfilled fields are collected in a Map keyed by field name, so a repeated name is counted once.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "found.set(field, null);"
+      }
+    },
+    {
+      "id": "adr-0035-horizon-inclusive",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "that last day\n   included",
+      "claim": "An expires on the last allowed day passes: only one after the horizon fails.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "if (expires > horizon) {"
+      }
+    },
+    {
+      "id": "adr-0035-utc-day-used",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "The deadline counts the UTC day",
+      "claim": "Every row's expires is judged against that UTC day.",
+      "method": "file-line",
+      "evaluation": "live",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "const expiry = expiryProblem(expires, today);"
+      }
+    },
+    {
+      "id": "adr-0035-rows-at-d0daec2",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "holds those five rows",
+      "claim": "At d0daec2 the register holds five rows, each expiring on 2026-10-31.",
+      "method": "config-value",
+      "evaluation": "historical",
+      "check": {
+        "file": "apps/web/src/data/owner-todo.ts",
+        "regex": "^    expires: '(\\d{4}-\\d\\d-\\d\\d)',$",
+        "equalsAll": ["2026-10-31", "2026-10-31", "2026-10-31", "2026-10-31", "2026-10-31"]
+      },
+      "asOf": "d0daec24174a3720937bd5997966ff6fb6e12696"
+    },
+    {
+      "id": "adr-0035-first-rows-at-a0331e4",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "merged the same day as a0331e4",
+      "claim": "At a0331e4 (#167) the register holds the first three rows, each expiring on 2026-10-31.",
+      "method": "config-value",
+      "evaluation": "historical",
+      "check": {
+        "file": "apps/web/src/data/owner-todo.ts",
+        "regex": "^    expires: '(\\d{4}-\\d\\d-\\d\\d)',$",
+        "equalsAll": ["2026-10-31", "2026-10-31", "2026-10-31"]
+      },
+      "asOf": "a0331e4f5525385d295f94ca0762970d195104ad"
+    },
+    {
+      "id": "adr-0035-built-at-55fb8b9",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "merged on 2026-09-29 as 55fb8b9",
+      "claim": "At 55fb8b9 (#155) owner-todo.ts exists and sets MAX_EXPIRY_DAYS to 366.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "export const MAX_EXPIRY_DAYS = 366;"
+      },
+      "asOf": "55fb8b995b7a2a1c9701f3dc8fa034c83bab09ba"
+    },
+    {
+      "id": "adr-0035-expiry-problem-at-55fb8b9",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "a one-line change in `expiryProblem`",
+      "claim": "At 55fb8b9 (#155) owner-todo.ts judges a row's expires in expiryProblem.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "check": {
+        "path": "apps/web/src/data/owner-todo.ts",
+        "contains": "function expiryProblem(expires: unknown, today: string): string | null {"
+      },
+      "asOf": "55fb8b995b7a2a1c9701f3dc8fa034c83bab09ba"
+    },
+    {
+      "id": "adr-0035-allowbuilds-script-at-55fb8b9",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "beside `check-allowbuilds-drift.mjs`",
+      "claim": "At 55fb8b9 scripts/check-allowbuilds-drift.mjs exists.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "check": {
+        "path": "scripts/check-allowbuilds-drift.mjs"
+      },
+      "asOf": "55fb8b995b7a2a1c9701f3dc8fa034c83bab09ba"
+    },
+    {
+      "id": "adr-0035-quality-job-at-d0daec2",
+      "doc": "docs/adr/0035-owner-placeholder-convention.md",
+      "anchor": "CI's required `quality` job",
+      "claim": "At d0daec2 ci.yml has the quality job.",
+      "method": "file-line",
+      "evaluation": "historical",
+      "check": {
+        "path": ".github/workflows/ci.yml",
+        "matches": "^  quality:$"
+      },
+      "asOf": "d0daec24174a3720937bd5997966ff6fb6e12696"
     },
     {
       "id": "adr-index-0025-cell-date",
@@ -9642,6 +11124,40 @@
       }
     },
     {
+      "id": "plan-blog-engine-design-link-adr-0034-blog-posts-drafted-with-claude",
+      "doc": "docs/plans/2026-09-28-blog-engine-design.md",
+      "anchor": "](../adr/0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to ../adr/0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "plan-blog-engine-design-link-2026-10-06-blog-publishing-design",
+      "doc": "docs/plans/2026-09-28-blog-engine-design.md",
+      "anchor": "](2026-10-06-blog-publishing-design.md)",
+      "claim": "The link to 2026-10-06-blog-publishing-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
       "id": "plan-blog-engine-plan-link-2026-09-28-blog-engine-design",
       "doc": "docs/plans/2026-09-28-blog-engine-plan.md",
       "anchor": "](2026-09-28-blog-engine-design.md)",
@@ -9777,6 +11293,333 @@
         "file": "docs/adr/0021-squash-only-merges-and-required-checks.md",
         "regex": "^\\| Squash commit message \\(`squash_merge_commit_message`\\)\\s+\\| (\\S+)",
         "equals": "`BLANK`:"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-adr-0028",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](../adr/0028-blog-posts-as-typed-data.md)",
+      "claim": "The link to ../adr/0028-blog-posts-as-typed-data.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-adr-0034",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](../adr/0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The link to ../adr/0034-blog-posts-drafted-with-claude.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-blog-engine-design",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](2026-09-28-blog-engine-design.md)",
+      "claim": "The link to 2026-09-28-blog-engine-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-28-blog-engine-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-design.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-link-blog-engine-plan",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "](2026-09-28-blog-engine-plan.md)",
+      "claim": "The link to 2026-09-28-blog-engine-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-09-28-blog-engine-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-09-28-blog-engine-plan.md"
+      }
+    },
+    {
+      "id": "blog-publishing-design-script-web-build",
+      "doc": "docs/plans/2026-10-06-blog-publishing-design.md",
+      "anchor": "`pnpm --filter web build`",
+      "claim": "`pnpm --filter web build` is a script in apps/web/package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "web build"
+        }
+      ],
+      "check": {
+        "package": "apps/web",
+        "script": "build"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-design",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](2026-10-06-blog-publishing-design.md)",
+      "claim": "The link to 2026-10-06-blog-publishing-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-adr-0028",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](0028-blog-posts-as-typed-data.md)",
+      "claim": "The ADR 0034 text that Task 1 quotes links ADR 0028 relative to docs/adr, where the record is.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0028-blog-posts-as-typed-data.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0028-blog-posts-as-typed-data.md"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-design-from-adr",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](../plans/2026-10-06-blog-publishing-design.md)",
+      "claim": "The ADR 0034 text that Task 1 quotes links the publishing design relative to docs/adr, and the design exists.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../plans/2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-adr-0034",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The ADR 0028 pointer and the index row that Task 1 quotes link ADR 0034 relative to docs/adr, and the link resolves to the record, docs/adr/0034-blog-posts-drafted-with-claude.md.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-adr-0034-from-plans",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](../adr/0034-blog-posts-drafted-with-claude.md)",
+      "claim": "The dated note and the Related link that Task 1 quotes link ADR 0034 relative to docs/plans, and the link resolves to the record, docs/adr/0034-blog-posts-drafted-with-claude.md.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0034-blog-posts-drafted-with-claude.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0034-blog-posts-drafted-with-claude.md"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-origin-work",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](${ORIGIN}/work)",
+      "claim": "The expected twin lines link the work page on the site origin, and the /work route exists.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "${ORIGIN}/work"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/app/work/page.tsx"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-origin-blog",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](${ORIGIN}/blog)",
+      "claim": "The expected twin lines link /blog on the site origin, and the /blog route exists.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "${ORIGIN}/blog"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/app/blog/page.tsx"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-work",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](/work)",
+      "claim": "The quoted draft and test inputs link the on-site path /work, and the route exists.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "/work"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/app/work/page.tsx"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-blog",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](/blog)",
+      "claim": "The quoted fixture draft links the on-site path /blog, and the route exists.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "/blog"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/app/blog/page.tsx"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-link-hostile-nowhere",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "](/nowhere)",
+      "claim": "Not a link: the plan quotes the hostile fixture paragraph, whose [not a link](/nowhere) is text the serialiser escapes; the fixture holds it.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "/nowhere"
+        }
+      ],
+      "check": {
+        "path": "apps/web/src/test/fixtures/posts.ts",
+        "contains": "[not a link](/nowhere)"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-script-lint-fix",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "`pnpm lint:fix`",
+      "claim": "`pnpm lint:fix` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "lint:fix"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "lint:fix"
+      }
+    },
+    {
+      "id": "blog-publishing-plan-script-lint",
+      "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
+      "anchor": "`pnpm lint`.",
+      "claim": "`pnpm lint` is a script in ./package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "lint"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "lint"
+      }
+    },
+    {
+      "id": "plans-readme-link-2026-10-06-blog-publishing-design",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-10-06-blog-publishing-design.md)",
+      "claim": "The link to 2026-10-06-blog-publishing-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-06-blog-publishing-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-design.md"
+      }
+    },
+    {
+      "id": "plans-readme-link-2026-10-06-blog-publishing-plan",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-10-06-blog-publishing-plan.md)",
+      "claim": "The link to 2026-10-06-blog-publishing-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-06-blog-publishing-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-06-blog-publishing-plan.md"
       }
     }
   ]

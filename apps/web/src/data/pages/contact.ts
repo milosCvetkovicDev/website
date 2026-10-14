@@ -1,14 +1,16 @@
 /**
  * The copy `/contact` renders, and the page record its Markdown twin reads (#59). The page keeps
- * the layout, the classes, its `h1` and each profile's icon, which it keys by the link's `name`,
- * and maps over what is here, so a page and its twin cannot disagree. Every string is text the
- * page shows, with two exceptions in the "Connect an agent" section. The page renders the connector
- * snippets from `data/mcp-server.ts` and tells the reader to paste one; the twin has no code block
- * to carry them, so it names the endpoint and points at the page instead (`agents.twinPointer`).
+ * the layout, the classes, the hook under its `h1` (#58), and each profile's icon, which it keys by
+ * the link's `name`, and renders what is here, `h1` included, so a page and its twin cannot
+ * disagree. Every string is text the page shows, with two exceptions in the "Connect an agent"
+ * section. The page renders the connector snippets from `data/mcp-server.ts` and tells the reader
+ * to paste one; the twin has no code block to carry them, so it names the endpoint and points at
+ * the page instead (`agents.twinPointer`).
  * Importing this module evaluates `MCP_SERVER_URL`, so a malformed `NEXT_PUBLIC_SITE_URL` throws
  * here, naming the variable, as it does for every absolute URL the build writes.
  */
 import { MCP_SERVER_URL } from '@/data/mcp-server';
+import { OCCUPATION } from '@/data/profile';
 import { social } from '@/data/social';
 import type { PageRecord, PageSection } from './types';
 
@@ -52,10 +54,13 @@ export const socialLinks = [
 /** The names the page keys its icons by, so a profile added here without an icon fails typecheck. */
 export type SocialLinkName = (typeof socialLinks)[number]['name'];
 
-/** The rest of what `/contact` renders in its main element, in page order, less the `h1` (#58's). */
+/**
+ * The rest of what `/contact` renders in its main element, in page order, less the `h1`, which is
+ * the record's `heading`, and the hook under it (#58's).
+ */
 export const contactCopy = {
   socialTitle: 'Contact Milos Cvetkovic',
-  eyebrow: 'Contact · Milos Cvetkovic, Senior Full-Stack Engineer',
+  eyebrow: `Contact · Milos Cvetkovic, ${OCCUPATION}`,
   intro:
     "I share what I'm building, lessons from production, and engineering insights. Pick your preferred platform and say hi.",
   closing: {
@@ -107,6 +112,7 @@ const sections: readonly PageSection[] = [
 export const contactRecord: PageRecord = {
   path: '/contact',
   title: 'Contact',
+  heading: 'Contact Milos Cvetkovic on LinkedIn, GitHub or X',
   summary:
     'Connect with Milos Cvetkovic on LinkedIn, GitHub, and X. Follow along for engineering insights and project updates.',
   sections,

@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { CHROMIUM_LAUNCH_ARGS } from './e2e/support/chromium-launch-args';
 
 /**
  * The check that runs against the deployed site after Vercel reports a production deployment
@@ -30,5 +31,11 @@ export default defineConfig({
     baseURL: process.env.LIVE_URL || DEFAULT_LIVE_URL,
     trace: 'on-first-retry',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // The same Chromium build as the e2e suite, so the same launch flags (ADR 0032).
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'], launchOptions: { args: [...CHROMIUM_LAUNCH_ARGS] } },
+    },
+  ],
 });

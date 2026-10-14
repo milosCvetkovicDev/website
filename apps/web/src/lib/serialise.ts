@@ -1,16 +1,29 @@
 import {
   caseStudies,
+  caseStudyMetricScope,
   formatMetric,
   formatMetricScope,
   oneLine,
+  techStackTable,
   type CaseStudy,
   type CaseStudyHighlight,
   type CaseStudyMetric,
   type MetricDefinition,
 } from '@/data/case-studies';
 import { OWNER_TODO } from '@/data/owner-todo';
-import type { InlineLink, Paragraph, PageRecord, PageSection } from '@/data/pages/types';
+import { cellText, isWideTable, leadOf } from '@/data/pages/table';
+import type {
+  InlineLink,
+  Paragraph,
+  PageRecord,
+  PageSection,
+  Table,
+  TableCell,
+  TableRow,
+} from '@/data/pages/types';
+import { FOOTER_LINES, type Inline, type PostBlock, type PublishedPost } from '@/data/posts';
 import { assertPathname, markdownTwinPath } from './pathname';
+import { siteOrigin } from './site-origin';
 
 /**
  * The one module that writes Markdown (#59) and the case studies as JSON (#60). Every Markdown twin
@@ -18,8 +31,9 @@ import { assertPathname, markdownTwinPath } from './pathname';
  * route handler builds Markdown of its own. Every string it is handed is plain text: it escapes
  * whatever Markdown would read as syntax, so the text a reader sees is the text in the module.
  *
- * Each document opens the same way: `# <title>`, the summary paragraph, then `Source:` and the
- * absolute canonical URL of the HTML page it mirrors. A server module like `metadata.ts`.
+ * Each document opens the same way: `# <h1>`, the text of the HTML page's `h1`, then the summary
+ * paragraph, then `Source:` and the absolute canonical URL of that page. A server module like
+ * `metadata.ts`.
  */
 
 // RFC 7763 registers text/markdown with a required charset. Written here and nowhere else, so no
@@ -55,8 +69,8 @@ export function jsonResponse(value: unknown): Response {
 }
 
 /**
- * The absolute URL of a path on this site. The origin comes from the variable and the fallback
- * `app/sitemap.ts` and `app/robots.ts` read, so a preview build names production like the sitemap
+ * The absolute URL of a path on this site. The origin is `siteOrigin()`'s, from the variable and the
+ * fallback `app/sitemap.ts` and `app/robots.ts` read, so a preview build names production like the sitemap
  * does, and the root is the bare origin, as its served canonical is. `metadataBase` cannot help
  * here: it resolves URLs in the head, and a Markdown body is plain text.
  */
@@ -66,35 +80,6 @@ export function absoluteUrl(path: string): string {
   }
   const origin = siteOrigin();
   return path === '/' ? origin : `${origin}${path}`;
-}
-
-/**
- * `NEXT_PUBLIC_SITE_URL`, or production when it is unset or blank, as the bare origin. A trailing
- * slash is dropped, so `https://x.dev/` cannot write `https://x.dev//about`; anything that is not an
- * http(s) origin (no scheme, a path, a query) throws at build time rather than ship broken URLs.
- */
-function siteOrigin(): string {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim() || 'https://miloscvetkovic.dev';
-  let url: URL | undefined;
-  try {
-    url = new URL(configured);
-  } catch {
-    url = undefined;
-  }
-  if (
-    !url ||
-    (url.protocol !== 'https:' && url.protocol !== 'http:') ||
-    url.pathname !== '/' ||
-    url.search ||
-    url.hash ||
-    url.username ||
-    url.password
-  ) {
-    throw new Error(
-      `absoluteUrl: NEXT_PUBLIC_SITE_URL "${configured}" is not an origin such as https://miloscvetkovic.dev`,
-    );
-  }
-  return url.origin;
 }
 
 // Inline syntax anywhere in a line: code spans, emphasis, links, autolinks and raw HTML, GFM's table
@@ -127,7 +112,9 @@ function destination(url: string): string {
   return url.replace(/[\\()]/g, '\\$&').replace(/[\s<>]/g, (mark) => encodeURIComponent(mark));
 }
 
-function link({ text: label, href }: InlineLink): string {
+/** A link; `where`, when given, names the block it stands in, as a post's errors do. */
+function link({ text: label, href }: InlineLink, where?: string): string {
+  const at = where ? ` in ${where}` : '';
   // A twin is read away from the site, so an on-site path becomes an absolute URL.
   let url: string;
   if (href.startsWith('/') && !href.startsWith('//')) {
@@ -136,11 +123,11 @@ function link({ text: label, href }: InlineLink): string {
     url = href;
   } else {
     throw new Error(
-      `serialise: the link "${href}" is neither a path on this site nor an http(s) or mailto URL`,
+      `serialise: the link "${href}"${at} is neither a path on this site nor an http(s) or mailto URL`,
     );
   }
   const visibleLabel = text(label).trim();
-  if (!visibleLabel) throw new Error(`serialise: the link to "${href}" has no text`);
+  if (!visibleLabel) throw new Error(`serialise: the link to "${href}"${at} has no text`);
   return `[${visibleLabel}](${destination(url)})`;
 }
 
@@ -176,8 +163,9 @@ function paragraph(value: Paragraph, what: string): string {
   return block(nonEmpty(inline(value), what));
 }
 
-function heading(level: 1 | 2, value: string): string {
-  const title = nonEmpty(inline(value), `a level-${level} heading`);
+/** A heading; `what` names it in an error, as in `postToMarkdown: the title of /blog/<slug>`. */
+function heading(level: 1 | 2 | 3, value: string, what = `a level-${level} heading`): string {
+  const title = nonEmpty(inline(value), what);
   // A run of `#` after a space ends an ATX heading's text and is dropped as its closing sequence.
   return `${'#'.repeat(level)} ${title.replace(/(^| )(#+)$/, '$1\\$2')}`;
 }
@@ -195,24 +183,78 @@ function numbered(items: readonly string[], what: string): string {
     .join('\n');
 }
 
-function table(
-  title: string,
-  columns: readonly string[],
-  rows: readonly (readonly string[])[],
-): string {
-  if (columns.length === 0) {
-    throw new Error(`renderSections: the table under "${title}" has no columns`);
+/**
+ * A cell as the page reads it (`cellText()`), so the twin and `components/data-table.tsx` word it
+ * alike: a list as its entries joined with `, `, which no entry may hold, a lead as a sentence
+ * before the text, an icon left out. A plain cell may be blank, as a table's can; a decorated one
+ * must have text, or its icon or lead would stand for a value the twin cannot write.
+ */
+function cell(value: TableCell, what: string): string {
+  if (typeof value === 'string') return value;
+  if ('text' in value) {
+    nonEmpty(inline(value.text), what);
+    return cellText(value);
   }
-  entries(rows, `the table under "${title}"`);
+  return commaList(value, what);
+}
+
+/**
+ * A table as its caption, `name`, and its columns and rows, `markdown`; the caller decides whether
+ * a `Table:` caption line (Pandoc's) goes above them, as `table()` and a post's table do. `where`
+ * names the table in an error. The caption, every column and every row header must have text: the
+ * page renders each as a name, a `<caption>` or a `<th>`, and an empty one is an unnamed header to
+ * a screen reader and a gap in the twin. A table needs a data column as well as its header column,
+ * or its column header would head no cell.
+ *
+ * A wide table (`isWideTable()`) also has to fit the layout `components/data-table.tsx` stacks it
+ * into on a phone, where its row header and first cell run on as one line after a drawn " · ": that
+ * first cell must be text, not a list (drawn as a block of chips) nor a cell with a lead (set on a
+ * line of its own), either of which would break the line after the dot; and no cell may be blank,
+ * which would leave the dot pointing at nothing or an empty line in the row. Every table the site
+ * renders comes through here when its twin is written, a page's or a case study's through
+ * `table()` and a post's through `postBlock()`, so writing the twin refuses such a row.
+ */
+function captionedTable(
+  { caption, columns, rows }: Table,
+  where: string,
+): { name: string; markdown: string } {
+  if (columns.length === 0) {
+    throw new Error(`serialise: ${where} has no columns`);
+  }
+  if (columns.length === 1) {
+    throw new Error(`serialise: ${where} has one column, row headers with no cell to head`);
+  }
+  const name = nonEmpty(inline(caption), `the caption of ${where}`);
+  columns.forEach((column, index) => nonEmpty(inline(column), `column ${index + 1} of ${where}`));
+  entries(rows, where);
   rows.forEach((row, index) => {
     if (row.length !== columns.length) {
       throw new Error(
-        `renderSections: row ${index + 1} of the table under "${title}" has ${row.length} cells for ${columns.length} columns`,
+        `serialise: row ${index + 1} of ${where} has ${row.length} cells for ${columns.length} columns`,
       );
     }
+    nonEmpty(inline(row[0]), `the header of row ${index + 1} of ${where}`);
+    if (isWideTable({ columns })) stackable(row, columns, `row ${index + 1} of ${where}`);
   });
   const line = (cells: readonly string[]) => `| ${cells.map(inline).join(' | ')} |`;
-  return [line(columns), line(columns.map(() => '---')), ...rows.map(line)].join('\n');
+  const markdown = [
+    line(columns),
+    line(columns.map(() => '---')),
+    ...rows.map((row, index) =>
+      line(
+        row.map((value, column) =>
+          cell(value, `the ${columns[column]} of row ${index + 1} of ${where}`),
+        ),
+      ),
+    ),
+  ].join('\n');
+  return { name, markdown };
+}
+
+/** A page table: its caption line is left out when the section's heading already names it (#58). */
+function table(heading: string, content: Table, where = `the table under "${heading}"`): string {
+  const { name, markdown } = captionedTable(content, where);
+  return name === inline(heading) ? markdown : `Table: ${name}\n\n${markdown}`;
 }
 
 function section(content: PageSection): string[] {
@@ -236,7 +278,7 @@ function section(content: PageSection): string[] {
           .join('\n'),
       ];
     case 'table':
-      return [heading(2, content.heading), table(content.heading, content.columns, content.rows)];
+      return [heading(2, content.heading), table(content.heading, content)];
     default: {
       // The types rule this out; a record cast from elsewhere must not lose a section silently.
       const unknown: never = content;
@@ -257,11 +299,21 @@ function document(parts: readonly string[]): string {
   return `${blocks(parts)}\n`;
 }
 
-/** The opening every twin shares: its title, its summary and the page it mirrors. */
-function opening(title: string, summary: string, path: string, caller: string): string {
+/**
+ * The opening every twin shares: the page's `h1`, its summary and the page it mirrors. A case
+ * study's and a post's `h1` is its title; a static route's is its record's `heading`. `field`
+ * names which, so an error points at the field the author wrote.
+ */
+function opening(
+  h1: string,
+  field: 'heading' | 'title',
+  summary: string,
+  path: string,
+  caller: string,
+): string {
   assertPathname(path, caller);
   return blocks([
-    heading(1, title),
+    heading(1, h1, `${caller}: the ${field} of ${path}`),
     paragraph(summary, `${caller}: the summary of ${path}`),
     `Source: ${absoluteUrl(path)}`,
   ]);
@@ -273,19 +325,25 @@ export function renderSections(sections: readonly PageSection[]): string {
 }
 
 /**
- * A static route's twin, from its page record. The H1 is the route's own title, without the
- * layout's `%s | Milos Cvetkovic` template: that suffix names the site in a browser tab, and the
- * twin names the site on its Source line instead.
+ * A static route's twin, from its page record. It opens with the page's `h1`, the record's
+ * `heading` (#58), so a reader of either meets the same first line. The meta title names the page
+ * in a browser tab instead, through the layout's `%s | Milos Cvetkovic` template on every route
+ * but `/`, and the twin names the site on its Source line.
  */
 export function pageToMarkdown(page: PageRecord): string {
-  const title = typeof page.title === 'string' ? page.title : page.title?.absolute;
-  if (typeof title !== 'string') {
-    throw new Error(`pageToMarkdown: the record for ${page.path} has no title`);
-  }
-  return document([
-    opening(title, page.summary, page.path, 'pageToMarkdown'),
+  const markdown = document([
+    opening(page.heading, 'heading', page.summary, page.path, 'pageToMarkdown'),
     renderSections(page.sections),
   ]);
+  // A record's copy is served as written, so an `ownerTodo()` marker left anywhere in it but where
+  // its renderer leaves the row out (the quick facts' bases, `shownFacts`) would reach the twin:
+  // the prerender fails rather than publish it, as `caseStudyToJson()` does (`data/owner-todo.ts`).
+  if (markdown.includes(OWNER_TODO)) {
+    throw new Error(
+      `pageToMarkdown(${page.path}): a field still holds ${OWNER_TODO}, never served`,
+    );
+  }
+  return markdown;
 }
 
 // The section headings `app/work/[slug]/page.tsx` renders, so the twin reads like the page.
@@ -302,8 +360,13 @@ const CASE_STUDY_HEADINGS = {
 /**
  * A case study's twin: every field of the study, including those the page shows only in its
  * metadata and JSON-LD (the tagline, the highlight, the dates). The metric goes through
- * `formatMetric()`, the function the cards use, so the twin cannot render a figure differently.
- * `lib/__tests__/serialise.test.ts` fails when a study holds a value the twin does not show.
+ * `formatMetric()`, the function the cards use, so the twin cannot render a figure differently, and
+ * its scope follows on the Basis line, as the page's metric panel prints it under the figure: the
+ * one sentence `formatMetricScope()` makes of the basis and, once the owner has defined it, the
+ * metric definition's window and method (#58), read through `caseStudyMetricScope()`, which the
+ * page reads too and which throws, naming the study, when the basis has nothing to state, so the
+ * twin is refused rather than written without one. `lib/__tests__/serialise.test.ts` fails when a
+ * study holds a value the twin does not show.
  */
 export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
   const { highlight, howItWorks, lessons, slug } = caseStudy;
@@ -313,6 +376,7 @@ export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
     ['Category', highlight.category],
     ['Status', highlight.status],
     ['Metric', `${formatMetric(highlight.metric)} ${highlight.metric.label}`],
+    ['Basis', caseStudyMetricScope(caseStudy)],
     ['Tags', commaList(caseStudy.tags, where('the tags'))],
     ['Published', caseStudy.publishedAt],
     ['Updated', caseStudy.updatedAt],
@@ -321,6 +385,7 @@ export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
   return document([
     opening(
       caseStudy.title,
+      'title',
       caseStudy.description,
       `/work/${caseStudy.slug}`,
       'caseStudyToMarkdown',
@@ -343,23 +408,164 @@ export function caseStudyToMarkdown(caseStudy: CaseStudy): string {
       ? [heading(2, CASE_STUDY_HEADINGS.lessons), bullets(lessons, where('Lessons'))]
       : []),
     heading(2, CASE_STUDY_HEADINGS.techStack),
-    table(
-      CASE_STUDY_HEADINGS.techStack,
-      ['Category', 'Items'],
-      caseStudy.techStack.map(({ category, items }) => [
-        nonEmpty(category.trim(), where('a tech-stack category')),
-        commaList(items, where(`the ${category} items`)),
-      ]),
+    // The page's table whole (#58): its caption, columns and rows, checked here so an error names
+    // the study, and so the page and the twin read one array.
+    table(CASE_STUDY_HEADINGS.techStack, techStackTable(caseStudy), where('the tech stack')),
+  ]);
+}
+
+/** The longest run of backticks in `code`, so that a fence or a code span can be one longer. */
+const longestBacktickRun = (code: string) =>
+  Math.max(0, ...(code.match(/`+/g) ?? []).map((run) => run.length));
+
+/**
+ * Inline code as a code span: one backtick more than its longest run, and a space inside each end
+ * when the code starts or ends with a backtick or a space, which CommonMark strips again.
+ */
+function codeSpan(code: string): string {
+  const ticks = '`'.repeat(longestBacktickRun(code) + 1);
+  const pad = /^[ `]|[ `]$/.test(code) ? ' ' : '';
+  return `${ticks}${pad}${code}${pad}${ticks}`;
+}
+
+/**
+ * A fenced code block, whose fence is one backtick longer than the code's longest run, three at
+ * least.
+ */
+function codeBlock(code: string, language = ''): string {
+  const fence = '`'.repeat(Math.max(3, longestBacktickRun(code) + 1));
+  return `${fence}${language}\n${code}\n${fence}`;
+}
+
+/**
+ * A run of a post's inline pieces: text as `text()` writes it, code spans, and links; `where` names
+ * the block in a link's error. It cannot reuse `inline()`, which has no code piece and collapses
+ * every run of spaces in the joined line: a code span's spaces are code, and must stay as written.
+ */
+function postInline(content: readonly Inline[], where: string): string {
+  const pieces = content.filter((piece) => piece !== '');
+  return pieces
+    .map((piece, index) => {
+      if (typeof piece !== 'string') {
+        return piece.code !== undefined ? codeSpan(piece.code) : link(piece, where);
+      }
+      const next = pieces[index + 1];
+      // `!` right before a link's `[` would make the link an image.
+      return typeof next === 'object' && next.code === undefined
+        ? text(piece).replace(/!$/, '\\!')
+        : text(piece);
+    })
+    .join('')
+    .trim();
+}
+
+/** One block of a post; `where` is its place, as in `block 3 of <slug>`, for an error. */
+function postBlock(content: PostBlock, where: string): string {
+  switch (content.kind) {
+    case 'heading':
+      return heading(content.level, content.text, `the level-${content.level} heading at ${where}`);
+    case 'paragraph':
+      return block(nonEmpty(postInline(content.content, where), where));
+    case 'list':
+      return entries(content.items, where)
+        .map((item, index) => {
+          const marker = content.ordered ? `${index + 1}.` : '-';
+          const at = `item ${index + 1} of ${where}`;
+          return `${marker} ${block(nonEmpty(postInline(item, at), at))}`;
+        })
+        .join('\n');
+    case 'code':
+      return codeBlock(nonEmpty(content.code, where), content.language);
+    case 'quote':
+      return `> ${block(nonEmpty(postInline(content.content, where), where))}`;
+    case 'table': {
+      // Always captioned, even under a heading of the same words, so a draft's `Table:` line and
+      // the twin's compare line for line (D6 of the publishing design).
+      const { name, markdown } = captionedTable(content, `the table at ${where}`);
+      return `Table: ${name}\n\n${markdown}`;
+    }
+    default: {
+      // The types rule this out; a post cast from elsewhere must not lose a block silently.
+      const unknown: never = content;
+      throw new Error(
+        `postToMarkdown: no writer for the block kind "${(unknown as { kind: string }).kind}" at ${where}`,
+      );
+    }
+  }
+}
+
+/** A post's body as Markdown, block after block; `slug` names the post in an error. */
+export function postBodyToMarkdown(body: readonly PostBlock[], slug: string): string {
+  return blocks(
+    entries(body, `the body of ${slug}`).map((content, index) =>
+      postBlock(content, `block ${index + 1} of ${slug}`),
     ),
+  );
+}
+
+/**
+ * A post's twin (61e, ADR 0034): the opening every twin shares, the post's dates, its body, and,
+ * for a kind with footer lines, a `---` rule and each line, as the page ends its article.
+ * `scripts/post-draft-check.mjs` compares an approved draft with this output, and
+ * `src/lib/__tests__/post-draft.test.ts` keeps the two in step.
+ */
+export function postToMarkdown(post: PublishedPost): string {
+  const footer = FOOTER_LINES[post.kind];
+  return document([
+    opening(post.title, 'title', post.summary, `/blog/${post.slug}`, 'postToMarkdown'),
+    `- Published: ${post.publishedAt}\n- Updated: ${post.updatedAt}`,
+    postBodyToMarkdown(post.body, post.slug),
+    ...(footer.length > 0
+      ? ['---', ...footer.map((line) => paragraph(line, `a footer line of ${post.slug}`))]
+      : []),
   ]);
 }
 
 /**
+ * `/blog`'s twin. While no post is published it is the record, Coming Soon card included, as the
+ * page shows. After that it lists the posts in the order given, which `publishedPosts` keeps
+ * newest first, as the page does: the title as a heading, the day it was published and its URL,
+ * then its summary.
+ */
+export function blogToMarkdown(page: PageRecord, list: readonly PublishedPost[]): string {
+  if (list.length === 0) return pageToMarkdown(page);
+  return document([
+    opening(page.heading, 'heading', page.summary, page.path, 'blogToMarkdown'),
+    ...list.flatMap((post) => [
+      heading(2, post.title, `blogToMarkdown: the title of ${post.slug}`),
+      `- Published: ${post.publishedAt}\n- URL: ${absoluteUrl(`/blog/${post.slug}`)}`,
+      paragraph(post.summary, `blogToMarkdown: the summary of ${post.slug}`),
+    ]),
+  ]);
+}
+
+/**
+ * Refuses a wide table's row that its stacked layout on a phone could not draw (see
+ * `captionedTable()`).
+ */
+function stackable([, first, ...rest]: TableRow, columns: readonly string[], where: string): void {
+  const what = (column: number) => `serialise: the ${columns[column]} of ${where}`;
+  if (Array.isArray(first)) {
+    throw new Error(`${what(1)} is a list, which cannot run on after the row header on a phone`);
+  }
+  if (typeof first === 'object' && 'text' in first && leadOf(first)) {
+    throw new Error(`${what(1)} has a lead, which cannot run on after the row header on a phone`);
+  }
+  [first, ...rest].forEach((value, index) => {
+    if (typeof value === 'string' && !value.trim()) {
+      throw new Error(`${what(index + 1)} is blank, which a stacked row on a phone cannot draw`);
+    }
+  });
+}
+
+/**
  * Entries joined with `, `, as the page's chips would read aloud. An entry holding a comma would
- * read as two, and no entries at all as a blank, so both throw.
+ * read as two, and a blank entry or no entries at all as a gap, so each throws.
  */
 function commaList(list: readonly string[], what: string): string {
   entries(list, what).forEach((entry) => {
+    // A blank entry would be an empty chip on the page and a gap between two commas in the twin.
+    if (!entry.trim()) throw new Error(`serialise: an entry in ${what} is empty`);
     if (entry.includes(',')) {
       throw new Error(`serialise: "${entry}" in ${what} holds a comma and would read as two`);
     }

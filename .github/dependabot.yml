@@ -35,11 +35,19 @@ updates:
       # major cannot arrive ahead of the runtime. Revisit when .nvmrc changes major.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+    # The order of the groups does not, by itself, keep a package in its own group: it decides only
+    # between two groups that both keep a package, in a run where neither has an open pull request.
+    # A group with no patterns never gives a dependency up, even to a group that names it exactly,
+    # and outranks a wildcard pattern; a group with an open pull request claims its members, and
+    # those recorded on the pull request, before the others run; and refreshing that pull request
+    # takes every member. So a package with a group of its own is also in the `exclude-patterns` of
+    # the catch-all group with the same `applies-to` (minor-and-patch or security), which Dependabot
+    # reads before any pattern, and only a group whose update-types include minor and patch owns a
+    # package this way. See docs/adr/0033-dependabot-group-exclusions.md.
     groups:
       # A security update of lighthouse itself is red by design for the reason given at the
       # `lighthouse` group below, so it gets its own security pull request instead of turning the
-      # batch red and holding every other security fix. It sits ahead of `security` because
-      # Dependabot puts a dependency in the first group that matches it.
+      # batch red and holding every other security fix.
       lighthouse-security:
         applies-to: security-updates
         patterns: ['lighthouse']
@@ -51,11 +59,11 @@ updates:
       security:
         applies-to: security-updates
         patterns: ['*']
+        exclude-patterns: ['lighthouse']
       # The vite family moves as one: @vitejs/plugin-react 6 peers vite ^8, which is why #9 failed
       # when it arrived alone against vite 7, and vitest and @vitest/coverage-v8 peer on each
       # other's exact version. Majors are included so that they arrive together in one pull
-      # request. It sits ahead of minor-and-patch because Dependabot puts a dependency in the first
-      # group that matches it. See docs/adr/0018-dependency-update-policy.md.
+      # request. See docs/adr/0018-dependency-update-policy.md.
       vite:
         patterns: ['vite', '@vitejs/*', 'vitest', '@vitest/*']
         update-types: [major, minor, patch]
@@ -66,13 +74,15 @@ updates:
       # would hold every other minor and patch bump. `update-types` lists every level, which is
       # also the default, to match vite and to say that a major comes through this group too. The
       # pattern matches the exact name only: lighthouse-logger and the rest of its tree are
-      # transitive and change only when a lighthouse bump requires it. It sits ahead of
-      # minor-and-patch because Dependabot puts a dependency in the first group that matches it.
+      # transitive and change only when a lighthouse bump requires it.
       lighthouse:
         patterns: ['lighthouse']
         update-types: [major, minor, patch]
+      # Every other minor and patch version update. The exclusions repeat the patterns of `vite` and
+      # `lighthouse`: without them this group took both families' bumps in #232.
       minor-and-patch:
         update-types: [minor, patch]
+        exclude-patterns: ['vite', '@vitejs/*', 'vitest', '@vitest/*', 'lighthouse']
     commit-message:
       prefix: build
       include: scope

@@ -16,11 +16,28 @@ import type { gsap } from '../gsap-runtime';
  * The message lists every call the spy saw, so a changed duration or a missing `onUpdate` reads
  * straight off the failure.
  *
- * It reads `gsap.to` calls only. A tween made with `gsap.fromTo`, `gsap.from` or a timeline's
- * `.to` never reaches the spy, so a tween that moves to one of those shows up here as "no call".
+ * `pickTween` reads `gsap.to` calls, and `pickFromToTween` does the same for a spy on
+ * `gsap.fromTo`, with a query over the target and both vars; `fromToOf(element, what)` is the query
+ * for the one reveal an element gets. A tween made with `gsap.from` or a timeline's `.to` or
+ * `.fromTo` never reaches either spy, so a tween that moves to one of those shows up here as "no
+ * call".
  */
 
 type GsapTo = typeof gsap.to;
+/**
+ * `gsap.fromTo` as the phases call it. Its type also declares GSAP 2's
+ * `(targets, duration, fromVars, toVars)` form, last, so `vi.spyOn(gsap, 'fromTo')` types its
+ * calls by that legacy form: the picker takes either spy and reads the calls as the
+ * three-argument form every caller here uses. A call whose second and third arguments are not
+ * both objects (the legacy form, or vars left out) never reaches a query, so it matches nothing.
+ */
+export type FromToCall = (
+  targets: gsap.TweenTarget,
+  fromVars: gsap.TweenVars,
+  toVars: gsap.TweenVars,
+) => gsap.core.Tween;
+/** Both spies' results: `gsap.to` and `gsap.fromTo` each return the tween they made. */
+type TweenResults = MockInstance<GsapTo>['mock']['results'];
 
 /** What a test is looking for among the `gsap.to` calls. */
 export interface TweenQuery {
@@ -42,27 +59,81 @@ export function pickTween(
   query: TweenQuery,
   { latest = false }: { latest?: boolean } = {},
 ): PickedTween {
-  const calls = toSpy.mock.calls;
-  const matching = matchingCalls(toSpy, query);
+  return pickCall(
+    'gsap.to',
+    toSpy.mock.calls,
+    toSpy.mock.results,
+    query.what,
+    matchingCalls(toSpy, query),
+    latest,
+  );
+}
+
+/** What a test is looking for among the `gsap.fromTo` calls. */
+export interface FromToQuery {
+  /** The tween, in words, for the failure message: "No gsap.fromTo call is <what>". */
+  readonly what: string;
+  /** Whether the call `gsap.fromTo(target, fromVars, toVars)` created the tween. */
+  readonly matches: (target: unknown, fromVars: gsap.TweenVars, toVars: gsap.TweenVars) => boolean;
+}
+
+/** `pickTween` for a spy on `gsap.fromTo`: the same refusals, the same failure message. */
+export function pickFromToTween(
+  fromToSpy: MockInstance<typeof gsap.fromTo> | MockInstance<FromToCall>,
+  query: FromToQuery,
+  { latest = false }: { latest?: boolean } = {},
+): PickedTween {
+  const calls: readonly (readonly unknown[])[] = fromToSpy.mock.calls;
+  const matching = calls.flatMap(([target, fromVars, toVars], index) =>
+    isVars(fromVars) && isVars(toVars) && query.matches(target, fromVars, toVars) ? [index] : [],
+  );
+  return pickCall('gsap.fromTo', calls, fromToSpy.mock.results, query.what, matching, latest);
+}
+
+function isVars(value: unknown): value is gsap.TweenVars {
+  return typeof value === 'object' && value !== null;
+}
+
+/**
+ * The `gsap.fromTo` call whose target is this very element, as a reveal is: the phases hand GSAP
+ * the element a ref holds, never a selector or a list. `what` names it in the failure message. A
+ * missing element throws: a ref read before mount is `null`, and a query for `null` would match
+ * any call made with such a ref.
+ */
+export function fromToOf(element: unknown, what: string): FromToQuery {
+  if (element === null || element === undefined) {
+    throw new Error(`fromToOf was given ${String(element)} for ${what}: find the element first.`);
+  }
+  return { what, matches: (target) => target === element };
+}
+
+function pickCall(
+  method: string,
+  calls: readonly (readonly unknown[])[],
+  results: TweenResults,
+  what: string,
+  matching: number[],
+  latest: boolean,
+): PickedTween {
   if (matching.length === 0) {
-    throw new Error(`No gsap.to call is ${query.what}. ${describeCalls(calls)}`);
+    throw new Error(`No ${method} call is ${what}. ${describeCalls(calls)}`);
   }
   if (matching.length > 1 && !latest) {
     const which = matching.map((index) => `#${index}`).join(', ');
     throw new Error(
-      `${matching.length} gsap.to calls (${which}) are ${query.what}; pass { latest: true } ` +
+      `${matching.length} ${method} calls (${which}) are ${what}; pass { latest: true } ` +
         `if the test wants the last of them. ${describeCalls(calls)}`,
     );
   }
   const index = matching[matching.length - 1];
-  const result = toSpy.mock.results[index];
+  const result = results[index];
   if (result.type === 'incomplete') {
-    throw new Error(`gsap.to call #${index}, ${query.what}, has not returned yet.`);
+    throw new Error(`${method} call #${index}, ${what}, has not returned yet.`);
   }
   if (result.type !== 'return') {
-    throw new Error(`gsap.to call #${index}, ${query.what}, threw instead of returning a tween.`);
+    throw new Error(`${method} call #${index}, ${what}, threw instead of returning a tween.`);
   }
-  return { target: calls[index][0], tween: result.value };
+  return { target: calls[index][0] as gsap.TweenTarget, tween: result.value };
 }
 
 /**
@@ -106,11 +177,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-function describeCalls(calls: Parameters<GsapTo>[]): string {
+/**
+ * Each call's target and every argument after it, joined by an arrow: a `fromTo` call's two vars
+ * objects read `from -> to`, and a call in another form shows each argument it was given.
+ */
+function describeCalls(calls: readonly (readonly unknown[])[]): string {
   if (calls.length === 0) return 'The spy saw no call.';
-  const described = calls.map(
-    ([target, vars], index) => `#${index} ${describeTarget(target)} ${describeVars(vars)}`,
-  );
+  const described = calls.map(([target, ...args], index) => {
+    const shown = (args.length === 0 ? [undefined] : args).map((arg) => describeVars(arg));
+    return `#${index} ${describeTarget(target)} ${shown.join(' -> ')}`;
+  });
   return `The spy saw ${calls.length} call${calls.length === 1 ? '' : 's'}: ${described.join('; ')}.`;
 }
 

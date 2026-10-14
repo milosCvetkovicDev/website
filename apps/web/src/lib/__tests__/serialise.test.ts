@@ -11,20 +11,32 @@
  * Markdown reader sees, backslash escapes removed, so correct escaping never reads as a gap.
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { caseStudies, formatMetric, type CaseStudy } from '@/data/case-studies';
-import { OWNER_TODO } from '@/data/owner-todo';
-import type { PageRecord, PageSection, Paragraph } from '@/data/pages/types';
+import {
+  caseStudies,
+  caseStudyMetricScope,
+  formatMetric,
+  formatMetricScope,
+  type CaseStudy,
+} from '@/data/case-studies';
+import { OWNER_TODO, ownerTodo } from '@/data/owner-todo';
+import { pages } from '@/data/pages';
+import type { PageRecord, PageSection, Paragraph, TableSection } from '@/data/pages/types';
+import { buildPostIndex, type PostBlock } from '@/data/posts';
+import { everyBlockPost, fixturePosts, hostileTitlePost } from '@/test/fixtures/posts';
 import { visible } from '@/test/markdown';
 import { buildMetadata } from '../metadata';
 import { markdownTwinPath } from '../pathname';
 import {
   absoluteUrl,
+  blogToMarkdown,
   caseStudyToMarkdown,
   markdownResponse,
   pageToMarkdown,
+  postBodyToMarkdown,
+  postToMarkdown,
   renderSections,
 } from '../serialise';
 
@@ -55,11 +67,12 @@ const FORMATTED_METRIC_FIELDS = new Set([
 ]);
 
 /**
- * The study fields the twin leaves out on purpose, because the page does not show them yet. A
- * metric's scope (`formatMetricScope()`) reaches the page and its twin together in #58; until then
- * neither shows it, and an unfilled definition's marker must never be served at all.
+ * The study fields the twin shows only inside `formatMetricScope()`'s sentence on its Basis line
+ * (#58), as the page's metric panel does: the window's days as a reader reads them, the method as
+ * a sentence, and nothing of a definition that is still the owner's, whose marker is never served.
+ * So they are not looked for leaf by leaf; `missingFrom` looks for that whole sentence instead.
  */
-const NOT_ON_THE_PAGE_YET = ['metricDefinition'];
+const SCOPE_FIELDS = ['metricDefinition'];
 
 interface Leaf {
   path: string;
@@ -77,11 +90,17 @@ function leaves(value: unknown, path = ''): Leaf[] {
   return value === undefined ? [] : [{ path, text: String(value) }];
 }
 
-/** The fields each shown on one fact line of the twin, by the label that line opens with. */
+/**
+ * The fields each shown on one fact line of the twin, by the label that line opens with. The most
+ * specific key that owns a path wins, so the basis, which sits inside the metric, is looked for on
+ * its own line whatever order these keys are in.
+ */
 const FACT_LINES: Record<string, string> = {
   tagline: 'Tagline',
   'highlight.category': 'Category',
   'highlight.status': 'Status',
+  'highlight.metric.basis': 'Basis',
+  metricDefinition: 'Basis',
   'highlight.metric': 'Metric',
   tags: 'Tags',
   publishedAt: 'Published',
@@ -113,7 +132,9 @@ function region(shown: string, path: string): string {
   if (owns('title')) return line('# ');
   if (owns('slug')) return line('Source: ');
   if (owns('description')) return shown.split('\n\n')[1] ?? '';
-  const fact = Object.keys(FACT_LINES).find(owns);
+  const [fact] = Object.keys(FACT_LINES)
+    .filter(owns)
+    .sort((a, b) => b.length - a.length);
   if (fact) return line(`- ${FACT_LINES[fact]}: `);
   const section = Object.keys(SECTIONS).find(owns);
   if (section) {
@@ -133,9 +154,12 @@ function missingFrom(study: CaseStudy, twin: string): string[] {
     ...leaves(study).filter(
       ({ path }) =>
         !FORMATTED_METRIC_FIELDS.has(path) &&
-        !NOT_ON_THE_PAGE_YET.some((field) => path === field || path.startsWith(`${field}.`)),
+        !SCOPE_FIELDS.some((field) => path === field || path.startsWith(`${field}.`)),
     ),
     { path: 'highlight.metric', text: `${formatMetric(metric)} ${metric.label}` },
+    // The scope sentence, from the producer the page reads too; a study with no basis to state
+    // throws here, so a missing scope fails the check rather than look for an empty string.
+    { path: 'metricDefinition', text: caseStudyMetricScope(study) },
   ];
   return expected
     .filter(({ path, text }) => !region(shown, path).includes(text))
@@ -205,7 +229,11 @@ describe('markdownResponse()', () => {
   // route, so a handler cannot build and serve a twin of its own.
   it('is the only writer of the Markdown content type under src/app', () => {
     const app = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app');
-    const offenders = readdirSync(app, { recursive: true, encoding: 'utf8' })
+    // Regular files only: route folders carry file-like names (`about/index.md/`, #173), and one
+    // that ended in a script extension would reach readFileSync and throw EISDIR (#189).
+    const offenders = readdirSync(app, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => relative(app, join(entry.parentPath, entry.name)))
       .filter((name) => /\.(?:ts|tsx|js|mjs)$/.test(name))
       .filter((name) => !/(^|\/)__tests__\/|\.test\./.test(name))
       .filter((name) => readFileSync(join(app, name), 'utf8').includes('text/markdown'));
@@ -252,6 +280,7 @@ describe('absoluteUrl()', () => {
 const FIXTURE: PageRecord = {
   path: '/about',
   title: 'About — Senior Full-Stack Engineer',
+  heading: 'About Milos Cvetkovic: legacy rescue, clean architecture, and AI-native systems',
   summary: 'I fix the systems everyone else gave up on.',
   sections: [
     {
@@ -284,6 +313,7 @@ const FIXTURE: PageRecord = {
     {
       kind: 'table',
       heading: 'Quick facts',
+      caption: 'Quick facts',
       columns: ['Fact', 'Value'],
       rows: [
         ['Production systems rescued', '12'],
@@ -294,10 +324,21 @@ const FIXTURE: PageRecord = {
 };
 
 describe('pageToMarkdown() and renderSections()', () => {
-  it('renders the title, summary and source, then every section variant', () => {
+  it("refuses a record that still holds an owner's placeholder anywhere, rather than serve it", () => {
+    // The quick facts leave out a fact whose basis is a placeholder; a marker anywhere else in a
+    // record (a label, a figure, a paragraph) has no renderer to leave it out, so the twin refuses.
+    const marker = ownerTodo('a fixture hint');
+    const withMarker: PageRecord = { ...FIXTURE, summary: `${FIXTURE.summary} ${marker}` };
+    expect(() => pageToMarkdown(withMarker)).toThrow(
+      `pageToMarkdown(/about): a field still holds ${OWNER_TODO}, never served`,
+    );
+    expect(pageToMarkdown(FIXTURE)).not.toContain(OWNER_TODO);
+  });
+
+  it('opens with the heading, never the meta title, then the summary, source and sections', () => {
     expect(pageToMarkdown(FIXTURE)).toBe(
       [
-        '# About — Senior Full-Stack Engineer',
+        '# About Milos Cvetkovic: legacy rescue, clean architecture, and AI-native systems',
         '',
         'I fix the systems everyone else gave up on.',
         '',
@@ -327,15 +368,16 @@ describe('pageToMarkdown() and renderSections()', () => {
     );
   });
 
-  it('uses an absolute title as it stands, and names the root without a trailing slash', () => {
+  it('opens with the heading under an absolute title too, and names the root without a slash', () => {
     const home = pageToMarkdown({
       path: '/',
-      title: { absolute: 'Milos Cvetkovic — Senior Full-Stack Engineer' },
+      title: { absolute: 'Milos Cvetkovic | Senior Full-Stack Engineer' },
+      heading: 'Milos Cvetkovic — senior full-stack engineer',
       summary: 'Summary.',
       sections: [],
     });
     expect(home).toBe(
-      `# Milos Cvetkovic — Senior Full-Stack Engineer\n\nSummary.\n\nSource: ${ORIGIN}\n`,
+      `# Milos Cvetkovic — senior full-stack engineer\n\nSummary.\n\nSource: ${ORIGIN}\n`,
     );
   });
 
@@ -361,13 +403,139 @@ describe('pageToMarkdown() and renderSections()', () => {
     const ragged: PageSection = {
       kind: 'table',
       heading: 'Quick facts',
+      caption: 'Quick facts',
       columns: ['Fact', 'Value'],
       rows: [['Teams led', '4', 'extra']],
     };
     expect(() => renderSections([ragged])).toThrow(
-      'renderSections: row 1 of the table under "Quick facts" has 3 cells for 2 columns',
+      'serialise: row 1 of the table under "Quick facts" has 3 cells for 2 columns',
     );
   });
+
+  it('writes a cell as the page reads it: a list joined, a lead as a sentence, no icon (#58)', () => {
+    const markdown = renderSections([
+      {
+        kind: 'table',
+        heading: 'The longer version',
+        caption: 'Career timeline',
+        // The icon cell first: a wide table's first cell runs on after the row header on a phone,
+        // so it may not be a list or carry a lead (refused below).
+        columns: ['Year', 'Area', 'Kit', 'What changed'],
+        rows: [
+          [
+            '2025',
+            { icon: '🤖', text: 'Agents' },
+            ['Bun', 'Hono'],
+            { lead: 'Shipped the agent', text: 'It fixed bugs.' },
+          ],
+        ],
+      },
+    ]);
+    expect(markdown).toBe(
+      [
+        '## The longer version',
+        '',
+        'Table: Career timeline',
+        '',
+        '| Year | Area | Kit | What changed |',
+        '| --- | --- | --- | --- |',
+        '| 2025 | Agents | Bun, Hono | Shipped the agent. It fixed bugs. |',
+      ].join('\n'),
+    );
+  });
+
+  it('names a table by its caption, as the page does, unless the heading already does (#58)', () => {
+    const withCaption = (caption: string): PageSection => ({
+      kind: 'table',
+      heading: 'Quick facts',
+      caption,
+      columns: ['Fact', 'Figure'],
+      rows: [['Teams led', '4']],
+    });
+    expect(renderSections([withCaption('Facts at a glance')])).toBe(
+      [
+        '## Quick facts',
+        '',
+        'Table: Facts at a glance',
+        '',
+        '| Fact | Figure |',
+        '| --- | --- |',
+        '| Teams led | 4 |',
+      ].join('\n'),
+    );
+    expect(renderSections([withCaption('Quick facts')])).not.toContain('Table:');
+  });
+
+  it.each<[string, Partial<TableSection>, RegExp]>([
+    ['a blank caption', { caption: ' ' }, /the caption of the table under "T" is empty/],
+    ['a blank column', { columns: ['A', ''] }, /column 2 of the table under "T" is empty/],
+    ['a blank row header', { rows: [[' ', 'x']] }, /the header of row 1 of the table under "T"/],
+    [
+      'a decorated cell without text',
+      { rows: [['Row', { icon: '🤖', text: ' ' }]] },
+      /the B of row 1 of the table under "T" is empty/,
+    ],
+  ])(
+    'refuses a table with %s: the page would render an unnamed header or a bare icon',
+    (_, change, error) => {
+      const base: TableSection = {
+        kind: 'table',
+        heading: 'T',
+        caption: 'C',
+        columns: ['A', 'B'],
+        rows: [['Row', 'x']],
+      };
+      expect(() => renderSections([{ ...base, ...change }])).toThrow(error);
+    },
+  );
+
+  it('refuses a list cell whose entry holds a comma, or that has no entries', () => {
+    const withList = (list: readonly string[]): PageSection => ({
+      kind: 'table',
+      heading: 'Toolkit',
+      caption: 'Skills by category',
+      columns: ['Category', 'Skills'],
+      rows: [['Frontend', list]],
+    });
+    expect(() => renderSections([withList(['React, Next.js'])])).toThrow(/holds a comma/);
+    expect(() => renderSections([withList([])])).toThrow(
+      /the Skills of row 1 of the table under "Toolkit" is empty/,
+    );
+    // A blank entry would be an empty chip on the page and "A, , B" in the twin.
+    expect(() => renderSections([withList(['React', ' ', 'Vue'])])).toThrow(
+      /an entry in the Skills of row 1 of the table under "Toolkit" is empty/,
+    );
+  });
+
+  it.each<[string, TableSection['rows'], RegExp]>([
+    [
+      'a list as its first cell',
+      [['2025', ['Bun', 'Hono'], 'x']],
+      /the B of row 1 of the table under "T" is a list/,
+    ],
+    [
+      'a lead in its first cell',
+      [['2025', { lead: 'Shipped', text: 'x' }, 'x']],
+      /the B of row 1 of the table under "T" has a lead/,
+    ],
+    ['a blank first cell', [['2025', ' ', 'x']], /the B of row 1 of the table under "T" is blank/],
+    ['a blank later cell', [['2025', 'x', '']], /the C of row 1 of the table under "T" is blank/],
+  ])(
+    'refuses a wide table with %s, which its stacked row on a phone could not draw',
+    (_, rows, error) => {
+      const wide: TableSection = {
+        kind: 'table',
+        heading: 'T',
+        caption: 'C',
+        columns: ['A', 'B', 'C'],
+        rows,
+      };
+      expect(() => renderSections([wide])).toThrow(error);
+      // Two columns never stack, so the same cells are fine there.
+      const narrow = rows.map(([header, first]) => [header, first] as const);
+      expect(() => renderSections([{ ...wide, columns: ['A', 'B'], rows: narrow }])).not.toThrow();
+    },
+  );
 
   it('writes plain text so that it displays as written, never as Markdown syntax', () => {
     const markdown = renderSections([
@@ -392,6 +560,7 @@ describe('pageToMarkdown() and renderSections()', () => {
       {
         kind: 'table',
         heading: 'Pipes',
+        caption: 'Pipes',
         columns: ['A|B', 'C'],
         rows: [['x | y', '']],
       },
@@ -489,13 +658,18 @@ describe('pageToMarkdown() and renderSections()', () => {
     ],
     [
       'a table with no columns',
-      { kind: 'table', heading: 'T', columns: [], rows: [] },
+      { kind: 'table', heading: 'T', caption: 'T', columns: [], rows: [] },
       /table under "T" has no columns/,
     ],
     [
       'a table with no rows',
-      { kind: 'table', heading: 'T', columns: ['A'], rows: [] },
+      { kind: 'table', heading: 'T', caption: 'T', columns: ['A', 'B'], rows: [] },
       /table under "T" is empty/,
+    ],
+    [
+      'a table of one column, row headers with no cell to head',
+      { kind: 'table', heading: 'T', caption: 'T', columns: ['A'], rows: [['x']] },
+      /table under "T" has one column/,
     ],
     [
       'an unknown section kind',
@@ -506,10 +680,10 @@ describe('pageToMarkdown() and renderSections()', () => {
     expect(() => renderSections([content])).toThrow(error);
   });
 
-  it('refuses a record without a title or a summary', () => {
-    expect(() =>
-      pageToMarkdown({ ...FIXTURE, title: {} as unknown as PageRecord['title'] }),
-    ).toThrow('pageToMarkdown: the record for /about has no title');
+  it('refuses a record whose heading or summary is blank', () => {
+    expect(() => pageToMarkdown({ ...FIXTURE, heading: ' ' })).toThrow(
+      'serialise: pageToMarkdown: the heading of /about is empty',
+    );
     expect(() => pageToMarkdown({ ...FIXTURE, summary: '' })).toThrow(
       /summary of \/about is empty/,
     );
@@ -526,7 +700,14 @@ describe('caseStudyToMarkdown()', () => {
     highlight: {
       category: 'DEVOPS',
       status: 'PRODUCTION',
-      metric: { value: 4.96, prefix: '~', suffix: '×', decimals: 1, label: 'faster builds' },
+      metric: {
+        value: 4.96,
+        prefix: '~',
+        suffix: '×',
+        decimals: 1,
+        label: 'faster builds',
+        basis: 'CI time with the cache, against every run rebuilding everything.',
+      },
     },
     challenge: 'Every CI run rebuilt the entire monorepo.',
     approach: 'I built a cache server.',
@@ -560,6 +741,7 @@ describe('caseStudyToMarkdown()', () => {
         '- Category: DEVOPS',
         '- Status: PRODUCTION',
         '- Metric: \\~5.0× faster builds',
+        '- Basis: CI time with the cache, against every run rebuilding everything. Measured from 1 March 2025 to 31 August 2025. Median CI time over the window, before and after.',
         '- Tags: Bun, Elysia',
         '- Published: 2026-09-09',
         '- Updated: 2026-09-25',
@@ -592,7 +774,9 @@ describe('caseStudyToMarkdown()', () => {
         '',
         '## Tech Stack',
         '',
-        '| Category | Items |',
+        'Table: Tech stack for Nx Remote Cache Server',
+        '',
+        '| Layer | Technologies |',
         '| --- | --- |',
         '| Runtime | Bun |',
         '| Storage | Azure Blob Storage, LRU Cache |',
@@ -601,11 +785,65 @@ describe('caseStudyToMarkdown()', () => {
     );
   });
 
-  it('leaves the metric’s scope out, even when it is defined, until the page shows it (#58)', () => {
+  it('writes the metric’s scope on the Basis line, in place of the basis alone, as the page does (#58)', () => {
     const twin = caseStudyToMarkdown(STUDY);
-    expect(twin).not.toContain('Median CI time');
+    const scope = formatMetricScope(STUDY.highlight.metric.basis, STUDY.metricDefinition);
+    expect(scope).toMatch(/^CI time with the cache.* Measured from .* Median CI time/);
+    expect(visible(twin)).toContain(`\n- Basis: ${scope}\n`);
+    // One producer, one copy: the basis is inside the sentence, never on a line of its own too.
+    expect(visible(twin).split(STUDY.highlight.metric.basis)).toHaveLength(2);
+    // The window as a reader reads it, never the stored days.
     expect(twin).not.toContain('2025-03-01');
-    expect(twin).not.toContain('Measured from');
+  });
+
+  it('writes the basis alone while the definition is still the owner’s, and never its marker', () => {
+    const unfilled: CaseStudy = { ...STUDY, metricDefinition: { state: OWNER_TODO } };
+    const twin = caseStudyToMarkdown(unfilled);
+    expect(visible(twin)).toContain(`\n- Basis: ${STUDY.highlight.metric.basis}\n`);
+    expect(twin).not.toContain('Measured');
+    expect(twin).not.toContain(OWNER_TODO);
+    expect(missingFrom(unfilled, twin)).toEqual([]);
+  });
+
+  it('refuses a study whose scope cannot be stated at all, rather than write an empty Basis line', () => {
+    const blank: CaseStudy = {
+      ...STUDY,
+      highlight: { ...STUDY.highlight, metric: { ...STUDY.highlight.metric, basis: ' ' } },
+      metricDefinition: { state: OWNER_TODO },
+    };
+    expect(() => caseStudyToMarkdown(blank)).toThrow(
+      /caseStudyMetricScope\(nx-remote-cache\): the headline figure has no basis to state/,
+    );
+  });
+
+  it('refuses a study with a window and method but no basis, which would not say what it counted', () => {
+    // formatMetricScope() alone would state the window and method; a study's scope opens with what
+    // the figure counted, so the twin refuses it, as the page does, rather than serve the rest.
+    expect(STUDY.metricDefinition.state).toBe('defined');
+    for (const basis of ['', ' ', '—.']) {
+      const unstated: CaseStudy = {
+        ...STUDY,
+        highlight: { ...STUDY.highlight, metric: { ...STUDY.highlight.metric, basis } },
+      };
+      expect(() => caseStudyToMarkdown(unstated), JSON.stringify(basis)).toThrow(
+        /caseStudyMetricScope\(nx-remote-cache\)/,
+      );
+    }
+  });
+
+  it('escapes Markdown in the basis, which is free prose, and still shows it whole', () => {
+    const basis = '*Median* CI time for `nx build` [all_projects], against <none> ~ ever | 1 & 2.';
+    const study: CaseStudy = {
+      ...STUDY,
+      highlight: { ...STUDY.highlight, metric: { ...STUDY.highlight.metric, basis } },
+    };
+    const twin = caseStudyToMarkdown(study);
+    // The basis opens the scope sentence, and the window and method follow it on the same line.
+    expect(twin).toContain(
+      '\n- Basis: \\*Median\\* CI time for \\`nx build\\` \\[all\\_projects\\], against \\<none\\> \\~ ever \\| 1 & 2. Measured from ',
+    );
+    expect(visible(twin)).toContain(`\n- Basis: ${basis} Measured from `);
+    expect(missingFrom(study, twin)).toEqual([]);
   });
 
   it('leaves out an optional section the study does not have', () => {
@@ -646,11 +884,16 @@ describe('caseStudyToMarkdown()', () => {
     ['no tags', { tags: [] }, /the tags of nx-remote-cache is empty/],
     ['a blank tagline', { tagline: ' ' }, /the Tagline of nx-remote-cache is empty/],
     ['an empty challenge', { challenge: '' }, /the challenge of nx-remote-cache is empty/],
-    ['no tech stack', { techStack: [] }, /table under "Tech Stack" is empty/],
+    ['no tech stack', { techStack: [] }, /the tech stack of nx-remote-cache is empty/],
     [
       'a tech-stack category with no items',
       { techStack: [{ category: 'Runtime', items: [] }] },
-      /the Runtime items of nx-remote-cache is empty/,
+      /the Technologies of row 1 of the tech stack of nx-remote-cache is empty/,
+    ],
+    [
+      'a blank tech-stack category',
+      { techStack: [{ category: ' ', items: ['Bun'] }] },
+      /the header of row 1 of the tech stack of nx-remote-cache is empty/,
     ],
     [
       'a tag holding a comma',
@@ -689,17 +932,25 @@ describe('caseStudyToMarkdown()', () => {
       expect(missingFrom(study, twin)).toEqual([]);
     });
 
-    it('renders its metric through formatMetric()', () => {
+    it('renders its metric through formatMetric(), and its scope once, on the next line', () => {
       const { metric } = study.highlight;
-      expect(visible(twin)).toContain(`- Metric: ${formatMetric(metric)} ${metric.label}\n`);
+      const scope = caseStudyMetricScope(study);
+      expect(scope.startsWith(metric.basis), 'the scope opens with the basis').toBe(true);
+      expect(visible(twin)).toContain(
+        `- Metric: ${formatMetric(metric)} ${metric.label}\n- Basis: ${scope}\n`,
+      );
+      // One producer (#58): the scope sentence holds the basis, so the basis is never written twice.
+      expect(visible(twin).split(metric.basis)).toHaveLength(2);
     });
 
-    it('lists the tech stack as a Category | Items table, one row per category', () => {
+    it('lists the tech stack as a Layer | Technologies table, one row per layer', () => {
+      // The page's table has these columns (#58): the twin's first header cell is the unit the
+      // markdown-twins parity test looks for.
       const rows = study.techStack.map(
         ({ category, items }) => `| ${category} | ${items.join(', ')} |`,
       );
       expect(visible(twin)).toContain(
-        ['| Category | Items |', '| --- | --- |', ...rows].join('\n'),
+        ['| Layer | Technologies |', '| --- | --- |', ...rows].join('\n'),
       );
     });
 
@@ -719,5 +970,202 @@ describe('the spaced-out check', () => {
     expect('Most bugs live in the gap — and I mean a gap').not.toMatch(SPACED_OUT);
     expect('| A | B | C |\n| 1 | 2 | 3 |').not.toMatch(SPACED_OUT);
     expect(pageToMarkdown(FIXTURE)).not.toMatch(SPACED_OUT);
+  });
+});
+
+describe('postToMarkdown()', () => {
+  it('writes the every-block fixture: its opening, its dates, then every block kind in order', () => {
+    expect(postToMarkdown(everyBlockPost)).toBe(
+      [
+        '# Fixture: every block and inline kind',
+        '',
+        'A test fixture that uses each block kind and each inline kind once or more, so a renderer that drops one is caught.',
+        '',
+        `Source: ${ORIGIN}/blog/fixture-every-block`,
+        '',
+        '- Published: 2026-08-03',
+        '- Updated: 2026-08-20',
+        '',
+        `A paragraph of plain text, then inline code: \`buildPostIndex(posts)\`, then a link to [the work page](${ORIGIN}/work) and one to [an external page](https://example.com/fixture?kind=link#inline).`,
+        '',
+        '## A level-two heading',
+        '',
+        '- A bullet item of plain text.',
+        '- A bullet item with `inline code` in it.',
+        `- [A bullet item that is a link](${ORIGIN}/blog)`,
+        '',
+        '### A level-three heading',
+        '',
+        '1. The first numbered item.',
+        '2. The second numbered item.',
+        '',
+        '```ts',
+        "const greeting = 'fixture';",
+        'console.log(greeting);',
+        '```',
+        '',
+        '```',
+        'A code block with no language.',
+        '```',
+        '',
+        '> A quotation, with `code` and plain text in it.',
+        '',
+        // Captioned even where a heading might name it, so a draft's `Table:` line always has a twin.
+        'Table: Fixture: a table of three columns',
+        '',
+        '| Fixture run | Blocks | Result |',
+        '| --- | --- | --- |',
+        '| First run | 9 | Every block rendered |',
+        '| Second run | 9 | The same, with \\| and \\* in a cell |',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('escapes what Markdown would read as syntax, and ends a jev post with its lines after a rule', () => {
+    expect(postToMarkdown(hostileTitlePost)).toBe(
+      [
+        '# Fixture: & \\<tags\\> and "quotes"',
+        '',
+        'A test fixture whose title holds &, \\< and " and whose text holds \\*stars\\*, \\_underscores\\_ and \\<b\\>tags\\</b\\>, all of it plain text.',
+        '',
+        `Source: ${ORIGIN}/blog/fixture-hostile-title`,
+        '',
+        '- Published: 2026-09-07',
+        '- Updated: 2026-09-07',
+        '',
+        '\\# Not a heading, \\*not emphasis\\*, \\[not a link\\](/nowhere) & \\<em\\>not markup\\</em\\>.',
+        '',
+        '---',
+        '',
+        'I have no relationship with TypeSafe.',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('fences code longer than its longest backtick run, and pads a code span that starts with one', () => {
+    expect(
+      postBodyToMarkdown(
+        [
+          { kind: 'code', language: 'md', code: '```ts\nconst a = `b`;\n---\n```' },
+          { kind: 'paragraph', content: ['Run ', { code: '`x`' }, ' or ', { code: 'a``b' }, '.'] },
+        ],
+        'fixture',
+      ),
+    ).toBe(
+      [
+        '````md',
+        '```ts',
+        'const a = `b`;',
+        '---',
+        '```',
+        '````',
+        '',
+        'Run `` `x` `` or ```a``b```.',
+      ].join('\n'),
+    );
+  });
+
+  it('escapes a ! that ends text before a link, which would make the link an image', () => {
+    expect(
+      postBodyToMarkdown(
+        [
+          {
+            kind: 'paragraph',
+            content: [
+              'Look!',
+              { text: 'the work page', href: '/work' },
+              ' Run!',
+              { code: 'x' },
+              '!',
+            ],
+          },
+        ],
+        'fixture',
+      ),
+    ).toBe(`Look\\![the work page](${ORIGIN}/work) Run!\`x\`!`);
+  });
+
+  it('refuses a table the page could not draw, as it refuses a page table', () => {
+    expect(() =>
+      postBodyToMarkdown(
+        [{ kind: 'table', caption: 'One column', columns: ['Only'], rows: [['a']] }],
+        'fixture',
+      ),
+    ).toThrow(/^serialise: the table at block 1 of fixture has one column/);
+  });
+
+  it.each<[string, PostBlock[], string]>([
+    [
+      'an empty heading',
+      [{ kind: 'heading', level: 3, text: ' ' }],
+      'serialise: the level-3 heading at block 1 of fixture is empty',
+    ],
+    [
+      'a link to another scheme',
+      [{ kind: 'paragraph', content: ['See ', { text: 'the file', href: 'ftp://example.com/a' }] }],
+      'serialise: the link "ftp://example.com/a" in block 1 of fixture is neither a path on this site nor an http(s) or mailto URL',
+    ],
+    [
+      'a link with no text in a list item',
+      [{ kind: 'list', items: [['One.'], [{ text: ' ', href: '/work' }]] }],
+      'serialise: the link to "/work" in item 2 of block 1 of fixture has no text',
+    ],
+    [
+      'a block kind it has no writer for',
+      [{ kind: 'video' } as unknown as PostBlock],
+      'postToMarkdown: no writer for the block kind "video" at block 1 of fixture',
+    ],
+  ])('names the post and the block for %s', (_name, body, message) => {
+    expect(() => postBodyToMarkdown(body, 'fixture')).toThrow(message);
+  });
+
+  it('names the post whose title is empty', () => {
+    expect(() => postToMarkdown({ ...everyBlockPost, title: ' ' })).toThrow(
+      'serialise: postToMarkdown: the title of /blog/fixture-every-block is empty',
+    );
+  });
+});
+
+describe('blogToMarkdown()', () => {
+  it('is the record, Coming Soon card included, while no post is published', () => {
+    expect(blogToMarkdown(pages['/blog'], [])).toBe(pageToMarkdown(pages['/blog']));
+  });
+
+  it('lists each published post newest first, as /blog does: title, day, URL, summary', () => {
+    expect(blogToMarkdown(pages['/blog'], buildPostIndex(fixturePosts).publishedPosts)).toBe(
+      [
+        '# Writing',
+        '',
+        pages['/blog'].summary,
+        '',
+        `Source: ${ORIGIN}/blog`,
+        '',
+        '## Fixture: & \\<tags\\> and "quotes"',
+        '',
+        '- Published: 2026-09-07',
+        `- URL: ${ORIGIN}/blog/fixture-hostile-title`,
+        '',
+        'A test fixture whose title holds &, \\< and " and whose text holds \\*stars\\*, \\_underscores\\_ and \\<b\\>tags\\</b\\>, all of it plain text.',
+        '',
+        '## Fixture: every block and inline kind',
+        '',
+        '- Published: 2026-08-03',
+        `- URL: ${ORIGIN}/blog/fixture-every-block`,
+        '',
+        'A test fixture that uses each block kind and each inline kind once or more, so a renderer that drops one is caught.',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('names itself, and the blank heading or post title, in an error', () => {
+    expect(() => blogToMarkdown({ ...pages['/blog'], heading: ' ' }, [everyBlockPost])).toThrow(
+      'serialise: blogToMarkdown: the heading of /blog is empty',
+    );
+    expect(() => blogToMarkdown(pages['/blog'], [{ ...everyBlockPost, title: ' ' }])).toThrow(
+      'serialise: blogToMarkdown: the title of fixture-every-block is empty',
+    );
   });
 });

@@ -1,9 +1,10 @@
+import { OCCUPATION } from '@/data/profile';
 import { social } from '@/data/social';
-import type { InlineLink, PageRecord } from './types';
+import type { InlineLink, PageRecord, Table } from './types';
 
 /**
  * /skills: the copy `app/skills/page.tsx` renders, and the record its Markdown twin reads (#59).
- * The `h1` stays in the page.
+ * The page renders its `h1` from the record's `heading` (#58); the hook under it stays in the page.
  */
 
 /** A primary skill with its depth: the badge's years, the bar's level, and a line of context. */
@@ -18,6 +19,10 @@ export interface CoreSkill {
 /** A category of the full toolkit: its icon, a one-line description, and the skills under it. */
 export interface ToolkitCategory {
   name: string;
+  /**
+   * An emoji drawn beside the name as decoration. The page hides it from screen readers and the
+   * twin leaves it out, so it stays a field of its own and never goes inside the text.
+   */
   icon: string;
   description: string;
   skills: readonly string[];
@@ -143,9 +148,11 @@ export const differentiators: readonly Differentiator[] = [
   },
 ];
 
-/** The copy the page renders around its `h1` and its three lists, in page order. */
+/**
+ * The copy the page renders around its `h1`, the hook under it and its three lists, in page order.
+ */
 export const skillsCopy = {
-  eyebrow: 'Technical toolkit · Milos Cvetkovic, Senior Full-Stack Engineer',
+  eyebrow: `Technical toolkit · Milos Cvetkovic, ${OCCUPATION}`,
   intro: [
     'What matters is knowing ',
     { text: 'when', tag: 'em' },
@@ -197,9 +204,24 @@ export const skillsCopy = {
   };
 };
 
+/**
+ * The full toolkit as a table (#58): each category heads its row, then what it covers, led by its
+ * icon, then its skills. The icon is decoration, so the twin leaves it out.
+ */
+export const toolkitTable: Table = {
+  caption: 'Skills by category',
+  columns: ['Category', 'What it covers', 'Skills'],
+  rows: skillCategories.map(({ name, icon, description, skills }) => [
+    name,
+    { icon, text: description },
+    skills,
+  ]),
+};
+
 export const skillsRecord: PageRecord = {
   path: '/skills',
   title: 'Skills — TypeScript, React, NestJS, Azure',
+  heading: 'Skills: full-stack TypeScript, Azure infrastructure, and production AI agents',
   summary:
     'Full-stack TypeScript, AI agents, legacy rescue, cloud infrastructure. The tools I use to ship production systems.',
   sections: [
@@ -219,15 +241,7 @@ export const skillsRecord: PageRecord = {
       heading: skillsCopy.headings.differentiators,
       items: differentiators.map(({ title, description }) => ({ term: title, description })),
     },
-    {
-      kind: 'list',
-      heading: skillsCopy.headings.toolkit,
-      // The icon is decoration, so the twin leaves it out.
-      items: skillCategories.map(({ name, description, skills }) => ({
-        term: name,
-        description: `${description}: ${skills.join(', ')}`,
-      })),
-    },
+    { kind: 'table', heading: skillsCopy.headings.toolkit, ...toolkitTable },
     {
       kind: 'prose',
       heading: skillsCopy.staySharp.heading,

@@ -13,12 +13,15 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { caseStudies } from '@/data/case-studies';
+import { isWideTable } from '@/data/pages/table';
 import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 import { formatContentDate, isPublishableContentDate } from '@/lib/content-date';
 import { NO_PUBLISHED_POST_SLUG } from '@/lib/post-static-params';
+import { PRODUCTION_ORIGIN } from '@/lib/site-origin';
 import { draftPost, everyBlockPost, fixturePosts, hostileTitlePost } from '@/test/fixtures/posts';
 import {
   buildPostIndex,
+  FOOTER_LINES,
   getPost,
   hasPublishedPosts,
   posts,
@@ -26,6 +29,7 @@ import {
   type Inline,
   type Post,
   type PostBlock,
+  type PostKind,
   type PublishedPost,
 } from '../posts';
 
@@ -34,11 +38,14 @@ const TITLE_SUFFIX = ' | Milos Cvetkovic';
 /** Google cuts a title at about 600 px, some 60 characters, as page-metadata.test.ts holds. */
 const TITLE_MAX = 60;
 /**
- * #61's bounds for a summary. They are not a meta description's: 61b decides whether a summary can
- * double as one, which page-metadata.test.ts holds to 155 characters.
+ * #61's bounds for every entry's summary, a draft's included. A published post's summary is also
+ * its meta description (61b), so `descriptionProblems` holds the published index to
+ * `DESCRIPTION_MAX`: a draft entry is held to 300 characters and a published post to 155.
  */
 const SUMMARY_MIN = 50;
 const SUMMARY_MAX = 300;
+/** What page-metadata.test.ts allows every page's meta description, a post's summary included. */
+const DESCRIPTION_MAX = 155;
 /** Lowercase letters and digits in words joined by single hyphens: the `<slug>` in `/blog/<slug>`. */
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 /** One character of a URL as RFC 3986 writes it: ASCII, with anything else percent-encoded. */
@@ -53,6 +60,13 @@ const HREF = new RegExp(
   String.raw`^(?:https://[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d{1,5})?(?:[/?#]${URL_CHARACTER}*)?|/(?!/)${URL_CHARACTER}*)$`,
   'i',
 );
+/**
+ * This site's own hosts. A link to one, on any port, is written as a path, which the page-exists
+ * check covers; a full URL on them would skip it. The URL parser lowercases a host and keeps the
+ * port out of `hostname`.
+ */
+const OWN_HOST = new URL(PRODUCTION_ORIGIN).hostname;
+const OWN_HOSTS = new Set([OWN_HOST, `www.${OWN_HOST}`]);
 /** Link text that says nothing of where the link goes, as a screen reader's list of links reads it. */
 const VAGUE_LINK_TEXT = /^(?:here|click here|this|that|link|this link|more|read more)[.!:]?$/i;
 /** A code block's language as a Markdown fence's info string and a `language-*` class can carry it. */
@@ -76,7 +90,10 @@ const hasInvisible = (value: string) =>
   });
 const INVISIBLE_PROBLEM = 'holds a line break, a control or a direction character';
 
-/** Problems with one line of prose: a title, a summary, a heading or a tag. */
+/**
+ * Problems with one line of prose: a title, a summary, a heading, a tag, or a table's caption, a
+ * column name or a row header.
+ */
 function lineProblems(value: unknown, what: string): string[] {
   if (typeof value !== 'string' || !value.trim()) return [`${what} is empty`];
   if (hasInvisible(value)) return [`${what} ${INVISIBLE_PROBLEM}`];
@@ -95,14 +112,31 @@ function pagesFor(list: readonly Post[]): ReadonlySet<string> {
   ]);
 }
 
+/**
+ * `href` as the URL parser reads it, or null where the parser refuses it: a port over 65535, an
+ * IPv4 address with a part over 255 or a punycode label that does not decode, which `HREF` lets
+ * through.
+ */
+function parseUrl(href: string): URL | null {
+  try {
+    return new URL(href);
+  } catch {
+    return null;
+  }
+}
+
 /** Problems with a run of inline pieces: a paragraph, a quote or one list item. */
 function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<string>): string[] {
   if (!Array.isArray(pieces) || pieces.length === 0) return [`${where} is empty`];
   const problems: string[] = [];
   let text = '';
+  // Whether the last piece that was not empty text is inline code: the twin writes two such pieces
+  // as one span (`a``b` is the code a``b), where the page draws two.
+  let afterCode = false;
   pieces.forEach((piece: unknown, index) => {
     const at = `${where}, piece ${index + 1}`;
     if (typeof piece === 'string') {
+      if (piece !== '') afterCode = false;
       if (hasInvisible(piece)) problems.push(`${at} ${INVISIBLE_PROBLEM}`);
       else text += piece;
     } else if (piece && typeof piece === 'object' && 'code' in piece) {
@@ -110,15 +144,24 @@ function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<strin
       // a link this checker read as code.
       if ('text' in piece || 'href' in piece) {
         problems.push(`${at} is both inline code and a link`);
+        afterCode = false;
         return;
       }
+      if (afterCode) {
+        problems.push(`${at}: two pieces of inline code side by side; join them into one piece`);
+      }
+      afterCode = true;
       const { code } = piece as { code: unknown };
-      if (typeof code !== 'string' || !code.trim()) {
+      if (typeof code !== 'string' || !code) {
         problems.push(`${at}: the inline code is empty`);
+      } else if (!code.trim()) {
+        // CommonMark keeps every space of a span made only of spaces, so the twin and page differ.
+        problems.push(`${at}: the inline code is only whitespace`);
       } else if (hasInvisible(code)) {
         problems.push(`${at}: the inline code ${INVISIBLE_PROBLEM}`);
       } else text += code;
     } else if (piece && typeof piece === 'object' && 'href' in piece) {
+      afterCode = false;
       const { text: label, href } = piece as { text: unknown; href: unknown };
       if (typeof label !== 'string' || !label.trim()) {
         problems.push(`${at}: the link has no text`);
@@ -127,16 +170,31 @@ function inlineProblems(pieces: unknown, where: string, pages: ReadonlySet<strin
       } else if (VAGUE_LINK_TEXT.test(label.trim())) {
         problems.push(`${at}: the link text ${JSON.stringify(label)} does not say where it goes`);
       } else text += label;
+      const elsewhere = `${at}: the link goes to ${JSON.stringify(href)}, which is neither an https URL nor a path on this site`;
       if (typeof href !== 'string' || !HREF.test(href)) {
-        problems.push(
-          `${at}: the link goes to ${JSON.stringify(href)}, which is neither an https URL nor a path on this site`,
-        );
-      } else if (href.startsWith('/') && !pages.has(href.split(/[?#]/)[0])) {
-        problems.push(
-          `${at}: the link goes to ${JSON.stringify(href)}, which is no page on this site`,
-        );
+        problems.push(elsewhere);
+      } else if (href.startsWith('/')) {
+        if (!pages.has(href.split(/[?#]/)[0])) {
+          problems.push(
+            `${at}: the link goes to ${JSON.stringify(href)}, which is no page on this site`,
+          );
+        }
+      } else {
+        const url = parseUrl(href);
+        if (url === null) {
+          problems.push(elsewhere);
+        } else if (OWN_HOSTS.has(url.hostname)) {
+          // In one problem with the page-exists check's finding, so the writer who swaps the URL
+          // for its path is not sent to a second failure.
+          const missing = pages.has(url.pathname) ? '' : ', which is no page on this site';
+          problems.push(
+            `${at}: the link goes to ${JSON.stringify(href)}, which names this site's own host; ` +
+              `write its path, ${JSON.stringify(url.pathname + url.search + url.hash)}${missing}`,
+          );
+        }
       }
     } else {
+      afterCode = false;
       problems.push(`${at} is not text, code or a link`);
     }
   });
@@ -178,6 +236,77 @@ function blockProblems(block: PostBlock, where: string, pages: ReadonlySet<strin
       }
       return problems;
     }
+    case 'table': {
+      const problems = lineProblems(block.caption, `${where}: the table caption`);
+      const { columns, rows }: { columns: unknown; rows: unknown } = block;
+      if (!Array.isArray(columns) || columns.length < 2) {
+        const count = Array.isArray(columns) ? columns.length : 0;
+        problems.push(
+          `${where}: the table has ${count} column${count === 1 ? '' : 's'}; it needs the row headers and a column of values`,
+        );
+        return problems;
+      }
+      // A reader moves between rows by their headers, and hears each cell with its column's name,
+      // so two rows or two columns with one name could not be told apart (`data-table.test.tsx`
+      // holds the site's own tables to unique row headers). Compared ignoring case, as headings and
+      // tags are, since a screen reader says both alike; a blank one is reported as blank only.
+      const names = new Set<string>();
+      columns.forEach((column: unknown, index) => {
+        const [problem] = lineProblems(column, `${where}: column ${index + 1}`);
+        if (problem) {
+          problems.push(problem);
+          return;
+        }
+        const key = String(column).toLowerCase();
+        if (names.has(key)) {
+          problems.push(
+            `${where}: column ${index + 1}, ${JSON.stringify(column)}, repeats an earlier column name`,
+          );
+        }
+        names.add(key);
+      });
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return [...problems, `${where}: the table has no rows`];
+      }
+      // Below 640px a wide table draws no column names: each row is its header and first value
+      // joined by a drawn " · ", then each other value on a line of its own. A blank first value
+      // leaves the dot pointing at nothing, and a blank later one an empty line that shifts which
+      // value a reader takes for which column. `stackable()` in `lib/serialise.ts` refuses the same
+      // in the site's own tables, and `isWideTable` is the predicate both the page and it use.
+      const stacks = isWideTable({ columns });
+      const headers = new Set<string>();
+      rows.forEach((row: unknown, index) => {
+        const at = `${where}: row ${index + 1}`;
+        if (!Array.isArray(row) || row.length !== columns.length) {
+          problems.push(
+            `${at} has ${Array.isArray(row) ? row.length : 0} cells for ${columns.length} columns`,
+          );
+          return;
+        }
+        const [headerProblem] = lineProblems(row[0], `${at}: the row header`);
+        if (headerProblem) problems.push(headerProblem);
+        else {
+          const key = String(row[0]).toLowerCase();
+          if (headers.has(key)) {
+            problems.push(
+              `${at}: the row header ${JSON.stringify(row[0])} repeats an earlier row header`,
+            );
+          }
+          headers.add(key);
+        }
+        row.slice(1).forEach((cell: unknown, offset) => {
+          const cellAt = `${at}, column ${offset + 2}`;
+          if (typeof cell !== 'string') problems.push(`${cellAt} is not text`);
+          else if (hasInvisible(cell)) problems.push(`${cellAt} ${INVISIBLE_PROBLEM}`);
+          else if (stacks && !cell.trim()) {
+            problems.push(
+              `${cellAt} is blank, and a table of three or more columns cannot show a blank cell on a phone`,
+            );
+          }
+        });
+      });
+      return problems;
+    }
     default: {
       const { kind } = block as { kind?: unknown };
       return [`${where}: unknown block kind ${JSON.stringify(kind)}`];
@@ -216,6 +345,79 @@ function dateProblems(post: Post, today: Date): string[] {
     );
   }
   return problems;
+}
+
+/** The kinds a post may have: the keys of `FOOTER_LINES`, which names every kind once. */
+const KINDS: readonly unknown[] = Object.keys(FOOTER_LINES);
+
+/**
+ * Jev or TypeSafe as their owners write them, as a whole word. No letter, mark, digit or underscore
+ * may stand on either side, in any script: an ASCII `\b` would take the `đ` of "Jevđević" for a
+ * word edge. So "Jevtić" and "TypeSafety" are not the names, and "Jev's" is.
+ */
+const JEV_NAMES = /(?<![\p{L}\p{M}\p{N}_])(?:Jev|TypeSafe)(?![\p{L}\p{M}\p{N}_])/u;
+
+/**
+ * Fields whose values a reader is never shown as text: identifiers, dates, flags. A link's `href`
+ * is not one of them, because the Markdown twin prints a link's URL after its text. `slug` stays:
+ * `SLUG` allows lowercase letters, digits and hyphens only, so a slug can never hold either name.
+ */
+const NOT_SHOWN = new Set([
+  'slug',
+  'kind',
+  'draft',
+  'publishedAt',
+  'updatedAt',
+  'level',
+  'ordered',
+]);
+
+/**
+ * Every string a post shows, each with its path in the post (`body[2].content[1].text`). The walk
+ * is generic, so a block kind added later is covered without a change here.
+ */
+function shownTexts(value: unknown, path: string): [path: string, text: string][] {
+  if (typeof value === 'string') return [[path, value]];
+  if (Array.isArray(value)) {
+    return value.flatMap((item: unknown, index) => shownTexts(item, `${path}[${index}]`));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).flatMap(([key, item]) =>
+      NOT_SHOWN.has(key) ? [] : shownTexts(item, path ? `${path}.${key}` : key),
+    );
+  }
+  return [];
+}
+
+function kindProblems(post: Post): string[] {
+  const { kind }: { kind: unknown } = post;
+  if (KINDS.includes(kind)) return [];
+  const known = KINDS.map((each) => JSON.stringify(each)).join(' or ');
+  return [`${post.slug}: kind must be ${known}, not ${JSON.stringify(kind)}`];
+}
+
+/** A published post that names Jev or TypeSafe must be `jev`, so that it carries the disclosure. */
+function namingProblems(post: PublishedPost): string[] {
+  if (post.kind === 'jev') return [];
+  return shownTexts(post, '').flatMap(([path, text]) => {
+    const name = JEV_NAMES.exec(text)?.[0];
+    return name
+      ? [
+          `${post.slug}: ${path} names "${name}", so its kind must be "jev", not ${JSON.stringify(post.kind)}`,
+        ]
+      : [];
+  });
+}
+
+/**
+ * A block's list kind as the page and the twin draw it, reading `ordered` as they do; none for a
+ * block that is not a list.
+ */
+function listKind(block: unknown): 'numbered' | 'bulleted' | undefined {
+  if (!block || typeof block !== 'object' || (block as { kind?: unknown }).kind !== 'list') {
+    return undefined;
+  }
+  return (block as { ordered?: unknown }).ordered ? 'numbered' : 'bulleted';
 }
 
 /** What a published post must hold before anything renders it. */
@@ -284,6 +486,19 @@ function contentProblems(post: PublishedPost, pages: ReadonlySet<string>): strin
       return;
     }
     problems.push(...blockProblems(block as PostBlock, where, pages));
+    // CommonMark joins two lists of one kind that only a blank line parts, and the twin's dates
+    // are a bulleted list right above the body: the page's two lists would be one in the twin, and
+    // in the Markdown draft the twin is checked against.
+    const list = listKind(block);
+    if (list === 'bulleted' && index === 0) {
+      problems.push(
+        `${where}: the body opens with a bulleted list, which the twin, and a Markdown draft, would read as one list with the dates above it`,
+      );
+    } else if (list && list === listKind(post.body[index - 1])) {
+      problems.push(
+        `${where}: a ${list} list right after another, which the twin, and a Markdown draft, would read as one list`,
+      );
+    }
     const { kind, level, text } = block as { kind?: unknown; level?: unknown; text?: unknown };
     if (kind !== 'heading') return;
     if (level === 2) underLevelTwo = true;
@@ -302,11 +517,12 @@ function contentProblems(post: PublishedPost, pages: ReadonlySet<string>): strin
 }
 
 /**
- * Every problem with `list` as of `today`, one message each, or none. A slug is checked on every
- * post, since a draft keeps its slug when it is published. A draft is otherwise held only to the
- * dates it gives: it renders nowhere, so its title, summary and body are checked once it is
- * published, in the commit that sets `draft: false`. A link to this site has to name a static
- * route, a case study or a published post in `list`, so a link to a draft is refused too.
+ * Every problem with `list` as of `today`, one message each, or none. A kind is checked on every
+ * post, and the names only on a published one. A slug is checked on every post, since a draft
+ * keeps its slug when it is published. A draft is otherwise held only to the dates it gives: it
+ * renders nowhere, so its title, summary and body are checked once it is published, in the commit
+ * that sets `draft: false`. A link to this site has to name a static route, a case study or a
+ * published post in `list`, so a link to a draft is refused too.
  */
 function problemsIn(list: readonly Post[], today: Date): string[] {
   const problems: string[] = [];
@@ -326,54 +542,130 @@ function problemsIn(list: readonly Post[], today: Date): string[] {
     if (draft !== true && draft !== false) {
       problems.push(`${post.slug}: draft must be true or false, not ${JSON.stringify(draft)}`);
     }
+    problems.push(...kindProblems(post));
     problems.push(...dateProblems(post, today));
-    if (post.draft === false) problems.push(...contentProblems(post, pages));
+    if (post.draft === false)
+      problems.push(...contentProblems(post, pages), ...namingProblems(post));
   }
   return problems;
+}
+
+/**
+ * Problems with the published index alone: a post's summary is its meta description, which
+ * page-metadata.test.ts holds to 155 characters, so a published summary of 156 to 300 characters
+ * passes `problemsIn` and is refused here. This runs where the publish procedure's posts.test.ts
+ * step does, before the page's own test would fail.
+ */
+function descriptionProblems(published: readonly PublishedPost[]): string[] {
+  return published.flatMap(({ slug, summary }) => {
+    const length = characters(summary);
+    return length > DESCRIPTION_MAX
+      ? [
+          `${slug}: the summary is ${length} characters; ` +
+            `it is the meta description, so at most ${DESCRIPTION_MAX}`,
+        ]
+      : [];
+  });
 }
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const POSTS_MODULE = join(SRC, 'data', 'posts');
 
-/**
- * What one source file does against ADR 0028's third decision: import `posts` itself, or the whole
- * module as a namespace, rather than the index; or import the module's values into a client
- * component, which bundles the whole array, drafts and all, into JavaScript sent to the browser.
- * A type-only import compiles away, so it is always allowed.
- */
-function postsImportProblems(file: string, source: string): string[] {
-  const problems: string[] = [];
-  const at = relative(SRC, file);
-  const client = /^\s*['"]use client['"]/.test(source);
-  const isPostsModule = (from: string) => {
-    const target = from.startsWith('@/')
-      ? join(SRC, from.slice(2))
-      : from.startsWith('.')
-        ? resolve(dirname(file), from)
-        : '';
-    return target === POSTS_MODULE || target === `${POSTS_MODULE}.ts`;
-  };
+const isClient = (source: string) => /^\s*['"]use client['"]/.test(source);
+
+/** Where `from`, imported by `file`, points under `src`, without its extension; `''` for a package. */
+function targetOf(file: string, from: string): string {
+  const target = from.startsWith('@/')
+    ? join(SRC, from.slice(2))
+    : from.startsWith('.')
+      ? resolve(dirname(file), from)
+      : '';
+  return target.replace(/\.tsx?$/, '');
+}
+
+/** The import and re-export statements of `source` that bring in values: not `import type`. */
+function valueImports(source: string): { bindings: string; from: string; names: string[] }[] {
+  const found: { bindings: string; from: string; names: string[] }[] = [];
   const statements = source.matchAll(
     /^(?:import|export)\s+(type\s+)?([^;'"]*?)\s*from\s*['"]([^'"]+)['"]/gm,
   );
   for (const [, typeOnly, bindings, from] of statements) {
-    if (typeOnly || !isPostsModule(from)) continue;
+    if (typeOnly) continue;
     const names = (/\{([^}]*)\}/.exec(bindings)?.[1] ?? '')
       .split(',')
       .map((part) => part.trim())
       .filter((part) => part && !part.startsWith('type '))
       .map((part) => part.split(/\s+as\s+/)[0]);
-    if (names.includes('posts') || bindings.includes('*')) {
-      problems.push(`${at}: reads posts itself; read publishedPosts, hasPublishedPosts or getPost`);
-    } else if (client && names.length > 0) {
-      problems.push(`${at}: a client component imports ${from}, which ships the drafts`);
+    // `import { type A, type B } from` brings in nothing; a default or namespace import does.
+    const braces = /\{[^}]*\}/.exec(bindings);
+    const outside = bindings
+      .replace(/\{[^}]*\}/, '')
+      .replace(/,/g, '')
+      .trim();
+    if (names.length > 0 || outside || !braces) found.push({ bindings, from, names });
+  }
+  // A bare `import '...'` runs the module for its effects, which bundles it as surely.
+  for (const [, from] of source.matchAll(/^import\s*['"]([^'"]+)['"]/gm)) {
+    found.push({ bindings: '', from, names: [] });
+  }
+  return found;
+}
+
+/**
+ * The server modules that carry the posts module's values to whatever imports them: those that
+ * import it, then those that import one of them, and so on (`lib/metadata.ts` for
+ * `hasPublishedPosts`, `lib/atom.ts` for `buildPostIndex`, and every page reading either). A client
+ * component importing one bundles the posts as surely as importing them directly. Paths without
+ * their extension, as `targetOf` returns them.
+ */
+function postsCarriers(files: readonly { file: string; source: string }[]): Set<string> {
+  const carriers = new Set<string>();
+  const carries = (target: string) =>
+    target === POSTS_MODULE || carriers.has(target) || carriers.has(join(target, 'index'));
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const { file, source } of files) {
+      const self = file.replace(/\.tsx?$/, '');
+      if (self === POSTS_MODULE || carriers.has(self) || isClient(source)) continue;
+      if (valueImports(source).some(({ from }) => carries(targetOf(file, from)))) {
+        carriers.add(self);
+        grew = true;
+      }
     }
   }
-  if (client) {
-    for (const [, from] of source.matchAll(/^import\s*['"]([^'"]+)['"]/gm)) {
-      if (isPostsModule(from)) {
+  return carriers;
+}
+
+/**
+ * What one source file does against ADR 0028's third decision: import `posts` itself, or the whole
+ * module as a namespace, rather than the index; or import the module's values into a client
+ * component, which bundles the whole array, drafts and all, into JavaScript sent to the browser,
+ * whether directly or through one of `carriers` (`postsCarriers`). A type-only import compiles
+ * away, so it is always allowed.
+ */
+function postsImportProblems(
+  file: string,
+  source: string,
+  carriers: ReadonlySet<string> = new Set(),
+): string[] {
+  const problems: string[] = [];
+  const at = relative(SRC, file);
+  const client = isClient(source);
+  for (const { bindings, from, names } of valueImports(source)) {
+    const target = targetOf(file, from);
+    if (target === POSTS_MODULE) {
+      if (names.includes('posts') || bindings.includes('*')) {
+        problems.push(
+          `${at}: reads posts itself; read publishedPosts, hasPublishedPosts or getPost`,
+        );
+      } else if (client) {
         problems.push(`${at}: a client component imports ${from}, which ships the drafts`);
       }
+    } else if (client && (carriers.has(target) || carriers.has(join(target, 'index')))) {
+      problems.push(
+        `${at}: a client component imports ${from}, which imports the posts and ships the drafts`,
+      );
     }
   }
   return problems;
@@ -397,9 +689,18 @@ const withLink = (href: string, text = 'the linked page') =>
 const withTags = (...tags: unknown[]) => published({ tags });
 const withCode = (language: unknown, code = 'const fixture = 1;') =>
   withBody({ kind: 'code', language, code });
+const tableBlock = (fields: Record<string, unknown> = {}) => ({
+  kind: 'table',
+  caption: 'Fixture results',
+  columns: ['Run', 'Tokens', 'Cost'],
+  rows: [['First run', '1,234', '$0.10']],
+  ...fields,
+});
+const withTable = (fields: Record<string, unknown>) => withBody(tableBlock(fields));
 const withTitle = (title: string, metaTitle?: string) =>
   published(metaTitle === undefined ? { title } : { title, metaTitle });
 const summaryOf = (length: number) => published({ summary: 'x'.repeat(length) });
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const defects: [string, Post[], RegExp][] = [
   [
@@ -532,13 +833,41 @@ const defects: [string, Post[], RegExp][] = [
   ],
   [
     'a list with no items',
-    [withBody({ kind: 'list', items: [] })],
-    /: block 1: the list has no items$/,
+    [withBody(paragraph('Text.'), { kind: 'list', items: [] })],
+    /: block 2: the list has no items$/,
   ],
   [
     'an empty list item',
-    [withBody({ kind: 'list', items: [['One.'], []] })],
-    /: block 1 \(list item 2\) is empty$/,
+    [withBody(paragraph('Text.'), { kind: 'list', items: [['One.'], []] })],
+    /: block 2 \(list item 2\) is empty$/,
+  ],
+  [
+    'a body that opens with a bulleted list',
+    [withBody({ kind: 'list', items: [['One.']] }, paragraph('Text.'))],
+    /: block 1: the body opens with a bulleted list, which the twin, and a Markdown draft, would read as one list with the dates above it$/,
+  ],
+  [
+    // `ordered: false` and no `ordered` are one kind, as the page draws them.
+    'two bulleted lists next to each other',
+    [
+      withBody(
+        paragraph('Text.'),
+        { kind: 'list', ordered: false, items: [['One.']] },
+        { kind: 'list', items: [['Two.']] },
+      ),
+    ],
+    /: block 3: a bulleted list right after another, which the twin, and a Markdown draft, would read as one list$/,
+  ],
+  [
+    'two numbered lists next to each other',
+    [
+      withBody(
+        paragraph('Text.'),
+        { kind: 'list', ordered: true, items: [['One.']] },
+        { kind: 'list', ordered: true, items: [['Two.']] },
+      ),
+    ],
+    /: block 3: a numbered list right after another, which the twin, and a Markdown draft, would read as one list$/,
   ],
   [
     'an empty code block',
@@ -546,9 +875,103 @@ const defects: [string, Post[], RegExp][] = [
     /: block 1: the code block is empty$/,
   ],
   [
+    'a table with no caption',
+    [withTable({ caption: '' })],
+    /: block 1: the table caption is empty$/,
+  ],
+  [
+    'a table with one column',
+    [withTable({ columns: ['Run'], rows: [['First run']] })],
+    /: block 1: the table has 1 column; it needs the row headers and a column of values$/,
+  ],
+  [
+    'a table with an empty column name',
+    [withTable({ columns: ['Run', '', 'Cost'] })],
+    /: block 1: column 2 is empty$/,
+  ],
+  ['a table with no rows', [withTable({ rows: [] })], /: block 1: the table has no rows$/],
+  [
+    'a short table row',
+    [withTable({ rows: [['First run', '1,234']] })],
+    /: block 1: row 1 has 2 cells for 3 columns$/,
+  ],
+  [
+    'a table row with no header',
+    [withTable({ rows: [['', '1,234', '$0.10']] })],
+    /: block 1: row 1: the row header is empty$/,
+  ],
+  [
+    'a blank cell in a table of three columns',
+    [withTable({ rows: [['First run', ' ', '$0.10']] })],
+    /: block 1: row 1, column 2 is blank, and a table of three or more columns cannot show a blank cell on a phone$/,
+  ],
+  [
+    'a table cell with a line break',
+    [withTable({ rows: [['First run', '1,234\n5', '$0.10']] })],
+    /: block 1: row 1, column 2 holds a line break, a control or a direction character$/,
+  ],
+  [
+    'a table row longer than its columns',
+    [withTable({ rows: [['First run', '1,234', '$0.10', 'Extra']] })],
+    /: block 1: row 1 has 4 cells for 3 columns$/,
+  ],
+  [
+    'a blank last cell in a table of three columns',
+    [withTable({ rows: [['First run', '1,234', '']] })],
+    /: block 1: row 1, column 3 is blank, and a table of three or more columns cannot show a blank cell on a phone$/,
+  ],
+  [
+    'a table cell that is not text',
+    [withTable({ rows: [['First run', 1234, '$0.10']] })],
+    /: block 1: row 1, column 2 is not text$/,
+  ],
+  [
+    'a column name used twice, in another case',
+    [withTable({ columns: ['Run', 'Cost', 'cost'], rows: [['First run', '$0.10', '$0.20']] })],
+    /: block 1: column 3, "cost", repeats an earlier column name$/,
+  ],
+  [
+    'a row header used twice, in another case',
+    [
+      withTable({
+        rows: [
+          ['First run', '1,234', '$0.10'],
+          ['first run', '987', '$0.08'],
+        ],
+      }),
+    ],
+    /: block 1: row 2: the row header "first run" repeats an earlier row header$/,
+  ],
+  [
+    'a row header with two spaces in a row',
+    [withTable({ rows: [['First  run', '1,234', '$0.10']] })],
+    /: block 1: row 1: the row header has a space at an end or two in a row$/,
+  ],
+  [
     'an empty piece of inline code',
     [withBody(paragraph('Run ', { code: '' }, '.'))],
     /: block 1 \(paragraph\), piece 2: the inline code is empty$/,
+  ],
+  [
+    'inline code that is only whitespace',
+    [withBody(paragraph('Indent with ', { code: '   ' }, '.'))],
+    /: block 1 \(paragraph\), piece 2: the inline code is only whitespace$/,
+  ],
+  [
+    'two pieces of inline code side by side',
+    [withBody(paragraph('Run ', { code: 'make' }, { code: 'all' }, '.'))],
+    /: block 1 \(paragraph\), piece 3: two pieces of inline code side by side; join them into one piece$/,
+  ],
+  [
+    'two pieces of inline code with empty text between them',
+    [
+      withBody({
+        kind: 'list',
+        ordered: true,
+        items: [['Run ', { code: 'make' }, '', { code: 'all' }]],
+      }),
+    ],
+    /: block 1 \(list item 1\), piece 4: two pieces of inline code side by side; join them into one piece$/,
   ],
   [
     'a link with no text',
@@ -562,8 +985,8 @@ const defects: [string, Post[], RegExp][] = [
   ],
   [
     'a block of no known kind',
-    [withBody({ kind: 'table', rows: [] })],
-    /: block 1: unknown block kind "table"$/,
+    [withBody({ kind: 'html', content: '<p>Text.</p>' })],
+    /: block 1: unknown block kind "html"$/,
   ],
   ...[
     'http://example.com',
@@ -589,6 +1012,10 @@ const defects: [string, Post[], RegExp][] = [
     'https://localhost:3000/',
     'https://example.com/\u202egnp.exe',
     'https://ex\u00e4mple.com',
+    // HREF lets these through; the URL parser refuses them.
+    'https://example.com:99999/x',
+    'https://1.2.3.999/',
+    'https://xn--a.com/',
   ].map((href): [string, Post[], RegExp] => [
     `a link to ${JSON.stringify(href)}`,
     [withLink(href)],
@@ -606,6 +1033,26 @@ const defects: [string, Post[], RegExp][] = [
     [withLink('/blog/fixture-draft'), draftPost],
     /, piece 2: the link goes to "\/blog\/fixture-draft", which is no page on this site$/,
   ],
+  // A link that names this site's own host, on any port, is written as a path, which the
+  // page-exists check covers; a path that names no page is reported in the same problem.
+  ...(
+    [
+      ['https://miloscvetkovic.dev/wrok', '/wrok', 'missing'],
+      ['https://www.miloscvetkovic.dev/work?view=all#top', '/work?view=all#top', 'page'],
+      ['https://MilosCvetkovic.dev', '/', 'page'],
+      ['https://miloscvetkovic.dev:443/blog', '/blog', 'page'],
+      ['https://miloscvetkovic.dev:8443/work', '/work', 'page'],
+      ['https://WWW.miloscvetkovic.dev/work', '/work', 'page'],
+    ] as const
+  ).map(([href, path, target]): [string, Post[], RegExp] => [
+    `a link to ${href}, which names this site's own host`,
+    [withLink(href)],
+    new RegExp(
+      `, piece 2: the link goes to ${escapeRegExp(JSON.stringify(href))}, which names this ` +
+        `site's own host; write its path, ${escapeRegExp(JSON.stringify(path))}` +
+        `${target === 'missing' ? ', which is no page on this site' : ''}$`,
+    ),
+  ]),
   [
     'a piece that is both inline code and a link',
     [withBody(paragraph('See ', { code: 'x', text: 'y', href: 'javascript:alert(1)' }, '.'))],
@@ -696,6 +1143,123 @@ const defects: [string, Post[], RegExp][] = [
     /: block 1: the code language ".*" is not a plain name such as ts$/,
   ]),
   ['a body entry that is not a block', [withBody(null)], /: block 1 is not a block$/],
+  // Each with the value the problem has to report, written out rather than computed.
+  ...(
+    [
+      [undefined, 'undefined'],
+      ['Jev', '"Jev"'],
+      ['typesafe', '"typesafe"'],
+      ['', '""'],
+    ] as const
+  ).map(([kind, reported]): [string, Post[], RegExp] => [
+    `the kind ${reported}`,
+    [published({ kind })],
+    new RegExp(`^fixture-every-block: kind must be "own" or "jev", not ${escapeRegExp(reported)}$`),
+  ]),
+  // A draft's kind is checked too: it keeps its kind when it is published.
+  [
+    'the kind "x" on a draft',
+    [{ ...draftPost, kind: 'x' } as unknown as Post],
+    /^fixture-draft: kind must be "own" or "jev", not "x"$/,
+  ],
+  // Each place a post shows text. A name in any of them makes an `own` post a defect (ADR 0034).
+  ...(
+    [
+      ['the title', { title: 'Fixture: what TypeSafe measures' }, 'title', 'TypeSafe'],
+      [
+        'metaTitle',
+        { title: 'Fixture: a title', metaTitle: 'Fixture: Jev in short' },
+        'metaTitle',
+        'Jev',
+      ],
+      ['the summary', { summary: `${everyBlockPost.summary} It mentions Jev.` }, 'summary', 'Jev'],
+      ['a tag', { tags: ['Fixture', 'Jev'] }, 'tags[1]', 'Jev'],
+      ['a heading', { body: [heading(2, 'What Jev gets right')] }, 'body[0].text', 'Jev'],
+      ['a paragraph', { body: [paragraph("Jev's numbers.")] }, 'body[0].content[0]', 'Jev'],
+      [
+        'link text',
+        {
+          body: [
+            paragraph('See ', { text: 'the TypeSafe docs', href: 'https://example.com' }, '.'),
+          ],
+        },
+        'body[0].content[1].text',
+        'TypeSafe',
+      ],
+      // The twin prints a link's URL after its text, so the URL is text the post shows too.
+      [
+        'a link target',
+        {
+          body: [
+            paragraph(
+              'See ',
+              { text: 'the example page', href: 'https://example.com/TypeSafe' },
+              '.',
+            ),
+          ],
+        },
+        'body[0].content[1].href',
+        'TypeSafe',
+      ],
+      [
+        'inline code',
+        { body: [paragraph('Run ', { code: 'TypeSafe.check()' }, '.')] },
+        'body[0].content[1].code',
+        'TypeSafe',
+      ],
+      [
+        'a list item',
+        // Numbered, because a body may not open with a bulleted list.
+        { body: [{ kind: 'list', ordered: true, items: [['Ask Jev.']] }] },
+        'body[0].items[0][0]',
+        'Jev',
+      ],
+      ['a code block', { body: [{ kind: 'code', code: 'model = "Jev"' }] }, 'body[0].code', 'Jev'],
+      // The page names the code figure by its language, and the twin's fence carries it.
+      [
+        'a code language',
+        { body: [{ kind: 'code', language: 'TypeSafe', code: 'x' }] },
+        'body[0].language',
+        'TypeSafe',
+      ],
+      [
+        'a quote',
+        { body: [{ kind: 'quote', content: ['TypeSafe said so.'] }] },
+        'body[0].content[0]',
+        'TypeSafe',
+      ],
+      [
+        'a table caption',
+        { body: [tableBlock({ caption: 'What Jev measured' })] },
+        'body[0].caption',
+        'Jev',
+      ],
+      [
+        'a table column',
+        { body: [tableBlock({ columns: ['Run', 'TypeSafe', 'Cost'] })] },
+        'body[0].columns[1]',
+        'TypeSafe',
+      ],
+      [
+        'a table cell',
+        { body: [tableBlock({ rows: [['First run', 'Jev', '$0.10']] })] },
+        'body[0].rows[0][1]',
+        'Jev',
+      ],
+      [
+        'a table row header',
+        { body: [tableBlock({ rows: [['Jev run', '1,234', '$0.10']] })] },
+        'body[0].rows[0][0]',
+        'Jev',
+      ],
+    ] as const
+  ).map(([place, fields, path, name]): [string, Post[], RegExp] => [
+    `${name} named in ${place} of an own post`,
+    [published(fields)],
+    new RegExp(
+      `^fixture-every-block: ${escapeRegExp(path)} names "${name}", so its kind must be "jev", not "own"$`,
+    ),
+  ]),
 ];
 
 const accepted: [string, Post[]][] = [
@@ -722,6 +1286,9 @@ const accepted: [string, Post[]][] = [
     '/work?view=all#top',
     'https://example.com:8443/wiki/A_(b)',
     'https://example.com/%E2%9C%93',
+    'https://miloscvetkovic.dev.example.com/work',
+    'https://blog.miloscvetkovic.dev/work',
+    'https://example.com/miloscvetkovic.dev',
   ].map((href): [string, Post[]] => [`a link to ${href}`, [withLink(href)]]),
   ['a link to a published post', [withLink('/blog/fixture-hostile-title'), hostileTitlePost]],
   [
@@ -736,11 +1303,67 @@ const accepted: [string, Post[]][] = [
   ]),
   ['code with backticks and a fence in it', [withCode('md', '```ts\nconst a = `b`;\n```')]],
   [
+    'a two-column table with a blank cell',
+    [withTable({ columns: ['Run', 'Note'], rows: [['First run', '']] })],
+  ],
+  ['a table cell with | and * in it', [withTable({ rows: [['First run', 'a | b', '*']] })]],
+  // The twin's dates are a bulleted list, and CommonMark starts a new list when the kind changes.
+  [
+    'a body that opens with a numbered list',
+    [withBody({ kind: 'list', ordered: true, items: [['One.']] })],
+  ],
+  [
+    'a bulleted list right after a numbered one',
+    [
+      withBody(
+        paragraph('Text.'),
+        { kind: 'list', ordered: true, items: [['One.']] },
+        { kind: 'list', items: [['Two.']] },
+      ),
+    ],
+  ],
+  [
     'headings with one text at different places in two posts',
     [
       withBody(heading(2, 'Results')),
       { ...hostileTitlePost, body: [{ kind: 'heading', level: 2, text: 'Results' }] },
     ],
+  ],
+  [
+    'a jev post that names TypeSafe and Jev',
+    [published({ kind: 'jev', title: 'Fixture: TypeSafe and Jev' })],
+  ],
+  ['a jev post that names neither', [published({ kind: 'jev' })]],
+  // A draft renders nowhere, so the names are checked once it is published.
+  ['a draft that names Jev', [{ ...draftPost, title: 'Fixture: Jev' }]],
+  // Not the names: a surname that starts with one, whether the letter after it is ASCII or not, a
+  // longer word, another case.
+  ...['Jevtić', 'Jevđević', 'Jevremović', 'TypeSafety', 'typesafe', 'type-safe', 'JEV'].map(
+    (word): [string, Post[]] => [
+      `${word} in an own post`,
+      [withBody(paragraph(`A sentence with ${word} in it.`))],
+    ],
+  ),
+  // Not the names either: a letter, digit, underscore or combining mark against one edge.
+  ...[
+    ['a letter before Jev', 'ŠJev'],
+    ['a digit before Jev', '2Jev'],
+    ['an underscore before Jev', '_Jev'],
+    ['a combining acute accent before Jev', 'e\u0301Jev'],
+    ['a letter before TypeSafe', 'MyTypeSafe'],
+    ['a digit after Jev', 'Jev2'],
+    ['an underscore after Jev', 'Jev_'],
+    ['a combining acute accent after Jev', 'Jev\u0301'],
+    ['a digit after TypeSafe', 'TypeSafe2'],
+    ['an underscore after TypeSafe', 'TypeSafe_'],
+  ].map(([edge, word]): [string, Post[]] => [
+    `${edge} in an own post`,
+    [withBody(paragraph(`A sentence with ${word} in it.`))],
+  ]),
+  // The match is case-sensitive (ADR 0034), so a lowercase domain in a link's URL is not the name.
+  [
+    'an own post linking to a lowercase typesafe domain',
+    [withLink('https://typesafe.dev/docs', 'their docs')],
   ],
 ];
 
@@ -766,11 +1389,30 @@ describe('posts', () => {
     }
   });
 
+  it('fit each published summary in a meta description', () => {
+    expect(descriptionProblems(publishedPosts)).toEqual([]);
+  });
+
   it('can never take the placeholder slug the development server is given', () => {
     // `postStaticParams` hands `next dev` this slug while nothing is published; the slug rule is
     // what keeps a real post from ever answering at it.
     expect(SLUG.test(NO_PUBLISHED_POST_SLUG)).toBe(false);
     expect(getPost(NO_PUBLISHED_POST_SLUG)).toBeUndefined();
+  });
+});
+
+describe('descriptionProblems', () => {
+  it('names each published post whose summary is longer than a meta description', () => {
+    const { publishedPosts: index } = buildPostIndex([
+      published({ slug: 'one-too-long', summary: 'x'.repeat(DESCRIPTION_MAX + 1) }),
+      published({ slug: 'at-the-limit', summary: 'x'.repeat(DESCRIPTION_MAX) }),
+      published({ slug: 'the-longest', summary: 'x'.repeat(SUMMARY_MAX) }),
+      { ...draftPost, summary: 'x'.repeat(SUMMARY_MAX) },
+    ]);
+    expect(descriptionProblems(index)).toEqual([
+      'one-too-long: the summary is 156 characters; it is the meta description, so at most 155',
+      'the-longest: the summary is 300 characters; it is the meta description, so at most 155',
+    ]);
   });
 });
 
@@ -835,6 +1477,7 @@ describe('the post fixtures', () => {
       list: true,
       code: true,
       quote: true,
+      table: true,
     } satisfies Record<PostBlock['kind'], true>;
     expect(new Set(blocks.map(({ kind }) => kind))).toEqual(new Set(Object.keys(kinds)));
     const headings = blocks.filter((block) => block.kind === 'heading');
@@ -877,6 +1520,12 @@ describe('the post fixtures', () => {
     const [older, newer] = publishedFixtures;
     expect(older.publishedAt < newer.publishedAt).toBe(true);
   });
+
+  it('hold a published post of each kind', () => {
+    // `satisfies` fails typecheck when a kind is added to PostKind without being added here.
+    const kinds = { own: true, jev: true } satisfies Record<PostKind, true>;
+    expect(new Set(publishedFixtures.map(({ kind }) => kind))).toEqual(new Set(Object.keys(kinds)));
+  });
 });
 
 describe('problemsIn', () => {
@@ -913,20 +1562,64 @@ describe('problemsIn', () => {
 });
 
 describe('imports of the posts module', () => {
-  const sources = readdirSync(SRC, { recursive: true, encoding: 'utf8' }).filter(
-    (name) => /\.tsx?$/.test(name) && !/(?:^|[\\/])(?:__tests__|test)[\\/]/.test(name),
-  );
+  // Regular files only: route folders carry file-like names (`about/index.md/`, #173), and one
+  // ending in `.ts` or `.tsx` would pass the filter below, reach readFileSync and throw EISDIR
+  // (#189).
+  const sources = readdirSync(SRC, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(SRC, join(entry.parentPath, entry.name)))
+    .filter((name) => /\.tsx?$/.test(name) && !/(?:^|[\\/])(?:__tests__|test)[\\/]/.test(name));
+  const page = join(SRC, 'app', 'blog', 'page.tsx');
 
   it('read the index, never posts itself, and never from a client component', () => {
     expect(sources.length).toBeGreaterThan(50);
     expect(sources.map((name) => join('data', 'posts.ts') === name)).toContain(true);
-    const offenders = sources.flatMap((name) =>
-      postsImportProblems(join(SRC, name), readFileSync(join(SRC, name), 'utf8')),
+    const files = sources.map((name) => ({
+      file: join(SRC, name),
+      source: readFileSync(join(SRC, name), 'utf8'),
+    }));
+    const carriers = postsCarriers(files);
+    // The two modules that bring the posts into every head and into the feed, found by the walk.
+    expect(carriers).toContain(join(SRC, 'lib', 'metadata'));
+    expect(carriers).toContain(join(SRC, 'lib', 'atom'));
+    const offenders = files.flatMap(({ file, source }) =>
+      postsImportProblems(file, source, carriers),
     );
     expect(offenders).toEqual([]);
   });
 
-  const page = join(SRC, 'app', 'blog', 'page.tsx');
+  it.each([
+    ['by name', "'use client';\nimport { SITE_NAME } from '@/lib/metadata';"],
+    ['relatively', "'use client';\nimport { buildAtomFeed } from '../../lib/atom';"],
+    ['for its effects', "'use client';\nimport '@/lib/metadata';"],
+  ])('names a client component importing a module that carries the posts, %s', (_, source) => {
+    const carriers = new Set([join(SRC, 'lib', 'metadata'), join(SRC, 'lib', 'atom')]);
+    expect(postsImportProblems(page, source, carriers)).toEqual([
+      expect.stringMatching(/a client component imports .*, which imports the posts/),
+    ]);
+    // A server module may import it, and a client one may import its types.
+    expect(postsImportProblems(page, source.replace("'use client';\n", ''), carriers)).toEqual([]);
+    expect(
+      postsImportProblems(
+        page,
+        "'use client';\nimport type { Metadata } from '@/lib/metadata';",
+        carriers,
+      ),
+    ).toEqual([]);
+  });
+
+  it('finds the carriers through any number of server modules, and stops at a client one', () => {
+    const at = (path: string) => join(SRC, path);
+    const carriers = postsCarriers([
+      { file: at('lib/a.ts'), source: "import { hasPublishedPosts } from '@/data/posts';" },
+      { file: at('lib/b.ts'), source: "import { a } from './a';" },
+      { file: at('lib/c.ts'), source: "import type { a } from './a';" },
+      { file: at('lib/d.tsx'), source: "'use client';\nimport { b } from './b';" },
+      { file: at('lib/e.ts'), source: "import { d } from './d';" },
+    ]);
+    expect([...carriers].sort()).toEqual([at('lib/a'), at('lib/b')]);
+  });
+
   it.each([
     ['posts by name', "import { posts } from '@/data/posts';"],
     ['posts under another name', "import { getPost, posts as all } from '../../data/posts';"],
@@ -955,5 +1648,17 @@ describe('imports of the posts module', () => {
     ['posts from another module', "import { posts } from '@/data/other-posts';"],
   ])('allows an import of %s', (_, source) => {
     expect(postsImportProblems(page, source)).toEqual([]);
+  });
+});
+
+describe('FOOTER_LINES', () => {
+  it("ends a jev post with the owner's disclosure, word for word, and an own post with nothing", () => {
+    expect(FOOTER_LINES).toEqual({ own: [], jev: ['I have no relationship with TypeSafe.'] });
+  });
+
+  it('holds lines the post checker accepts as text', () => {
+    for (const line of Object.values(FOOTER_LINES).flat()) {
+      expect(lineProblems(line, 'a footer line')).toEqual([]);
+    }
   });
 });

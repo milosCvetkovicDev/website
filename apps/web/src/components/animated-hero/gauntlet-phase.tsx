@@ -5,6 +5,7 @@ import { isAlreadyReached, runWithGsap, type Gsap } from './load-gsap';
 import { HudPanel, PipelineStage, NotificationToast, progressFillTransform } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { useStoryVisibility } from '@/hooks/use-story-visibility';
 import { storyClosings, storyTitles } from '@/data/pages/home';
 
 const pipelineStages = [
@@ -27,6 +28,8 @@ const passedStages: StageState[] = pipelineStages.map(() => ({ status: 'passed',
 
 export function GauntletPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  // Pauses the section's endless CSS animations while it is out of view (globals.css).
+  useStoryVisibility(sectionRef);
   const titleId = useId();
   const pipelineRef = useRef<HTMLDivElement>(null);
   const deployRef = useRef<HTMLDivElement>(null);
@@ -191,6 +194,8 @@ export function GauntletPhase() {
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
+    // Every element the entrance hides carries data-story-reveal, which a print shows in full
+    // (the @media print rule in globals.css).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap, ScrollTrigger }) => {
@@ -273,7 +278,7 @@ export function GauntletPhase() {
         </h2>
 
         {/* Pipeline */}
-        <div ref={pipelineRef}>
+        <div ref={pipelineRef} data-story-reveal="">
           <HudPanel title="CI/CD PIPELINE">
             <div className="space-y-3">
               {pipelineStages.map((stage, index) => (
@@ -290,7 +295,7 @@ export function GauntletPhase() {
         </div>
 
         {/* Deployment Status. data-gauntlet marks the panels the tests look up. */}
-        <div ref={deployRef} data-gauntlet="deploy" className="mt-6">
+        <div ref={deployRef} data-story-reveal="" data-gauntlet="deploy" className="mt-6">
           {shownDeploymentStatus !== 'idle' && (
             <div
               className={`rounded-lg border p-6 text-center transition-all duration-500 ${
@@ -356,13 +361,18 @@ export function GauntletPhase() {
         {/* Achievement */}
         <div
           ref={achievementRef}
+          data-story-reveal=""
           data-reveal="achievement"
           data-gauntlet="achievement"
           className={`mt-6 ${achievementVisible ? '' : 'opacity-0'}`}
         >
           <NotificationToast type="success">
             <div className="flex items-center gap-3">
-              <span className="text-xl">🏆</span>
+              {/* Decoration: "Achievement Unlocked" beside it says it, so a screen reader skips
+                  the emoji. */}
+              <span aria-hidden="true" className="text-xl">
+                🏆
+              </span>
               <div>
                 <div className="font-semibold">Achievement Unlocked</div>
                 <div className="text-sm">&quot;Zero Trust, Full Send&quot; — +500 XP</div>
@@ -374,6 +384,7 @@ export function GauntletPhase() {
         {/* Headline */}
         <div
           ref={headlineRef}
+          data-story-reveal=""
           data-reveal="headline"
           className={`mt-16 text-center ${achievementVisible ? '' : 'opacity-0'}`}
         >

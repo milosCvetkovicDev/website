@@ -20,7 +20,7 @@ window.matchMedia = (query: string) =>
 
 export const Resting = () => (
   <div className="flex flex-wrap gap-4">
-    <MetricCounter active={false} value={73} suffix="%" label="faster resolution" />
+    <MetricCounter active={false} value={73} suffix="%" label="errors resolved autonomously" />
     <MetricCounter active={false} value={40} suffix="%" label="less complexity" />
     <MetricCounter active={false} value={5} suffix="×" label="faster builds" />
   </div>
@@ -28,14 +28,14 @@ export const Resting = () => (
 
 export const Active = () => (
   <div className="flex">
-    <MetricCounter active value={73} suffix="%" label="faster resolution" />
+    <MetricCounter active value={73} suffix="%" label="errors resolved autonomously" />
   </div>
 );
 
 export const DarkTheme = () => (
   <div className="dark bg-[var(--background)] p-6 text-[var(--foreground)]">
     <div className="flex flex-wrap gap-4">
-      <MetricCounter active value={73} suffix="%" label="faster resolution" />
+      <MetricCounter active value={73} suffix="%" label="errors resolved autonomously" />
       <MetricCounter active={false} value={5} suffix="×" label="faster builds" />
     </div>
   </div>

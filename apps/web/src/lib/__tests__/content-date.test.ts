@@ -7,7 +7,12 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from 'vitest';
-import { formatContentDate, formatContentDates, isPublishableContentDate } from '../content-date';
+import {
+  formatContentDate,
+  formatContentDates,
+  formatPageDate,
+  isPublishableContentDate,
+} from '../content-date';
 
 /** Strings that are not a real `YYYY-MM-DD` day from 2000 on, each with why. */
 const NOT_A_DAY: [string, string][] = [
@@ -105,6 +110,33 @@ describe('formatContentDates', () => {
   it('throws for a pair updated before it was published', () => {
     expect(() => formatContentDates('/work/x', '2026-09-25', '2026-09-09')).toThrow(
       '/work/x: updatedAt 2026-09-09 is before publishedAt 2026-09-25',
+    );
+  });
+});
+
+describe('formatPageDate', () => {
+  it('writes a page’s one stored date as formatContentDate does', () => {
+    expect(formatPageDate('/privacy', '2026-09-27')).toBe('27 September 2026');
+    expect(formatPageDate('/about', '2026-10-07')).toBe('7 October 2026');
+  });
+
+  it('writes the edges: the earliest day, a leap day, and the first and last of a month and year', () => {
+    expect(formatPageDate('/about', '2000-01-01')).toBe('1 January 2000');
+    expect(formatPageDate('/about', '2024-02-29')).toBe('29 February 2024');
+    expect(formatPageDate('/about', '2026-10-31')).toBe('31 October 2026');
+    expect(formatPageDate('/about', '2026-12-31')).toBe('31 December 2026');
+  });
+
+  it('names whichever page it is given', () => {
+    expect(() => formatPageDate('/about', '2026-10-32')).toThrow(/^\/about: /);
+  });
+
+  // A static route's "Last updated" line used to print the stored value as it was, so a typo there
+  // shipped as written, and formatContentDate alone would print nothing for it. Throwing fails the
+  // prerender instead (#57).
+  it.each(NOT_A_DAY)('throws, naming the page and the value, for %j (%s)', (date) => {
+    expect(() => formatPageDate('/privacy', date)).toThrow(
+      `/privacy: a content date must be a real YYYY-MM-DD day from 2000 on, got ${JSON.stringify(date)}`,
     );
   });
 });

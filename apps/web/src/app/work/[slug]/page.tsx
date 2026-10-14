@@ -1,8 +1,17 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { BreadcrumbListJsonLd, TechArticleJsonLd } from '@/components/json-ld';
-import { adjacentCaseStudies, caseStudies, getCaseStudy } from '@/data/case-studies';
+import { BreadcrumbListJsonLd, TechArticleJsonLd, WebPageJsonLd } from '@/components/json-ld';
+import { DataTable } from '@/components/data-table';
+import {
+  adjacentCaseStudies,
+  caseStudies,
+  caseStudyMetricScope,
+  caseStudyPageTitle,
+  formatMetric,
+  getCaseStudy,
+  techStackTable,
+} from '@/data/case-studies';
 import { social } from '@/data/social';
 import { formatContentDates } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
@@ -36,7 +45,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   return buildMetadata({
-    title: `${caseStudy.title} — ${caseStudy.tagline}`,
+    title: caseStudyPageTitle(caseStudy),
     description: caseStudy.description,
     path: `/work/${caseStudy.slug}`,
     type: 'article',
@@ -64,9 +73,19 @@ export default async function CaseStudyPage({ params }: PageProps) {
     caseStudy.publishedAt,
     caseStudy.updatedAt,
   );
+  const { metric } = caseStudy.highlight;
+  // What the figure counted, then, once the owner has defined it, when and how it was measured:
+  // one sentence from one producer, which the twin's Basis line writes too (#58). A study with no
+  // basis to state throws here, as its twin does, and fails the prerender.
+  const scope = caseStudyMetricScope(caseStudy);
 
   return (
     <div className="py-16 md:py-24">
+      <WebPageJsonLd
+        path={`/work/${caseStudy.slug}`}
+        name={caseStudyPageTitle(caseStudy)}
+        breadcrumb
+      />
       <TechArticleJsonLd caseStudy={caseStudy} />
       <BreadcrumbListJsonLd caseStudy={caseStudy} />
       <div className="mx-auto max-w-3xl px-6">
@@ -124,6 +143,26 @@ export default async function CaseStudyPage({ params }: PageProps) {
             ))}
           </div>
         </header>
+
+        {/* The headline figure the study's cards on / and /work advertise, printed as they print it,
+            with its scope: the basis that says what it counted (#49), and the window and method
+            once the owner has defined them (#58). A named region rather than a heading:
+            landmark navigation reaches it, and markdown-twins.spec.ts, which requires every h2 and
+            h3 in main to be a section of the twin, is not asked to find one. */}
+        <section
+          aria-label="Headline result"
+          className="mb-12 rounded-lg border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-6"
+        >
+          <p>
+            <span className="block font-mono text-4xl font-bold text-[var(--accent-text)]">
+              {formatMetric(metric)}
+            </span>{' '}
+            <span className="mt-1 block font-mono text-xs tracking-wider text-[var(--muted)] uppercase">
+              {metric.label}
+            </span>
+          </p>
+          <p className="mt-4 leading-relaxed text-[var(--muted)]">{scope}</p>
+        </section>
 
         {/* The Challenge */}
         <section className="mb-12">
@@ -230,33 +269,12 @@ export default async function CaseStudyPage({ params }: PageProps) {
           </section>
         ) : null}
 
-        {/* Tech Stack */}
+        {/* Tech Stack, as a table (#58) */}
         <section className="mb-12">
           <h2 className="mb-6 text-sm font-medium tracking-wider text-[var(--muted)] uppercase">
             Tech Stack
           </h2>
-          <div className="grid gap-4">
-            {caseStudy.techStack.map((category) => (
-              <div
-                key={category.category}
-                className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4"
-              >
-                <h3 className="mb-3 text-sm font-medium text-[var(--muted)]">
-                  {category.category}
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {category.items.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1 text-sm"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <DataTable {...techStackTable(caseStudy)} />
           <p className="mt-6 text-sm">
             <Link href="/skills" className="text-[var(--accent-text)] hover:underline">
               All my skills, and the experience behind each one

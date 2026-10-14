@@ -22,8 +22,10 @@ export async function GET(
 ) {
   const { slug } = await params;
   const post = getPost(slug);
-  // Unreachable while `generateStaticParams` and `getPost` read one index: `dynamicParams` 404s any
-  // other slug first. If they ever drift, the prerender fails naming the slug.
+  // Unreachable in a build while `generateStaticParams` and `getPost` read one index:
+  // `dynamicParams` 404s any other slug first, and if they ever drift, the prerender fails naming
+  // the slug. Reached under `next dev` while nothing is published: `postStaticParams` adds a
+  // placeholder slug there that `getPost` cannot find, so requesting it throws here.
   if (!post) throw new Error(`og-image.png: unknown post ${JSON.stringify(slug)}`);
   return socialCard({
     eyebrow: 'Writing',

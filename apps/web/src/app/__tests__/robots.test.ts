@@ -46,8 +46,8 @@ describe('robots()', () => {
   it('follows NEXT_PUBLIC_SITE_URL when it is set', () => {
     // `robots()` reads the variable inside the function body rather than at module scope, so setting it
     // and calling again is enough — no re-import, which would only earn a Vite dynamic-import warning.
-    // That is a real difference from `components/json-ld.tsx`, which does read it at module scope and
-    // therefore does need `vi.resetModules()`.
+    // That is a real difference from `lib/structured-data.ts`, which builds the JSON-LD nodes: it
+    // reads it at module scope and therefore does need `vi.resetModules()`.
     const original = process.env.NEXT_PUBLIC_SITE_URL;
     process.env.NEXT_PUBLIC_SITE_URL = 'https://staging.example.test';
     try {

@@ -8,7 +8,9 @@
  * published text. Nothing here reads `Intl`, `toLocale*` or a `Date`'s local getters.
  *
  * `e2e/seo-surface.spec.ts` imports this module directly, outside the bundler, so it stays free of
- * imports: an `@/` alias, `server-only` or an asset here would stop that whole spec file loading.
+ * imports: `server-only` or an asset here would stop that whole spec file loading. Playwright
+ * resolves the `@/` alias, but `next.config.ts` reaches this module through `case-studies.ts`, and
+ * Next's config loader does not (ADR 0030; `next-config.test.ts` loads the config that way).
  */
 
 const MONTHS = [
@@ -62,6 +64,22 @@ export function formatContentDate(date: string): string | null {
   const start = startOfDay(date);
   if (!start) return null;
   return `${start.getUTCDate()} ${MONTHS[start.getUTCMonth()]} ${start.getUTCFullYear()}`;
+}
+
+/**
+ * A page's one stored date as a reader sees it, for a static route's "Last updated" line. Throws,
+ * naming `page` and the stored value, when it is not a real day, so a typo fails the prerender
+ * rather than printing a blank or a malformed date.
+ */
+export function formatPageDate(page: string, date: string): string {
+  const formatted = formatContentDate(date);
+  if (!formatted) {
+    throw new Error(
+      `${page}: a content date must be a real YYYY-MM-DD day from ${EARLIEST_YEAR} on, ` +
+        `got ${JSON.stringify(date)}`,
+    );
+  }
+  return formatted;
 }
 
 /**
