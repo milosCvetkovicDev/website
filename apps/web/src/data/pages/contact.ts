@@ -2,10 +2,10 @@
  * The copy `/contact` renders, and the page record its Markdown twin reads (#59). The page keeps
  * the layout, the classes, the hook under its `h1` (#58), and each profile's icon, which it keys by
  * the link's `name`, and renders what is here, `h1` included, so a page and its twin cannot
- * disagree. Every string is text the page shows, with two exceptions in the "Connect an agent"
- * section. The page renders the connector snippets from `data/mcp-server.ts` and tells the reader
- * to paste one; the twin has no code block to carry them, so it names the endpoint and points at
- * the page instead (`agents.twinPointer`).
+ * disagree, except in the "Connect an agent" section. There the page alone renders the connector
+ * snippets from `data/mcp-server.ts` and `agents.paste`, which tells the reader to paste one; the
+ * twin has no code block to carry them, so it names the endpoint and points at the page instead
+ * with `agents.twinPointer`, the one string here that the page does not show.
  * Importing this module evaluates `MCP_SERVER_URL`, so a malformed `NEXT_PUBLIC_SITE_URL` throws
  * here, naming the variable, as it does for every absolute URL the build writes.
  */
