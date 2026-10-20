@@ -237,6 +237,11 @@ describe('the served composition', () => {
     ]);
   });
 
+  it('names a blank fact by its place in the copy, counting the placeholders left out before it', () => {
+    const copy = { summary: FILLED.summary, facts: [ownerTodo('the first fact'), ' '] };
+    expect(() => siteIndexToLlmsTxt({ copy })).toThrow('siteIndexToLlmsTxt: fact 2 is empty');
+  });
+
   it('fails rather than serve a marker that reached it from any other source', () => {
     const [study, ...rest] = caseStudies;
     const studies = [{ ...study, description: `${study.description} ${ownerTodo('a stray gap')}` }];

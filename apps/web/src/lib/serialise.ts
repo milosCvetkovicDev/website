@@ -737,13 +737,14 @@ export function siteIndexToLlmsTxt({
 } = {}): string {
   const shown = (value: unknown) => includeUnfilled || !JSON.stringify(value).includes(OWNER_TODO);
   const summary = shown(copy.summary) ? copy.summary : homePage.summary;
-  const facts = copy.facts.filter(shown);
+  // Numbered before the unfilled ones are left out, so an error names the paragraph in the copy.
+  const facts = copy.facts.flatMap((value, index) => (shown(value) ? [{ value, index }] : []));
   const excluded: readonly string[] = EXCLUDED_FROM_LLMS_TXT;
 
   const body = document([
     heading(1, SITE_NAME),
     `> ${paragraph(summary, 'siteIndexToLlmsTxt: the summary')}`,
-    ...facts.map((value, index) => paragraph(value, `siteIndexToLlmsTxt: fact ${index + 1}`)),
+    ...facts.map(({ value, index }) => paragraph(value, `siteIndexToLlmsTxt: fact ${index + 1}`)),
     llmsTxtSection(
       'Case studies',
       studies.map(({ slug, title, description, highlight: { metric } }) => {
