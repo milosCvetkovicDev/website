@@ -31,8 +31,8 @@ import {
   type PublishedPost,
 } from '@/data/posts';
 import type { StaticRoute } from '@/data/static-routes';
-import { SITE_NAME } from './metadata';
 import { assertPathname, markdownTwinPath } from './pathname';
+import { SITE_NAME } from './site-name';
 import { absoluteUrl } from './site-origin';
 
 /**
