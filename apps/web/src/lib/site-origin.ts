@@ -36,3 +36,21 @@ export function siteOrigin(): string {
   }
   return url.origin;
 }
+
+/**
+ * The absolute URL of a path on this site. The origin is `siteOrigin()`'s, from the variable and the
+ * fallback `app/sitemap.ts` and `app/robots.ts` read, so a preview build names production like the
+ * sitemap does, and the root is the bare origin, as its served canonical is. `metadataBase` cannot
+ * help here: it resolves URLs in the head, and a Markdown body is plain text.
+ *
+ * It lives here rather than in `lib/serialise.ts`, which re-exports it, because a data module calls
+ * it while it loads (`data/mcp-server.ts`) and the serialiser imports the data modules: importing it
+ * from there closed a cycle in which the call ran before this module's binding existed.
+ */
+export function absoluteUrl(path: string): string {
+  if (!path.startsWith('/') || path.startsWith('//')) {
+    throw new Error(`absoluteUrl: "${path}" is not a path on this site`);
+  }
+  const origin = siteOrigin();
+  return path === '/' ? origin : `${origin}${path}`;
+}

@@ -33,7 +33,7 @@ import {
 import type { StaticRoute } from '@/data/static-routes';
 import { SITE_NAME } from './metadata';
 import { assertPathname, markdownTwinPath } from './pathname';
-import { siteOrigin } from './site-origin';
+import { absoluteUrl } from './site-origin';
 
 /**
  * The one module that writes Markdown (#59), the case studies as JSON and the site's `/llms.txt`
@@ -88,19 +88,8 @@ export function llmsTxtResponse(body: string): Response {
   return new Response(body, { headers: { 'Content-Type': LLMS_TXT_CONTENT_TYPE } });
 }
 
-/**
- * The absolute URL of a path on this site. The origin is `siteOrigin()`'s, from the variable and the
- * fallback `app/sitemap.ts` and `app/robots.ts` read, so a preview build names production like the sitemap
- * does, and the root is the bare origin, as its served canonical is. `metadataBase` cannot help
- * here: it resolves URLs in the head, and a Markdown body is plain text.
- */
-export function absoluteUrl(path: string): string {
-  if (!path.startsWith('/') || path.startsWith('//')) {
-    throw new Error(`absoluteUrl: "${path}" is not a path on this site`);
-  }
-  const origin = siteOrigin();
-  return path === '/' ? origin : `${origin}${path}`;
-}
+// Written in `site-origin.ts`, which imports nothing, and re-exported for the serialiser's callers.
+export { absoluteUrl };
 
 // Inline syntax anywhere in a line: code spans, emphasis, links, autolinks and raw HTML, GFM's table
 // cell separator and strikethrough, and the backslash itself. An `&` is syntax only when it opens an
