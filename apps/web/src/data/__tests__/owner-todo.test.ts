@@ -120,9 +120,14 @@ describe('OWNER_TODO and ownerTodo', () => {
 
   it('keeps each live /llms.txt hint as the draft composition writes it', () => {
     const draft = siteIndexToLlmsTxt({ includeUnfilled: true });
-    for (const marker of [LLMS_TXT_OWNER_COPY.summary, ...LLMS_TXT_OWNER_COPY.facts]) {
-      expect(draft).toContain(marker as string);
-    }
+    // The markers alone, each up to the `)` that ends it: copy the owner has written is escaped where
+    // it holds Markdown syntax, and a paragraph with a link in it is an array of pieces.
+    const marker = new RegExp(`${OWNER_TODO}\\([^)]*\\)`, 'g');
+    const hints = [LLMS_TXT_OWNER_COPY.summary, ...LLMS_TXT_OWNER_COPY.facts]
+      .flat()
+      .flatMap((piece) => (typeof piece === 'string' ? (piece.match(marker) ?? []) : []));
+    expect(hints).not.toHaveLength(0);
+    for (const hint of hints) expect(draft).toContain(hint);
   });
 });
 
