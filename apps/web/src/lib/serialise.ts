@@ -10,7 +10,9 @@ import {
   type CaseStudyMetric,
   type MetricDefinition,
 } from '@/data/case-studies';
-import { OWNER_TODO } from '@/data/owner-todo';
+import { OWNER_TODO, ownerTodo } from '@/data/owner-todo';
+import { pages } from '@/data/pages';
+import { homePage } from '@/data/pages/home';
 import { cellText, isWideTable, leadOf } from '@/data/pages/table';
 import type {
   InlineLink,
@@ -21,15 +23,24 @@ import type {
   TableCell,
   TableRow,
 } from '@/data/pages/types';
-import { FOOTER_LINES, type Inline, type PostBlock, type PublishedPost } from '@/data/posts';
+import {
+  FOOTER_LINES,
+  hasPublishedPosts,
+  type Inline,
+  type PostBlock,
+  type PublishedPost,
+} from '@/data/posts';
+import type { StaticRoute } from '@/data/static-routes';
 import { assertPathname, markdownTwinPath } from './pathname';
-import { siteOrigin } from './site-origin';
+import { SITE_NAME } from './site-name';
+import { absoluteUrl } from './site-origin';
 
 /**
- * The one module that writes Markdown (#59) and the case studies as JSON (#60). Every Markdown twin
- * renders its body here from the content modules, so a twin and its page read one source and no
- * route handler builds Markdown of its own. Every string it is handed is plain text: it escapes
- * whatever Markdown would read as syntax, so the text a reader sees is the text in the module.
+ * The one module that writes Markdown (#59), the case studies as JSON and the site's `/llms.txt`
+ * index (#60). Every Markdown twin renders its body here from the content modules, so a twin and
+ * its page read one source and no route handler builds Markdown of its own. Every string it is
+ * handed is plain text: it escapes whatever Markdown would read as syntax, so the text a reader sees
+ * is the text in the module.
  *
  * Each document opens the same way: `# <h1>`, the text of the HTML page's `h1`, then the summary
  * paragraph, then `Source:` and the absolute canonical URL of that page. A server module like
@@ -42,6 +53,10 @@ const MARKDOWN_CONTENT_TYPE = 'text/markdown; charset=utf-8';
 
 // RFC 8259 defines no charset parameter for application/json: JSON on the wire is UTF-8.
 const JSON_CONTENT_TYPE = 'application/json';
+
+// llmstxt.org names no media type for `/llms.txt`: it is Markdown served as a plain text file, and
+// text/plain defaults to US-ASCII without a charset (RFC 2046), which would garble an em dash.
+const LLMS_TXT_CONTENT_TYPE = 'text/plain; charset=utf-8';
 
 // Where a twin is served, re-exported as part of this module's interface (#59). It lives in
 // `pathname.ts`, which has no imports, so `metadata.ts` and the e2e helpers can read it without
@@ -68,19 +83,13 @@ export function jsonResponse(value: unknown): Response {
   return new Response(body, { headers: { 'Content-Type': JSON_CONTENT_TYPE } });
 }
 
-/**
- * The absolute URL of a path on this site. The origin is `siteOrigin()`'s, from the variable and the
- * fallback `app/sitemap.ts` and `app/robots.ts` read, so a preview build names production like the sitemap
- * does, and the root is the bare origin, as its served canonical is. `metadataBase` cannot help
- * here: it resolves URLs in the head, and a Markdown body is plain text.
- */
-export function absoluteUrl(path: string): string {
-  if (!path.startsWith('/') || path.startsWith('//')) {
-    throw new Error(`absoluteUrl: "${path}" is not a path on this site`);
-  }
-  const origin = siteOrigin();
-  return path === '/' ? origin : `${origin}${path}`;
+/** The `/llms.txt` body as a response, with the one content type it is served with (#60). */
+export function llmsTxtResponse(body: string): Response {
+  return new Response(body, { headers: { 'Content-Type': LLMS_TXT_CONTENT_TYPE } });
 }
+
+// Written in `site-origin.ts`, which imports nothing, and re-exported for the serialiser's callers.
+export { absoluteUrl };
 
 // Inline syntax anywhere in a line: code spans, emphasis, links, autolinks and raw HTML, GFM's table
 // cell separator and strikethrough, and the backslash itself. An `&` is syntax only when it opens an
@@ -322,6 +331,15 @@ function opening(
 /** A page's sections, each under a `##` heading. Empty for none. */
 export function renderSections(sections: readonly PageSection[]): string {
   return blocks(sections.flatMap(section));
+}
+
+/** A page record's own title, template or absolute; a record without one fails the prerender. */
+function titleOf(page: PageRecord, caller: string): string {
+  const title = typeof page.title === 'string' ? page.title : page.title?.absolute;
+  if (typeof title !== 'string') {
+    throw new Error(`${caller}: the record for ${page.path} has no title`);
+  }
+  return title;
 }
 
 /**
@@ -644,4 +662,151 @@ export function caseStudyToJson(caseStudy: CaseStudy): CaseStudyJson {
 /** Every case study as JSON, in the data module's order: the body of `/case-studies.json`. */
 export function caseStudiesToJson(): CaseStudyJson[] {
   return caseStudies.map((caseStudy) => caseStudyToJson(caseStudy));
+}
+
+/**
+ * The owner's words in `/llms.txt` (#60): the blockquote, one sentence on who this is and what he
+ * is for, and the facts block, the ground truth an engine otherwise guesses. Only the owner writes
+ * them. Until then each is an `ownerTodo()` placeholder with a row in `unfilledOwnerFields`
+ * (`data/owner-todo.ts`, as `llms-txt#<hint>`), and the served file shows the home page's
+ * description in the summary's place and no facts block. Writing one means replacing its
+ * placeholder here and deleting its row in the same commit, or the owner-todo gate fails.
+ */
+export interface LlmsTxtOwnerCopy {
+  /** One sentence of plain text. */
+  summary: string;
+  /** Paragraphs of plain text and links, with no headings; none for no facts block. */
+  facts: readonly Paragraph[];
+}
+
+export const LLMS_TXT_OWNER_COPY: LlmsTxtOwnerCopy = {
+  summary: ownerTodo('the blockquote, one sentence on who Milos is and what he is for'),
+  facts: [
+    ownerTodo('the facts block, how the current role is phrased and which profile links to list'),
+  ],
+};
+
+/**
+ * The static routes `/llms.txt` leaves out of `## Site pages`. `/blog` is a placeholder with nothing
+ * on it until the first post (#61), and an agent that follows a link to an empty page learns the
+ * index is unreliable. It returns with that post through `hasPublishedPosts`, the one switch
+ * ADR 0028 names for everything that waits for it, so publishing needs no change here.
+ */
+export const EXCLUDED_FROM_LLMS_TXT: readonly StaticRoute[] = hasPublishedPosts ? [] : ['/blog'];
+
+/**
+ * llmstxt.org's advice and #60's bound: the whole index fits any context window. The prerender
+ * fails at it, so no path that skips the tests can serve a larger file.
+ */
+export const LLMS_TXT_MAX_BYTES = 10_240;
+
+/** One `- [name](url): note` line of an llms.txt link list, its URL absolute on this site. */
+function llmsTxtLink(name: string, path: string, note: string, what: string): string {
+  const label = nonEmpty(text(name).trim(), `siteIndexToLlmsTxt: the link text of ${what}`);
+  const said = nonEmpty(inline(note), `siteIndexToLlmsTxt: the note on ${what}`);
+  return `- [${label}](${destination(absoluteUrl(path))}): ${said}`;
+}
+
+/** A `## ` section whose body is only link lines, as llmstxt.org shapes every section. */
+function llmsTxtSection(title: string, links: readonly string[]): string {
+  return blocks([heading(2, title), entries(links, `the llms.txt section "${title}"`).join('\n')]);
+}
+
+/**
+ * The site's index for agents, in llmstxt.org v2's shape (#60): one `# ` H1 with the site's name,
+ * one `> ` blockquote, the facts block when there is one, then `## Case studies`,
+ * `## Site pages` and `## Machine-readable representations`, each a list of
+ * `- [name](url): note` links to the Markdown twins and the JSON. No `## Optional` section: v2
+ * dropped its special meaning. Every link and note is read from the modules the pages read.
+ *
+ * `includeUnfilled` is the draft-complete composition: the owner's placeholders stand in their
+ * blocks instead of the fallback and the omission, so the owner-todo gate can find them. It is
+ * never served; the served composition fails the prerender rather than carry a marker from any
+ * source, or grow to `LLMS_TXT_MAX_BYTES`. Each fact paragraph is shown or left out on its own, so
+ * a written one is served while another is still a placeholder. `copy` and `studies` are for tests.
+ * `lib/__tests__/llms-txt.test.ts` pins both compositions line by line.
+ */
+export function siteIndexToLlmsTxt({
+  includeUnfilled = false,
+  copy = LLMS_TXT_OWNER_COPY,
+  studies = caseStudies,
+}: {
+  includeUnfilled?: boolean;
+  copy?: LlmsTxtOwnerCopy;
+  studies?: readonly CaseStudy[];
+} = {}): string {
+  const shown = (value: unknown) => includeUnfilled || !JSON.stringify(value).includes(OWNER_TODO);
+  const summary = shown(copy.summary) ? copy.summary : homePage.summary;
+  // Numbered before the unfilled ones are left out, so an error names the paragraph in the copy.
+  const facts = copy.facts.flatMap((value, index) => (shown(value) ? [{ value, index }] : []));
+  const excluded: readonly string[] = EXCLUDED_FROM_LLMS_TXT;
+
+  const body = document([
+    heading(1, SITE_NAME),
+    `> ${paragraph(summary, 'siteIndexToLlmsTxt: the summary')}`,
+    ...facts.map(({ value, index }) => paragraph(value, `siteIndexToLlmsTxt: fact ${index + 1}`)),
+    llmsTxtSection(
+      'Case studies',
+      studies.map(({ slug, title, description, highlight: { metric } }) => {
+        // formatMetric() writes a figure it cannot render as an em dash; a note with no figure in
+        // it fails the prerender instead, as the same study's JSON does.
+        if (!Number.isFinite(metric.value)) {
+          throw new Error(
+            `siteIndexToLlmsTxt(${slug}): the metric value ${metric.value} is not finite`,
+          );
+        }
+        return llmsTxtLink(
+          title,
+          markdownTwinPath(`/work/${slug}`),
+          `${formatMetric(metric)} ${metric.label}. ${description}`,
+          `the case study ${slug}`,
+        );
+      }),
+    ),
+    llmsTxtSection(
+      'Site pages',
+      Object.values(pages)
+        .filter(({ path }) => !excluded.includes(path))
+        .map((page) =>
+          llmsTxtLink(
+            titleOf(page, 'siteIndexToLlmsTxt'),
+            markdownTwinPath(page.path),
+            page.summary,
+            `the page ${page.path}`,
+          ),
+        ),
+    ),
+    llmsTxtSection('Machine-readable representations', [
+      llmsTxtLink(
+        'Case studies as JSON',
+        '/case-studies.json',
+        'Every case study as one JSON array: the fields its page shows, its metric as the cards render it, and the URLs of its page and its Markdown twin.',
+        '/case-studies.json',
+      ),
+      ...studies.map(({ slug, title }) =>
+        llmsTxtLink(
+          `${title} as JSON`,
+          `/work/${slug}/index.json`,
+          'The same entry for one case study, as a document of its own.',
+          `the JSON of ${slug}`,
+        ),
+      ),
+    ]),
+  ]);
+
+  if (!includeUnfilled && body.includes(OWNER_TODO)) {
+    const at = body.indexOf(OWNER_TODO);
+    throw new Error(
+      `siteIndexToLlmsTxt: the served body still holds ${OWNER_TODO}, never served: ` +
+        `"${body.slice(Math.max(0, at - 40), at + 60)}"`,
+    );
+  }
+  const bytes = new TextEncoder().encode(body).length;
+  if (bytes >= LLMS_TXT_MAX_BYTES) {
+    throw new Error(
+      `siteIndexToLlmsTxt: the body is ${bytes} bytes, not under ${LLMS_TXT_MAX_BYTES}: ` +
+        'the whole index has to fit a context window',
+    );
+  }
+  return body;
 }

@@ -21,7 +21,8 @@
  * `url` (cursor.com/docs/context/mcp), and a `servers` entry of `type: "http"`, VS Code's name for
  * the streamable HTTP transport (code.visualstudio.com/docs/copilot/reference/mcp-configuration).
  */
-import { absoluteUrl } from '@/lib/serialise';
+// Not from `@/lib/serialise`: it imports `@/data/pages`, whose `/contact` record imports this module.
+import { absoluteUrl } from '@/lib/site-origin';
 
 /** The server's path on this site. */
 export const MCP_PATH = '/mcp';

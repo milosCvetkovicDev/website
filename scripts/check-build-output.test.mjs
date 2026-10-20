@@ -43,6 +43,7 @@ const APP_ROUTES = {
   '/opengraph-image/route': '/opengraph-image',
   '/case-studies.json/route': '/case-studies.json',
   '/feed.xml/route': '/feed.xml',
+  '/llms.txt/route': '/llms.txt',
   '/work/[slug]/page': '/work/[slug]',
   '/work/[slug]/og-image.png/route': '/work/[slug]/og-image.png',
   '/work/[slug]/index.json/route': '/work/[slug]/index.json',
@@ -101,6 +102,7 @@ const cleanPrerender = () => ({
     '/opengraph-image': prerendered('/opengraph-image'),
     '/case-studies.json': prerendered('/case-studies.json'),
     '/feed.xml': prerendered('/feed.xml'),
+    '/llms.txt': prerendered('/llms.txt'),
     '/work/a': prerendered('/work/[slug]'),
     '/work/b': prerendered('/work/[slug]'),
     '/work/a/og-image.png': prerendered('/work/[slug]/og-image.png'),
@@ -124,6 +126,7 @@ const CLEAN_BODIES = [
   'opengraph-image.body',
   'case-studies.json.body',
   'feed.xml.body',
+  'llms.txt.body',
   'work/a.html',
   'work/b.html',
   'work/a/og-image.png.body',
@@ -189,6 +192,7 @@ describe('bodyFile', () => {
     ['/feed.xml', 'route', 'feed.xml.body'],
     ['/index.md', 'route', 'index.md.body'],
     ['/about/index.md', 'route', 'about/index.md.body'],
+    ['/llms.txt', 'route', 'llms.txt.body'],
     ['/case-studies.json', 'route', 'case-studies.json.body'],
     ['/work/a/index.json', 'route', 'work/a/index.json.body'],
   ]) {
@@ -359,20 +363,30 @@ describe('collectProblems', () => {
     assert.match(problems[0], /^\/work\/b\/index\.json .*server\/app\/work\/b\/index\.json\.body/);
   });
 
-  it('fails a required handler built without force-static once, as a function', () => {
-    // `app/case-studies.json/route.ts` without its `dynamic` export: in the app manifest, not
-    // prerendered. The function finding names it; being required adds no second one.
-    const prerender = cleanPrerender();
-    delete prerender.routes['/case-studies.json'];
-    const { problems } = check({
-      prerender,
-      bodies: CLEAN_BODIES.filter((b) => b !== 'case-studies.json.body'),
-    });
+  it('fails a missing /llms.txt body, naming the file', () => {
+    const { problems } = check({ bodies: CLEAN_BODIES.filter((b) => b !== 'llms.txt.body') });
     assert.equal(problems.length, 1);
-    assert.match(problems[0], /^\/case-studies\.json: .*function.*force-static/);
+    assert.match(problems[0], /^\/llms\.txt .*server\/app\/llms\.txt\.body/);
   });
 
-  for (const route of ['/case-studies.json', '/feed.xml', '/work/[slug]/index.json']) {
+  // The feed has a test of its own below, which also keeps it off the allowlist.
+  for (const [route, body] of [
+    ['/case-studies.json', 'case-studies.json.body'],
+    ['/llms.txt', 'llms.txt.body'],
+  ]) {
+    it(`fails the required ${route} built without force-static once, as a function`, () => {
+      // Its `route.ts` without the `dynamic` export: in the app manifest, not prerendered. The
+      // function finding names it; being required adds no second one.
+      const prerender = cleanPrerender();
+      delete prerender.routes[route];
+      const { problems } = check({ prerender, bodies: CLEAN_BODIES.filter((b) => b !== body) });
+      assert.equal(problems.length, 1);
+      assert.ok(problems[0].startsWith(`${route}: `), problems[0]);
+      assert.match(problems[0], /function.*force-static/);
+    });
+  }
+
+  for (const route of ['/case-studies.json', '/feed.xml', '/llms.txt', '/work/[slug]/index.json']) {
     it(`fails a build without the required ${route}, naming it`, () => {
       const { problems } = check(without(route));
       assert.equal(problems.length, 1);
@@ -738,10 +752,10 @@ describe('paramsSibling', () => {
 });
 
 describe('REQUIRED_ROUTES', () => {
-  it('names the case-study JSON #60 serves and the feed #61 serves, and no function', () => {
+  it('names /llms.txt and the case-study JSON #60 serves and the feed #61 serves, and no function', () => {
     assert.deepEqual(
       [...REQUIRED_ROUTES],
-      ['/case-studies.json', '/feed.xml', '/work/[slug]/index.json'],
+      ['/case-studies.json', '/feed.xml', '/llms.txt', '/work/[slug]/index.json'],
     );
     assert.deepEqual(
       REQUIRED_ROUTES.filter((route) => ALLOWED_FUNCTIONS.includes(route)),
@@ -824,7 +838,7 @@ describe('the command', () => {
     withTree({}, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, /11 routes, 13 prerendered bodies, server functions: \/mcp /);
+      assert.match(result.stdout, /12 routes, 14 prerendered bodies, server functions: \/mcp /);
       assert.match(result.stdout, /\(BUILD_ID test-build-id, written \d{4}-\d\d-\d\dT[\d:.]+Z\)/);
     });
   });

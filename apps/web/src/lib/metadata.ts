@@ -3,6 +3,7 @@ import { hasPublishedPosts } from '@/data/posts';
 import { social } from '@/data/social';
 import { OG_CONTENT_TYPE, OG_SIZE } from './og-image';
 import { assertPathname, FEED_PATH, markdownTwinPath } from './pathname';
+import { SITE_NAME } from './site-name';
 
 /**
  * The per-route half of the head. The root layout keeps only what is true of every response, the
@@ -14,7 +15,8 @@ import { assertPathname, FEED_PATH, markdownTwinPath } from './pathname';
  * A server module like `theme.ts`, not a client one.
  */
 
-export const SITE_NAME = 'Milos Cvetkovic';
+// Written in `site-name.ts`, which imports nothing, and re-exported for the head and the feed.
+export { SITE_NAME };
 /**
  * The Atom feed's title (#61): the site's name, then the blog's, as `/blog`'s heading names it. The
  * feed's own `<title>` and the `title` of the link that advertises it, so a reader that lists the

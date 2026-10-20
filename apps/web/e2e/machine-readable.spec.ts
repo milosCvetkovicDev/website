@@ -12,21 +12,20 @@ import {
 } from './endpoints';
 
 /**
- * The machine-readable endpoints, as declared failures until each one ships (#55 AC 10).
+ * The machine-readable endpoints, each row its endpoint's contract (#55 AC 10).
  *
- * Every path comes from `endpoints.ts`. Each test's title and `fixed-by` annotation name the task
- * that ships its endpoint: #59 the Markdown twins, #60 `/llms.txt` and the JSON representation, #61
- * the Atom feed, #62 the MCP server. The twins (#59), the case-study JSON (#60), the feed (#61) and
- * the MCP server (#62) are served, so their rows run the contract alone; for each endpoint not yet
- * served, `expectNotServedYet` makes its test an expected failure for that one reason only. It
- * first requires the status to be the 404 of an endpoint that is not there, outside the declared
- * failure, so a 5xx, a timeout or a server that never started fails the run; only then does it call
- * `test.fail()` and fail on the status. A 200 fails the run too, so the change that ships an
- * endpoint must delete that one call, and the rest of the test is then that endpoint's contract.
+ * Every path comes from `endpoints.ts`. Each test's title names the task that ships its endpoint:
+ * #59 the Markdown twins, #60 `/llms.txt` and the JSON representation, #61 the Atom feed, #62 the
+ * MCP server. All of them are served, so no row is an expected failure: the rows that were (#55
+ * AC 10) each required the 404 of an endpoint that is not there before `test.fail()`, so that a
+ * 5xx, a timeout or a server that never started failed the run, and the change that shipped the
+ * endpoint deleted that declaration. An endpoint added to `endpoints.ts` before it ships declares
+ * one the same way.
  *
  * Everything here goes through `request`, the served bytes, because that is all an agent's fetch
- * tool reads. `retries: 0`, as for every spec that carries an expected failure (`e2e-tests.md`): a
- * retry would report a row that has started passing as flaky instead of failing it.
+ * tool reads. `retries: 0`, as for every spec that carries an expected failure (`e2e-tests.md`): none
+ * is left, but an endpoint that answers only some of the time fails the run rather than passing as
+ * flaky, and a row declared that way would need it again.
  */
 
 test.describe.configure({ retries: 0, timeout: 60_000 });
@@ -34,25 +33,35 @@ test.describe.configure({ retries: 0, timeout: 60_000 });
 /** A slug no case study has, for the 404 of its JSON document (#60 AC 7). */
 const UNKNOWN_SLUG = 'no-such-case-study';
 
+/**
+ * Refused, not pending, so it is no row in `endpoints.ts`: not in the llmstxt.org specification, and
+ * this site's `/llms.txt` already is the whole site (ADR 0017's refusal table, #60 AC 4).
+ */
+const LLMS_FULL_TXT = '/llms-full.txt';
+
+/** llmstxt.org's advice, and #60's bound: the whole file fits any context window. */
+const LLMS_TXT_MAX_BYTES = 10_240;
+
+/** An llmstxt.org list line as #60 writes every one, `- [name](url): note`; its URL as written. */
+const LLMS_TXT_LINK = /^- \[(?:[^\]\\]|\\.)+\]\((\S+)\): \S.*$/;
+
+/** Every Markdown link destination in a body, as written (backslash escapes included). */
+const MARKDOWN_LINK = /\]\(((?:\\.|[^\s()\\])+)\)/g;
+
+/** A destination as the URL it names: the serialiser escapes `(`, `)` and `\` with a backslash. */
+const unescapeDestination = (written: string) => written.replace(/\\([\\()])/g, '$1');
+
+/** The media type each kind of link in `/llms.txt` must answer with. */
+function expectedType(path: string): RegExp {
+  if (path.endsWith('.md')) return /^text\/markdown; ?charset=utf-8$/i;
+  if (path.endsWith('.json')) return /^application\/json\b/i;
+  return /^text\/html\b/i;
+}
+
 /** The MCP protocol revision #62 targets. */
 const MCP_PROTOCOL_VERSION = '2026-07-28';
 
 const contentType = (response: APIResponse) => response.headers()['content-type'] ?? '';
-
-/**
- * Declares the test an expected failure because `path` is not served yet, and only for that: the
- * status must be 404 before `test.fail()` is called, so every other outcome fails the run.
- */
-function expectNotServedYet(response: APIResponse, path: string, issue: string): void {
-  test.info().annotations.push({ type: 'fixed-by', description: issue });
-  expect(
-    response.status(),
-    `${path} answers ${response.status()}. While ${issue} is open it must be a 404; once ${issue} ` +
-      'serves it, delete this expectNotServedYet call so the contract below runs',
-  ).toBe(404);
-  test.fail();
-  expect(response.status(), `${path} is not served`).toBe(200);
-}
 
 /**
  * A JSON endpoint's document, after its status, its content type and the owner-placeholder rule
@@ -162,15 +171,20 @@ for (const { route, twin } of MARKDOWN_TWINS) {
 
 // The shape is #60's "exact v2 shape": one `# ` H1 first (the only section llmstxt.org requires),
 // then one `> ` blockquote, which #60 requires of this site; then link lists pointing at the twins.
+// `lib/__tests__/llms-txt.test.ts` pins the shape line by line; this row checks the served bytes.
 test(`#60: ${LLMS_TXT} opens with one H1 and a blockquote and links every case study`, async ({
   request,
 }) => {
   const response = await request.get(LLMS_TXT);
-  expectNotServedYet(response, LLMS_TXT, '#60');
   expect(response.status()).toBe(200);
-  expect(contentType(response)).toMatch(/^text\/plain\b/);
+  expect(contentType(response)).toMatch(/^text\/plain; ?charset=utf-8$/i);
 
   const body = await response.text();
+  // The served composition, never the draft one: a placeholder falls back or is left out (#60 AC 15).
+  expect(body, `${LLMS_TXT} serves no owner placeholder`).not.toContain(OWNER_TODO);
+  expect(Buffer.byteLength(body, 'utf8'), `${LLMS_TXT} fits a context window`).toBeLessThan(
+    LLMS_TXT_MAX_BYTES,
+  );
   const lines = linesOutsideFences(body).filter((line) => line.trim() !== '');
   expect(lines[0], 'llmstxt.org: the file opens with the H1').toMatch(/^# \S/);
   expect(
@@ -178,9 +192,75 @@ test(`#60: ${LLMS_TXT} opens with one H1 and a blockquote and links every case s
     'and has only the one H1',
   ).toHaveLength(1);
   expect(lines[1], '#60: followed by the blockquote').toMatch(/^> \S/);
-  for (const { twin } of CASE_STUDY_ENDPOINTS) {
+  expect(
+    lines.filter((line) => /^##\s+optional\s*$/i.test(line)),
+    'v2 dropped the Optional section',
+  ).toEqual([]);
+  for (const { twin, json } of CASE_STUDY_ENDPOINTS) {
     expect(linksTo(body, twin), `${LLMS_TXT} should link ${twin}`).toBe(true);
+    expect(linksTo(body, json), `${LLMS_TXT} should link ${json}`).toBe(true);
   }
+  expect(linksTo(body, CASE_STUDIES_JSON), `${LLMS_TXT} should link ${CASE_STUDIES_JSON}`).toBe(
+    true,
+  );
+});
+
+// #60 AC 4: an agent that follows the index must never land on a 404, so every link in it is
+// requested, by its path on this server once it has been checked to name this site's origin: each
+// section line, which must be on this site, and any on-site link in the facts block above them (an
+// off-site profile link there is not requested). Each must answer with its own media type, one at a
+// time, so a growing index cannot fan out against the test server.
+test(`#60: every link in ${LLMS_TXT} answers 200 with its media type`, async ({ request }) => {
+  const response = await request.get(LLMS_TXT);
+  expect(response.status()).toBe(200);
+  const body = await response.text();
+  const lines = body.split('\n');
+  const sectionStart = lines.findIndex((line) => line.startsWith('## '));
+  expect(sectionStart, `${LLMS_TXT} has link sections`).toBeGreaterThan(0);
+  const listed = lines.slice(sectionStart).filter((line) => line.trim() && !/^## /.test(line));
+
+  const problems: string[] = [];
+  const paths = new Set<string>();
+  const parse = (written: string, where: string): URL | undefined => {
+    const href = unescapeDestination(written);
+    try {
+      return new URL(href);
+    } catch {
+      problems.push(`${where}: ${href} is not an absolute URL`);
+      return undefined;
+    }
+  };
+  for (const line of listed) {
+    const written = LLMS_TXT_LINK.exec(line)?.[1];
+    if (written === undefined) {
+      problems.push(`not a - [name](url): note line: ${line}`);
+      continue;
+    }
+    const url = parse(written, line);
+    if (!url) continue;
+    if (url.origin !== SITE_ORIGIN) problems.push(`${line}: not on ${SITE_ORIGIN}`);
+    else paths.add(url.pathname);
+  }
+  for (const [, written] of lines.slice(0, sectionStart).join('\n').matchAll(MARKDOWN_LINK)) {
+    const url = parse(written, 'the facts block');
+    if (url?.origin === SITE_ORIGIN) paths.add(url.pathname);
+  }
+  expect(problems, `${LLMS_TXT}'s links`).toEqual([]);
+  expect(paths.size, `${LLMS_TXT} links something`).toBeGreaterThan(0);
+
+  const answers: string[] = [];
+  for (const path of paths) {
+    const linked = await request.get(path);
+    const type = contentType(linked);
+    if (linked.status() !== 200 || !expectedType(path).test(type)) {
+      answers.push(`${path}: ${linked.status()} ${type}`);
+    }
+  }
+  expect(answers, 'every link answers 200 with its media type').toEqual([]);
+});
+
+test(`#60: ${LLMS_FULL_TXT} is a 404, deliberately not served`, async ({ request }) => {
+  expect((await request.get(LLMS_FULL_TXT)).status()).toBe(404);
 });
 
 test(`#60: ${CASE_STUDIES_JSON} is a JSON array of every case study`, async ({ request }) => {

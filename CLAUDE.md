@@ -54,10 +54,10 @@ There is no shared ESLint or TypeScript config package (ADR 0018): `apps/web` li
 ## Routes (App Router)
 
 `/`, `/about`, `/blog`, `/blog/[slug]`, `/contact`, `/privacy`, `/skills`, `/work`, `/work/[slug]`.
-Handlers: an `/index.md` twin per page, `/case-studies.json`, `/work/<slug>/index.json`,
-`/feed.xml` and `/mcp` (`POST` only). Every other `route.ts` exports `dynamic = 'force-static'`,
-there is no middleware or `proxy.ts` (ADR 0017, 0030), and `pnpm check:build-output` fails any
-server function but `/mcp`.
+Handlers: an `/index.md` twin per page, `/llms.txt`, `/case-studies.json`,
+`/work/<slug>/index.json`, `/feed.xml` and `/mcp` (`POST` only). Every other `route.ts` exports
+`dynamic = 'force-static'`, there is no middleware or `proxy.ts` (ADR 0017, 0030), and
+`pnpm check:build-output` fails any server function but `/mcp`.
 
 Every route's head comes from `buildMetadata()` in `apps/web/src/lib/metadata.ts`, and every
 static route folder needs its own `opengraph-image`; see `app-router-and-content.md`.

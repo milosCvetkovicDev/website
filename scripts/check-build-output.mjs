@@ -84,14 +84,15 @@ export const ALLOWED_FUNCTIONS = Object.freeze(['/mcp']);
  * the route above its last dynamic segment is a route too, exactly that route's params, so
  * `/work/[slug]/index.json` needs one body per `/work/<slug>` page without this list naming a
  * slug. A required route is never a function, so it cannot be in `ALLOWED_FUNCTIONS` as well.
- * #60 adds the case-study JSON and #61 the Atom feed; each later prerendered endpoint adds its own
- * route (#62's `/mcp` is a function, so it is in `ALLOWED_FUNCTIONS` instead).
+ * #60 adds `/llms.txt` and the case-study JSON and #61 the Atom feed; each later prerendered
+ * endpoint adds its own route (#62's `/mcp` is a function, so it is in `ALLOWED_FUNCTIONS` instead).
  *
  * @type {readonly string[]}
  */
 export const REQUIRED_ROUTES = Object.freeze([
   '/case-studies.json',
   '/feed.xml',
+  '/llms.txt',
   '/work/[slug]/index.json',
 ]);
 

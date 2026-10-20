@@ -149,13 +149,15 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   the pull request that fixes the defect deletes the annotation in the same change. The
   machine-readable endpoints follow the same rule without a manifest row: `e2e/endpoints.ts` is the
   one list of their paths, and `e2e/machine-readable.spec.ts` holds one `test.fail()` per endpoint
-  not yet served, its title and `fixed-by` annotation naming the issue that ships it (#60's
-  `/llms.txt`). #59's Markdown twins, #60's case-study JSON, #61's Atom feed and #62's MCP server
-  ship: the JSON's and the server's rows there are their contract, and
+  not yet served, its title and `fixed-by` annotation naming the issue that ships it; none is left.
+  #59's Markdown twins, #60's `/llms.txt` and case-study JSON, #61's Atom feed and #62's MCP server
+  ship: the rows for `/llms.txt`, the JSON and the server there are their contract (every link in
+  `/llms.txt` answers 200, and the refused `/llms-full.txt` stays a 404), `e2e/seo-surface.spec.ts`
+  checks every route's one `rel="describedby"` link to `/llms.txt`, and
   `e2e/markdown-twins.spec.ts`, `e2e/feed.spec.ts` and `e2e/mcp.spec.ts` are the fuller ones of the
-  twins, the feed and the server. Its `expectNotServedYet` requires the 404 before it calls
-  `test.fail()`, so a 5xx or a server that never answered fails the run instead of passing as the
-  expected failure; the change that ships an endpoint deletes that call.
+  twins, the feed and the server. An endpoint listed before it ships requires the 404 before its row
+  calls `test.fail()`, so a 5xx or a server that never answered fails the run instead of passing as
+  the expected failure; the change that ships it deletes that declaration.
 - The two gate specs opt out of those retries: `e2e/console-clean.spec.ts` and
   `e2e/accessibility.spec.ts` both set `test.describe.configure({ retries: 0 })`, and so does every
   spec that carries an expected failure. A retry would turn an intermittent console message or axe
