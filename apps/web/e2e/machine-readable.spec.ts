@@ -23,8 +23,9 @@ import {
  * one the same way.
  *
  * Everything here goes through `request`, the served bytes, because that is all an agent's fetch
- * tool reads. `retries: 0`, as for every spec that carries an expected failure (`e2e-tests.md`), so
- * that a row declared that way is never reported flaky instead of failing.
+ * tool reads. `retries: 0`, as for every spec that carries an expected failure (`e2e-tests.md`): none
+ * is left, but an endpoint that answers only some of the time fails the run rather than passing as
+ * flaky, and a row declared that way would need it again.
  */
 
 test.describe.configure({ retries: 0, timeout: 60_000 });

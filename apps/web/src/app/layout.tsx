@@ -83,6 +83,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <PersonJsonLd />
         <WebsiteJsonLd />
+        {/* A literal element: `metadata.alternates` has no `describedby` key (#60). */}
         <link rel="describedby" href={new URL('/llms.txt', siteUrl).href} />
       </head>
       <body

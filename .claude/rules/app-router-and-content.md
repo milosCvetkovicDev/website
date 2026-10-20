@@ -269,9 +269,9 @@ The gate is `pnpm --filter web exec vitest run src/data/__tests__/owner-todo.tes
 walk (a function, a `Map`, a `Set`, a class instance, a symbol key), on a row that matches no
 unfilled field or repeats another, on a row with a blank `why`, and on a row whose `expires` is
 missing, a placeholder, not a real `YYYY-MM-DD` day, reached, or more than `MAX_EXPIRY_DAYS` (366)
-ahead, on the real clock in UTC. The sources today are `case-studies` (the data module) and
-`llms-txt`, the owner draft of `/llms.txt` that `siteIndexToLlmsTxt({ includeUnfilled: true })`
-returns. A sibling joins it with one `{ id, value }` entry in that list (a data module's export, or
+ahead, on the real clock in UTC. The sources today are `case-studies` and `about` (data modules,
+the second /about's record copy) and `llms-txt`, the owner draft of `/llms.txt` that
+`siteIndexToLlmsTxt({ includeUnfilled: true })` returns. A sibling joins it with one `{ id, value }` entry in that list (a data module's export, or
 the string a generator returns) and one register row per unfilled field:
 `field` as the finding names it, `why`, and an `expires` the owner chooses, never an agent. A typed
 placeholder is `<source>.<path>` (56c's `case-studies.0.metricDefinition`, for example), and each

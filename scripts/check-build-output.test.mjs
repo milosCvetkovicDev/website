@@ -369,9 +369,9 @@ describe('collectProblems', () => {
     assert.match(problems[0], /^\/llms\.txt .*server\/app\/llms\.txt\.body/);
   });
 
+  // The feed has a test of its own below, which also keeps it off the allowlist.
   for (const [route, body] of [
     ['/case-studies.json', 'case-studies.json.body'],
-    ['/feed.xml', 'feed.xml.body'],
     ['/llms.txt', 'llms.txt.body'],
   ]) {
     it(`fails the required ${route} built without force-static once, as a function`, () => {
