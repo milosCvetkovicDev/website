@@ -3,22 +3,24 @@
  *
  * The single-source rule in CLAUDE.md, enforced over the source files themselves.
  *
- * Rows R33 and R34 of the RED manifest, both fixed by #49.
+ * Rows R33 and R34 of the RED manifest, issue #49.
  *
  * `apps/web/src/data` is the single source of truth for project copy and metrics, and pages are
- * supposed to read from it rather than restate any of it. Two families of literal break that today, and
- * both are invisible to any test that renders a component, because a hard-coded `73%` renders exactly
- * as well as a derived one. The only instrument that can see the difference is the source text, so this
- * file reads the modules as files.
+ * supposed to read from it rather than restate any of it. Two families of literal broke that,
+ * metric figures (R33) and years of experience (R34). Neither does now: #162 fixed R34 and #207
+ * R33, and both rows pass. Both were invisible to any test that renders a component, because a
+ * hard-coded `73%` renders exactly as well as a derived one. The only instrument that can see the
+ * difference is the source text, so this file reads the modules as files.
  *
  * That makes it a lint rule wearing a test's clothes, and it is deliberately written as one: it reports
  * the file, the line and the literal, so a failure is actionable without opening anything.
  *
  * Two decisions from the task, recorded because they shape what is asserted rather than how:
  *
- * - The About page's `40%` is **not** established. The owner confirms or drops it in #49, so this file
- *   forbids a hard-coded metric literal rather than asserting a value: it stays correct whichever way
- *   that decision goes.
+ * - The About page's `40%` was **not** established. #49 dropped it from the 2021 timeline entry
+ *   pending the owner's answer, and sourcing it from the enterprise study through `formatMetric()`
+ *   instead would pass here too: this file forbids a hard-coded metric literal rather than asserting
+ *   a value, so it stays correct whichever way that decision goes.
  * - Likewise the years of experience. A fixed count and `10+` used to contradict each other; the
  *   assertion is that there is one source, not which number wins. #49 made that source
  *   `data/profile.ts`, which derives the total from the year the career started.
@@ -32,12 +34,24 @@ import { caseStudies, formatMetric } from '@/data/case-studies';
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /**
+ * Every regular file under `root`, subfolders included, as a path relative to it. Folders are left
+ * out even when their name ends like a source file: route folders carry file-like names
+ * (`about/index.md/`, #173), and one ending in `.ts` or `.tsx` would pass the callers' filters,
+ * reach `readFileSync` and throw `EISDIR` (#189).
+ */
+function filesUnder(root: string): string[] {
+  return readdirSync(root, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(root, join(entry.parentPath, entry.name)));
+}
+
+/**
  * The page records under `src/data/pages`, one module per route, less `types.ts`, which holds no
  * copy. They are read from the directory, subfolders included, rather than listed, so a record
  * added later is scanned without anyone remembering to add it here. A `.tsx` record counts; a
  * declaration file or a test beside the records does not.
  */
-const PAGE_RECORDS = readdirSync(join(SRC, 'data/pages'), { recursive: true, encoding: 'utf8' })
+const PAGE_RECORDS = filesUnder(join(SRC, 'data/pages'))
   .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts') && name !== 'types.ts')
   .filter((name) => !/(^|\/)__tests__\/|\.test\./.test(name))
   .sort()
@@ -60,9 +74,11 @@ const COPY_MODULES = [
   'app/skills/page.tsx',
   'app/work/page.tsx',
   'app/work/[slug]/page.tsx',
+  'app/blog/[slug]/page.tsx',
   'app/not-found.tsx',
   'app/error.tsx',
   'components/json-ld.tsx',
+  'lib/structured-data.ts',
   'components/animated-hero/hero-content.tsx',
   ...PAGE_RECORDS,
 ];
@@ -124,9 +140,8 @@ describe('metrics and biography live in one place', () => {
       const source = readFileSync(join(SRC, file), 'utf8');
       expect(source.length, `${file} must be readable and non-empty`).toBeGreaterThan(100);
     }
-    // R33's import half reads ABOUT_COPY, and it only runs once #49 turns R33 into `it`: until then
-    // the literal half fails first. So its files are proven readable here, and inside the scanned
-    // set, or a rename would leave R33 passing as an expected failure and throwing ENOENT later.
+    // R33's import half reads ABOUT_COPY, so its files are proven readable here, and inside the
+    // scanned set: a rename would otherwise fail R33 with ENOENT rather than a finding.
     for (const file of ABOUT_COPY) {
       expect(COPY_MODULES, `${file} must be one of the scanned copy modules`).toContain(file);
       const source = readFileSync(join(SRC, file), 'utf8');
@@ -138,33 +153,30 @@ describe('metrics and biography live in one place', () => {
     expect(importsCaseStudies(readFileSync(join(SRC, 'data/pages/about.ts'), 'utf8'))).toBe(true);
   });
 
-  it.fails(
-    'R33 (#49): no page module restates a caseStudies metric literal, and the About page reads them from the data',
-    () => {
-      // Every metric as it renders: `formatMetric` is the one function that turns the data into copy,
-      // so its output is exactly the string a page must not contain in source.
-      const rendered = caseStudies.map(({ highlight }) => formatMetric(highlight.metric));
-      expect(rendered, 'the data file must actually define metrics').not.toHaveLength(0);
+  it('R33 (#49): no page module restates a caseStudies metric literal, and the About page reads them from the data', () => {
+    // Every metric as it renders: `formatMetric` is the one function that turns the data into copy,
+    // so its output is exactly the string a page must not contain in source.
+    const rendered = caseStudies.map(({ highlight }) => formatMetric(highlight.metric));
+    expect(rendered, 'the data file must actually define metrics').not.toHaveLength(0);
 
-      const restated = findLiterals(rendered);
-      expect(
-        restated.map(describeHit),
-        'the About timeline (data/pages/about.ts) hard-codes 40%, so the About page can contradict ' +
-          '/work and the home page without anything failing. Its 73% is already read from the study.',
-      ).toEqual([]);
+    const restated = findLiterals(rendered);
+    expect(
+      restated.map(describeHit),
+      'a page module states a case-study figure itself, so it can contradict /work and the home ' +
+        'page without anything failing: read it from the study through formatMetric()',
+    ).toEqual([]);
 
-      // The other half of the same row: the About copy has to read the figures from somewhere.
-      // Forbidding the literal without requiring the import would be satisfied by deleting the
-      // sentence. #59 moved the copy from the page into its record, so either module may hold it.
-      const importers = ABOUT_COPY.filter((file) =>
-        importsCaseStudies(readFileSync(join(SRC, file), 'utf8')),
-      );
-      expect(
-        importers,
-        `the About copy (${ABOUT_COPY.join(' or ')}) must import the case-study data it quotes figures from`,
-      ).not.toHaveLength(0);
-    },
-  );
+    // The other half of the same row: the About copy has to read the figures from somewhere.
+    // Forbidding the literal without requiring the import would be satisfied by deleting the
+    // sentence. #59 moved the copy from the page into its record, so either module may hold it.
+    const importers = ABOUT_COPY.filter((file) =>
+      importsCaseStudies(readFileSync(join(SRC, file), 'utf8')),
+    );
+    expect(
+      importers,
+      `the About copy (${ABOUT_COPY.join(' or ')}) must import the case-study data it quotes figures from`,
+    ).not.toHaveLength(0);
+  });
 
   it('R34 (#49): no page, layout or JSON-LD module hard-codes a years-of-experience figure', () => {
     // Two numbers used to ship for one fact: a fixed count of years in json-ld.tsx and
@@ -195,7 +207,7 @@ describe('metrics and biography live in one place', () => {
     // COPY_MODULES names the routes and the JSON-LD; a component or helper added later is not on it.
     // Every module under src outside src/data renders or builds what the pages say, so none of them
     // may state the figure either. src/data is where it belongs: profile.ts derives it.
-    const modules = readdirSync(SRC, { recursive: true, encoding: 'utf8' })
+    const modules = filesUnder(SRC)
       .filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.d.ts'))
       .filter((name) => !/(^|\/)(__tests__|test)\/|\.test\./.test(name))
       .filter((name) => !name.startsWith('data/') || name.startsWith('data/pages/'));

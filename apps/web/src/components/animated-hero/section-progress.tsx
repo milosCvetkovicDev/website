@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, type RefObject } from 'react';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
+import { storyTitles } from '@/data/pages/home';
 
 /**
  * Smallest gap between two measurements, ~30fps. The dots and the readout move a whole step at a
@@ -19,15 +20,22 @@ export const MEASURE_THROTTLE_MS = 33;
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]';
 
+/**
+ * The seven sections, each named by the title it shows, so a dot's `Go to … section` name and the
+ * readout name a section the way the section names itself: the phase titles from each header row,
+ * and `SESSION COMPLETE`, which heads the closing section, read from the same record the phases
+ * render them from (`storyTitles`). The hero shows no title, so it takes the start of the name its
+ * region is announced by ("Hero - …").
+ *
+ * `label` is what a dot draws beside itself: the title's last word. The dot column is pinned to the
+ * right edge and is as wide as its widest label, hidden ones included, so drawing
+ * `SESSION COMPLETE` there pulled every dot 52px left, onto the story's panels at 1280px wide.
+ * A label is always a word of the title, so it stays inside the button's name (WCAG 2.5.3).
+ */
 const sections = [
-  { id: 'loading', label: 'INIT' },
-  { id: 'discovery', label: 'DISCOVER' },
-  { id: 'strategy', label: 'PLAN' },
-  { id: 'execution', label: 'BUILD' },
-  { id: 'gauntlet', label: 'TEST' },
-  { id: 'loop', label: 'SHIP' },
-  { id: 'complete', label: 'CTA' },
-];
+  { id: 'hero', title: 'HERO' },
+  ...Object.entries(storyTitles).map(([id, { title }]) => ({ id, title })),
+].map((section) => ({ ...section, label: section.title.split(' ').at(-1) ?? section.title }));
 
 /**
  * Where the story starts in the document, and the scroll it takes to run from its first section to
@@ -127,7 +135,7 @@ export function SectionProgress({
     // A scroll event announces a change, never a position, so nothing has yet said where the page
     // is. A reload at a restored scroll position, and a back-navigation into the middle of the
     // story, both arrive already scrolled and dispatch nothing: without this pass the indicator
-    // reads [01/07] INIT, with a 0% bar, until the visitor scrolls. It measures on an animation
+    // reads [01/07] HERO, with a 0% bar, until the visitor scrolls. It measures on an animation
     // frame rather than here, which is also what keeps `setActiveSection` out of the effect body.
     scheduleMeasure();
     return () => {
@@ -174,7 +182,7 @@ export function SectionProgress({
                     });
                   }}
                   className={`group flex items-center gap-2 rounded ${FOCUS_RING}`}
-                  aria-label={`Go to ${section.label} section`}
+                  aria-label={`Go to ${section.title} section`}
                   // Which dot is active was carried by a fill colour and a glow alone, neither of
                   // which reaches assistive technology. `location` rather than `step`: the dots
                   // are seven places in the page a visitor can jump between in any order, not
@@ -277,7 +285,7 @@ export function SectionProgress({
         {/* Current section indicator - positioned bottom-left to avoid overlap with scroll indicator */}
         <div className="absolute bottom-4 left-16 font-mono text-[10px] tracking-widest text-[var(--accent-text)]">
           [{String(activeSection + 1).padStart(2, '0')}/{String(sections.length).padStart(2, '0')}]{' '}
-          {sections[activeSection]?.label}
+          {sections[activeSection]?.title}
         </div>
       </div>
     </>

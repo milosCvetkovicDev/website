@@ -1,7 +1,8 @@
 import type { PageRecord, ProseSection } from './types';
 
 /**
- * The home page's record: its title and description, and the lines the story is built around.
+ * The home page's record: its title, its `h1` and description, and the lines the story is built
+ * around.
  *
  * The story's client components import this module to render their closing lines, so everything in
  * it ships in the home page's client chunk. It imports types only and must stay that way: a runtime
@@ -17,6 +18,21 @@ import type { PageRecord, ProseSection } from './types';
 export interface StoryClosing extends ProseSection {
   paragraphs: readonly [string];
 }
+
+/**
+ * The title each story section shows at its top, keyed like `storyClosings` and in the same order:
+ * the phase badge and title of each header row, and the closing section's `SESSION COMPLETE`. Each
+ * phase renders it as the heading its section is named by, and the section progress dots take their
+ * names from the same strings, so a dot and the section it goes to cannot drift apart (#47, hero-10).
+ */
+export const storyTitles = {
+  discovery: { phase: 'PHASE 1', title: 'DISCOVERY' },
+  strategy: { phase: 'PHASE 2', title: 'STRATEGY' },
+  execution: { phase: 'PHASE 3', title: 'EXECUTION' },
+  gauntlet: { phase: 'PHASE 4', title: 'THE GAUNTLET' },
+  loop: { phase: 'PHASE 5', title: 'THE LOOP' },
+  complete: { title: 'SESSION COMPLETE' },
+} as const satisfies Record<keyof typeof storyClosings, { phase?: string; title: string }>;
 
 /** Each story section's closing pair, keyed by its section, in the order the story tells them. */
 export const storyClosings = {
@@ -62,6 +78,8 @@ export const homePage = {
   path: '/',
   // The root template applies to child segments only, so this is the whole title; `absolute` says so.
   title: { absolute: 'Milos Cvetkovic | Senior Full-Stack Engineer' },
+  // The hero's `h1` (`hero-content.tsx`), which says who the site is about (#58).
+  heading: 'Milos Cvetkovic — senior full-stack engineer and architect building AI-native systems',
   summary:
     'Senior Full Stack Engineer building AI-native systems: self-healing agents, legacy rescue and cloud architecture in TypeScript, React and NestJS.',
   // Every closing pair, in the order `storyClosings` lists them, which is the story's order: a pair

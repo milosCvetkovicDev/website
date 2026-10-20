@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { caseStudies, formatMetric } from '../src/data/case-studies';
 import { CASE_STUDY_ROUTES, STATIC_ROUTES } from './routes';
 import { gotoHydrated } from './support/hydration';
+import { PAGE_HEADINGS } from './support/page-headings';
 import { servedText } from './support/served-text';
 
 /**
@@ -108,11 +109,16 @@ const HOME_PHRASES = [
   // The discovery phase's headline (`DiscoveryPhase`), rendered one `<span>` per character by
   // `AnimatedText`'s wave animation: a zero-join extractor reads it whole.
   'Most bugs live in the gap between what you asked for and what you meant.',
-  // Two phrases, not one sentence: the hero headline (`HeroContent`) separates them with a `<br />`,
-  // which yields no whitespace under any tag-strip, so the served text reads `…at 3am.Nobody woke up.`
-  // and the sentence with its space is in no crawler's copy of the page.
-  'This happened at 3am.',
-  'Nobody woke up.',
+  // The hero's two-line hook and subtitle (`HeroContent`), each whole with the space between its
+  // sentences (#58 AC 4). A `<br />` yields no whitespace under any tag-strip, so until #58 put a
+  // space before each one the served text read `…at 3am.Nobody woke up.` and `…ship
+  // clarity.Scroll to see how.`, and neither sentence pair was in any crawler's copy of the page.
+  // The hook is AC 4's exact string, `This happened at 3am. Nobody woke up.`, read from the specs'
+  // copy of the five headings and hooks (`support/page-headings.ts`).
+  PAGE_HEADINGS['/'].hook,
+  'I build systems that inherit chaos and ship clarity. Scroll to see how.',
+  // The h1 that names who the site is about, which the hook used to be (#58 AC 1).
+  PAGE_HEADINGS['/'].heading,
 ];
 
 /**

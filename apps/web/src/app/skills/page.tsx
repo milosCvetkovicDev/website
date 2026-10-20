@@ -2,13 +2,14 @@ import Link from 'next/link';
 import {
   coreSkills,
   differentiators,
-  skillCategories,
   skillsCopy,
   skillsRecord,
+  toolkitTable,
   type CoreSkill,
   type RichParagraph,
-  type ToolkitCategory,
 } from '@/data/pages/skills';
+import { WebPageJsonLd } from '@/components/json-ld';
+import { DataTable } from '@/components/data-table';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
@@ -52,13 +53,19 @@ function SkillBar({ name, years, level, context }: CoreSkill) {
         </span>
       </div>
       <div className="mb-3">
+        {/* A fixed level within a known range, so a meter: a progressbar would announce a task
+            under way. The value text makes every screen reader say the value as "95%" rather than
+            a bare number. The name repeats the level on purpose: a reader without meter support
+            announces the name alone. A meter's children are presentational, so the fill inside
+            is decoration. */}
         <div
           className="h-2 overflow-hidden rounded-full bg-[var(--border)]"
-          role="progressbar"
+          role="meter"
           aria-valuenow={level}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`${name} proficiency: ${level}%`}
+          aria-valuetext={`${level}%`}
+          aria-label={`${name} self-assessed proficiency: ${level}%`}
         >
           <div
             className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent)]/70 transition-all duration-500"
@@ -71,50 +78,32 @@ function SkillBar({ name, years, level, context }: CoreSkill) {
   );
 }
 
-function SkillCategory({ category }: { category: ToolkitCategory }) {
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 transition-all hover:border-[var(--accent)]/50">
-      <div className="mb-3 flex items-center gap-3">
-        <span className="text-2xl">{category.icon}</span>
-        <div>
-          <h3 className="font-semibold">{category.name}</h3>
-          <p className="text-xs text-[var(--muted)]">{category.description}</p>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {category.skills.map((skill) => (
-          <span
-            key={skill}
-            className="rounded bg-[var(--accent)]/10 px-2 py-1 font-mono text-xs text-[var(--accent-text)]"
-          >
-            {skill}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function SkillsPage() {
   return (
     <div className="py-16 md:py-24">
+      <WebPageJsonLd path={skillsRecord.path} name={skillsRecord.title} />
       <div className="mx-auto max-w-4xl px-6">
         {/* Header */}
         <div className="mb-16">
           <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {skillsCopy.eyebrow}
           </p>
-          <h1 className="mb-6 text-3xl font-bold md:text-4xl lg:text-5xl">Tools are just tools.</h1>
+          {/* The h1 names the subject; the hook under it stays the largest line (#58). */}
+          <h1 className="mb-3 text-lg leading-snug font-semibold text-balance md:text-xl">
+            {skillsRecord.heading}
+          </h1>
+          <p className="mb-6 text-3xl font-bold md:text-4xl lg:text-5xl">Tools are just tools.</p>
           <p className="max-w-2xl text-xl text-[var(--muted)]">
             <Rich paragraph={skillsCopy.intro} />
           </p>
         </div>
 
-        {/* Core skills with depth */}
+        {/* Core skills with depth: the note says what the bars and years are before they show */}
         <section className="mb-20">
-          <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
+          <h2 className="mb-3 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {skillsCopy.headings.coreSkills}
           </h2>
+          <p className="mb-6 text-sm text-[var(--muted)]">{skillsCopy.coreSkillsNote}</p>
           <div className="grid gap-4 md:grid-cols-2">
             {coreSkills.map((skill) => (
               <SkillBar key={skill.name} {...skill} />
@@ -140,16 +129,12 @@ export default function SkillsPage() {
           </div>
         </section>
 
-        {/* Full skill grid */}
+        {/* The full toolkit, as a table (#58): on a phone each category stacks into a block. */}
         <section className="mb-20">
           <h2 className="mb-6 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {skillsCopy.headings.toolkit}
           </h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {skillCategories.map((category) => (
-              <SkillCategory key={category.name} category={category} />
-            ))}
-          </div>
+          <DataTable {...toolkitTable} />
         </section>
 
         {/* Learning philosophy */}

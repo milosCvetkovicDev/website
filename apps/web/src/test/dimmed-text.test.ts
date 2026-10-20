@@ -2,9 +2,10 @@
  * Guard for the colour rule ADR 0008 set and ADR 0011 carried over, which CLAUDE.md restates under
  * Conventions: text is not dimmed with an opacity modifier, "decorative or `aria-hidden` text
  * included, since axe measures it either way". The axe gate (`e2e/accessibility.spec.ts`) enforces
- * it only on what a route renders, at the moment it samples: `CodeLine`'s line numbers,
- * `text-[var(--muted)]/50` at 2.74:1 on the Terminal, went unnoticed until #110 because no route
- * renders `CodeLine`. This reads the source instead, so it sees every component a page uses or not.
+ * it only on what a route renders, at the moment it samples: the code-line component's line
+ * numbers, `text-[var(--muted)]/50` at 2.74:1 on the Terminal, went unnoticed until #110 because no
+ * route rendered that component (#47 has since deleted it). This reads the source instead, so it
+ * sees every component a page uses or not.
  *
  * It reads every module under `src/components` outside tests and flags dimming declared in the
  * markup that reaches text:
@@ -26,12 +27,12 @@
  * `opacity-0` and an alpha of 0 hide rather than dim, so the reveal idiom stays legal. "Reaches
  * text" is structural: text or an expression anywhere under the element, SVG `<text>` included, or
  * content the scan cannot see, such as an imported component's output. An opacity reaches the whole
- * subtree, because it composites everything under the element, which is how `DataStream`'s
- * `opacity-10` wrapper dimmed digits one element down until #111. A colour stops where a descendant
- * always sets its own, and SVG text takes `fill` rather than `color`, so a decorative SVG can keep
- * a dimmed `currentColor`, as the section progress corners do. A class a variant aims elsewhere
- * reaches what it aims at: the children or descendants `*:`, `**:` and `[&_p]:` select, or the
- * content `before:` generates. A component of the same module is followed through its props:
+ * subtree, because it composites everything under the element, which is how the data-stream
+ * texture's `opacity-10` wrapper dimmed digits one element down until #111. A colour stops where
+ * a descendant always sets its own, and SVG text takes `fill` rather than `color`, so a decorative
+ * SVG can keep a dimmed `currentColor`, as the section progress corners do. A class a variant aims
+ * elsewhere reaches what it aims at: the children or descendants `*:`, `**:` and `[&_p]:` select,
+ * or the content `before:` generates. A component of the same module is followed through its props:
  * `<Label tone={DIM} />` dims whatever `Label` puts `tone` on. Class and style props are the
  * exception, because they land on the `<Label>` element itself and are judged there.
  *
@@ -97,8 +98,8 @@ describe('what the scan flags', () => {
 
   it.each<[string, string, (string | [string, Verdict])[]]>([
     [
-      "CodeLine's gutter as it was before #110",
-      `export function CodeLine({ lineNumber }: { lineNumber?: number }) {
+      "a code line's gutter as it was before #110",
+      `export function GutterLine({ lineNumber }: { lineNumber?: number }) {
         return (
           <div className="group flex">
             {lineNumber !== undefined && (
@@ -219,13 +220,15 @@ describe('what the scan flags', () => {
       );`,
       ['group-hover:opacity-50'],
     ],
+    // The inner class is a declared animation that moves rather than dims, so the scan judges it
+    // from its keyframes (the texture's own animate-scroll-up went with it in #47's slice 47l).
     [
-      "an opacity on an ancestor of the text, as DataStream's wrapper had until #111",
-      `export function DataStream({ className = '' }: { className?: string }) {
+      "an opacity on an ancestor of the text, as the data-stream texture's wrapper had until #111",
+      `export function Stream({ className = '' }: { className?: string }) {
         const lines = '0101';
         return (
           <div className={\`pointer-events-none absolute inset-0 opacity-10 \${className}\`}>
-            <div className="animate-scroll-up font-mono">{lines}</div>
+            <div className="animate-shimmer font-mono">{lines}</div>
           </div>
         );
       }`,
@@ -316,7 +319,7 @@ describe('what the scan flags', () => {
       ],
     ],
     [
-      'a pulse on text, as StatDisplay had when highlighted until #111',
+      'a pulse on text, as the highlighted stat had until #111',
       `export function Stat({ value, highlight }: { value: string; highlight?: boolean }) {
         return (
           <span
@@ -841,8 +844,8 @@ describe('what the scan leaves alone', () => {
       ['opacity-100', 'opacity-50'],
     ],
     [
-      "shapes inside an SVG beside text that is not dimmed, as HexBadge's polygons are",
-      `export function HexBadge({ children }: { children: React.ReactNode }) {
+      "shapes inside an SVG beside text that is not dimmed, as the hex badge's polygons were",
+      `export function Badge({ children }: { children: React.ReactNode }) {
         return (
           <div className="relative inline-flex">
             <svg viewBox="0 0 100 100" className="h-16 w-16 text-[var(--accent)]">
@@ -1237,7 +1240,7 @@ describe('what the scan leaves alone', () => {
       "paints for a bar, a graph's edges or a border side, whose last word says whose they are",
       `export const Charts = () => (
         <div className="font-mono">
-          <ProgressBar barColor="rgba(99,102,241,0.3)" value={40} />
+          <Meter barColor="rgba(99,102,241,0.3)" value={40} />
           <Graph edgeOpacity={0.4} />
           <Toggle borderTopColor="rgba(0,0,0,0.5)" ringOffsetColor="rgba(0,0,0,0.5)" />
         </div>
@@ -1402,18 +1405,29 @@ describe('how an animation is judged', () => {
     expect(judge(css, utility)).toBe(dims);
   });
 
-  // A new dimming animation fails this: check where it is used, then add it here.
-  it("finds that only pulse and ping dim, among Tailwind's animations and globals.css's", () => {
+  // A new dimming animation fails this: check where it is used, then add it here. The four hero and
+  // caret classes (slice 47g of #47) carry the keyframes the story used to write inline, and each
+  // runs on a text-free, aria-hidden element: the hero glow, the scroll dot, the status dot and the
+  // Execution caret. `shimmer` is the declared, non-dimming animation the ancestor-opacity fixture
+  // above relies on.
+  it("finds which of Tailwind's animations and globals.css's dim", () => {
     const names = [...vocabulary.animations.keys()];
     expect(names).toEqual(
-      expect.arrayContaining(['spin', 'bounce', 'fade-in', 'blink', 'highlight-scan']),
+      expect.arrayContaining(['spin', 'bounce', 'fade-in', 'blink', 'highlight-scan', 'shimmer']),
     );
     const dimming = names.filter((name) =>
       (vocabulary.animations.get(name) ?? []).some((shorthand) =>
         animationDims(shorthand, vocabulary.keyframes),
       ),
     );
-    expect(dimming.toSorted()).toEqual(['ping', 'pulse']);
+    expect(dimming.toSorted()).toEqual([
+      'caret-pulse',
+      'hero-breathe',
+      'hero-scroll-bounce',
+      'hero-status-pulse',
+      'ping',
+      'pulse',
+    ]);
   });
 });
 
@@ -1459,10 +1473,11 @@ interface KnownDefect {
  * The violations present when this guard landed. Each is an expected failure until the change that
  * fixes it deletes the entry, which it has to: an expected failure that passes fails the run. Adding
  * an entry ships a known defect on purpose, so it names what fixes it. #47 is the hero task of the
- * audit remediation epic (.claude/epics/audit-remediation-2026-09/47.md): R12 and R13 are its
- * expected-failure rows in e2e/hero-contrast.spec.ts, and hero-2 its finding. DIM1, the glitch
- * variant's two copies at `opacity-70` (critic-8), was fixed with R17 by #47's slice 47d; ids are
- * not reused.
+ * audit remediation epic (.claude/epics/audit-remediation-2026-09/47.md). DIM1, the glitch
+ * variant's two copies at `opacity-70` (critic-8), was fixed with R17 by #47's slice 47d; DIM3 and
+ * DIM4, the hero skill tags and the Scroll label (hero-2), with R12 and R13 in
+ * e2e/hero-contrast.spec.ts by slice 47c; DIM6, CircuitBackground's SVG labels, by slice 47l, which
+ * deleted the component (hero-6). Ids are not reused.
  */
 const KNOWN_DEFECTS: KnownDefect[] = [
   {
@@ -1475,24 +1490,6 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     why: 'the SVG <text> node labels of the diagram behind the featured work sit at 40% (60% dark), and at 0.3 of that under a hovered card',
   },
   {
-    id: 'DIM3',
-    file: 'src/components/animated-hero/hero-content.tsx',
-    component: 'SkillTags',
-    tokens: ['text-[rgba(99,102,241,0.7)]', 'dark:text-[rgba(167,139,250,0.6)]'],
-    sites: 2,
-    fixedBy: 'R12, R13, #47',
-    why: 'the hero skill tags paint an accent at 0.7 alpha, 0.6 in the dark theme (hero-2)',
-  },
-  {
-    id: 'DIM4',
-    file: 'src/components/animated-hero/hero-section.tsx',
-    component: 'HeroSection',
-    tokens: ['style.color'],
-    sites: 1,
-    fixedBy: 'R13, #47',
-    why: 'the Scroll label under the hero, painted inline at 0.7 alpha (hero-2)',
-  },
-  {
     id: 'DIM5',
     file: 'src/components/animated-hero/tmux-background.tsx',
     component: 'StaticPane',
@@ -1501,22 +1498,14 @@ const KNOWN_DEFECTS: KnownDefect[] = [
     fixedBy: 'unassigned',
     why: 'the log lines of the tmux background take the --log-* colours, 0.35 to 0.55 alpha; the animated panes set the same colours from script, which the scan cannot see',
   },
-  {
-    id: 'DIM6',
-    file: 'src/components/animated-hero/circuit-background.tsx',
-    component: 'CircuitBackground',
-    tokens: ['fill={…}'],
-    sites: 1,
-    fixedBy: '#47',
-    why: 'SVG <text> labels filled at 0.7, 0.5 and 0.35 alpha; #47 deletes the component',
-  },
 ];
 
 /**
- * Dimmed classes the text rule allows because nothing under them renders text: the three sites this
- * guard was written to leave alone. Pinned with their counts to show the scan reaching and judging
- * them rather than missing them. A <text> added under one turns it into a finding, and the change
- * that deletes one of these components (#47 deletes HexBadge) deletes its row.
+ * Dimmed classes the text rule allows because nothing under them renders text: the sites this guard
+ * was written to leave alone, less the hex badge's polygons, which went with the component (#47,
+ * slice 47l). Pinned with their counts to show the scan reaching and judging them rather than
+ * missing them. A <text> added under one turns it into a finding, and the change that deletes one
+ * of these components deletes its row.
  */
 const DECORATIVE = [
   {
@@ -1531,20 +1520,6 @@ const DECORATIVE = [
     component: 'CornerBrackets',
     element: 'svg',
     token: 'opacity-50',
-    count: 1,
-  },
-  {
-    file: 'src/components/animated-hero/hud-elements.tsx',
-    component: 'HexBadge',
-    element: 'polygon',
-    token: 'opacity-50',
-    count: 1,
-  },
-  {
-    file: 'src/components/animated-hero/hud-elements.tsx',
-    component: 'HexBadge',
-    element: 'polygon',
-    token: 'opacity-10',
     count: 1,
   },
 ];

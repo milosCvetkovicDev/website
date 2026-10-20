@@ -1,36 +1,37 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { isAlreadyReached, runWithGsap } from './load-gsap';
 import { Terminal, HudPanel, ActivityEntry } from './hud-elements';
 import { AnimatedText } from './animated-text';
 import { usePrefersReducedMotion } from '@/hooks/use-prefers-reduced-motion';
-import { storyClosings } from '@/data/pages/home';
+import { useStoryVisibility } from '@/hooks/use-story-visibility';
+import { storyClosings, storyTitles } from '@/data/pages/home';
 
 /** The code sample, one span per entry; exported so the served-story test counts the same lines. */
 export const codeLines = [
-  { type: 'keyword', content: 'export class', delay: 0 },
-  { type: 'class', content: ' ErrorAnalyzer ', delay: 0.1 },
-  { type: 'punctuation', content: '{', delay: 0.15 },
-  { type: 'newline', content: '', delay: 0.2 },
-  { type: 'keyword', content: '  async ', delay: 0.3 },
-  { type: 'function', content: 'analyze', delay: 0.35 },
-  { type: 'punctuation', content: '(error: Error) {', delay: 0.4 },
-  { type: 'newline', content: '', delay: 0.45 },
-  { type: 'keyword', content: '    const ', delay: 0.55 },
-  { type: 'variable', content: 'context ', delay: 0.6 },
-  { type: 'operator', content: '= ', delay: 0.65 },
-  { type: 'keyword', content: 'await ', delay: 0.7 },
-  { type: 'function', content: 'this.getCodeContext', delay: 0.75 },
-  { type: 'punctuation', content: '();', delay: 0.8 },
-  { type: 'newline', content: '', delay: 0.85 },
-  { type: 'keyword', content: '    return ', delay: 0.95 },
-  { type: 'function', content: 'this.claude.diagnose', delay: 1.0 },
-  { type: 'punctuation', content: '(error, context);', delay: 1.05 },
-  { type: 'newline', content: '', delay: 1.1 },
-  { type: 'punctuation', content: '  }', delay: 1.2 },
-  { type: 'newline', content: '', delay: 1.25 },
-  { type: 'punctuation', content: '}', delay: 1.3 },
+  { type: 'keyword', content: 'export class' },
+  { type: 'class', content: ' ErrorAnalyzer ' },
+  { type: 'punctuation', content: '{' },
+  { type: 'newline', content: '' },
+  { type: 'keyword', content: '  async ' },
+  { type: 'function', content: 'analyze' },
+  { type: 'punctuation', content: '(error: Error) {' },
+  { type: 'newline', content: '' },
+  { type: 'keyword', content: '    const ' },
+  { type: 'variable', content: 'context ' },
+  { type: 'operator', content: '= ' },
+  { type: 'keyword', content: 'await ' },
+  { type: 'function', content: 'this.getCodeContext' },
+  { type: 'punctuation', content: '();' },
+  { type: 'newline', content: '' },
+  { type: 'keyword', content: '    return ' },
+  { type: 'function', content: 'this.claude.diagnose' },
+  { type: 'punctuation', content: '(error, context);' },
+  { type: 'newline', content: '' },
+  { type: 'punctuation', content: '  }' },
+  { type: 'newline', content: '' },
+  { type: 'punctuation', content: '}' },
 ];
 
 const activities = [
@@ -81,6 +82,9 @@ const AnimatedProgressBar = ({
 
 export function ExecutionPhase() {
   const sectionRef = useRef<HTMLDivElement>(null);
+  // Pauses the section's endless CSS animations while it is out of view (globals.css).
+  useStoryVisibility(sectionRef);
+  const titleId = useId();
   const codeRef = useRef<HTMLDivElement>(null);
   const statsRef = useRef<HTMLDivElement>(null);
   const activityRef = useRef<HTMLDivElement>(null);
@@ -131,6 +135,8 @@ export function ExecutionPhase() {
     // after it reverts. A build that finds the section already in view finishes the entrance at
     // once rather than hide what the visitor is reading (isAlreadyReached). If GSAP never arrives,
     // the section renders its finished state, as under reduced motion.
+    // Every element the entrance hides carries data-story-reveal, which a print shows in full
+    // (the @media print rule in globals.css).
     let ctx: gsap.Context | undefined;
     const cancelBuild = runWithGsap(
       ({ gsap }) => {
@@ -288,22 +294,25 @@ export function ExecutionPhase() {
   return (
     <section
       ref={sectionRef}
+      aria-labelledby={titleId}
       className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 sm:py-24"
     >
       <div className="w-full max-w-5xl">
-        {/* Phase Header */}
-        <div className="mb-8 flex items-center gap-3">
+        {/* Phase Header: the section's heading and its name, ahead of the panels. The space keeps
+            "PHASE 3" and the title apart in that name (a flex row lays it out as nothing), and
+            `story-phases.test.tsx` holds the name. */}
+        <h2 id={titleId} className="mb-8 flex items-center gap-3">
           <span className="rounded-full bg-[var(--accent)]/20 px-3 py-1 font-mono text-xs text-[var(--accent-text)]">
-            <AnimatedText animation="glitch">PHASE 3</AnimatedText>
-          </span>
+            <AnimatedText animation="glitch">{storyTitles.execution.phase}</AnimatedText>
+          </span>{' '}
           <AnimatedText animation="stagger-up" className="font-mono text-sm text-[var(--muted)]">
-            EXECUTION
+            {storyTitles.execution.title}
           </AnimatedText>
-        </div>
+        </h2>
 
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           {/* Code Streaming */}
-          <div ref={codeRef}>
+          <div ref={codeRef} data-story-reveal="">
             <Terminal className="h-full">
               {/* Scrolls sideways on a phone rather than widening the page, so it is a named
                   region the keyboard can reach and scroll. */}
@@ -320,6 +329,7 @@ export function ExecutionPhase() {
                       ref={(el) => {
                         codeSpansRef.current[i] = el;
                       }}
+                      data-story-reveal=""
                       className={getTokenColor(line.type)}
                       style={{
                         opacity: codeLinesShown ? 1 : 0,
@@ -331,18 +341,18 @@ export function ExecutionPhase() {
                   ))}
                 </code>
                 {/* After the code rather than inside it: the caret is no line of the sample,
-                    and its pulse animates opacity for ever. */}
+                    and its pulse animates opacity for ever, paused while the section is out of
+                    view (globals.css). */}
                 <span
                   aria-hidden="true"
-                  className="ml-0.5 inline-block h-4 w-2 bg-[var(--accent)]"
-                  style={{ animation: 'pulse 1s ease-in-out infinite' }}
+                  className="animate-caret-pulse ml-0.5 inline-block h-4 w-2 bg-[var(--accent)]"
                 />
               </pre>
             </Terminal>
           </div>
 
           {/* Stats HUD - using refs for direct DOM manipulation */}
-          <div ref={statsRef} className="space-y-4">
+          <div ref={statsRef} data-story-reveal="" className="space-y-4">
             <HudPanel title="BUILD STATS">
               <div className="space-y-4">
                 <AnimatedProgressBar
@@ -375,6 +385,7 @@ export function ExecutionPhase() {
             {/* Combo Counter */}
             <div
               ref={comboRef}
+              data-story-reveal=""
               className="flex items-center justify-center gap-2 rounded-lg border border-[var(--status-warn)]/30 bg-[var(--status-warn)]/10 p-4"
             >
               <span ref={comboCountRef} className="text-3xl font-bold text-[var(--status-warn)]">
@@ -386,7 +397,7 @@ export function ExecutionPhase() {
         </div>
 
         {/* Activity Feed */}
-        <div ref={activityRef} className="mt-8">
+        <div ref={activityRef} data-story-reveal="" className="mt-8">
           <HudPanel title="ACTIVITY LOG">
             <div className="grid gap-2 md:grid-cols-2">
               {activities.map((activity, i) => (
@@ -400,10 +411,10 @@ export function ExecutionPhase() {
         </div>
 
         {/* Headline */}
-        <div ref={headlineRef} className="mt-16 text-center">
-          <h2 className="mb-3 text-2xl font-bold md:text-4xl">
+        <div ref={headlineRef} data-story-reveal="" className="mt-16 text-center">
+          <h3 className="mb-3 text-2xl font-bold md:text-4xl">
             <AnimatedText animation="scatter">{storyClosings.execution.heading}</AnimatedText>
-          </h2>
+          </h3>
           <p className="text-lg text-[var(--muted)]">
             <AnimatedText animation="blur-reveal">
               {storyClosings.execution.paragraphs[0]}

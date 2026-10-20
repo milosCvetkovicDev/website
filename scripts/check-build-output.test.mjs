@@ -41,12 +41,20 @@ const APP_ROUTES = {
   '/about/page': '/about',
   '/robots.txt/route': '/robots.txt',
   '/opengraph-image/route': '/opengraph-image',
-  '/llms.txt/route': '/llms.txt',
   '/case-studies.json/route': '/case-studies.json',
+  '/feed.xml/route': '/feed.xml',
+  '/llms.txt/route': '/llms.txt',
   '/work/[slug]/page': '/work/[slug]',
   '/work/[slug]/og-image.png/route': '/work/[slug]/og-image.png',
   '/work/[slug]/index.json/route': '/work/[slug]/index.json',
 };
+
+/**
+ * `APP_ROUTES` with the site's one server function, the MCP server's `POST` handler (#62), as a
+ * build of this repository lists it: an app route with no prerendered path. The command checks
+ * against the real `ALLOWED_FUNCTIONS`, so the trees it is handed carry it.
+ */
+const BUILT_ROUTES = { ...APP_ROUTES, '/mcp/route': '/mcp' };
 
 /**
  * One `routes` entry of `prerender-manifest.json`, with the fields the gate reads.
@@ -92,8 +100,9 @@ const cleanPrerender = () => ({
     '/about': prerendered('/about'),
     '/robots.txt': prerendered('/robots.txt'),
     '/opengraph-image': prerendered('/opengraph-image'),
-    '/llms.txt': prerendered('/llms.txt'),
     '/case-studies.json': prerendered('/case-studies.json'),
+    '/feed.xml': prerendered('/feed.xml'),
+    '/llms.txt': prerendered('/llms.txt'),
     '/work/a': prerendered('/work/[slug]'),
     '/work/b': prerendered('/work/[slug]'),
     '/work/a/og-image.png': prerendered('/work/[slug]/og-image.png'),
@@ -115,8 +124,9 @@ const CLEAN_BODIES = [
   'about.html',
   'robots.txt.body',
   'opengraph-image.body',
-  'llms.txt.body',
   'case-studies.json.body',
+  'feed.xml.body',
+  'llms.txt.body',
   'work/a.html',
   'work/b.html',
   'work/a/og-image.png.body',
@@ -164,15 +174,12 @@ function without(route) {
     if ((entry.srcRoute ?? path) === route) delete prerender.routes[path];
   }
   delete prerender.dynamicRoutes[route];
-  /** @type {Record<string, RegExp>} */
-  const bodiesOf = {
-    '/llms.txt': /^llms\.txt\.body$/,
-    '/case-studies.json': /^case-studies\.json\.body$/,
-    '/work/[slug]/index.json': /\/index\.json\.body$/,
-  };
-  const gone = bodiesOf[route];
-  if (!gone) assert.fail(`without(): no body pattern for ${route}`);
-  return { appRoutes, prerender, bodies: CLEAN_BODIES.filter((b) => !gone.test(b)) };
+  // A static handler's one body is its path plus `.body`; the dynamic one's are every slug's.
+  const gone = (/** @type {string} */ body) =>
+    route === '/work/[slug]/index.json'
+      ? body.endsWith('/index.json.body')
+      : body === `${route.slice(1)}.body`;
+  return { appRoutes, prerender, bodies: CLEAN_BODIES.filter((b) => !gone(b)) };
 }
 
 describe('bodyFile', () => {
@@ -182,6 +189,7 @@ describe('bodyFile', () => {
     ['/work/a', 'page', 'work/a.html'],
     ['/robots.txt', 'route', 'robots.txt.body'],
     ['/work/a/og-image.png', 'route', 'work/a/og-image.png.body'],
+    ['/feed.xml', 'route', 'feed.xml.body'],
     ['/index.md', 'route', 'index.md.body'],
     ['/about/index.md', 'route', 'about/index.md.body'],
     ['/llms.txt', 'route', 'llms.txt.body'],
@@ -362,8 +370,9 @@ describe('collectProblems', () => {
   });
 
   for (const [route, body] of [
-    ['/llms.txt', 'llms.txt.body'],
     ['/case-studies.json', 'case-studies.json.body'],
+    ['/feed.xml', 'feed.xml.body'],
+    ['/llms.txt', 'llms.txt.body'],
   ]) {
     it(`fails the required ${route} built without force-static once, as a function`, () => {
       // Its `route.ts` without the `dynamic` export: in the app manifest, not prerendered. The
@@ -377,7 +386,7 @@ describe('collectProblems', () => {
     });
   }
 
-  for (const route of ['/llms.txt', '/case-studies.json', '/work/[slug]/index.json']) {
+  for (const route of ['/case-studies.json', '/feed.xml', '/llms.txt', '/work/[slug]/index.json']) {
     it(`fails a build without the required ${route}, naming it`, () => {
       const { problems } = check(without(route));
       assert.equal(problems.length, 1);
@@ -521,6 +530,35 @@ describe('collectProblems', () => {
     assert.match(problems[0], /^\/mcp: .*ALLOWED_FUNCTIONS/);
   });
 
+  it('passes the site as built, with ALLOWED_FUNCTIONS, reporting /mcp as its one function', () => {
+    const { problems, functions } = check({ appRoutes: BUILT_ROUTES, allowed: ALLOWED_FUNCTIONS });
+    assert.deepEqual(problems, []);
+    assert.deepEqual(functions, ['/mcp']);
+  });
+
+  it('fails a second function beside /mcp under ALLOWED_FUNCTIONS, naming only the second', () => {
+    const { problems, functions } = check({
+      appRoutes: { ...BUILT_ROUTES, '/llms-full.txt/route': '/llms-full.txt' },
+      allowed: ALLOWED_FUNCTIONS,
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/llms-full\.txt: .*function/);
+    assert.deepEqual(functions, ['/mcp']);
+  });
+
+  it('fails a page that became a function beside /mcp under ALLOWED_FUNCTIONS', () => {
+    const prerender = cleanPrerender();
+    delete prerender.routes['/about'];
+    const { problems } = check({
+      appRoutes: BUILT_ROUTES,
+      prerender,
+      bodies: CLEAN_BODIES.filter((b) => b !== 'about.html'),
+      allowed: ALLOWED_FUNCTIONS,
+    });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/about: is not prerendered/);
+  });
+
   it('fails a route that revalidates every 0 s too', () => {
     const prerender = cleanPrerender();
     prerender.routes['/about'] = prerendered('/about', { initialRevalidateSeconds: 0 });
@@ -591,6 +629,43 @@ describe('collectProblems', () => {
   });
 });
 
+describe('the Atom feed (#61)', () => {
+  // `app/feed.xml/route.ts` as `next build` writes it, part of the clean tree above: a static
+  // handler whose body is `server/app/feed.xml.body`, prerendered even with no post published (an
+  // empty feed). It is in REQUIRED_ROUTES, so a build without it fails with the other required
+  // routes in `collectProblems`.
+  const withoutBody = CLEAN_BODIES.filter((b) => b !== 'feed.xml.body');
+
+  it('passes the feed prerendered with its body', () => {
+    // The clean tree carries the feed as a build writes it: a route handler, one static path whose
+    // source route is itself, and that path's body.
+    assert.equal(APP_ROUTES['/feed.xml/route'], '/feed.xml');
+    assert.deepEqual(cleanPrerender().routes['/feed.xml'], prerendered('/feed.xml'));
+    assert.ok(CLEAN_BODIES.includes('feed.xml.body'));
+    const result = check();
+    assert.deepEqual(result.problems, []);
+    assert.equal(result.bodies, CLEAN_BODIES.length);
+  });
+
+  it('fails the feed without its body, naming server/app/feed.xml.body', () => {
+    const { problems } = check({ bodies: withoutBody });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/feed\.xml \(\/feed\.xml\): .*server\/app\/feed\.xml\.body/);
+  });
+
+  it('fails the feed built without force-static once, as a function', () => {
+    // The handler without `export const dynamic = 'force-static'`: in the app manifest, never
+    // prerendered, so no body either. The function finding names it, and being required adds no
+    // second one. The feed must not be on the allowlist (#62 adds only /mcp).
+    const prerender = cleanPrerender();
+    delete prerender.routes['/feed.xml'];
+    const { problems } = check({ prerender, bodies: withoutBody });
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /^\/feed\.xml: .*function.*force-static/);
+    assert.equal(ALLOWED_FUNCTIONS.includes('/feed.xml'), false);
+  });
+});
+
 describe('collectOtherFunctions', () => {
   it('passes the four manifests of a function-free build', () => {
     assert.deepEqual(otherFunctions(), []);
@@ -656,8 +731,8 @@ describe('collectOtherFunctions', () => {
 });
 
 describe('ALLOWED_FUNCTIONS', () => {
-  it('is empty: nothing in this site needs a server function until #62 adds /mcp', () => {
-    assert.deepEqual([...ALLOWED_FUNCTIONS], []);
+  it('is exactly /mcp, the MCP server (#62): the one route on this site that runs per request', () => {
+    assert.deepEqual([...ALLOWED_FUNCTIONS], ['/mcp']);
   });
 });
 
@@ -677,10 +752,10 @@ describe('paramsSibling', () => {
 });
 
 describe('REQUIRED_ROUTES', () => {
-  it('names /llms.txt and the case-study JSON #60 serves, and no function', () => {
+  it('names /llms.txt and the case-study JSON #60 serves and the feed #61 serves, and no function', () => {
     assert.deepEqual(
       [...REQUIRED_ROUTES],
-      ['/llms.txt', '/case-studies.json', '/work/[slug]/index.json'],
+      ['/case-studies.json', '/feed.xml', '/llms.txt', '/work/[slug]/index.json'],
     );
     assert.deepEqual(
       REQUIRED_ROUTES.filter((route) => ALLOWED_FUNCTIONS.includes(route)),
@@ -702,7 +777,7 @@ describe('REQUIRED_ROUTES', () => {
  *   a string is written as the file's text as it is, and `null` leaves the file out
  */
 function writeTree({
-  appRoutes = APP_ROUTES,
+  appRoutes = BUILT_ROUTES,
   prerender = cleanPrerender(),
   other = {},
   buildId = 'test-build-id',
@@ -763,7 +838,7 @@ describe('the command', () => {
     withTree({}, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 0, result.stderr);
-      assert.match(result.stdout, /10 routes, 13 prerendered bodies, no server function/);
+      assert.match(result.stdout, /12 routes, 14 prerendered bodies, server functions: \/mcp /);
       assert.match(result.stdout, /\(BUILD_ID test-build-id, written \d{4}-\d\d-\d\dT[\d:.]+Z\)/);
     });
   });
@@ -785,19 +860,58 @@ describe('the command', () => {
     });
   });
 
-  it('exits 1 on an unlisted function, naming the route', () => {
-    withTree({ appRoutes: { ...APP_ROUTES, '/llms-full.txt/route': '/llms-full.txt' } }, (dist) => {
+  it('exits 1 on a second function beside /mcp, naming only the second', () => {
+    // #62's AC 10: the allowlist is one entry long, so a handler that forgot `force-static` fails
+    // the build even though a function is now allowed.
+    withTree(
+      { appRoutes: { ...BUILT_ROUTES, '/llms-full.txt/route': '/llms-full.txt' } },
+      (dist) => {
+        const result = run([dist]);
+        assert.equal(result.status, 1);
+        const problems = result.stderr.split('\n').filter((line) => line.startsWith('  - '));
+        assert.equal(problems.length, 1, result.stderr);
+        assert.match(problems[0], /^ {2}- \/llms-full\.txt: .*function/);
+      },
+    );
+  });
+
+  it('exits 1 when a page route quietly became a function beside /mcp', () => {
+    const prerender = cleanPrerender();
+    delete prerender.routes['/about'];
+    const bodies = CLEAN_BODIES.filter((b) => b !== 'about.html');
+    withTree({ prerender, bodies }, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 1);
-      assert.match(result.stderr, /\/llms-full\.txt/);
+      assert.match(result.stderr, /\/about: is not prerendered/);
+      assert.doesNotMatch(result.stderr, /- \/mcp/);
+    });
+  });
+
+  it('exits 1 on a function Next configured for a route other than /mcp', () => {
+    const functionsConfig = { version: 1, functions: { '/mcp': {}, '/about': {} } };
+    withTree({ other: { functionsConfig } }, (dist) => {
+      const result = run([dist]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /\/about: Next configured it/);
+      assert.doesNotMatch(result.stderr, /- \/mcp/);
+    });
+  });
+
+  it('exits 1 when the build has no /mcp, since the allowlist must be exact', () => {
+    withTree({ appRoutes: APP_ROUTES }, (dist) => {
+      const result = run([dist]);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /\/mcp: is in ALLOWED_FUNCTIONS but the build has no such route/);
     });
   });
 
   it('exits 1 when a required route is gone, naming it', () => {
-    withTree(without('/work/[slug]/index.json'), (dist) => {
+    const tree = without('/work/[slug]/index.json');
+    withTree({ ...tree, appRoutes: { ...tree.appRoutes, '/mcp/route': '/mcp' } }, (dist) => {
       const result = run([dist]);
       assert.equal(result.status, 1);
       assert.match(result.stderr, /\/work\/\[slug\]\/index\.json: is in REQUIRED_ROUTES/);
+      assert.doesNotMatch(result.stderr, /- \/mcp/);
     });
   });
 

@@ -12,40 +12,44 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "content-dates:update": "CONTENT_DATES_UPDATE=1 vitest run src/data/__tests__/content-dates.test.tsx -u",
     "test:e2e": "playwright test",
     "clean": "rm -rf .next .next-e2e .turbo coverage node_modules"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "^2.2.0",
     "@vercel/analytics": "^2.0.1",
     "gsap": "^3.14.2",
-    "next": "16.3.6",
+    "mcp-handler": "^2.2.0",
+    "next": "16.3.8",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.58.2",
     "@repo/prettier-config": "workspace:*",
     "@tailwindcss/postcss": "^4",
-    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.1.1",
-    "@vitest/coverage-v8": "5.0.2",
+    "@vitest/coverage-v8": "5.0.3",
     "eslint": "^9.39.5",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.3.8",
     "jsdom": "^30.0.1",
-    "lighthouse": "13.4.1",
-    "schema-dts": "2.0.0",
+    "lighthouse": "13.5.0",
+    "schema-dts": "2.1.0",
     "tailwindcss": "^4",
     "typescript": "^6",
     "vite": "^8.3.1",
     "vitest": "^5.0.0"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,mjs,cjs}": [
+    "*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}": [
       "eslint --fix --max-warnings 0 --no-warn-ignored",
       "prettier --write"
     ],

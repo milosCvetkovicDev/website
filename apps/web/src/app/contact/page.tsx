@@ -1,6 +1,8 @@
 import type { ReactElement } from 'react';
 import Link from 'next/link';
+import { RUN_IN_TERMINAL, connectorSnippets } from '@/data/mcp-server';
 import { contactCopy, contactRecord, socialLinks, type SocialLinkName } from '@/data/pages/contact';
+import { WebPageJsonLd } from '@/components/json-ld';
 import { buildMetadata } from '@/lib/metadata';
 
 export const metadata = buildMetadata({
@@ -32,12 +34,18 @@ const icons: Record<SocialLinkName, ReactElement> = {
 export default function ContactPage() {
   return (
     <div className="py-16 md:py-24">
+      <WebPageJsonLd path={contactRecord.path} name={contactRecord.title} />
       <div className="mx-auto max-w-3xl px-6">
         {/* Header */}
         <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
           {contactCopy.eyebrow}
         </p>
-        <h1 className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">Let&apos;s connect.</h1>
+        {/* The h1 names the person and what the page offers; the hook under it stays the largest
+            line (#58). */}
+        <h1 className="mb-3 text-lg leading-snug font-semibold text-balance md:text-xl">
+          {contactRecord.heading}
+        </h1>
+        <p className="mb-4 text-3xl font-bold md:text-4xl lg:text-5xl">Let&apos;s connect.</p>
         <p className="mb-12 text-xl text-[var(--muted)]">{contactCopy.intro}</p>
 
         {/* Social links */}
@@ -98,6 +106,49 @@ export default function ContactPage() {
               />
             </svg>
           </Link>
+        </section>
+
+        {/* Connect an agent: plain text to copy, so no client JavaScript. Each snippet scrolls
+            sideways inside its own box rather than widening the page, so it is a region named by
+            its caption that the keyboard can reach and scroll, as the hero's code panel is. */}
+        <section className="mt-16">
+          <h2 className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
+            {contactCopy.agents.heading}
+          </h2>
+          <p className="mb-4 break-words text-[var(--muted)]">
+            {contactCopy.agents.intro}{' '}
+            <code className="font-mono">{contactCopy.agents.endpoint}</code>
+          </p>
+          <p className="mb-8 text-[var(--muted)]">{contactCopy.agents.paste}</p>
+          <div className="space-y-6">
+            {connectorSnippets.map(({ client, files, code }, index) => {
+              // The index keeps the ids distinct whatever the clients are called.
+              const captionId = `connector-snippet-${index}`;
+              return (
+                <div key={client}>
+                  <p id={captionId} className="mb-2 text-sm">
+                    <span className="font-semibold">{client}</span>{' '}
+                    <span aria-hidden="true" className="text-[var(--muted)]">
+                      ·
+                    </span>{' '}
+                    {files.length > 0 ? (
+                      <span className="font-mono text-[var(--muted)]">{files.join(' or ')}</span>
+                    ) : (
+                      <span className="text-[var(--muted)]">{RUN_IN_TERMINAL}</span>
+                    )}
+                  </p>
+                  <pre
+                    tabIndex={0}
+                    role="region"
+                    aria-labelledby={captionId}
+                    className="focus-ring overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 font-mono text-xs leading-relaxed sm:text-sm"
+                  >
+                    <code>{code}</code>
+                  </pre>
+                </div>
+              );
+            })}
+          </div>
         </section>
       </div>
     </div>

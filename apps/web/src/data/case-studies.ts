@@ -1,12 +1,33 @@
-import { formatContentDate } from '@/lib/content-date';
+// Relative, not `@/lib/...`: `next.config.ts` imports this module to derive the routes that
+// negotiate a Markdown twin, and Next's config loader turns an `@/` import into `./src/...`, a path
+// that is right only beside the config, so the alias fails here (`src/test/next-config.test.ts`
+// loads the config through that loader to catch it).
+import { formatContentDate } from '../lib/content-date';
 import { OWNER_TODO } from './owner-todo';
+import type { Table } from './pages/types';
 
-export interface CaseStudyMetric {
+/**
+ * A figure as a card prints it: the number, how it is written, and what it counts. `formatMetric`
+ * and `MetricCounter` take this shape, so a count-up or a test fixture needs no basis.
+ */
+export interface CaseStudyFigure {
   value: number;
   label: string;
   prefix?: string;
   suffix?: string;
   decimals?: number;
+}
+
+/** A study's headline figure, with what makes it checkable. */
+export interface CaseStudyMetric extends CaseStudyFigure {
+  /**
+   * One line, a sentence: what the figure counted, against what baseline (#49). The case-study
+   * page prints it under the figure, and its Markdown twin on the line after the figure, each as
+   * the start of `formatMetricScope()`'s sentence (#58). When and how it was measured is the
+   * study's `metricDefinition`, not this. `featured-projects.ts` drops it before the home page's
+   * client cards, which print no basis, so it is not serialised into that payload.
+   */
+  basis: string;
 }
 
 /** Short facts shown on project cards (home page and /work). One source, so they cannot contradict. */
@@ -23,7 +44,7 @@ export interface CaseStudyHighlight {
  * 0..20, inside the 0..100 that toFixed accepts, so a data edit cannot throw during server
  * rendering.
  */
-export function formatMetric(metric: CaseStudyMetric): string {
+export function formatMetric(metric: CaseStudyFigure): string {
   if (!Number.isFinite(metric.value)) return '—';
   const decimals = Math.min(20, Math.max(0, Math.trunc(metric.decimals ?? 0)));
   return `${metric.prefix ?? ''}${metric.value.toFixed(decimals)}${metric.suffix ?? ''}`;
@@ -94,11 +115,15 @@ function measuredSentences(definition: MetricDefinition): string | null {
 
 /**
  * The one sentence that says what a headline figure is a fraction of, over what period and how it
- * was measured: the metric's `basis` (#49; `null` until it exists), then the window, then the
- * method. It is the single producer of that sentence, so a page renders it and a serialiser writes
- * it rather than joining the parts again. Nothing renders it yet: #58 puts it on the case-study page
- * and in its Markdown twin together. It takes the basis as a parameter rather than reading
- * `CaseStudyMetric`, so it depends on nothing about that interface's shape.
+ * was measured: the metric's `basis` (#49), then the window, then the method. It is the single
+ * producer of that sentence, so a page renders it and a serialiser writes it rather than joining
+ * the parts again: the case-study page's metric panel prints it under the figure, and its Markdown
+ * twin writes it on the `- Basis:` line (#58), each *instead of* the basis alone, never beside it,
+ * or the basis would print twice; `e2e/case-study.spec.ts` and `lib/__tests__/serialise.test.ts`
+ * each fail on a second copy. While a study's definition is still the owner's placeholder, the
+ * sentence is the basis alone, so both read as they did before #58. It takes the basis as a
+ * parameter rather than reading `CaseStudyMetric`, so it depends on nothing about that interface's
+ * shape.
  *
  * Total, and never a half-built string: the basis alone, on one line, while the definition cannot be
  * stated, `null` when there is neither, and never a placeholder marker, an empty part, a line break
@@ -112,6 +137,26 @@ export function formatMetricScope(
   const measured = measuredSentences(definition);
   if (measured === null) return statedBasis;
   return statedBasis === null ? measured : `${asSentence(statedBasis)} ${measured}`;
+}
+
+/**
+ * A study's metric scope as its page's metric panel prints it and its twin's `- Basis:` line writes
+ * it: `formatMetricScope()`'s sentence of the study's basis and definition. The page and the twin
+ * both read it here, so they cannot treat a missing scope differently. A study's sentence must open
+ * with its basis, what the figure counted, so a basis with nothing statable in it throws, naming
+ * the study, even when the window and method could be stated: the prerender of the page and of the
+ * twin fails rather than serve a headline figure that says when it was measured but not what it
+ * counted. `data/__tests__/case-studies.test.ts` fails such a data edit first.
+ */
+export function caseStudyMetricScope({ slug, highlight, metricDefinition }: CaseStudy): string {
+  const { basis } = highlight.metric;
+  const scope = formatMetricScope(basis, metricDefinition);
+  if (scope === null || formatMetricScope(basis, { state: OWNER_TODO }) === null) {
+    throw new Error(
+      `caseStudyMetricScope(${slug}): the headline figure has no basis to state, so it cannot say what it counted`,
+    );
+  }
+  return scope;
 }
 
 export interface CaseStudy {
@@ -143,8 +188,10 @@ export interface CaseStudy {
   }[];
   /**
    * When the case study first went public and when its visible content last changed, as ISO dates
-   * (`YYYY-MM-DD`). The sitemap's `lastmod` and the TechArticle's dates read them, so bump
-   * `updatedAt` in the commit that changes what the page says, and only then.
+   * (`YYYY-MM-DD`). The page's visible Published and Updated line, the TechArticle's dates and the
+   * sitemap's `lastmod` read them, so bump `updatedAt` in the commit that changes what the page
+   * says, and only then. A commit that changes either the copy or a date regenerates
+   * `content-dates.json` (`pnpm --filter web content-dates:update`), or `pnpm test` fails.
    */
   publishedAt: string;
   updatedAt: string;
@@ -152,11 +199,13 @@ export interface CaseStudy {
 
 // Every study went public with the site's first production deployment, on 2026-09-09
 // (docs/runbooks/deploy.md:14-18); acacce0 had written them on 2026-01-27. UPDATED_AT is the day
-// the self-healing agent's study moved to the past tense and the enterprise study's claims were
-// aligned with the public record. Every study page shows that change, in its own copy or in the
-// neighbour descriptions of its "More work" block.
+// every study page's tech stack became a captioned table, its layers and technologies under column
+// headers (#58), dated the day it is expected to merge. The change before it, on 2026-10-01, gave
+// every study page its metric panel, the headline figure with its label and basis (#49), which also
+// relabelled the self-healing agent's figure; on 2026-09-25 that study moved to the past tense and
+// the enterprise study's claims were aligned with the public record.
 const PUBLISHED_AT = '2026-09-09';
-const UPDATED_AT = '2026-09-25';
+const UPDATED_AT = '2026-10-03';
 
 export const caseStudies: CaseStudy[] = [
   {
@@ -166,7 +215,13 @@ export const caseStudies: CaseStudy[] = [
     highlight: {
       category: 'AI AGENT',
       status: 'RETIRED',
-      metric: { value: 73, suffix: '%', label: 'faster resolution' },
+      metric: {
+        value: 73,
+        suffix: '%',
+        label: 'errors resolved autonomously',
+        basis:
+          'Production errors the agent diagnosed and fixed in a pull request the team merged, out of all the production errors it monitored.',
+      },
     },
     metricDefinition: { state: OWNER_TODO },
     title: 'Self-Healing Agent',
@@ -217,7 +272,13 @@ export const caseStudies: CaseStudy[] = [
     highlight: {
       category: 'PLATFORM',
       status: 'PRODUCTION',
-      metric: { value: 40, suffix: '%', label: 'less complexity' },
+      metric: {
+        value: 40,
+        suffix: '%',
+        label: 'less complexity',
+        basis:
+          'Complexity of the codebase after its module-by-module move to Clean Architecture, against the legacy codebase before it.',
+      },
     },
     metricDefinition: { state: OWNER_TODO },
     title: 'Enterprise B2B Platform',
@@ -275,7 +336,13 @@ export const caseStudies: CaseStudy[] = [
     highlight: {
       category: 'DEVOPS',
       status: 'PRODUCTION',
-      metric: { value: 5, suffix: '×', label: 'faster builds' },
+      metric: {
+        value: 5,
+        suffix: '×',
+        label: 'faster builds',
+        basis:
+          'CI build time with the remote cache, against the same pipelines rebuilding the entire monorepo on every run.',
+      },
     },
     metricDefinition: { state: OWNER_TODO },
     title: 'Nx Remote Cache Server',
@@ -319,6 +386,26 @@ export const caseStudies: CaseStudy[] = [
     ],
   },
 ];
+
+/**
+ * A case study's page title, `<title> — <tagline>`: the route's head and its WebPage node both name
+ * it so, and the JSON-LD tests build the served name from here rather than restating the format.
+ */
+export function caseStudyPageTitle(caseStudy: CaseStudy): string {
+  return `${caseStudy.title} — ${caseStudy.tagline}`;
+}
+
+/**
+ * A case study's tech stack as the table its page renders and its twin writes (#58): one row per
+ * layer, its technologies listed in the row.
+ */
+export function techStackTable(caseStudy: CaseStudy): Table {
+  return {
+    caption: `Tech stack for ${caseStudy.title}`,
+    columns: ['Layer', 'Technologies'],
+    rows: caseStudy.techStack.map(({ category, items }) => [category, items]),
+  };
+}
 
 export function getCaseStudy(slug: string): CaseStudy | undefined {
   return caseStudies.find((cs) => cs.slug === slug);

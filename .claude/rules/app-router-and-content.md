@@ -32,10 +32,18 @@ never reaches a page that declares its own `openGraph`. The route handlers:
 - `work/[slug]/og-image.png/route.ts` draws the case-study card, whose alt text has to name the
   study, which an `opengraph-image` file's single `alt` cannot; the page points og:image at it
   through `buildMetadata()`'s `image`.
+- `blog/[slug]/og-image.png/route.ts` draws the post card the same way, under the `Writing`
+  eyebrow, with its own `generateStaticParams` over `publishedPosts` and `dynamicParams = false`,
+  so a draft has no card as it has no page (#61). The post page, its card and its twin
+  (`blog/[slug]/index.md/route.ts`, 61e) take their list from `postStaticParams()` in
+  `src/lib/post-static-params.ts`, which adds one placeholder slug under `next dev` while no post is
+  published: the dev server enforces `dynamicParams = false` only for a non-empty list, and without
+  it every `/blog/<slug>` page served Next's recovery shell (ADR 0015) and every card answered 500.
 - The Markdown twins (#59): an `index.md/route.ts` in each static route's folder
-  (`app/index.md/route.ts` for `/`), and `work/[slug]/index.md/route.ts` for the case studies, with
-  its own `generateStaticParams` and `dynamicParams = false`. Each is three lines that hand a record
-  from `pages` in `src/data/pages/index.ts`, or a study, to the serialiser below.
+  (`app/index.md/route.ts` for `/`), `work/[slug]/index.md/route.ts` for the case studies and
+  `blog/[slug]/index.md/route.ts` for the published posts (61e), the two dynamic ones each with its
+  own `generateStaticParams` and `dynamicParams = false`. Each is three lines that hand a record
+  from `pages` in `src/data/pages/index.ts`, a study or a post, to the serialiser below.
 - The case studies as JSON (#60), `application/json` and outside `/api/` on purpose:
   `case-studies.json/route.ts` serves every study as one array at `/case-studies.json`, and
   `work/[slug]/index.json/route.ts` one study at `/work/<slug>/index.json`, with its own
@@ -56,10 +64,49 @@ never reaches a page that declares its own `openGraph`. The route handlers:
   (`LLMS_TXT_OWNER_COPY`): until they are filled the served file takes the home record's summary as
   its blockquote and leaves out each fact paragraph still unfilled, and the prerender fails if a
   marker survives anywhere else, a metric value is not finite, or the body reaches
-  `LLMS_TXT_MAX_BYTES`. The root layout's head carries one `<link rel="describedby">` to its absolute URL, on
-  every route, the 404 included. `lib/__tests__/llms-txt.test.ts` checks the shape of both the
-  served and the owner-draft compositions, every twin, figure and listed route, and that the file
-  stays under 10240 bytes. There is no `/llms-full.txt` (ADR 0017 refuses it).
+  `LLMS_TXT_MAX_BYTES`. The root layout's head carries one `<link rel="describedby">` to its
+  absolute URL, on every route, the 404 included. `lib/__tests__/llms-txt.test.ts` checks the shape
+  of both the served and the owner-draft compositions, every twin, figure and listed route, and
+  that the file stays under 10240 bytes. There is no `/llms-full.txt` (ADR 0017 refuses it).
+- `feed.xml/route.ts` serves the Atom feed of `publishedPosts` (#61) as
+  `application/atom+xml; charset=utf-8`, written by `buildAtomFeed()` in `src/lib/atom.ts`: entries
+  newest first with the summary only, links absolute on the site's origin, ids on the fixed
+  `https://miloscvetkovic.dev` whatever the origin (RFC 4287 ids never change), an author name and
+  URI and no address, and `updated` the later of the latest post update and `/blog`'s date in
+  `static-routes.ts`, never the clock: bump `/blog`'s date when a post is unpublished. `/blog`'s
+  sitemap `lastmod` differs on purpose: it is the later of the same date and the posts'
+  `publishedAt`, because each feed entry carries its post's `updated`, a date `/blog` does not
+  show. It builds with no post published too, as a feed with no entries.
+  `app/__tests__/feed.test.ts` parses it with a real XML parser, and `e2e/feed.spec.ts` checks it
+  as served.
+- The MCP server (#62), `mcp/route.ts`: `POST` only, a stateless, read-only server on protocol
+  revision 2026-07-28 built with `mcp-handler`, whose three tools in `mcp/tools.ts`
+  (`search_case_studies`, `get_case_study`, `get_tech_stack`) return the same serialiser's JSON. It
+  refuses a present `Origin` with 403 unless it is the canonical one, or the request's own on
+  Vercel or on a loopback host (never a DNS-rebound name), and logs nothing.
+  `mcp/__tests__/tools.test.ts` and `route.test.ts` call its `POST`, and `e2e/mcp.spec.ts` the
+  served route; `/mcp` is kept out of `e2e/routes.ts`, whose walks GET every route.
+  `data/mcp-server.ts` builds the published URL from `absoluteUrl()` and the three copy-paste
+  connector snippets that `/contact` renders and the README carries between its
+  `connector-snippets` markers; `mcp/__tests__/connector-snippets.test.ts` fails when the README
+  copy differs or its `MCP_PATH` differs from `MCP` in `e2e/endpoints.ts`.
+
+A post's twin is written by `postToMarkdown()`: the opening, the dates, the body, then `---` and the
+kind's `FOOTER_LINES` when it has any (`own` has none). `/blog`'s twin is written by
+`blogToMarkdown()`, which lists the published posts once there are any. The post format an approved
+draft must follow, and the publish check (`scripts/post-draft-check.mjs`) that compares the draft
+with the served twin, are in `docs/plans/2026-10-06-blog-publishing-design.md`. That document is the
+contract the writing room's publish mode reads (its D7, under ADR 0034). A change to how a post
+block is written there must keep `src/lib/__tests__/post-draft.test.ts` green. The check's `--kind`
+is the kind the writing room's tracker gives the article (the design's D2), never read back from
+`posts.ts`, with D4's naming check in `posts.test.ts` as the backstop for a Jev post marked `own`;
+the dates are not compared, because D9 sets them.
+
+A post table of three or more columns stacks each row below 640px and hides its column names from
+sight (`DataTable`, #226), so each value says what it is by its unit or a word ("1,234 tokens",
+"420 ms"), or the table keeps to two columns, which never stack. `posts.test.ts` refuses a blank
+cell there, but only whoever approves the draft can check the rest (`TableBlock` in
+`src/data/posts.ts`).
 
 `buildMetadata()` advertises the twin of every route that calls it as
 `alternates.types['text/markdown']`, at the path `markdownTwinPath()` in `src/lib/pathname.ts`
@@ -67,21 +114,36 @@ derives from the canonical's (a module with no imports, which the e2e helpers re
 folder with a `page.tsx` needs an `index.md/route.ts` beside it: `data/__tests__/pages.test.ts`
 fails one without, fails a static route without a record, and calls every handler to check it
 serves exactly the serialiser's output, statically. `e2e/markdown-twins.spec.ts` checks the served
-twins against the served pages. The sitemap lists no twin.
+twins against the served pages. The sitemap lists no twin. The page's own URL also answers with
+its twin when the request's `Accept` lists `text/markdown` (not at `q=0`), through one rewrite
+per route in `next.config.ts` (the rules and their limits are in `deploy-and-next-config.md`), so
+a route added here needs its twin for the rewrite as well: `src/test/next-config.test.ts` fails
+when the negotiated routes and the twin handlers differ. `src/data/static-routes.ts`,
+`src/data/case-studies.ts`, `src/data/posts.ts`, `src/lib/pathname.ts` and every module they import
+are loaded by `next.config.ts` and must import by relative path, never `@/`, or `next build` fails.
+The pattern, `force-static` included, is recorded in
+`docs/adr/0030-generated-endpoints-as-static-route-handlers.md`. Once `hasPublishedPosts` is true,
+`buildMetadata()` also advertises the feed on every route, as
+`alternates.types['application/atom+xml']` at `FEED_PATH` from `src/lib/pathname.ts`, titled
+with the feed's own `FEED_TITLE` from `lib/metadata.ts`; until then no route links it, since an
+advertised feed with nothing in it helps no reader (ADR 0028).
 
-All of the route handlers prerender at build time, and `pnpm check:build-output` (a `quality` step,
-`ci-and-scripts.md`) fails when a route does not: a `GET` handler is dynamic unless it exports
-`dynamic = 'force-static'`, and without it builds as a server function, as a handler that exports
-any other method does even with it. The same check fails a `proxy.ts` and any `'use server'`
-action, and a build that lacks a route in its `REQUIRED_ROUTES` (`/llms.txt` and the JSON handlers
-above) or prerendered no path for one, or other slugs for `/work/[slug]/index.json` than for the
-page. `sitemap.ts`, `robots.ts`, `layout.tsx`, `components/json-ld.tsx` and `lib/serialise.ts` each
-read `NEXT_PUBLIC_SITE_URL`, falling back to `https://miloscvetkovic.dev`. There is no middleware.
-`src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies and the
-page records typed in `src/data/pages/types.ts`, and no route handler builds Markdown of its own
-(#59). It writes the case-study JSON and `/llms.txt` too, with `jsonResponse()` and
-`llmsTxtResponse()` as the one place that sets each content type (#60).
-`lib/__tests__/serialise.test.ts` fails when a file under `src/app` writes `text/markdown`.
+Every route handler but `/mcp` prerenders at build time. `/mcp` is the site's one server function,
+because a `POST` handler cannot be prerendered, and `pnpm check:build-output` (a `quality` step,
+`ci-and-scripts.md`) allows it and fails any other route that does not prerender: a `GET` handler
+is dynamic unless it exports `dynamic = 'force-static'`, and without it builds as a server function,
+as a handler that exports any other method does even with it. The same check fails a `proxy.ts` and
+any `'use server'` action, and a build that lacks a route in its `REQUIRED_ROUTES` (`/llms.txt`,
+the JSON handlers and the feed above) or prerendered no path for one, or other slugs for
+`/work/[slug]/index.json` than for the page. `sitemap.ts`, `robots.ts`, `layout.tsx`,
+`feed.xml/route.ts` and `lib/site-origin.ts` (for `lib/structured-data.ts` and `lib/serialise.ts`,
+which refuses a value that is not an http(s) origin) each read `NEXT_PUBLIC_SITE_URL`, falling back
+to `https://miloscvetkovic.dev`. There is no middleware.
+`src/lib/serialise.ts` is the one module that writes Markdown: it renders the case studies, the
+page records typed in `src/data/pages/types.ts`, the posts and `/blog`'s list of them, and no route
+handler builds Markdown of its own (#59). It writes the case-study JSON and `/llms.txt` too, with
+`jsonResponse()` and `llmsTxtResponse()` as the one place that sets each content type (#60). `lib/__tests__/serialise.test.ts` fails when a
+file under `src/app` writes `text/markdown`.
 The security headers come from one static `headers()` entry in `apps/web/next.config.ts` whose
 source, `/:path*`, matches every path, `/_next/static` assets and the 404s included:
 `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a Content-Security-Policy, a
@@ -102,6 +164,92 @@ fails when the served line and the TechArticle disagree. A date that is not a re
 or a pair updated before it was published, throws there and fails the prerender. "Not in the
 future" is a unit-test check against the live clock, not a build check, and it counts a day as
 begun once UTC+14 has reached it: an accepted tolerance of up to 14 hours against the UTC date.
+A static route that shows a "Last updated" line (today /about and /privacy) writes its day the
+same way, through `formatPageDate()` in the same module, with its stored `STATIC_ROUTE_UPDATED`
+value in `dateTime`, and a value that is not a real day throws there too. Every entry of
+`STATIC_ROUTE_UPDATED`, shown on its page or only sent as `lastmod`, is held to a real day on or
+before today by `src/data/__tests__/static-routes.test.ts`.
+
+`src/data/content-dates.json` pairs each route's content date with what it serves (#191): one line
+per static route (/blog's Coming Soon page included), case study and published post, holding its
+sitemap `lastmod` (/blog's own date while the sitemap leaves it out) and a fingerprint of its served
+text. `src/data/__tests__/content-dates.test.tsx` computes it and compares it with the file, so the
+commit that changes what a route says, or its date, regenerates it with
+`pnpm --filter web content-dates:update`, or `pnpm test` fails with the route's line in the diff.
+Served text is the page component's server render (no `script`, `style`, `template` or `time`,
+each block element a line of its own, whitespace collapsed) plus its Markdown twin, with the
+route's own dates masked in both forms: comments, types and formatting cannot move a fingerprint,
+and a date bump alone moves only `updated`, which a test proves by moving every content date forty
+days. So a `<time>` holds a date and nothing else, and an index page prints a listed entry's date
+only inside one. Only /blog, while no post is published, may be missing from the sitemap. The text
+is read on a pinned day and origin, so the years figure is fingerprinted as of that day, not as the
+live site prints it. `/` is rendered finished as well (reduced motion), since its server render
+leaves out the log events and deploy result the story reveals. Not covered: the layout's chrome, text in
+attributes (`alt`, `aria-label`) and strings shown only mid-animation (`Processing...`, the
+deploying label). The helper is `src/test/content-fingerprint.ts`. A conflicted manifest is
+regenerated, never merged by hand; adjacent routes' lines conflict too.
+
+`src/data/content-dates.json` pairs each route's content date with what it serves (#191): one line
+per static route (/blog's Coming Soon page included), case study and published post, holding its
+sitemap `lastmod` (/blog's own date while the sitemap leaves it out) and a fingerprint of its served
+text. `src/data/__tests__/content-dates.test.tsx` computes it and compares it with the file, so the
+commit that changes what a route says, or its date, regenerates it with
+`pnpm --filter web content-dates:update`, or `pnpm test` fails with the route's line in the diff.
+Served text is the page component's server render (no `script`, `style`, `template` or `time`,
+each block element a line of its own, whitespace collapsed) plus its Markdown twin, with the
+route's own dates masked in both forms: comments, types and formatting cannot move a fingerprint,
+and a date bump alone moves only `updated`, which a test proves by moving every content date forty
+days. So a `<time>` holds a date and nothing else, and an index page prints a listed entry's date
+only inside one. Only /blog, while no post is published, may be missing from the sitemap. The text
+is read on a pinned day and origin, so the years figure is fingerprinted as of that day, not as the
+live site prints it. `/` is rendered finished as well (reduced motion), since its server render
+leaves out the log events and deploy result the story reveals. Not covered: the layout's chrome, text in
+attributes (`alt`, `aria-label`) and strings shown only mid-animation (`Processing...`, the
+deploying label). The helper is `src/test/content-fingerprint.ts`. A conflicted manifest is
+regenerated, never merged by hand; adjacent routes' lines conflict too.
+
+On a pull request the `Content dates` workflow (ADR 0036, advisory) compares the file with the one
+at the merge base and fails a route whose `text` and `updated` did not move together, or whose
+`updated` moved backwards. A deliberate exception is a line in the pull request body,
+`Content-Date-Exception: <route> <reason>`, which the check lists. The three case studies share
+`UPDATED_AT`, so moving it for a change to one study needs an exception for each of the other two,
+or a date of its own for the study that changed.
+
+The JSON-LD is one graph joined by `@id` (#57, ADR 0031): `src/lib/structured-data.ts` builds the
+nodes as plain objects and `components/json-ld.tsx` renders each in its own block through
+`serializeJsonLd`, the one `JSON.stringify` there. The root layout renders the Person and the
+WebSite on every route, the 404 included; each static route, case study and post renders a
+`WebPageJsonLd` with the path and title it passes to `buildMetadata()`, except /about, whose
+`ProfilePageJsonLd` is dated with the day its "Last updated" line shows, and a case study adds its
+TechArticle and BreadcrumbList, as a post does with `PostWebPageJsonLd`, `PostArticleJsonLd` and
+`PostBreadcrumbJsonLd` (61f), which take its path and head title from `src/lib/post-page.ts`, as
+its `generateMetadata` does: the same types, no BlogPosting (#61), and no `description` or
+`keywords` on a post's article, because its page prints neither its summary nor its tags
+(`techArticle()` requires both keys, `undefined` leaving one out, and throws on an empty one).
+A node names another by `{ '@id': … }` alone. Each builder's object ends with
+`satisfies WithContext<T>` from schema-dts, each conditional spread's own object with
+`satisfies SpreadPredicates<…Leaf>` (no `@type` or `@id`) and each ListItem with
+`satisfies ListItem` (57c), so a misspelled predicate fails `pnpm typecheck`;
+`lib/__tests__/structured-data-types.test.ts` keeps schema-dts catching each kind and fails on a
+`satisfies` removed from the module. A new route
+renders its page node, and `components/__tests__/json-ld.test.tsx` and `e2e/seo-surface.spec.ts`
+pin each route's types; with no post published, the e2e graph test reports how many post routes it
+covered in an annotation.
+
+The Person asserts only what a page shows (57b):
+
+- Sources: its place and certification come from `data/profile.ts`, which /about's record reads
+  too; its occupation (`hasOccupation`, `jobTitle` and the description's opening) from the same
+  module, which the /work, /skills and /contact eyebrows read; its profiles and handle from
+  `data/social.ts`.
+- The check: the Person describe at the end of `e2e/seo-surface.spec.ts` fails on any string in it
+  that no page's body text shows as a whole word, on any description clause but the years that no
+  page shows, and on a profile no page renders as a link.
+- Exempt by path in its `NOT_PAGE_TEXT`, each checked another way: `@id`, `url`, `sameAs`,
+  `alternateName`, `description`, `hasCredential.credentialCategory` and `mainEntityOfPage.@id`;
+  `@context` and `@type` are vocabulary at any depth.
+- Its `mainEntityOfPage` names /about's ProfilePage, the one reference both graph tests let resolve
+  on another route.
 
 ## Owner placeholders
 

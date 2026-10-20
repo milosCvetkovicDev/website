@@ -1,28 +1,36 @@
 import { caseStudies, formatMetric } from '@/data/case-studies';
+import { OCCUPATION } from '@/data/profile';
 import { social } from '@/data/social';
+import { productionFigure } from '@/data/work-stats';
 import type { InlineLink, PageRecord, ProseSection } from './types';
 
 /**
  * /work: the copy `app/work/page.tsx` renders around its cards, and the record its Markdown twin
  * reads (#59). The cards themselves read `caseStudies`, and so does the record, so neither restates
- * a study's title, description or metric. The `h1` stays in the page.
+ * a study's title, description or metric. The page renders its `h1` from the record's `heading`
+ * (#58); the hook under it stays in the page.
  */
 
-/** A figure in the stats bar and the label under it. */
+/**
+ * A figure in the stats bar and the label under it, which the page renders as two elements: the
+ * figure large, the label small and uppercase. Keep them apart rather than one string.
+ */
 export interface WorkStat {
   value: string;
   label: string;
 }
 
-/** The copy the page renders around its `h1` and its cards, in page order. */
+/** The copy the page renders around its `h1`, the hook under it and its cards, in page order. */
 export const workCopy = {
-  eyebrow: 'Case studies · Milos Cvetkovic, Senior Full-Stack Engineer',
+  eyebrow: `Case studies · Milos Cvetkovic, ${OCCUPATION}`,
   intro:
     'Real projects with real constraints: AI agents, legacy modernization and developer tooling. Each one pushed boundaries—and delivered results.',
+  // Both figures are counted from `caseStudies` when the page is built, never written down (#58).
+  // The bar once claimed 100% in production, which went false when a study was retired, and a count
+  // of projects left unfinished with no denominator, which stays out until the owner supplies one.
   stats: [
     { value: String(caseStudies.length), label: 'Projects' },
-    { value: '100%', label: 'In Production' },
-    { value: '0', label: 'Left Unfinished' },
+    { value: productionFigure(caseStudies), label: 'Running in production' },
   ],
   /** The line at the foot of every card, which the whole card links from. */
   readMore: 'Read full case study',
@@ -61,6 +69,7 @@ const studies = caseStudies.map(
 export const workRecord: PageRecord = {
   path: '/work',
   title: 'Work — AI agents & legacy modernization',
+  heading: 'Case studies: AI agents, legacy modernization, and build infrastructure',
   summary:
     'Real projects, real constraints, real results. Case studies on AI agents, legacy modernization, and high-performance systems.',
   sections: [

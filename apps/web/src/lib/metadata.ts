@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
+import { hasPublishedPosts } from '@/data/posts';
 import { social } from '@/data/social';
 import { OG_CONTENT_TYPE, OG_SIZE } from './og-image';
-import { assertPathname, markdownTwinPath } from './pathname';
+import { assertPathname, FEED_PATH, markdownTwinPath } from './pathname';
 
 /**
  * The per-route half of the head. The root layout keeps only what is true of every response, the
@@ -14,6 +15,12 @@ import { assertPathname, markdownTwinPath } from './pathname';
  */
 
 export const SITE_NAME = 'Milos Cvetkovic';
+/**
+ * The Atom feed's title (#61): the site's name, then the blog's, as `/blog`'s heading names it. The
+ * feed's own `<title>` and the `title` of the link that advertises it, so a reader that lists the
+ * feeds a page offers shows the same name the feed gives itself.
+ */
+export const FEED_TITLE = `${SITE_NAME} — Writing`;
 /** The Twitter card's `creator`: the X profile's handle from `data/social.ts`, after an `@`. */
 export const TWITTER_HANDLE = `@${social.x.handle}`;
 
@@ -56,7 +63,18 @@ export function buildMetadata({
     // The canonical, and the route's Markdown twin as `<link rel="alternate" type="text/markdown">`,
     // which is how an agent reading the HTML finds it (#59). Both come from `path`, so they cannot
     // name different routes; `e2e/markdown-twins.spec.ts` fails a route whose twin is not served.
-    alternates: { canonical: path, types: { 'text/markdown': markdownTwinPath(path) } },
+    // Then the Atom feed, the same on every route, once a post is published (#61): `/feed.xml` is
+    // served either way, but an advertised feed with nothing in it helps no reader (ADR 0028). Here
+    // rather than in the layout, whose `alternates` every page's would replace.
+    alternates: {
+      canonical: path,
+      types: {
+        'text/markdown': markdownTwinPath(path),
+        ...(hasPublishedPosts && {
+          'application/atom+xml': [{ url: FEED_PATH, title: FEED_TITLE }],
+        }),
+      },
+    },
     openGraph: {
       type,
       url: path,

@@ -1,8 +1,8 @@
 /**
- * The pure half of `e2e/structured-data.spec.ts`: finding the ld+json elements in a served document,
- * and deciding whether validator.schema.org's answer is a verdict. No network and no Playwright, so
- * `src/test/schema-validator.test.ts` pins every branch that decides whether the advisory check can
- * fail, the way `src/test/playwright-config.test.ts` pins the config's parsing.
+ * The pure half of `e2e/structured-data.spec.ts`: deciding whether validator.schema.org's answer is
+ * a verdict (`support/json-ld.ts` finds the ld+json elements it posts). No network and no
+ * Playwright, so `src/test/schema-validator.test.ts` pins every branch that decides whether the
+ * advisory check can fail, the way `src/test/playwright-config.test.ts` pins the config's parsing.
  */
 
 /** What the validator prefixes every JSON answer with, so that the answer cannot run as a script. */
@@ -18,8 +18,9 @@ export interface ValidatorReport {
   totalNumWarnings?: number;
   /**
    * The top-level entities it read, not the blocks: a node another one names by `@id` is read as part
-   * of it. 1 for the two blocks on `/`, whose WebSite names the Person as its author, and 2 for the
-   * four on a case study, measured 2026-09-28.
+   * of it, so the count moves when the graph's references do. `ROUTES` in
+   * `e2e/structured-data.spec.ts` pins it per route, says when it was measured and how its numbers
+   * follow from the graph, and `objectCountProblem` compares against them.
    */
   numObjects?: number;
   fetchError?: string;
@@ -27,31 +28,6 @@ export interface ValidatorReport {
 }
 
 export type Verdict = { reached: true; report: ValidatorReport } | { reached: false; why: string };
-
-/** Every ld+json script element, whatever the order and quoting of its attributes. */
-const LD_JSON_ELEMENT =
-  /<script\b[^>]*\btype\s*=\s*["']?application\/ld\+json["']?[^>]*>[\s\S]*?<\/script>/gi;
-
-/**
- * Every ld+json script element in a served document, verbatim. A pattern is enough here: the blocks
- * are written through `serializeJsonLd`, which escapes every `<`, so none can contain `</script>`;
- * and Next's flight payload further down describes each one as a React element in escaped JSON
- * (`\"type\":\"application/ld+json\"`), which is not inside a script tag, so nothing is sent twice.
- */
-export function jsonLdScripts(html: string): string[] {
-  return [...html.matchAll(LD_JSON_ELEMENT)].map(([element]) => element);
-}
-
-/**
- * The script open tags that mention `application/ld+json` anywhere in their attributes, counted
- * independently of `jsonLdScripts`, so a block the element pattern misses is a count mismatch the
- * spec fails on rather than a block that silently never reaches the validator.
- */
-export function jsonLdOpenTagCount(html: string): number {
-  return [...html.matchAll(/<script\b[^>]*>/gi)].filter(([tag]) =>
-    /application\/ld\+json/i.test(tag),
-  ).length;
-}
 
 /**
  * Up to `max` characters of text from a third party, safe to print: every control character (the
@@ -120,6 +96,33 @@ export function readVerdict(status: number, body: string): Verdict {
     return { reached: false, why: `it read no object (numObjects ${numObjects ?? 'none'})` };
   }
   return { reached: true, report: report as ValidatorReport };
+}
+
+/**
+ * Why a verdict read another number of objects than the route's graph has, or null when it read
+ * exactly `expected` (the owner's comment on #57). A clean verdict can still be a partial read, and
+ * the error count alone passes it. The count catches a read that changes the number of top-level
+ * objects, not every one: a block whose loss leaves the count where it was goes unseen (what each
+ * route's count rests on is in `ROUTES` in `e2e/structured-data.spec.ts`). The count is the
+ * validator's own, so a change in how it counts fails too, and the message says to re-measure
+ * either way. An `expected` that is no count of objects is a typo in the spec, and throws.
+ */
+export function objectCountProblem(
+  expected: number,
+  { numObjects }: ValidatorReport,
+): string | null {
+  if (!Number.isInteger(expected) || expected < 1) {
+    throw new Error(`objectCountProblem: ${expected} is not a count of objects to expect`);
+  }
+  if (numObjects === expected) return null;
+  const read =
+    numObjects === undefined
+      ? 'gave no object count'
+      : `read ${numObjects} object${numObjects === 1 ? '' : 's'}`;
+  return (
+    `validator.schema.org ${read}, and ${expected} ${expected === 1 ? 'is' : 'are'} expected: ` +
+    'a block went unread, or the graph changed: re-measure and update the expected count'
+  );
 }
 
 /** The errors a report lists, as `errorType(args)`, read defensively: the shape is undocumented. */

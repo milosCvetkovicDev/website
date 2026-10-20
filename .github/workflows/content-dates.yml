@@ -1,0 +1,72 @@
+name: Content dates
+
+# Checks that a pull request moves each route's content date with its served text (#191, ADR 0036).
+# scripts/check-content-dates.mjs compares apps/web/src/data/content-dates.json at the head with the
+# file at the merge base, and fails a route whose text moved without its date, whose date moved
+# without its text, or whose date moved backwards, unless a `Content-Date-Exception: <route>
+# <reason>` line in the pull request body excuses it. Every exception is listed in the job's log.
+#
+# A workflow of its own, for two reasons. Adding an exception to the body is an `edited` event, and
+# that re-runs this alone rather than the build and the e2e suite, as commitlint.yml does for a
+# retitle. And ADR 0021's check that the required contexts agree with the job names reads every job
+# in ci.yml and commitlint.yml as required, while this one is advisory until the owner makes it
+# required (ADR 0036), so it cannot sit in either file.
+#
+# It trusts the manifest at the head. The required `quality` job keeps that file true: its unit
+# tests fail when the manifest disagrees with what the routes render. It also runs the pull
+# request's own copy of the script, as ci.yml runs the pull request's own tests: a pull request
+# that edits the script or this file is read as any change to CI is (ADR 0036).
+#
+# GitHub runs no `pull_request` workflow while the pull request conflicts with its base, so the
+# check is absent, not failing, until the conflict is resolved.
+#
+# No push trigger and no `workflow_dispatch`: neither has a pull request body or a merge base.
+
+on:
+  pull_request:
+    # `edited` is how an exception is added to or taken out of the body. It also fires for a retitle
+    # or a base change, and a re-run costs seconds.
+    types: [opened, edited, synchronize, reopened]
+
+# PRs: cancel superseded runs, as commitlint.yml does. The expression keeps a push from ever being
+# cancelled should the workflow gain a push trigger.
+concurrency:
+  group: content-dates-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Not a required check (ADR 0036). Making it one follows ADR 0021's order for adding a context, in
+  # a record that supersedes ADR 0021, whose agreement check reads only ci.yml and commitlint.yml.
+  content-dates:
+    name: Content dates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge base can be any distance back, so the whole history has to be there, and with
+          # it every branch, the base branch's current tip included.
+          fetch-depth: 0
+          # The token is not needed after the fetch, and the job runs code from the pull request.
+          persist-credentials: false
+
+      - name: Set up Node (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Compare each route's content date with its served text
+        # The body is attacker-controlled input: the script reads it from the event payload, so it
+        # is never interpolated into the script, and an environment variable's 128 KiB cap cannot
+        # fail the step. The base is the base branch as just fetched, because the payload's base
+        # SHA can lag it: a head that has merged newer base commits would be charged with their
+        # changes. The branch name and the head SHA come through the environment. The script uses
+        # Node built-ins only, so nothing is installed.
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-content-dates.mjs --base "origin/$BASE_REF" --head "$HEAD_SHA" --event "$GITHUB_EVENT_PATH"

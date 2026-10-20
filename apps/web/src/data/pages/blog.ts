@@ -2,8 +2,8 @@ import type { PageRecord, ProseSection } from './types';
 
 /**
  * /blog while it is a Coming Soon placeholder: the copy `app/blog/page.tsx` renders, and the record
- * its Markdown twin reads (#59). The `h1` stays in the page. When the first post ships, #61's post
- * model replaces the placeholder section here.
+ * its Markdown twin reads (#59), `h1` included: the page renders the record's `heading` (#58). When
+ * the first post ships, #61's post model replaces the placeholder section here.
  */
 
 /** The placeholder card: its heading and its one paragraph, rendered by the page as they are. */
@@ -24,6 +24,7 @@ export const blogCopy = {
 export const blogRecord: PageRecord = {
   path: '/blog',
   title: 'Writing',
+  heading: 'Writing',
   summary:
     'Hard-won lessons on AI agents, legacy rescue, and building systems that scale. No fluff, no hype—just what actually works.',
   sections: [comingSoon],

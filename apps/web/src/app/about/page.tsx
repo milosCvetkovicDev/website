@@ -3,11 +3,16 @@ import {
   aboutRecord,
   beliefs,
   credentials,
-  facts,
-  timeline,
+  factsTable,
+  questions,
+  timelineTable,
   type StoryParagraph,
 } from '@/data/pages/about';
+import { ProfilePageJsonLd } from '@/components/json-ld';
+import { DataTable } from '@/components/data-table';
+import { formatPageDate } from '@/lib/content-date';
 import { buildMetadata } from '@/lib/metadata';
+import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
 
 export const metadata = buildMetadata({
   title: aboutRecord.title,
@@ -36,17 +41,26 @@ function StoryText({ paragraph }: { paragraph: StoryParagraph }) {
 }
 
 export default function AboutPage() {
+  // One date for the visible line and the ProfilePage's dateModified, which may not assert a date the
+  // page does not show; it is also the sitemap's lastmod for /about.
+  const updated = STATIC_ROUTE_UPDATED['/about'];
   return (
     <div className="py-16 md:py-24">
+      <ProfilePageJsonLd path={aboutRecord.path} dateModified={updated} />
       <div className="mx-auto max-w-3xl px-6">
         {/* Hook */}
         <div className="mb-16">
           <p className="mb-4 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {aboutCopy.eyebrow}
           </p>
-          <h1 className="mb-6 text-3xl leading-tight font-bold md:text-4xl lg:text-5xl">
-            I fix the systems everyone else gave up on.
+          {/* The h1 names the person and the subject; the hook under it stays the largest line
+              (#58). */}
+          <h1 className="mb-3 text-lg leading-snug font-semibold text-balance md:text-xl">
+            {aboutRecord.heading}
           </h1>
+          <p className="mb-6 text-3xl leading-tight font-bold md:text-4xl lg:text-5xl">
+            I fix the systems everyone else gave up on.
+          </p>
           <p className="text-xl leading-relaxed text-[var(--muted)]">{aboutCopy.lede}</p>
         </div>
 
@@ -64,52 +78,29 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Quick facts */}
-        <section className="mb-20">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {facts.map((fact) => (
-              <div
-                key={fact.label}
-                className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-4 text-center"
-              >
-                <div className="mb-1 text-2xl font-bold text-[var(--accent-text)]">
-                  {fact.value}
-                </div>
-                <div className="text-xs tracking-wider text-[var(--muted)] uppercase">
-                  {fact.label}
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Questions a visitor asks: each heading's next element is its whole answer (#58) */}
+        <section className="mb-20 space-y-12">
+          {questions.map(({ question, answer }) => (
+            <div key={question}>
+              <h2 className="mb-4 text-2xl font-bold">{question}</h2>
+              <p className="text-lg leading-relaxed">{answer}</p>
+            </div>
+          ))}
         </section>
 
-        {/* Timeline with story */}
+        {/* Quick facts. The heading is for screen readers: without it the table would sit under the
+            last question in the heading outline (#58). */}
+        <section className="mb-20">
+          <h2 className="sr-only">{aboutCopy.factsHeading}</h2>
+          <DataTable {...factsTable} />
+        </section>
+
+        {/* Timeline with story, as a table (#58): on a phone each entry stacks into a block. */}
         <section className="mb-20">
           <h2 className="mb-8 font-mono text-sm tracking-wider text-[var(--accent-text)] uppercase">
             {aboutCopy.timelineHeading}
           </h2>
-          <div className="space-y-12">
-            {timeline.map((item) => (
-              <div key={item.year} className="relative">
-                {/* Year badge */}
-                <div className="mb-3 flex items-center gap-4">
-                  <span className="rounded-full bg-[var(--accent)]/10 px-3 py-1 font-mono text-sm font-bold text-[var(--accent-text)]">
-                    {item.year}
-                  </span>
-                  <span className="text-sm text-[var(--muted)]">{item.company}</span>
-                </div>
-
-                {/* Content */}
-                <div className="border-l-0 border-[var(--border)] pl-0 md:border-l-2 md:pl-4">
-                  <h3 className="mb-2 text-xl font-semibold">{item.role}</h3>
-                  <p className="mb-3 text-sm font-medium text-[var(--accent-text)] italic">
-                    &quot;{item.highlight}&quot;
-                  </p>
-                  <p className="leading-relaxed text-[var(--muted)]">{item.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <DataTable {...timelineTable} />
         </section>
 
         {/* Beliefs */}
@@ -124,7 +115,10 @@ export default function AboutPage() {
                 className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 transition-colors hover:border-[var(--accent)]/50"
               >
                 <div className="flex items-start gap-4">
-                  <span className="text-2xl">{belief.icon}</span>
+                  {/* Decoration: the title beside it says what it means, so it is not read out. */}
+                  <span aria-hidden="true" className="text-2xl">
+                    {belief.icon}
+                  </span>
                   <div>
                     <h3 className="mb-2 font-semibold">{belief.title}</h3>
                     <p className="leading-relaxed text-[var(--muted)]">{belief.description}</p>
@@ -146,7 +140,10 @@ export default function AboutPage() {
                 key={credential.text}
                 className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-4 py-2"
               >
-                <span className="text-sm">{`${credential.icon} ${credential.text}`}</span>
+                {/* The icon in a span of its own, hidden from screen readers; the text still reads. */}
+                <span className="text-sm">
+                  <span aria-hidden="true">{credential.icon}</span> {credential.text}
+                </span>
               </div>
             ))}
           </div>
@@ -184,6 +181,12 @@ export default function AboutPage() {
             ))}
           </div>
         </section>
+
+        {/* The line stays in the page with its date, as on /privacy: the stored day in dateTime,
+            written out as the case studies write theirs. */}
+        <p className="mt-12 text-sm text-[var(--muted)]">
+          Last updated <time dateTime={updated}>{formatPageDate(aboutRecord.path, updated)}</time>.
+        </p>
       </div>
     </div>
   );

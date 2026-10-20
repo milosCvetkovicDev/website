@@ -1,16 +1,15 @@
 import { caseStudies } from '../src/data/case-studies';
 import { markdownTwinPath } from '../src/lib/pathname';
-import { STATIC_ROUTES, caseStudyRoute } from './routes';
+import { POST_ROUTES, STATIC_ROUTES, caseStudyRoute } from './routes';
 
 /**
  * The one manifest of the machine-readable paths this site serves, or is about to.
  *
  * Every path an agent-facing endpoint answers on is written here once, and the specs and tasks that
  * build or test one import it rather than restating it: #59 (the Markdown twins), #60 (`/llms.txt`
- * and the JSON representation), #61 (the Atom feed) and #62 (the MCP server). The twins,
- * `/llms.txt` and the case-study JSON are served; the rest are not yet. `machine-readable.spec.ts`
- * holds one expected failure per endpoint not yet served, and the task that ships an endpoint
- * deletes its annotation in the same change.
+ * and the JSON representation), #61 (the Atom feed) and #62 (the MCP server), and all of them are
+ * served. `machine-readable.spec.ts` would hold one expected failure per endpoint listed here before
+ * it ships, and the task that ships an endpoint deletes its annotation in the same change.
  *
  * The page routes come from `routes.ts`, so a new static route or case study gets a twin row without
  * touching this file.
@@ -50,13 +49,14 @@ export const CASE_STUDY_ENDPOINTS = caseStudies.map(({ slug }) => ({
 }));
 
 /**
- * Every page route with its twin: the static routes and every case study, not the 404. `/privacy`
- * and `/blog` included: every route that goes through `buildMetadata()` advertises a twin, so every
- * one serves one (#59).
+ * Every page route with its twin: the static routes, every case study and every published post, not
+ * the 404. `/privacy` and `/blog` included: every route that goes through `buildMetadata()`
+ * advertises a twin, so every one serves one (#59).
  */
 export const MARKDOWN_TWINS = [
   ...STATIC_ROUTES.map((route) => ({ route, twin: markdownTwinPath(route) })),
   ...CASE_STUDY_ENDPOINTS.map(({ route, twin }) => ({ route, twin })),
+  ...POST_ROUTES.map((route) => ({ route, twin: markdownTwinPath(route) })),
 ];
 
 /**
@@ -72,7 +72,10 @@ export const LLMS_TXT = '/llms.txt';
  */
 export const CASE_STUDIES_JSON = '/case-studies.json';
 
-/** The Atom feed of the blog's published posts (#61). */
+/**
+ * The Atom feed of the blog's published posts (#61), served by `src/app/feed.xml/route.ts` from the
+ * first deploy, with no entries while nothing is published. `feed.spec.ts` is its fuller contract.
+ */
 export const FEED = '/feed.xml';
 
 /** The read-only, stateless MCP server over streamable HTTP (#62), the site's one server function. */

@@ -68,8 +68,3 @@ export function AnimatedHero({ children }: { children?: ReactNode }) {
     </div>
   );
 }
-
-// Re-export only the hero section (used above the fold). The other phases are not re-exported here
-// because AnimatedHero renders them itself; anything that needs one directly, such as a unit test,
-// imports its own module.
-export { HeroSection } from './hero-section';

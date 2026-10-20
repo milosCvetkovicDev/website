@@ -27,7 +27,20 @@ describe('featuredProjects', () => {
       expect(project.tags).toEqual(study?.tags);
       expect(project.category).toBe(study?.highlight.category);
       expect(project.status).toBe(study?.highlight.status);
-      expect(project.metric).toEqual(study?.highlight.metric);
+      // The figure, field for field; the basis is the one field the card does not take.
+      const metric = study?.highlight.metric;
+      expect({ ...project.metric, basis: metric?.basis }).toEqual(metric);
+    }
+  });
+
+  it('sends the cards no metric basis, which the home page never prints (#49)', () => {
+    // FeaturedWork is a client component, so every prop is serialised into `/`'s payload: the
+    // basis, a sentence per card, belongs to the case-study page and its twin.
+    expect(featuredProjects).not.toHaveLength(0);
+    for (const { slug, metric } of featuredProjects) {
+      expect(Object.keys(metric), slug).not.toContain('basis');
+      // And no key with nothing in it: an absent prefix stays absent rather than `undefined`.
+      expect(Object.values(metric), slug).not.toContain(undefined);
     }
   });
 

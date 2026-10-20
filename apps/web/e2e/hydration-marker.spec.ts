@@ -11,15 +11,16 @@ import { expectHydrated, hydrationMarker } from './support/hydration';
  * stays `false`, so the served markup alone cannot satisfy `expectHydrated`; the unit test is what
  * shows that React's hydration is what flips it.
  *
- * `/work/does-not-exist` joins `PAGE_ROUTES` because an unknown slug 404s at the routing layer, by a
- * different path from an unknown URL (ADR 0015), and both have to render the root layout.
+ * `/work/does-not-exist` and `/blog/does-not-exist` join `PAGE_ROUTES` because an unknown slug 404s
+ * at the routing layer, by a different path from an unknown URL (ADR 0015), and both have to render
+ * the root layout.
  */
 
 test.describe.configure({ retries: 0 });
 
-const UNKNOWN_SLUG = '/work/does-not-exist';
-const ROUTES = [...PAGE_ROUTES, UNKNOWN_SLUG];
-const statusOf = (path: string) => (path === UNKNOWN_SLUG ? 404 : expectedStatus(path));
+const UNKNOWN_SLUGS = ['/work/does-not-exist', '/blog/does-not-exist'];
+const ROUTES = [...PAGE_ROUTES, ...UNKNOWN_SLUGS];
+const statusOf = (path: string) => (UNKNOWN_SLUGS.includes(path) ? 404 : expectedStatus(path));
 
 /**
  * The `data-hydrated` value of every `#hydration-marker` in `html`, parsed the way a browser parses it,

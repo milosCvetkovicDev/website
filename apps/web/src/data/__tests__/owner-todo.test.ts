@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { LLMS_TXT_OWNER_COPY, siteIndexToLlmsTxt } from '@/lib/serialise';
 import { caseStudies } from '../case-studies';
+import { aboutCopy, beliefs, credentials, facts, questions, timeline } from '../pages/about';
 import {
   MAX_EXPIRY_DAYS,
   OWNER_TODO,
@@ -34,6 +35,10 @@ import {
 const RENDERS_ONLY: Record<string, string> = {
   'data/__tests__/case-studies.test.ts':
     'a unit test: builds unfilled fixtures to prove formatMetricScope leaves them out, and ships nowhere',
+  'data/__tests__/pages.test.ts':
+    'a unit test: reads the marker and the register to pin which quick facts /about leaves out, and ships nowhere',
+  'lib/serialise.ts':
+    'a renderer: serves an unfilled metric definition as null and fails the prerender on any other marker',
   'lib/__tests__/serialise.test.ts':
     'a unit test: reads the marker to prove no live Markdown twin serves it, and ships nowhere',
   'lib/__tests__/case-studies-json.test.ts':
@@ -51,6 +56,9 @@ const RENDERS_ONLY: Record<string, string> = {
  */
 const OWNER_TODO_SOURCES: OwnerTodoSource[] = [
   { id: 'case-studies', value: caseStudies },
+  // The /about record's copy, every list and string its page and twin are built from (58e): the
+  // quick facts' bases hold the owner's placeholders, and the table leaves such a fact out.
+  { id: 'about', value: { aboutCopy, beliefs, credentials, facts, questions, timeline } },
   // The draft-complete composition of /llms.txt (#60), because the served one carries no marker for
   // the walk to find: `lib/serialise.ts` holds the owner's blockquote and facts block there. Built
   // when the live test reads it, so a composition that throws fails that test by name instead of

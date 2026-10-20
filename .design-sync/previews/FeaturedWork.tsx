@@ -31,9 +31,13 @@ export const AsOnTheSite = () => {
         'An AI agent that woke up before you did. It monitored production, diagnosed errors, and opened PRs with fixes—all autonomously.',
       tags: ['Claude Agent SDK', 'Bun', 'Elysia', 'Azure'],
       category: 'AI AGENT',
-      status: 'RETIRED' as const,
-      metric: { value: 73, suffix: '%', label: 'faster resolution' },
-      activeNodes: ['client', 'gateway', 'worker', 'ai'] as const,
+      status: 'RETIRED',
+      metric: {
+        value: 73,
+        suffix: '%',
+        label: 'errors resolved autonomously',
+      },
+      activeNodes: ['client', 'gateway', 'worker', 'ai'],
     },
     {
       slug: 'enterprise-b2b-platform',
@@ -42,9 +46,13 @@ export const AsOnTheSite = () => {
         'Took a legacy codebase everyone was afraid to touch and turned it into a system the team actually enjoys working on.',
       tags: ['React', 'Node.js', 'PostgreSQL', 'Terraform'],
       category: 'PLATFORM',
-      status: 'PRODUCTION' as const,
-      metric: { value: 40, suffix: '%', label: 'less complexity' },
-      activeNodes: ['client', 'gateway', 'backend', 'db'] as const,
+      status: 'PRODUCTION',
+      metric: {
+        value: 40,
+        suffix: '%',
+        label: 'less complexity',
+      },
+      activeNodes: ['client', 'gateway', 'backend', 'db'],
     },
     {
       slug: 'nx-remote-cache',
@@ -53,9 +61,13 @@ export const AsOnTheSite = () => {
         "Why rebuild what hasn't changed? A custom cache server that slashed CI times and gave developers their coffee breaks back.",
       tags: ['Bun', 'Elysia', 'Azure Blob Storage'],
       category: 'DEVOPS',
-      status: 'PRODUCTION' as const,
-      metric: { value: 5, suffix: '×', label: 'faster builds' },
-      activeNodes: ['client', 'gateway', 'worker', 'storage'] as const,
+      status: 'PRODUCTION',
+      metric: {
+        value: 5,
+        suffix: '×',
+        label: 'faster builds',
+      },
+      activeNodes: ['client', 'gateway', 'worker', 'storage'],
     },
   ];
   return <FeaturedWork projects={projects} />;
@@ -70,9 +82,43 @@ export const DarkTheme = () => {
         'An AI agent that woke up before you did. It monitored production, diagnosed errors, and opened PRs with fixes—all autonomously.',
       tags: ['Claude Agent SDK', 'Bun', 'Elysia', 'Azure'],
       category: 'AI AGENT',
-      status: 'RETIRED' as const,
-      metric: { value: 73, suffix: '%', label: 'faster resolution' },
-      activeNodes: ['client', 'gateway', 'worker', 'ai'] as const,
+      status: 'RETIRED',
+      metric: {
+        value: 73,
+        suffix: '%',
+        label: 'errors resolved autonomously',
+      },
+      activeNodes: ['client', 'gateway', 'worker', 'ai'],
+    },
+    {
+      slug: 'enterprise-b2b-platform',
+      title: 'Enterprise B2B Platform',
+      description:
+        'Took a legacy codebase everyone was afraid to touch and turned it into a system the team actually enjoys working on.',
+      tags: ['React', 'Node.js', 'PostgreSQL', 'Terraform'],
+      category: 'PLATFORM',
+      status: 'PRODUCTION',
+      metric: {
+        value: 40,
+        suffix: '%',
+        label: 'less complexity',
+      },
+      activeNodes: ['client', 'gateway', 'backend', 'db'],
+    },
+    {
+      slug: 'nx-remote-cache',
+      title: 'Nx Remote Cache Server',
+      description:
+        "Why rebuild what hasn't changed? A custom cache server that slashed CI times and gave developers their coffee breaks back.",
+      tags: ['Bun', 'Elysia', 'Azure Blob Storage'],
+      category: 'DEVOPS',
+      status: 'PRODUCTION',
+      metric: {
+        value: 5,
+        suffix: '×',
+        label: 'faster builds',
+      },
+      activeNodes: ['client', 'gateway', 'worker', 'storage'],
     },
   ];
   return (

@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { CHROMIUM_LAUNCH_ARGS } from './e2e/support/chromium-launch-args';
 
 /**
  * The check that runs against the deployed site after Vercel reports a production deployment
@@ -7,8 +8,9 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * A configuration of its own, over a directory of its own: the main suite in `playwright.config.ts`
  * starts the server it tests and runs every spec under `e2e/`, and what this one checks exists only
- * on Vercel, where `VERCEL_ENV` turns Web Analytics on (ADR 0026). So it starts no server and never
- * sees the main suite's specs, which never see its spec either.
+ * on Vercel: Web Analytics, which `VERCEL_ENV` turns on (ADR 0026), and the CDN's cache in front of
+ * the negotiated Markdown twins (ADR 0030). So it starts no server and never sees the main suite's
+ * specs, which never see its specs either.
  *
  * `LIVE_URL` overrides the target, the apex by default. Vercel's own deployment URLs sit behind
  * Vercel Authentication, so the public apex is what this checks.
@@ -29,5 +31,11 @@ export default defineConfig({
     baseURL: process.env.LIVE_URL || DEFAULT_LIVE_URL,
     trace: 'on-first-retry',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // The same Chromium build as the e2e suite, so the same launch flags (ADR 0032).
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'], launchOptions: { args: [...CHROMIUM_LAUNCH_ARGS] } },
+    },
+  ],
 });

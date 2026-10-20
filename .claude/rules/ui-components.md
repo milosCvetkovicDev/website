@@ -16,19 +16,29 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 ## Quality gates
 
 - Accessibility is gated. `apps/web/e2e/accessibility.spec.ts` runs axe-core with the rule set
-  behind Lighthouse's accessibility category (kept in `e2e/axe.ts`) on all eleven routes in
-  `e2e/routes.ts`, in both colour schemes at the desktop viewport, at rest; again on `/` after the
-  whole story has been scrolled; and again on `/` with a header nav link hovered and with one focused.
+  behind Lighthouse's accessibility category (kept in `e2e/axe.ts`) on every route in
+  `e2e/routes.ts` (eleven while no post is published, one more per published post), in both colour
+  schemes at the desktop viewport, at rest; again on `/` after the whole story has been scrolled;
+  again on `/` with a header nav link hovered and with one focused; and on the header alone at every
+  scroll offset of `/`, which also holds the header to an opaque `--background` that nothing
+  under it shows through (no `backdrop-filter`, partial opacity or blend) and allows no undecidable
+  node in it (#147).
   `e2e/mobile/accessibility.spec.ts` runs the at-rest pass on `/` and `/work/self-healing-agent`
   under both phone projects. Any violation fails the `e2e` job. Each pass asserts a floor on how many
   nodes it measured, so content that stops being rendered or goes transparent fails too. Each
   desktop at-rest pass also holds a per-route, per-scheme budget of `incomplete` colour-contrast
   nodes (`INCOMPLETE_CONTRAST_BUDGET`): axe cannot decide text over a `backdrop-filter` or a
   gradient and does not count it as a violation, so that undecidable region may shrink but never
-  grow. The budget is zero on nine of the eleven routes, so the first blurred panel put behind text
-  there fails; never widen a budget or lower a floor to quieten a failure. A new
+  grow. The budget is zero on every route but `/` and `/work`, so the first blurred panel put behind
+  text there fails; never widen a budget or lower a floor to quieten a failure. A new
   `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
   Conventions and ADR 0011, which superseded 0008.
+- Focus never lands behind the sticky header (WCAG 2.4.11). The header is opaque, so
+  `scroll-margin-top: 5rem` on `main`, `footer` and everything in them (`globals.css`) keeps its
+  69px clear of whatever the browser scrolls into view, and `e2e/navigation.spec.ts` fails when
+  Shift+Tab leaves a link behind it. Never `scroll-padding-top` on `html`: the header's own controls
+  sit in that strip, so focusing one scrolled the page to the top (the phone's menu button failed
+  `e2e/mobile/navigation.spec.ts`). A taller header raises the margin.
 
 ## Conventions
 
@@ -44,6 +54,12 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   it look secondary, not even `aria-hidden` text (axe measures it anyway); use `--muted` instead.
   Never let a GSAP `from()`, `fromTo()` or `set()` leave text at a partial opacity: the "from"
   state renders immediately, before any scroll trigger fires.
+  An element the home page story hides for an entrance (a `fromTo()` target, a class-hidden closer,
+  an Execution code line, a dashed architecture line) carries `data-story-reveal`, which the
+  `@media print` rule in `globals.css` forces visible, so a print made after GSAP has built the
+  story shows it whole. `e2e/story-print.spec.ts` fails on one that does not when it holds text or
+  is held at an inline `opacity` or `visibility`; a class-hidden element with no text is left to
+  review.
 - Status colours come from three theme tokens (ADR 0010): `--status-ok`, `--status-warn` and
   `--status-err`, used as `text-[var(--status-ok)]`, `bg-[var(--status-ok)]/10`,
   `border-[var(--status-ok)]/50` and so on for text, icons, borders, tints, bars, dots and glows
@@ -75,6 +91,17 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   through `runWithGsap` and event handlers through `useWithGsap`; `import type` is fine. A static
   import from anything the home page reaches puts about 44 KB gzip back into its initial chunk, so
   `@typescript-eslint/no-restricted-imports` in `apps/web/eslint.config.mjs` refuses one everywhere
-  in `src` except that module, the tests and `circuit-background.tsx`, which still imports GSAP and
-  two plugins statically and is rendered by no route. `apps/web/src/test/eslint-config.test.ts`
-  pins the rule.
+  in `src` except that module and the tests. `apps/web/src/test/eslint-config.test.ts` pins the
+  rule.
+- An animation that repeats forever stops while nothing can see it (ADR 0009 rule 4). In the home
+  page story, `useStoryVisibility` (`src/hooks/use-story-visibility.ts`) marks the hero and each
+  phase `<section>` with `data-story-visible`, and the rule beside `.scan-line` in `globals.css`
+  pauses the endless animation classes it lists inside a section marked `false`. An endless CSS
+  animation there is a class on that list, never an inline `animation` shorthand, which resets
+  `animation-play-state` with inline precedence; a finite one stays off the list, or it would hold
+  its first frame while the section is out of view. `src/test/story-animation-pause.test.ts` holds
+  the story's sources to that list (no variant, arbitrary or inline animation), and
+  `e2e/reduced-motion.spec.ts` (R18) fails on an endless CSS or Web Animation in the story still
+  running at the bottom of the page. The pause is per section and ignores opacity: while any pixel
+  of a section is in view, everything in it runs. R18 cannot see GSAP tweens, so a GSAP tween that
+  repeats pauses from its own ScrollTrigger, as GameComplete's CTA glow does on leave.

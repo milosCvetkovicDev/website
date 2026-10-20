@@ -7,10 +7,17 @@ import {
   beliefs,
   credentials,
   facts,
+  questions,
+  shownFacts,
   timeline,
   type StoryParagraph,
 } from '@/data/pages/about';
+import { RUN_IN_TERMINAL, connectorSnippets } from '@/data/mcp-server';
 import { contactCopy, socialLinks } from '@/data/pages/contact';
+import { asSentence } from '@/data/pages/table';
+import { STATIC_ROUTE_UPDATED } from '@/data/static-routes';
+import { formatContentDate } from '@/lib/content-date';
+import { DAY_AS_WRITTEN } from '@/test/content-day';
 
 /**
  * `/about` and `/contact` map over their page records (#59), so a page and its Markdown twin read
@@ -47,18 +54,30 @@ describe('/about', () => {
       aboutCopy.connect.heading,
       aboutCopy.connect.text,
       ...aboutCopy.story.map(readAs),
+      ...questions.flatMap(({ question, answer }) => [question, answer]),
       ...timeline.flatMap(({ year, role, company, highlight, description }) => [
         year,
         role,
         company,
-        `"${highlight}"`,
+        // The timeline's last cell leads with the highlight, ended as a sentence (#58).
+        asSentence(highlight),
         description,
       ]),
       ...beliefs.flatMap(({ title, description, icon }) => [title, description, icon]),
-      ...facts.flatMap(({ label, value }) => [label, value]),
+      ...shownFacts.flatMap(({ label, value, basis }) => [label, value, basis]),
       ...credentials.map(({ icon, text }) => `${icon} ${text}`),
     ]) {
       expect(main, `/about must render "${text}"`).toContain(text);
+    }
+
+    // A quick fact whose basis the owner has not supplied yet is left out whole, label and figure
+    // with it, rather than shown without its basis (#58). Which facts those are is pinned in
+    // data/__tests__/pages.test.ts, against the marker and the register.
+    const hidden = facts.filter((fact) => !shownFacts.includes(fact));
+    for (const { label } of hidden) {
+      expect(main, `/about must not render "${label}" before its basis is filled`).not.toContain(
+        label,
+      );
     }
 
     // Each emphasised run of the story is its own element, of the kind the record names.
@@ -84,6 +103,60 @@ describe('/about', () => {
     });
 
     expect(errors, 'rendering /about must not log an error').not.toHaveBeenCalled();
+  });
+
+  it('answers each question in the paragraph after its h2, and heads the facts with their own h2', () => {
+    // #58: a question-shaped h2 whose next element is the whole answer is the unit an extractor
+    // lifts, and the facts grid after the questions needs a heading of its own, or the outline
+    // files it under the last question.
+    const { container } = render(<AboutPage />);
+    const headings = Array.from(container.querySelectorAll('h2'));
+    const asked = headings.filter((heading) => heading.textContent?.endsWith('?'));
+    expect(asked.map((heading) => heading.textContent)).toEqual(
+      questions.map(({ question }) => question),
+    );
+    asked.forEach((heading, index) => {
+      const next = heading.nextElementSibling;
+      expect(next?.tagName, `${heading.textContent} is followed by a paragraph`).toBe('P');
+      expect(next?.textContent).toBe(questions[index].answer);
+    });
+
+    const factsHeading = headings.find((heading) => heading.textContent === aboutCopy.factsHeading);
+    expect(factsHeading, 'the facts grid has an h2').toBeDefined();
+    const lastQuestion = asked.at(-1);
+    if (!factsHeading || !lastQuestion) throw new Error('both headings must render');
+    expect(
+      lastQuestion.compareDocumentPosition(factsHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the facts heading comes after the last question',
+    ).toBeTruthy();
+    for (const { value, basis } of shownFacts) {
+      expect(factsHeading.nextElementSibling?.textContent).toContain(value);
+      expect(factsHeading.nextElementSibling?.textContent).toContain(basis);
+    }
+    // The years' basis counts "from the first role in the timeline below": the timeline follows.
+    const timelineHeading = headings.find(
+      (heading) => heading.textContent === aboutCopy.timelineHeading,
+    );
+    if (!timelineHeading) throw new Error('the timeline has an h2');
+    expect(
+      factsHeading.compareDocumentPosition(timelineHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+      'the timeline comes after the quick facts',
+    ).toBeTruthy();
+  });
+
+  it('writes its "Last updated" day as the case studies write theirs, the stored day in dateTime (#57)', () => {
+    render(<AboutPage />);
+    const updated = STATIC_ROUTE_UPDATED['/about'];
+    const line = screen.getByText((_, element) =>
+      Boolean(element?.matches('p') && element.textContent?.startsWith('Last updated')),
+    );
+    const time = line.querySelector('time');
+    expect(time, 'the "Last updated" line dates itself with a <time>').not.toBeNull();
+    expect(time?.textContent).toBe(formatContentDate(updated));
+    // Spelled out in the shared pattern rather than read from the month table (#57).
+    expect(time?.textContent).toMatch(DAY_AS_WRITTEN);
+    expect(time).toHaveAttribute('dateTime', updated);
+    expect(line.textContent).toBe(`Last updated ${time?.textContent}.`);
   });
 
   it('renders two emphasised runs with the same text in one paragraph without a key clash', async () => {
@@ -128,6 +201,10 @@ describe('/contact', () => {
       contactCopy.closing.lead,
       contactCopy.closing.text,
       contactCopy.closing.link.text,
+      contactCopy.agents.heading,
+      contactCopy.agents.intro,
+      contactCopy.agents.endpoint,
+      contactCopy.agents.paste,
     ]) {
       expect(main, `/contact must render "${text}"`).toContain(text);
     }
@@ -147,5 +224,45 @@ describe('/contact', () => {
     });
 
     expect(errors, 'rendering /contact must not log an error').not.toHaveBeenCalled();
+  });
+
+  // #62: the snippets are text to copy, so each is a plain `pre` holding exactly what
+  // `data/mcp-server.ts` renders. It scrolls sideways on a phone, so the keyboard has to reach it,
+  // and a focusable element needs a role and a name: its caption, which starts with the client.
+  it('renders each connector snippet as a named region the keyboard can reach', () => {
+    render(<ContactPage />);
+    const heading = screen.getByRole('heading', { level: 2, name: contactCopy.agents.heading });
+    const section = heading.closest('section');
+    expect(section, 'the heading opens its own section').not.toBeNull();
+
+    // The endpoint is code, not the end of a sentence: nothing after it for a selection to take.
+    const endpoint = within(section!).getByText(contactCopy.agents.endpoint);
+    expect(endpoint.tagName).toBe('CODE');
+    expect(endpoint.nextSibling).toBeNull();
+
+    const regions = within(section!).getAllByRole('region');
+    expect(regions).toHaveLength(connectorSnippets.length);
+    const ids = new Set<string | null>();
+    connectorSnippets.forEach(({ client, files, code }, index) => {
+      const region = regions[index];
+      expect(region.tagName, client).toBe('PRE');
+      expect(region, client).toHaveAttribute('tabindex', '0');
+      ids.add(region.getAttribute('aria-labelledby'));
+      // The caption, read without its decorative separator.
+      const where = files.length > 0 ? files.join(' or ') : RUN_IN_TERMINAL;
+      expect(region, client).toHaveAccessibleName(`${client} ${where}`);
+      expect(region.textContent, client).toBe(code);
+    });
+    expect(ids.size, 'each region is named by its own caption').toBe(connectorSnippets.length);
+  });
+
+  it('names the person and exactly the profiles the page links in its h1 (#58)', () => {
+    render(<ContactPage />);
+    const heading = screen.getByRole('heading', { level: 1 }).textContent ?? '';
+    expect(heading).toContain('Milos Cvetkovic');
+    // The h1 lists the channels as "on A, B or C", by the name before any " / " (`X / Twitter` is
+    // X), so a profile added to or dropped from `socialLinks` fails here until the line follows.
+    const [, channels = ''] = heading.split(' on ');
+    expect(channels.split(/, | or /)).toEqual(socialLinks.map(({ name }) => name.split(' / ')[0]));
   });
 });

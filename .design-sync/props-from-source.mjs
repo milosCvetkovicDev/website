@@ -102,6 +102,21 @@ function printType(type, at, depth = 0, optional = false) {
       return `${readonlyArray ? 'ReadonlyArray' : 'Array'}<${inner}>`;
     }
   }
+  if (type.isTuple()) {
+    // A tuple (DataTable's row: its header, then its cells) keeps its labels and its rest element.
+    // Left to the object branch below, it would print every method of Array as a member.
+    const target = type.compilerType.target;
+    const elements = type.getTupleElements().map((element, index) => {
+      const flag = target.elementFlags[index];
+      const label = target.labeledElementDeclarations?.[index]?.name?.text;
+      const optionalMark = flag & ts.ElementFlags.Optional ? '?' : '';
+      const printed = printType(element, at, depth);
+      if (flag & ts.ElementFlags.Rest) return `...${label ? `${label}: ` : ''}Array<${printed}>`;
+      if (flag & ts.ElementFlags.Variadic) return `...${label ? `${label}: ` : ''}${printed}`;
+      return label ? `${label}${optionalMark}: ${printed}` : `${printed}${optionalMark}`;
+    });
+    return `${target.readonly ? 'readonly ' : ''}[${elements.join(', ')}]`;
+  }
   if (type.isObject() && isRepoDeclared(type) && !type.getCallSignatures().length) {
     // Deeper than this and the printed body stops being readable; the cap is loud rather than
     // silent, because falling through would print a local type name that resolves nowhere.

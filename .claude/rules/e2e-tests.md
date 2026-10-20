@@ -41,31 +41,57 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   the server's stderr reaches the log, because `webServer.stdout` stays at Playwright's default,
   `'ignore'`, so every other server line is a finding, warnings included. A missing or empty log
   fails too, and so does a log with no `[WebServer]` line, which means the capture broke, since
-  every run prints the allowlisted block. The check runs whenever the suite ran, passed or failed,
-  and not after an earlier step failed, when there is no log to read. Its tests run in
-  `pnpm test:scripts`.
+  every run prints the allowlisted block. That block comes from the not-found specs, which only the
+  `chromium` project runs, so the check means something only on a run that includes `chromium`: a
+  run of `mobile-chrome` or `mobile-safari` alone always fails it with the capture message, which
+  is not a server problem. The check runs whenever the suite ran, passed or failed, and not after
+  an earlier step failed, when there is no log to read. Its tests run in `pnpm test:scripts`.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
   React hydration mismatches included, so a stray `console.warn` fails the `e2e` job. Its routes come
   from `apps/web/e2e/routes.ts`, the one list the accessibility gate reads too: the seven static
-  routes, every case study derived from `src/data/case-studies.ts`, and a 404. `/` is also walked
-  down through the story and back up (light scheme only), so the scroll-driven GSAP callbacks and the
-  timers they schedule are watched too. The reduced-motion pass cannot cover those: every phase
-  effect returns early under `reduce`.
+  routes, every case study derived from `src/data/case-studies.ts`, every published post derived
+  from `src/data/posts.ts` (none yet), and a 404. `/` is also walked down through the story and back
+  up (light scheme only), so the scroll-driven GSAP callbacks and the timers they schedule are
+  watched too. The reduced-motion pass cannot cover those: every phase effect returns early under
+  `reduce`.
 - Accessibility is gated. `apps/web/e2e/accessibility.spec.ts` runs axe-core with the rule set
-  behind Lighthouse's accessibility category (kept in `e2e/axe.ts`) on all eleven routes in
-  `e2e/routes.ts`, in both colour schemes at the desktop viewport, at rest; again on `/` after the
-  whole story has been scrolled; and again on `/` with a header nav link hovered and with one focused.
+  behind Lighthouse's accessibility category (kept in `e2e/axe.ts`) on every route in
+  `e2e/routes.ts` (eleven while no post is published, one more per published post), in both colour
+  schemes at the desktop viewport, at rest; again on `/` after the whole story has been scrolled;
+  again on `/` with a header nav link hovered and with one focused; and on the header alone at every
+  scroll offset of `/`, which also holds the header to an opaque `--background` that nothing
+  under it shows through (no `backdrop-filter`, partial opacity or blend) and allows no undecidable
+  node in it (#147).
   `e2e/mobile/accessibility.spec.ts` runs the at-rest pass on `/` and `/work/self-healing-agent`
   under both phone projects. Any violation fails the `e2e` job. Each pass asserts a floor on how many
   nodes it measured, so content that stops being rendered or goes transparent fails too. Each
   desktop at-rest pass also holds a per-route, per-scheme budget of `incomplete` colour-contrast
   nodes (`INCOMPLETE_CONTRAST_BUDGET`): axe cannot decide text over a `backdrop-filter` or a
   gradient and does not count it as a violation, so that undecidable region may shrink but never
-  grow. The budget is zero on nine of the eleven routes, so the first blurred panel put behind text
-  there fails; never widen a budget or lower a floor to quieten a failure. A new
+  grow. The budget is zero on every route but `/` and `/work`, so the first blurred panel put behind
+  text there fails; never widen a budget or lower a floor to quieten a failure. A new
   `text-[var(--accent)]` or an opacity-dimmed label fails there; see the accent token bullet under
   Conventions in `ui-components.md` and ADR 0011, which superseded 0008.
+- What a crawler reads is gated (#55). `e2e/no-js-text.spec.ts` reads each static route's and case
+  study's response body, never the hydrated DOM, and fails one that does not answer 200, falls
+  under its floor of characters or loses a load-bearing phrase; a floor is about 80% of the
+  measured text, so content moved behind a client-only component or a `<Suspense>` fails there
+  while every browser test stays green. `e2e/crawlability.spec.ts` checks every same-origin URL a
+  route's HTML names or its render requests against `/robots.txt`, for the `*` group, Googlebot and
+  Applebot (with Applebot's fallback to Googlebot's groups), and fails any one of them refused.
+- The e2e job calls one third party. `e2e/structured-data.spec.ts` posts the
+  `<script type="application/ld+json">` elements served on `/`, the first case study and `/about`,
+  one route for each node set but a post's (no post route is sent until one is added with its
+  count), and nothing else of the page, to `validator.schema.org/validate`, one request per route,
+  from the `chromium` project only, so three times per run, with no retries. It is advisory and
+  fails open: a network error, a timeout, a non-2xx answer or an answer that read nothing passes
+  with an annotation. A validator that did answer decides: a verdict with errors fails
+  (`readVerdict` in `e2e/support/schema-validator.ts`), and so does one that read another number of
+  objects than the count `ROUTES` pins for the route (`objectCountProblem`), which catches some
+  partial reads, not all. A graph change that moves a count updates it in `ROUTES`, the one place
+  the counts and their derivation are written. `SCHEMA_VALIDATOR_STRICT=1` turns a missing verdict
+  into a failure.
 
 ## Testing
 
@@ -104,20 +130,34 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   where a spec goes when it needs a phone viewport or `isMobile`. `src/test/playwright-config.test.ts`
   pins the split. A run that fails every test in milliseconds is a missing browser, usually webkit
   after a Playwright bump: rerun the install command with `chromium webkit`.
+- Every Chromium this repository's Playwright starts launches with `--js-flags=--single-threaded-gc`
+  (`CHROMIUM_LAUNCH_ARGS` in `e2e/support/chromium-launch-args.ts`, passed by both Chromium projects
+  here, which `playwright.flake-hunt.config.ts` inherits, by the live check's project in
+  `playwright.live.config.ts` and by the Lighthouse spec's own launch): without it Chromium 153 on
+  the Linux runner now and then stops for good in the reduced-motion walk on `/`, the renderer idle
+  and answering nothing, and the test times out (#223, ADR 0032). No spec sets `launchOptions`,
+  which would replace the projects' flags and, from `e2e/mobile/`, reach WebKit. Playwright merges a
+  project's launch options into a spec's own `chromium.launch*` call shallowly, so a call with
+  `args` of its own spreads `CHROMIUM_LAUNCH_ARGS` into them. Every V8 flag goes into that one
+  `--js-flags` entry, because Chromium keeps only the last of a repeated switch.
+  `src/test/playwright-config.test.ts` checks all three, reading each spec as a syntax tree so that
+  comments and strings never count, and pins the Chromium build, 153.0.8010.12: when a Playwright
+  upgrade changes it, ADR 0032 says how to tell whether the flag is still needed.
 - Verified defects that an open task will fix are recorded as expected failures, `test.fail()` in
   Playwright and `it.fails` in Vitest, each naming its manifest row and fixing issue (see
   `.claude/epics/audit-remediation-2026-09/43.md`). An expected failure that passes fails the run, so
   the pull request that fixes the defect deletes the annotation in the same change. The
   machine-readable endpoints follow the same rule without a manifest row: `e2e/endpoints.ts` is the
   one list of their paths, and `e2e/machine-readable.spec.ts` holds one `test.fail()` per endpoint
-  not yet served, its title and `fixed-by` annotation naming the issue that ships it (#61 and #62).
-  #59's Markdown twins and #60's `/llms.txt` and case-study JSON ship: the rows for `/llms.txt` and
-  the JSON there are their contract (every link in `/llms.txt` answers 200, and the refused
-  `/llms-full.txt` stays a 404), `e2e/seo-surface.spec.ts` checks every route's one
-  `rel="describedby"` link to `/llms.txt`, and `e2e/markdown-twins.spec.ts` is the twins' fuller
-  contract. The machine-readable spec's `expectNotServedYet` requires the 404 before it calls
-  `test.fail()`, so a 5xx or a server that never answered fails the run instead of passing as the
-  expected failure; the change that ships an endpoint deletes that call.
+  not yet served, its title and `fixed-by` annotation naming the issue that ships it; none is left.
+  #59's Markdown twins, #60's `/llms.txt` and case-study JSON, #61's Atom feed and #62's MCP server
+  ship: the rows for `/llms.txt`, the JSON and the server there are their contract (every link in
+  `/llms.txt` answers 200, and the refused `/llms-full.txt` stays a 404), `e2e/seo-surface.spec.ts`
+  checks every route's one `rel="describedby"` link to `/llms.txt`, and
+  `e2e/markdown-twins.spec.ts`, `e2e/feed.spec.ts` and `e2e/mcp.spec.ts` are the fuller ones of the
+  twins, the feed and the server. An endpoint listed before it ships requires the 404 before its row
+  calls `test.fail()`, so a 5xx or a server that never answered fails the run instead of passing as
+  the expected failure; the change that ships it deletes that declaration.
 - The two gate specs opt out of those retries: `e2e/console-clean.spec.ts` and
   `e2e/accessibility.spec.ts` both set `test.describe.configure({ retries: 0 })`, and so does every
   spec that carries an expected failure. A retry would turn an intermittent console message or axe
@@ -131,6 +171,20 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   back. The local dev server also builds into `.next-e2e` (`NEXT_DIST_DIR`, read by
   `apps/web/next.config.ts`), so it never fights a `pnpm dev` from the same checkout over
   `apps/web/.next`. See `docs/adr/0014-playwright-owns-its-server.md`.
+- Against the dev server only, `e2e/global-setup.ts` requests every route that exports
+  `generateStaticParams` once before any worker starts, one request at a time, at the unknown slug
+  `does-not-exist`, and requires the 404. `next dev` (16.3.8) adds such a route to
+  `prerender-manifest.json` on its first request with an unlocked read and rewrite, and parallel
+  workers caught it mid-write (vercel/next.js#96259, #264): a 500 with
+  `Unexpected end of JSON input`. In one run the case studies' `index.md`, `index.json` and
+  `og-image.png` also answered 404 with no server error, a mechanism not traced. Under
+  `dynamicParams = false` it writes the static params before refusing a slug, so the unknown slug
+  warms the blog routes too while no post is published (`post-static-params.ts` gives them a
+  placeholder in development). The setup then reads the manifest back and fails, naming the
+  routes, if any is missing. Measured on the five specs of #182 under `next dev`, 6 of 10 runs
+  failed without it, and none of 20 with it on a 500 or a 404. The route list is
+  `e2e/static-params-routes.ts`; `src/test/global-setup.test.ts` scans `src/app` and fails when it
+  and the route files disagree.
 - A flaky e2e test is root-caused before it is patched: reproduce it repeatedly, tell a cold first
   request apart from a logic fault, and prefer warming the destination route on the dev server
   before the timed step (a route compiles on its first request) over an arbitrary wait or a retry.
@@ -191,15 +245,26 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   `pnpm --filter web clean`. Two local suites in the _same_ checkout on different ports also share
   it, so do not overlap them; two different checkouts are fine, they have their own.
 - The CI e2e log prints a three-line `[WebServer] Error: Internal: NoFallbackError` stack once for
-  every request of an unknown `/work/*` slug, so several times per run, and still passes. It is the
-  internal signal that routes such a slug to the site-level 404, and `not-found-shell`, `not-found`,
-  `console-clean` and `hydration-marker` all request `/work/does-not-exist`; the response is a
-  correct 404 and no browser console entry results. Do not chase it:
-  `scripts/check-webserver-log.mjs` allowlists exactly that message with its stack frames and fails
-  the job on any other `[WebServer]` line. The Vercel production log carries no such line, because
-  the platform answers an unknown path from the cached static 404 without invoking the route
-  (`docs/adr/0015-static-case-study-params.md`).
+  every request of an unknown `/work/*` or `/blog/*` slug, so several times per run, and still
+  passes. It is the internal signal that routes such a slug to the site-level 404, and
+  `not-found-shell`, `not-found`, `console-clean` and `hydration-marker` all request
+  `/work/does-not-exist` and `/blog/does-not-exist`; the response is a correct 404 and no browser
+  console entry results. Do not chase it: `scripts/check-webserver-log.mjs` allowlists exactly that
+  message with its stack frames and fails the job on any other `[WebServer]` line. The Vercel
+  production log carries no such line, because the platform answers an unknown path from the cached
+  static 404 without invoking the route (`docs/adr/0015-static-case-study-params.md`).
 - Claude Code's in-app Browser pane logs React error #418 (hydration mismatch) on every page of the
   deployed site, while an unmodified headless Chromium (Playwright from `apps/web`) reports none
   across schemes, viewports and reduced motion. Judge console cleanliness with Playwright, not the
   pane.
+- Under WebKit, Playwright (1.63) reports any console error WebKit attributes to JavaScript as a
+  `pageerror`, its text cut at the first colon (`splitErrorMessage`). A `page.goto` from a
+  production page whose link prefetches (`?_rsc=`) are still in flight cancels them, and Linux
+  WebKit now and then logs each as "Fetch API cannot load http://… due to access control checks.",
+  which arrives as `pageerror: /localhost:…`. macOS WebKit cancels them without logging, so a
+  local run stays green (#263). A page prefetches the links in view once it hydrates, after a hard
+  load as much as after a soft navigation, so a console guard in `e2e/mobile/` starts each test on
+  a fresh page and spans no second `page.goto`. `collectProblems` in
+  `e2e/mobile/navigation.spec.ts` listens for `requestfailed` too, which failed on the cancellation
+  in every WebKit run measured rather than on the rare message; Chromium's prefetches had finished
+  by then, so it is not shown to catch it there.

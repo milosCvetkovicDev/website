@@ -80,7 +80,10 @@ describe('error.tsx', () => {
     // A check over the source, beside the render in `global-error.test.tsx`: it names the row, and it
     // says why the file matters if it is ever deleted, where that render file would only fail to
     // resolve its import.
-    const files = readdirSync(APP_DIR);
+    // Regular files only: a route folder can carry a file-like name (#173, #189).
+    const files = readdirSync(APP_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name);
     const globalError = files.find((file) => /^global-error\.(tsx|jsx|ts|js)$/.test(file));
     expect(
       globalError,

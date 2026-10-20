@@ -11,6 +11,9 @@
  * compute it again in the visitor's browser, and a page built in December and hydrated in January
  * would then disagree with its own markup. `__tests__/profile.test.ts` fails when a client module
  * reaches it.
+ *
+ * The place, the certification and the occupation below are facts the Person JSON-LD asserts, so
+ * each is one a page shows (#57, ADR 0031).
  */
 import type { Fact } from './pages/about';
 
@@ -46,10 +49,36 @@ export function experienceFigureSince(asOf: Date = new Date()): string {
 }
 
 /**
- * The `/about` quick fact that states the total, label and figure together. The row lives here
- * whole rather than in the page record, so no copy module spells out a years figure of its own
- * (`single-source-metrics.test.ts`, R34).
+ * The certification `/about` lists under Credentials, and the Person JSON-LD's `hasCredential`
+ * (#57). The markup may assert only what a page shows, so both read it from here.
+ */
+export const CERTIFICATION = 'Angular Certified Architect';
+
+/**
+ * Where the person is based, as `/about` shows it ("Belgrade, Serbia" under Credentials, and the
+ * description's "Based in Belgrade."): the Person JSON-LD's `address` reads the same two names
+ * (#57). Its occupation names no place, because /about also lists the work as remote-first.
+ */
+export const LOCATION = { locality: 'Belgrade', country: 'Serbia' } as const;
+
+/**
+ * The occupation the Person JSON-LD's `hasOccupation` and `jobTitle` name and its description opens
+ * with (#57), as the pages print it: the eyebrows of /work, /skills and /contact read it from here.
+ * The home page's `h1` says it in lower case inside its own sentence, so it writes it itself;
+ * `e2e/seo-surface.spec.ts` fails when no page shows it.
+ */
+export const OCCUPATION = 'Senior Full-Stack Engineer';
+
+/**
+ * The `/about` quick fact that states the total, label, figure and basis together. The row lives
+ * here whole rather than in the page record, so no copy module spells out a years figure of its own
+ * (`single-source-metrics.test.ts`, R34). Its basis names the year the count starts from (#58),
+ * which the timeline printed under the quick facts shows as its first role.
  */
 export function experienceFact(asOf?: Date): Fact {
-  return { label: 'Years shipping code', value: String(yearsOfExperience(asOf)) };
+  return {
+    label: 'Years shipping code',
+    value: String(yearsOfExperience(asOf)),
+    basis: `Counted from the first role in the timeline below, ${CAREER_START_YEAR}.`,
+  };
 }

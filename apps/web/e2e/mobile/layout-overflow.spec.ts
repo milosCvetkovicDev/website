@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { CASE_STUDY_ROUTES, STATIC_ROUTES } from '../routes';
+import { CASE_STUDY_ROUTES, POST_ROUTES, STATIC_ROUTES } from '../routes';
 import { expectGsapLoaded } from '../support/gsap';
 import { expectHydrated, gotoHydrated } from '../support/hydration';
 import {
@@ -9,6 +9,7 @@ import {
   measureOverflow,
   type OverflowWindow,
 } from '../support/overflow';
+import { TABLES } from '../support/tables';
 
 /**
  * No page route may scroll sideways on a phone.
@@ -76,8 +77,15 @@ const MOTIONS = ['no-preference', 'reduce'] as const;
  */
 const REVERSE_MS = 4_000;
 
-/** Every page route but `/`, which the tests below cover at three widths each. */
-const OTHER_ROUTES = [...STATIC_ROUTES.filter((route) => route !== '/'), ...CASE_STUDY_ROUTES];
+/**
+ * Every page route but `/`, which the tests below cover at three widths each. The posts join as they
+ * are published: a code block's long line has to scroll inside the block, not the page (#61).
+ */
+const OTHER_ROUTES = [
+  ...STATIC_ROUTES.filter((route) => route !== '/'),
+  ...CASE_STUDY_ROUTES,
+  ...POST_ROUTES,
+];
 
 /** The same windows on any page that runs no GSAP: after hydration, then either end of a walk. */
 const READ_AND_WALK: OverflowWindow[] = [
@@ -139,7 +147,7 @@ for (const motion of MOTIONS) {
     // Each route is a navigation, a hydration wait, two walks and three reads: nine routes measured
     // 5 s together on Pixel 7 against the production build. Five seconds each on top of the file's
     // 30 s for a context leaves room for a loaded machine, and the budget grows with the case
-    // studies rather than being retuned by hand.
+    // studies and the posts rather than being retuned by hand.
     test.setTimeout(30_000 + OTHER_ROUTES.length * 5_000);
     await page.emulateMedia({ reducedMotion: motion });
     await narrowTo(page, 320);
@@ -161,6 +169,63 @@ for (const motion of MOTIONS) {
     }
   });
 }
+
+// #58: the routes that serve a data table, at every phone width rather than 320px alone. No table
+// scrolls sideways any more (the owner's decision on #226, 2026-10-03): a wide one (`isWideTable()`)
+// stacks each row into a block below 640px, and a narrow one wraps. So the page must not scroll
+// sideways at any of the three widths, each table's box must sit inside the viewport, and no table
+// may overflow its box, which is a plain card: not a region, not a tab stop, not a scroller.
+// `tables.spec.ts` beside this file checks the stacked rows themselves.
+test(`the routes with a table do not scroll sideways at ${PHONE_WIDTHS.join(', ')}px`, async ({
+  page,
+}) => {
+  const routes = Object.keys(TABLES);
+  expect([...routes].sort(), 'the routes that serve a table').toEqual(
+    ['/about', '/skills', ...CASE_STUDY_ROUTES].sort(),
+  );
+  // As above: a navigation, a hydration wait, two walks and three reads per route, per width.
+  test.setTimeout(30_000 + routes.length * PHONE_WIDTHS.length * 5_000);
+
+  for (const width of PHONE_WIDTHS) {
+    await narrowTo(page, width);
+    for (const route of routes) {
+      await test.step(`${route} at ${width}px`, async () => {
+        const response = await gotoHydrated(page, route);
+        expect.soft(response?.status(), `${route} did not answer 200`).toBe(200);
+        if (response?.status() !== 200) return;
+        expectNoOverflow(await measureOverflow(page, READ_AND_WALK), `${route} at ${width}px`);
+
+        const tables = TABLES[route] ?? [];
+        const boxes = page.locator('main div:has(> table)');
+        await expect.soft(boxes, `${route}: one box per table`).toHaveCount(tables.length);
+        for (const [index, table] of tables.entries()) {
+          const box = boxes.nth(index);
+          const name = table.caption;
+          const measured = await box.evaluate((element) => ({
+            overflowX: getComputedStyle(element).overflowX,
+            scrollWidth: element.scrollWidth,
+            clientWidth: element.clientWidth,
+          }));
+          // The computed style, not a class name: nothing is left to scroll, so nothing scrolls.
+          expect.soft(measured.overflowX, `${name}'s box is not a scroller`).toBe('visible');
+          expect
+            .soft(measured.scrollWidth, `${name} overflows its box at ${width}px`)
+            .toBeLessThanOrEqual(measured.clientWidth);
+          await expect.soft(box, `${name}'s box is not a region`).not.toHaveAttribute('role');
+          await expect.soft(box, `${name}'s box is not a tab stop`).not.toHaveAttribute('tabindex');
+          const bounds = await box.boundingBox();
+          expect.soft(bounds, `${name} is rendered`).not.toBeNull();
+          if (bounds) {
+            expect.soft(bounds.x, `${name} starts off the left edge`).toBeGreaterThanOrEqual(0);
+            expect
+              .soft(bounds.x + bounds.width, `${name} ends past the ${width}px viewport`)
+              .toBeLessThanOrEqual(width);
+          }
+        }
+      });
+    }
+  }
+});
 
 test("/ fits the story's narrowest parts into 320px", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -223,30 +288,46 @@ test("/ fits the story's narrowest parts into 320px", async ({ page }) => {
   expect(measured.techItems.filter((item) => item.overflow > 0)).toEqual([]);
   expect(measured.loopCells.filter((cell) => cell.overflow > 0)).toEqual([]);
 
-  // The headline's text lies inside the hero island. The hero section is `overflow-hidden`, which
-  // hides a headline wider than the island from `scrollWidth`, so the text box is measured instead.
+  // The headline's text lies inside the hero island: the h1 and, since #58, the hook under it, the
+  // largest line and the one that runs out of the island at 320 px if its nowrap breakpoint or its
+  // size drifts. The hero section is `overflow-hidden`, which hides a line wider than the island
+  // from `scrollWidth`, so each text box is measured instead.
   const headline = await page.evaluate(() => {
     const h1 = document.querySelector('h1');
+    const hook = h1?.nextElementSibling;
     const skills = document.querySelector('ul[aria-label="Technical skills"]');
     if (!h1 || !skills) throw new Error('the hero has no h1 or no skill list');
+    if (!hook) throw new Error('no hook under the h1');
     let island = h1.parentElement;
     while (island && !island.contains(skills)) island = island.parentElement;
     if (!island) throw new Error('no element holds both the headline and the skill tags');
-    const range = document.createRange();
-    range.selectNodeContents(h1);
-    const text = range.getBoundingClientRect();
+    const textBox = (element: Element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const { left, right, top, bottom } = range.getBoundingClientRect();
+      return { left, right, top, bottom };
+    };
     const box = island.getBoundingClientRect();
     return {
-      text: { left: text.left, right: text.right, top: text.top, bottom: text.bottom },
+      lines: [
+        { what: 'the h1', text: textBox(h1) },
+        { what: 'the hook under the h1', text: textBox(hook) },
+      ],
       island: { left: box.left, right: box.right, top: box.top, bottom: box.bottom },
     };
   });
-  expect(headline.text.left, 'the headline starts outside the hero island').toBeGreaterThanOrEqual(
-    headline.island.left,
-  );
-  expect(headline.text.right, 'the headline ends outside the hero island').toBeLessThanOrEqual(
-    headline.island.right,
-  );
-  expect(headline.text.top).toBeGreaterThanOrEqual(headline.island.top);
-  expect(headline.text.bottom).toBeLessThanOrEqual(headline.island.bottom);
+  for (const { what, text } of headline.lines) {
+    expect(text.left, `${what} starts outside the hero island`).toBeGreaterThanOrEqual(
+      headline.island.left,
+    );
+    expect(text.right, `${what} ends outside the hero island`).toBeLessThanOrEqual(
+      headline.island.right,
+    );
+    expect(text.top, `${what} starts above the hero island`).toBeGreaterThanOrEqual(
+      headline.island.top,
+    );
+    expect(text.bottom, `${what} ends below the hero island`).toBeLessThanOrEqual(
+      headline.island.bottom,
+    );
+  }
 });

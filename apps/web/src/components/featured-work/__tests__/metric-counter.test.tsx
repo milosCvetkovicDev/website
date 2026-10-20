@@ -1,5 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { caseStudies, formatMetric } from '@/data/case-studies';
+import { featuredProjects } from '@/data/featured-projects';
 import { MetricCounter } from '../metric-counter';
 
 function stubMatchMedia(matches: boolean) {
@@ -45,13 +47,15 @@ describe('MetricCounter', () => {
 
   it('shows the final value when idle', () => {
     stubAnimationFrames();
-    render(<MetricCounter value={73} suffix="%" label="faster resolution" active={false} />);
+    render(
+      <MetricCounter value={73} suffix="%" label="errors resolved autonomously" active={false} />,
+    );
     expect(screen.getByText('73%')).toBeInTheDocument();
   });
 
   it('starts at zero, passes through a partial value, and lands on the real one', () => {
     const frames = stubAnimationFrames();
-    render(<MetricCounter value={73} suffix="%" label="faster resolution" active />);
+    render(<MetricCounter value={73} suffix="%" label="errors resolved autonomously" active />);
     expect(screen.getByText('0%')).toBeInTheDocument();
 
     frames.advance(0);
@@ -82,11 +86,27 @@ describe('MetricCounter', () => {
   it('cancels its pending frame on unmount', () => {
     const frames = stubAnimationFrames();
     const { unmount } = render(
-      <MetricCounter value={73} suffix="%" label="faster resolution" active />,
+      <MetricCounter value={73} suffix="%" label="errors resolved autonomously" active />,
     );
     frames.advance(0);
     unmount();
     expect(frames.cancel).toHaveBeenCalled();
+  });
+
+  it("shows every featured card's figure and label as the card spreads them in", () => {
+    // featured-work.tsx spreads `project.metric` in: the counter prints the figure the card
+    // advertises, and never the study's basis, which featured-projects.ts does not pass (#49).
+    stubAnimationFrames();
+    expect(featuredProjects, 'the home page must feature some project').not.toHaveLength(0);
+    for (const { slug, metric } of featuredProjects) {
+      const { container, unmount } = render(<MetricCounter {...metric} active={false} />);
+      expect(container, slug).toHaveTextContent(formatMetric(metric));
+      expect(container, slug).toHaveTextContent(metric.label);
+      const basis = caseStudies.find((study) => study.slug === slug)?.highlight.metric.basis;
+      expect(basis, slug).toBeTruthy();
+      expect(container.innerHTML, slug).not.toContain(basis);
+      unmount();
+    }
   });
 
   it('never animates under reduced motion', () => {

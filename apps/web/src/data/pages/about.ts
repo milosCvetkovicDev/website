@@ -1,19 +1,36 @@
 /**
  * The copy `/about` renders, and the page record its Markdown twin reads (#59). The page keeps the
- * layout, the classes and its `h1`, and maps over what is here, so a page and its twin cannot
- * disagree. Every string is text the page already showed, with two exceptions that only the twin
- * reads: the `Quick facts` heading and the timeline's column names. Every record section needs a
- * heading and a table needs columns, and the page shows those parts without either.
+ * layout, the classes, the hook under its `h1` (#58), and its "Last updated" line, which reads
+ * `STATIC_ROUTE_UPDATED` (#57) as /privacy's does, and renders what is here, `h1` included, so a
+ * page and its twin cannot disagree.
+ * Every string is text the page shows, with one exception: the `Quick facts` heading, which the
+ * page gives screen readers only (#58), since every record section needs a heading. The quick facts
+ * and the timeline are tables (#58), which the page renders through `components/data-table.tsx`
+ * with their captions and column headers, and the twin writes with the same columns.
  */
 import { formatMetric, getCaseStudy } from '@/data/case-studies';
-import { experienceFact, yearsOfExperience } from '@/data/profile';
+import { OWNER_TODO, ownerTodo } from '@/data/owner-todo';
+import { CERTIFICATION, LOCATION, experienceFact, yearsOfExperience } from '@/data/profile';
 import { social } from '@/data/social';
-import type { PageRecord, PageSection, Paragraph } from './types';
+import type { PageRecord, PageSection, Paragraph, Table } from './types';
 
 // The timeline quotes the agent's metric, so it reads it from the study rather than restating it.
 const agentStudy = getCaseStudy('self-healing-agent');
 if (!agentStudy) throw new Error('The About page quotes the "self-healing-agent" case study');
 const agentMetric = agentStudy.highlight.metric;
+
+/**
+ * What the agent's case study lists first under `category` in its tech stack. The About answer
+ * about the agent names its stack from there, so the two cannot drift apart (#58).
+ */
+function agentStack(category: string): string {
+  const item = agentStudy?.techStack.find((entry) => entry.category === category)?.items[0];
+  if (!item) throw new Error(`The About page names the agent's ${category} from its case study`);
+  return item;
+}
+
+/** The name the questions ask about: each one names its subject, so it stands alone when lifted. */
+const FULL_NAME = 'Milos Cvetkovic';
 
 export interface TimelineEntry {
   readonly year: string;
@@ -26,17 +43,37 @@ export interface TimelineEntry {
 export interface Belief {
   readonly title: string;
   readonly description: string;
+  /**
+   * An emoji drawn beside the title as decoration. The page hides it from screen readers and the
+   * twin leaves it out, so it stays a field of its own and never goes inside the text.
+   */
   readonly icon: string;
 }
 
 export interface Fact {
   readonly label: string;
   readonly value: string;
+  /**
+   * What the figure counted, and over what (#58): the quick facts' Basis column. A basis only the
+   * owner can state is an `ownerTodo(...)` marker with a row in `unfilledOwnerFields`, and the
+   * table leaves that fact out, on the page and in the twin, until the owner fills it.
+   */
+  readonly basis: string;
 }
 
 export interface Credential {
+  /**
+   * An emoji drawn beside the text as decoration. The page hides it from screen readers and the
+   * twin leaves it out, so it stays a field of its own and never goes inside the text.
+   */
   readonly icon: string;
   readonly text: string;
+}
+
+/** A question a visitor asks, as a heading, and its answer in one self-contained paragraph. */
+export interface Question {
+  readonly question: string;
+  readonly answer: string;
 }
 
 /** A profile the closing call to action links to; the primary one is the filled button. */
@@ -64,7 +101,10 @@ export const timeline: readonly TimelineEntry[] = [
     year: '2021',
     role: 'JavaScript Tech Lead',
     company: 'Enterprise SaaS',
-    highlight: '40% reduction in bug reports after architecture overhaul',
+    // No figure until the owner sources one (#49, pages-3): the percentage this line used to state
+    // is established by no study, and the enterprise study's figure counts complexity, not bug
+    // reports. A figure here would be read from a study through formatMetric(), as 2025's is.
+    highlight: 'Fewer bug reports after architecture overhaul',
     description:
       'Inherited a codebase where "temporary fixes" had calcified into permanent nightmares. Introduced Clean Architecture. Watched bug reports drop. Trained the next generation of leads.',
   },
@@ -108,17 +148,31 @@ export const beliefs: readonly Belief[] = [
 ];
 
 // The first fact is the years of experience, whole from the profile: its figure is derived there,
-// and its label names the figure, so neither is spelled out in this module (R34).
+// and its label names the figure, so neither is spelled out in this module (R34). Each basis says
+// what its figure counted (#58); the two only the owner can state are placeholders until then.
 export const facts: readonly Fact[] = [
   experienceFact(),
-  { label: 'Production systems rescued', value: '12' },
-  { label: 'Teams led', value: '4' },
-  { label: 'Morning coffee required', value: '2 cups' },
+  {
+    label: 'Production systems rescued',
+    value: '12',
+    basis: ownerTodo('which years, and what counts as rescued'),
+  },
+  { label: 'Teams led', value: '4', basis: ownerTodo('which years') },
+  { label: 'Morning coffee required', value: '2 cups', basis: 'Not a measurement.' },
 ];
 
+/**
+ * The quick facts a reader is shown: every fact but one whose basis still holds the owner's
+ * placeholder, which is left out whole rather than shown without its basis or with the marker
+ * (`owner-todo.ts`'s publication rule). The page and the twin both read the table built from these.
+ */
+export const shownFacts: readonly Fact[] = facts.filter(({ basis }) => !basis.includes(OWNER_TODO));
+
+// The certification and the place are facts the Person JSON-LD asserts too, so both come from the
+// profile, where the markup reads them (#57): the page, its twin and the markup cannot disagree.
 export const credentials: readonly Credential[] = [
-  { icon: '🎓', text: 'Angular Certified Architect' },
-  { icon: '📍', text: 'Belgrade, Serbia' },
+  { icon: '🎓', text: CERTIFICATION },
+  { icon: '📍', text: `${LOCATION.locality}, ${LOCATION.country}` },
   { icon: '🌍', text: 'Remote-first since 2020' },
 ];
 
@@ -133,6 +187,35 @@ const story: readonly StoryParagraph[] = [
   ],
 ];
 
+/**
+ * Three questions a visitor asks, answered after the story (#58). A question-shaped heading with a
+ * short answer under it is the unit a text extractor can lift whole, so each question names its
+ * subject and each answer stands on its own in 40 to 80 words. An answer restates no case-study
+ * metric (a study's headline figure, in any numeric spelling), names the agent's safeguards without
+ * their figures, and reads the agent's stack from its study: the study is the one source for all
+ * three. `src/test/answer-copy.ts` measures both rules, for the unit test on this list and for
+ * `e2e/seo-surface.spec.ts` on the served HTML. The pattern is the visible text alone, with no
+ * structured data for it: ADR 0017 refuses that markup, and `scripts/ai-refusals.test.mjs` fails
+ * on its type name anywhere under `src`, comments included. The self-healing agent is retired, so
+ * it is in the past tense.
+ */
+export const questions: readonly Question[] = [
+  {
+    question: `What does ${FULL_NAME} build?`,
+    answer:
+      'Two kinds of system. The first is the legacy platform nobody wants to touch: I introduce boundaries one module at a time, so every pull request ships value while the architecture improves underneath it. The second is AI that repairs what breaks — a self-healing agent, since retired, that watched production, diagnosed errors and opened pull requests a person reviewed and merged.',
+  },
+  {
+    question: `What stack does ${FULL_NAME} work in?`,
+    answer:
+      'TypeScript end to end. React and Next.js on the front, NestJS, Node and Bun with Elysia behind it, PostgreSQL for state. Infrastructure is Azure — Container Apps, Blob Storage, Log Analytics — described in Terraform and shipped through GitHub Actions with Nx. The AI work runs on the Claude Agent SDK. Clean Architecture and domain-driven design are the habits underneath all of it.',
+  },
+  {
+    question: `What was ${FULL_NAME}'s self-healing agent, exactly?`,
+    answer: `A service on Azure that watched production logs, read the codebase, and when something broke, diagnosed the error and opened a pull request with a fix. It ran on ${agentStack('Runtime')} and ${agentStack('Framework')} with the ${agentStack('AI')}, and it shipped with limits: a daily cap, a budget cap, confidence thresholds, capped CI retries and a kill switch. A person reviewed and merged every fix.`,
+  },
+];
+
 const connectLinks: readonly ProfileLink[] = [
   { name: social.linkedin.name, href: social.linkedin.href, primary: true },
   { name: social.github.name, href: social.github.href, primary: false },
@@ -140,9 +223,12 @@ const connectLinks: readonly ProfileLink[] = [
   { name: 'X / Twitter', href: social.x.href, primary: false },
 ];
 
-/** The rest of what `/about` renders in its main element, in page order, less the `h1` (#58's). */
+/**
+ * The rest of what `/about` renders in its main element, in page order, less the `h1`, which is the
+ * record's `heading`, and the hook under it (#58's).
+ */
 export const aboutCopy = {
-  socialTitle: 'About Milos Cvetkovic',
+  socialTitle: `About ${FULL_NAME}`,
   eyebrow: 'The short version',
   lede: 'Then I make them better than they were before the problems started.',
   story,
@@ -159,6 +245,31 @@ export const aboutCopy = {
   },
 } as const;
 
+/**
+ * The quick facts as a table (#58): each fact's label heads its row, and its basis says what the
+ * figure counted. Three columns, so on a phone each row stacks into a block (`DataTable`).
+ */
+export const factsTable: Table = {
+  caption: 'Quick facts',
+  columns: ['Fact', 'Figure', 'Basis'],
+  rows: shownFacts.map(({ label, value, basis }) => [label, value, basis]),
+};
+
+/**
+ * The timeline as a table (#58), newest first: each year heads its row, and the last cell leads
+ * with the entry's highlight, then says what changed.
+ */
+export const timelineTable: Table = {
+  caption: 'Career timeline',
+  columns: ['Year', 'Role', 'Company', 'What changed'],
+  rows: timeline.map(({ year, role, company, highlight, description }) => [
+    year,
+    role,
+    company,
+    { lead: highlight, text: description },
+  ]),
+};
+
 /** A story paragraph as the text it reads as: the twin has no emphasis to carry. */
 function plainText(paragraph: StoryParagraph): string {
   if (typeof paragraph === 'string') return paragraph;
@@ -171,23 +282,13 @@ const sections: readonly PageSection[] = [
     heading: aboutCopy.eyebrow,
     paragraphs: [aboutCopy.lede, ...story.map(plainText), aboutCopy.storyClose],
   },
-  {
-    kind: 'list',
-    heading: aboutCopy.factsHeading,
-    items: facts.map(({ label, value }) => ({ term: label, description: value })),
-  },
-  {
-    kind: 'table',
-    heading: aboutCopy.timelineHeading,
-    columns: ['Year', 'Role', 'Company', 'Highlight', 'Description'],
-    rows: timeline.map(({ year, role, company, highlight, description }) => [
-      year,
-      role,
-      company,
-      highlight,
-      description,
-    ]),
-  },
+  ...questions.map(({ question, answer }): PageSection => ({
+    kind: 'prose',
+    heading: question,
+    paragraphs: [answer],
+  })),
+  { kind: 'table', heading: aboutCopy.factsHeading, ...factsTable },
+  { kind: 'table', heading: aboutCopy.timelineHeading, ...timelineTable },
   {
     kind: 'list',
     heading: aboutCopy.beliefsHeading,
@@ -211,6 +312,7 @@ const sections: readonly PageSection[] = [
 export const aboutRecord: PageRecord = {
   path: '/about',
   title: 'About — Senior Full-Stack Engineer',
-  summary: `I fix the systems everyone else gave up on: ${yearsOfExperience()} years rescuing legacy codebases, now building AI agents that fix their own bugs. Based in Belgrade.`,
+  heading: 'About Milos Cvetkovic: legacy rescue, clean architecture, and AI-native systems',
+  summary: `I fix the systems everyone else gave up on: ${yearsOfExperience()} years rescuing legacy codebases, now building AI agents that fix their own bugs. Based in ${LOCATION.locality}.`,
   sections,
 };

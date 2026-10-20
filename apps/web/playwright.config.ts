@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { servesProductionBuild } from './e2e/support/build-mode';
+import { CHROMIUM_LAUNCH_ARGS } from './e2e/support/chromium-launch-args';
 
 // GitHub Actions sets CI=true; anything else (including "false") is treated as local. This chooses
 // the command and the runner hardening below, not the port: docs/runbooks/deploy.md sets CI=true by
@@ -66,34 +67,45 @@ export default defineConfig({
   workers: isCI ? 1 : undefined,
   expect: { timeout: isCI ? 10_000 : 5_000 },
   reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // The dev server rewrites prerender-manifest.json on the first request of each route with
+  // generateStaticParams, and parallel workers then catch it half-written (#264). Requesting those
+  // routes one at a time first ends the writes; the production build never writes it.
+  globalSetup: isCI ? undefined : './e2e/global-setup.ts',
   use: {
     baseURL: `http://localhost:${port}`,
     trace: 'on-first-retry',
   },
   // Three projects. The desktop one is the original and still runs everything that is not phone
   // specific; the two phone ones run only `e2e/mobile/`, which is where a spec goes when the defect
-  // it measures needs a real phone viewport and a real `isMobile` (a tap rather than a click, and a
-  // `<header>` whose `backdrop-blur-sm` becomes the containing block for the `fixed` menu panel it
-  // renders — the whole of pages-1).
+  // it measures needs a real phone viewport and a real `isMobile` (a tap rather than a click, and,
+  // until the menu became a modal dialog, a `<header>` whose `backdrop-blur-sm` became the containing
+  // block for the `fixed` menu panel it rendered — the whole of pages-1; #147 later dropped the blur).
   //
   // WebKit rather than Firefox for the second engine, for two reasons that both matter here:
-  // Playwright's `isMobile` is unsupported on Firefox, and whether a `backdrop-filter` ancestor
-  // becomes the containing block for a `fixed` descendant is exactly the class of behaviour that
-  // differs between Blink and WebKit. A mobile-menu geometry assertion that only ever ran on
-  // Chromium would say nothing about what an iPhone visitor sees.
+  // Playwright's `isMobile` is unsupported on Firefox, and the menu is engine-specific. Today that
+  // is how a modal dialog handles focus: WebKit leaves links out of the tab order, which
+  // `e2e/mobile/navigation.spec.ts` ('Tab and Shift+Tab from the Close button keep focus in the
+  // menu, in both engines') runs against. The engine was chosen when the bug was a
+  // `backdrop-filter` ancestor turning into the containing block of a `fixed` descendant, which
+  // also differs between Blink and WebKit. A mobile-menu assertion that only ever ran on Chromium
+  // would say nothing about what an iPhone visitor sees.
   //
   // `resolvePort` and the `webServer` block below are untouched: one server, started by this run,
   // never reused, whichever projects are selected (ADR 0014).
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], launchOptions: { args: [...CHROMIUM_LAUNCH_ARGS] } },
       // Without this the desktop project would run the phone specs at 1280x720, where the mobile
       // header is `md:hidden` and every menu locator resolves to nothing: nine tests failing for a
       // reason that has nothing to do with the defect they exist to record.
       testIgnore: MOBILE_SPECS,
     },
-    { name: 'mobile-chrome', use: { ...devices['Pixel 7'] }, testMatch: MOBILE_SPECS },
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 7'], launchOptions: { args: [...CHROMIUM_LAUNCH_ARGS] } },
+      testMatch: MOBILE_SPECS,
+    },
     { name: 'mobile-safari', use: { ...devices['iPhone 13'] }, testMatch: MOBILE_SPECS },
   ],
   webServer: {

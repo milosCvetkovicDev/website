@@ -5,6 +5,7 @@
  *
  * @vitest-environment node
  */
+import { globSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
@@ -198,6 +199,26 @@ describe('the lazy GSAP import rule', () => {
     const rules = result.messages.map((message) => message.ruleId);
     expect(rules).toContain('no-restricted-imports');
     expect(rules).toContain(GSAP_RULE);
+  });
+
+  // The cases above name paths; this one reads every source module there is, so an exemption added
+  // to the rule's `ignores` for a component fails here rather than waiting for a reviewer to notice.
+  // #47 deleted the last one, circuit-background.tsx, with the component.
+  it('applies to every source module but gsap-runtime.ts and the tests', async () => {
+    const modules = globSync('src/**/*.{ts,tsx}', { cwd: appDir }).filter(
+      (file) => !file.includes('/__tests__/') && !file.startsWith('src/test/'),
+    );
+    expect(modules.length).toBeGreaterThan(50);
+
+    const exempt: string[] = [];
+    for (const file of modules) {
+      const config = await eslint.calculateConfigForFile(path.join(appDir, file));
+      const setting: unknown = config?.rules?.[GSAP_RULE];
+      const severity = Array.isArray(setting) ? setting[0] : setting;
+      if (severity === undefined || severity === 0 || severity === 'off') exempt.push(file);
+    }
+
+    expect(exempt).toEqual(['src/components/animated-hero/gsap-runtime.ts']);
   });
 });
 
