@@ -6190,24 +6190,24 @@
       "anchor": "| 0019 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0019's record carries the status line \"Accepted\".",
+      "claim": "ADR 0019's record carries the status line \"Superseded by ADR-0037\".",
       "check": {
         "file": "docs/adr/0019-next-agent-rules-disabled.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0037"
       }
     },
     {
       "id": "adr-index-0019-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0019 |",
-      "claim": "The index row for ADR 0019 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0019 gives the record's status line, \"Superseded by ADR-0037\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0019 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0037"
       }
     },
     {
@@ -8675,6 +8675,114 @@
         "jq": "[.required_status_checks.contexts[] | select(. == \"Content dates\")] | length",
         "equals": 0
       }
+    },
+    {
+      "id": "adr-readme-link-0037-next-agent-files-synced-off",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0037-next-agent-files-synced-off.md)",
+      "claim": "The link to 0037-next-agent-files-synced-off.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0037-next-agent-files-synced-off.md" }],
+      "check": { "path": "docs/adr/0037-next-agent-files-synced-off.md" }
+    },
+    {
+      "id": "adr-index-0037-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0037's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0037-next-agent-files-synced-off.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0037-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0037 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0037 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0037-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0037's record carries the Date \"2026-10-20\".",
+      "check": {
+        "file": "docs/adr/0037-next-agent-files-synced-off.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-20"
+      }
+    },
+    {
+      "id": "adr-index-0037-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0037 gives the record's Date, \"2026-10-20\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0037 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-20"
+      }
+    },
+    {
+      "id": "adr-index-0037-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0037's record carries the H1 title \"Next.js keeps its agent instruction blocks out of the app, on 16.4's sync\".",
+      "check": {
+        "file": "docs/adr/0037-next-agent-files-synced-off.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Next.js keeps its agent instruction blocks out of the app, on 16.4's sync"
+      }
+    },
+    {
+      "id": "adr-index-0037-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0037 gives the record's H1 title, \"Next.js keeps its agent instruction blocks out of the app, on 16.4's sync\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0037 \\| \\[(.+?)\\]\\(0037-",
+        "equals": "Next.js keeps its agent instruction blocks out of the app, on 16.4's sync"
+      }
+    },
+    {
+      "id": "adr-0037-link-0019-next-agent-rules-disabled",
+      "doc": "docs/adr/0037-next-agent-files-synced-off.md",
+      "anchor": "](0019-next-agent-rules-disabled.md)",
+      "claim": "The link to 0019-next-agent-rules-disabled.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0019-next-agent-rules-disabled.md" }],
+      "check": { "path": "docs/adr/0019-next-agent-rules-disabled.md" }
+    },
+    {
+      "id": "adr-0019-link-0037-next-agent-files-synced-off",
+      "doc": "docs/adr/0019-next-agent-rules-disabled.md",
+      "anchor": "](0037-next-agent-files-synced-off.md)",
+      "claim": "The link to 0037-next-agent-files-synced-off.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0037-next-agent-files-synced-off.md" }],
+      "check": { "path": "docs/adr/0037-next-agent-files-synced-off.md" }
     },
     {
       "id": "adr-0035-link-rules-app-router-and-content",
