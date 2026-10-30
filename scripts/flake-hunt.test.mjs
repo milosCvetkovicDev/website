@@ -827,6 +827,36 @@ describe('interruptions', () => {
 
 describe('the nightly workflow', () => {
   const WORKFLOW = join(dirname(SCRIPT), '../.github/workflows/flake-hunt.yml');
+  const HUNT_STEP = "Run this shard's runs";
+
+  // Measured on the 12 scheduled hunts from 2026-10-19 to 2026-10-30, 333 completed runs: one run
+  // of the suite took 10.10 to 14.01 minutes (median 12.66), and the hunt step lasts the sum of
+  // its runs to within a second. The steps before it took 0.97 to 1.32 minutes, except twice in 72
+  // shards, when a stalled apt mirror held the browser install for up to 32.65 minutes; the upload
+  // after it took at most 0.10. Five runs to a shard needed up to 70 minutes against the step's
+  // 65, so on 10 of those 12 nights a shard's last run was killed by the step's timeout.
+  const SLOWEST_RUN_MINUTES = 14.01;
+  const SLOWEST_SETUP_MINUTES = 32.65;
+  // The slowest run was 39% slower than the fastest, so half again the slowest covers a runner
+  // slower than any measured by more than the whole spread seen.
+  const RUN_MARGIN = 1.5;
+  const UPLOAD_MINUTES = 1;
+
+  /** @param {string} text @param {RegExp} pattern */
+  function number(text, pattern) {
+    const match = pattern.exec(text);
+    assert.ok(match, `${pattern} matches nothing`);
+    return Number(match[1]);
+  }
+
+  function timeouts() {
+    const step = stepBlock(HUNT_STEP).join('\n');
+    return {
+      job: number(readFileSync(WORKFLOW, 'utf8'), /\n {4}timeout-minutes: (\d+)/),
+      step: number(step, /timeout-minutes: (\d+)/),
+      runs: number(runScript(HUNT_STEP), /^scripts\/flake-hunt\.sh (\d+) &$/m),
+    };
+  }
 
   /** The indented block of the step named `name` under the key `key`, as the YAML holds it. */
   /** @param {string} name */
@@ -856,7 +886,7 @@ describe('the nightly workflow', () => {
   // The runner signals the step's shell alone: SIGINT, then SIGTERM 7.5 s later.
   for (const signal of /** @type {NodeJS.Signals[]} */ (['SIGINT', 'SIGTERM'])) {
     it(`stops the hunt cleanly when a cancelled shard's shell gets ${signal}`, async () => {
-      writeFileSync(join(root, 'repo/step.sh'), runScript('Run the suite five times'));
+      writeFileSync(join(root, 'repo/step.sh'), runScript(HUNT_STEP));
       plan(1, passing());
       writeFileSync(join(stub, 'run-2.hang'), '');
       const step = spawn('bash', ['--noprofile', '--norc', '-eo', 'pipefail', 'step.sh'], {
@@ -889,11 +919,46 @@ describe('the nightly workflow', () => {
     const job = Number(
       /** @type {RegExpExecArray} */ (/\n {4}timeout-minutes: (\d+)/.exec(text))[1],
     );
-    const step = stepBlock('Run the suite five times').join('\n');
+    const step = stepBlock(HUNT_STEP).join('\n');
     assert.ok(
       Number(/** @type {RegExpExecArray} */ (/timeout-minutes: (\d+)/.exec(step))[1]) < job,
     );
     assert.match(stepBlock("Upload this shard's runs").join('\n'), /if: \$\{\{ always\(\) \}\}/);
+  });
+
+  it("numbers the shards apart up to the expected runs, each the step's run count", () => {
+    const text = readFileSync(WORKFLOW, 'utf8');
+    const expected = number(text, /FLAKE_HUNT_EXPECTED_RUNS: '(\d+)'/);
+    const { runs } = timeouts();
+    const shards = [...text.matchAll(/^ {10}- \{ first: (\d+), last: (\d+) \}$/gm)];
+    assert.ok(shards.length > 0, 'no { first, last } shard in the matrix');
+    let next = 1;
+    for (const [, first, last] of shards) {
+      assert.equal(Number(first), next, `a shard starts at ${first}, not at ${next}`);
+      assert.equal(Number(last) - Number(first) + 1, runs, `shard ${first} to ${last}`);
+      next = Number(last) + 1;
+    }
+    assert.equal(next - 1, expected, 'the shards do not add up to FLAKE_HUNT_EXPECTED_RUNS');
+  });
+
+  it("fits a shard's runs in the step's timeout with half again the slowest run measured", () => {
+    const { runs, step } = timeouts();
+    const needed = runs * SLOWEST_RUN_MINUTES * RUN_MARGIN;
+    assert.ok(
+      needed <= step,
+      `${runs} runs of ${SLOWEST_RUN_MINUTES} min with a ${RUN_MARGIN}x margin need ` +
+        `${needed.toFixed(1)} min; the step allows ${step}`,
+    );
+  });
+
+  it("gives the job the slowest setup measured on top of the step's timeout", () => {
+    const { job, step } = timeouts();
+    const needed = SLOWEST_SETUP_MINUTES + step + UPLOAD_MINUTES;
+    assert.ok(
+      needed <= job,
+      `${SLOWEST_SETUP_MINUTES} min of setup, the step's ${step} and ${UPLOAD_MINUTES} to ` +
+        `upload need ${needed.toFixed(1)} min; the job allows ${job}`,
+    );
   });
 });
 
