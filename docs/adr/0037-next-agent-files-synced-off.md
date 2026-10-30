@@ -85,14 +85,17 @@ so Next.js writes no agent instructions into the app and removes its own blocks 
 
 - The checks match compiled code. In 16.4, `apps/web/src/test/next-config.test.ts` reads both the
   CommonJS and the ESM build of `dist/server/lib`, and fails if `router-server.js`'s `initialize`
-  stops returning `agentRules` and `agentFeedback` from the config; if any call of
-  `syncAgentRulesForDev` in `start-server.js` stops taking `<result>.agentRules !== false`, alone,
-  as its switch, on the object `getRequestHandlers` returned; if any call of
+  stops returning `agentRules` and `agentFeedback` from the config; if `start-server.js` stops
+  calling `syncAgentRulesForDev` or `syncAgentFeedbackForDev`, or calls either anywhere in a form
+  the test cannot read, `<name>(<identifier>, <switch>)` with no parenthesis in the switch; if a
+  call of `syncAgentRulesForDev` there takes anything but `<result>.agentRules !== false`, alone,
+  as its switch, on the object `getRequestHandlers` returned; if a call of
   `syncAgentFeedbackForDev` stops having `<result>.agentFeedback === true` among the `&&` terms of
-  its switch, or either switch gains a top-level `||` or `?`; if either function in
-  `app-info-log.js` stops opening with the removal when switched off, or stops being where its
-  writer is called; or if any other file under `dist` (bar the vendored bundles in `dist/compiled`
-  and the Markdown in `dist/docs`) calls either function or either writer. It also checks that
+  its switch, on that object; if either switch gains a top-level `||`, `??`, conditional `?` or
+  comma; if either function in `app-info-log.js` stops opening with the removal when switched off,
+  or stops being where its writer is called; or if any other `.js`, `.cjs` or `.mjs` file under
+  `dist` (bar the vendored bundles in `dist/compiled`, and `dist/docs`, which holds only Markdown)
+  calls either function or either writer. It also checks that
   `dist/docs` ships and that
   `dist/docs/01-app/03-api-reference/05-config/01-next-config-js/agentRules.md` still documents
   `agentRules: false`. So the next release that restructures that code fails them, as 16.4 did,

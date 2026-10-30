@@ -728,10 +728,14 @@ describe('the installed Next.js honours agentRules', () => {
     }
   };
   const serverLibs = ['dist/server/lib', 'dist/esm/server/lib'];
-  // Call sites only: the name followed by `(`, or by `)(` as in the CommonJS build's
-  // `(0, _mod.name)(...)`, and never the function's own declaration.
+  const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Every textual call site: the name, matched as text and not inside a longer identifier,
+  // followed by `(`, or by `)(` as in the CommonJS build's `(0, _mod.name)(...)`, and never the
+  // function's own declaration.
   const callSites = (source: string, name: string) => [
-    ...source.matchAll(new RegExp(`(?<!function\\s+)\\b${name}\\)?\\s*\\(`, 'g')),
+    ...source.matchAll(
+      new RegExp(`(?<!function\\s+)(?<![\\w$])${escapeRegExp(name)}\\)?\\s*\\(`, 'g'),
+    ),
   ];
   // The object literal whose `{` sits at `open`, found by counting braces; '' when there is none.
   const objectLiteral = (source: string, open: number) => {
@@ -797,31 +801,34 @@ describe('the installed Next.js honours agentRules', () => {
     },
   ];
 
-  const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-  // For each call of a sync, the object its switch reads (`<result>`), or null when the switch is
-  // not one this test accepts. The second argument is read as a conjunction: its `&&` terms, each
-  // a local constant replaced by its value. The pattern stops at the first parenthesis, so all it
-  // reads is top level, and a `||` or `?` there (a disjunction, a conditional, a `??` default)
-  // would let another operand switch the sync on whatever the guard says, so it is refused. A
-  // constant's value counts as one term, as if parenthesised: `a && <value>` is false whenever `a`
-  // is, so a `?` inside one, as in 16.4's `telemetryEnabled`, is no concern.
+  // One entry for every call site of a sync, as `callSites` finds them: the object its switch reads
+  // (`<result>`), or null when the call is not one this test can read or accepts. A call is read
+  // only as `<name>(<identifier>, <switch>)` with no parenthesis in the switch, so all it reads is
+  // top level; any other call (a parenthesis in the switch, a first argument that is not an
+  // identifier, a single argument) is a null, never skipped. The switch is read as a conjunction:
+  // its `&&` terms, each a local constant replaced by its value. A `||`, a `??` or a conditional
+  // `?` at top level would let another operand switch the sync on whatever the guard says, and a
+  // comma makes the rest another argument, so each is refused; `?.` is optional chaining unless a
+  // digit follows it. A constant's value counts as one term, as if parenthesised: `a && <value>` is
+  // false whenever `a` is, so a `?` inside one, as in 16.4's `telemetryEnabled`, is no concern.
   const switchGuards = (source: string, { name, switchedBy, only }: (typeof syncs)[number]) =>
-    [...source.matchAll(new RegExp(`\\b${name}\\)?\\(\\s*[\\w$]+\\s*,\\s*([^()]*)\\)`, 'g'))].map(
-      (call) => {
-        const argument = call[1] ?? '';
-        if (/\|\||\?/.test(argument)) return null;
-        const before = source.slice(0, call.index);
-        const terms = argument.split('&&').map((term) => {
-          const id = term.trim();
-          if (!/^[\w$]+$/.test(id)) return id;
-          const declaration = new RegExp(`\\bconst\\s+${escapeRegExp(id)}\\s*=\\s*([^;]+);`, 'g');
-          return ([...before.matchAll(declaration)].at(-1)?.[1] ?? id).trim();
-        });
-        if (only && terms.length !== 1) return null;
-        return terms.map((term) => term.match(switchedBy)).find(Boolean)?.[1] ?? null;
-      },
-    );
+    callSites(source, name).map((site) => {
+      const call = source
+        .slice(site.index)
+        .match(new RegExp(`^${escapeRegExp(name)}\\)?\\s*\\(\\s*[\\w$]+\\s*,\\s*([^()]*)\\)`));
+      if (!call) return null;
+      const argument = call[1] ?? '';
+      if (/\|\||,|\?(?!\.(?!\d))/.test(argument)) return null;
+      const before = source.slice(0, site.index);
+      const terms = argument.split('&&').map((term) => {
+        const id = term.trim();
+        if (!/^[\w$]+$/.test(id)) return id;
+        const declaration = new RegExp(`\\bconst\\s+${escapeRegExp(id)}\\s*=\\s*([^;]+);`, 'g');
+        return ([...before.matchAll(declaration)].at(-1)?.[1] ?? id).trim();
+      });
+      if (only && terms.length !== 1) return null;
+      return terms.map((term) => term.match(switchedBy)).find(Boolean)?.[1] ?? null;
+    });
 
   it('reads a switch as a conjunction, refusing one a false guard would not turn off', () => {
     const [rules, feedback] = syncs as [(typeof syncs)[number], (typeof syncs)[number]];
@@ -838,6 +845,37 @@ describe('the installed Next.js honours agentRules', () => {
     expect.soft(read(feedback, 'c ? x : r.agentFeedback === true && t')).toEqual([null]);
     // The rules switch is the guard alone.
     expect.soft(read(rules, 'r.agentRules !== false && t')).toEqual([null]);
+    // So is a `??` default, and a comma, which makes the rest of the switch another argument.
+    expect.soft(read(rules, 'x ?? r.agentRules !== false')).toEqual([null]);
+    const on = 'const on = r.agentFeedback === true;';
+    expect.soft(read(feedback, 'on && t, true', on)).toEqual([null]);
+    // `?.` is optional chaining, not a conditional, unless a digit follows it.
+    expect.soft(read(feedback, 'r.agentFeedback === true && t?.isEnabled')).toEqual(['r']);
+    expect.soft(read(feedback, 'c?.5:r.agentFeedback === true')).toEqual([null]);
+  });
+
+  it('reads every call of a sync, failing one it cannot parse instead of skipping it', () => {
+    const [rules] = syncs as [(typeof syncs)[number]];
+    const read = (sync: (typeof syncs)[number], ...calls: string[]) =>
+      switchGuards(
+        [`async function ${sync.name}(dir, enabled) {}`, ...calls.map((c) => `await ${c};`)].join(
+          '\n',
+        ),
+        sync,
+      );
+    const good = `${rules.name}(dir, r.agentRules !== false)`;
+    // The declaration is not a call, and the CommonJS build calls through `(0, _mod.name)(...)`.
+    expect.soft(read(rules, good)).toEqual(['r']);
+    expect.soft(read(rules, `(0, _m.${rules.name})(dir, r.agentRules !== false)`)).toEqual(['r']);
+    // A parenthesis in the switch, a first argument that is not an identifier, a single argument.
+    expect.soft(read(rules, good, `${rules.name}(dir, force() || r.x)`)).toEqual(['r', null]);
+    expect
+      .soft(read(rules, good, `${rules.name}(opts.dir, r.agentRules !== false)`))
+      .toEqual(['r', null]);
+    expect.soft(read(rules, good, `${rules.name}(r.agentRules !== false)`)).toEqual(['r', null]);
+    // A name is matched as text: `$` is an identifier character, not an anchor.
+    const dollar = { ...rules, name: 'sync$Rules' };
+    expect.soft(read(dollar, 'sync$Rules(dir, r.agentRules !== false)')).toEqual(['r']);
   });
 
   it('switches each sync of the agent files on the value initialize returned', () => {
@@ -875,10 +913,12 @@ describe('the installed Next.js honours agentRules', () => {
     }
   });
 
-  // A second caller anywhere else in Next.js would bypass the switches above. dist/compiled holds
-  // vendored, minified third-party bundles and dist/docs holds Markdown, so neither is read. The
-  // walk reads about 2,700 files, just under a second at a load average of 90, so it takes a
-  // longer timeout than the 5s default rather than failing on a busy machine.
+  // A second caller anywhere else in Next.js would bypass the switches above. The walk reads every
+  // `.js`, `.cjs` and `.mjs` file under dist but two directories: dist/compiled, which holds
+  // vendored, minified third-party bundles, and dist/docs, which holds only Markdown (474 files in
+  // 16.4.3) that the extension filter would pass over anyway. It reads about 2,700 files, just
+  // under a second at a load average of 90, so it takes a longer timeout than the 5s default
+  // rather than failing on a busy machine.
   it('calls the syncs and the writers from nowhere else in Next.js', () => {
     const names = syncs.flatMap(({ name, write }) => [name, write]);
     const found: Record<string, number> = {};
