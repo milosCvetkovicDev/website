@@ -42,12 +42,15 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   only the server's stderr reaches the log, because `webServer.stdout` stays at Playwright's
   default, `'ignore'`, so every other server line is a finding, warnings included. The canary is
   how the check knows the capture works, since a green 16.4 run's server writes nothing else to
-  stderr: under CI, `webServer.command` in `apps/web/playwright.config.ts` echoes
-  `WEB_SERVER_LOG_CANARY` to stderr before `pnpm start`, and the log must hold
-  `[WebServer] <canary>` exactly once. Its text is `CANARY` in the script, and
+  stderr: under CI, `webServer.command` in `apps/web/playwright.config.ts` prints
+  `WEB_SERVER_LOG_CANARY` to stderr with `printf '%s\n'` before `pnpm start`, and the log must
+  hold `[WebServer] <canary>` exactly once. Its text is `CANARY` in the script, and
   `src/test/playwright-config.test.ts` fails when the two differ. A missing or empty log fails,
   and so does a log without the canary, which means the capture broke, or with it twice, which
   holds two runs. The local dev server prints no canary, so a log from a local run fails the check.
+  The canary proves the capture, not that errors reach it: that rests on Next, whose 16.4.3
+  `next start` logs a request or render error with `console.error` (the route module's
+  `onRequestError`), and no test makes the server throw to show it.
   The check runs whenever the suite ran, passed or failed, and not after an earlier step failed,
   when there is no log to read. Its tests run in `pnpm test:scripts`.
 - Every route must load with a clean browser console, in both colour schemes.

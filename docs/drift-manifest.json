@@ -10030,7 +10030,7 @@
       "claim": "CI serves the production build with pnpm start.",
       "check": {
         "file": "apps/web/playwright.config.ts",
-        "regex": "^    command: isCI \\? [^\\n]*?(?:'|&& )(pnpm start)['`] : 'pnpm dev',$",
+        "regex": "^    command: isCI \\? (?:'(?=pnpm start')|`printf '%s\\\\\\\\n' '\\$\\{WEB_SERVER_LOG_CANARY\\}' >&2 && (?=pnpm start`))(pnpm start)['`] : 'pnpm dev',$",
         "equals": "pnpm start"
       }
     },

@@ -122,9 +122,10 @@ export default defineConfig({
   ],
   webServer: {
     // CI runs the production build (`pnpm build` runs first), after the canary; locally the dev
-    // server. Playwright runs the command through a shell, where `>&2` sends `echo` to the stderr
-    // it forwards.
-    command: isCI ? `echo '${WEB_SERVER_LOG_CANARY}' >&2 && pnpm start` : 'pnpm dev',
+    // server. Playwright runs the command through a shell, where `>&2` sends the canary to the
+    // stderr it forwards. `printf '%s\n'` prints its argument as written, which `echo` does not
+    // promise: some shells' `echo` reads backslashes and a leading `-n`.
+    command: isCI ? `printf '%s\\n' '${WEB_SERVER_LOG_CANARY}' >&2 && pnpm start` : 'pnpm dev',
     // Playwright merges this over process.env rather than replacing it. `next dev` and `next start`
     // both read PORT, so the port reaches Next without depending on how pnpm forwards arguments.
     env: {

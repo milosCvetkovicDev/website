@@ -258,7 +258,7 @@ function webServerOf(loaded: PlaywrightTestConfig) {
 }
 
 /** CI's server command: the canary scripts/check-webserver-log.mjs requires, then the build. */
-const CI_COMMAND = `echo '${WEB_SERVER_LOG_CANARY}' >&2 && pnpm start`;
+const CI_COMMAND = `printf '%s\\n' '${WEB_SERVER_LOG_CANARY}' >&2 && pnpm start`;
 
 // Every spelling of CI the config tells apart, with the server each one must get: `CI=true` and
 // `CI=1` run the production build, anything else (a stray `false` or `0` included) the dev server,
@@ -333,7 +333,12 @@ describe('playwright.config.ts webServer (ADR 0014)', () => {
     const command = webServerOf(await loadConfig('true')).command;
     const server = ' && pnpm start';
     expect(command.endsWith(server), command).toBe(true);
-    const printed = spawnSync('sh', ['-c', command.slice(0, -server.length)], { encoding: 'utf8' });
+    // A shell that hangs fails here, with `error` naming the timeout, rather than at the test's.
+    const printed = spawnSync('sh', ['-c', command.slice(0, -server.length)], {
+      encoding: 'utf8',
+      timeout: 4000,
+    });
+    expect(printed.error).toBeUndefined();
     expect(printed).toMatchObject({ status: 0, stdout: '', stderr: `${WEB_SERVER_LOG_CANARY}\n` });
   });
 
