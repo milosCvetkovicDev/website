@@ -56,17 +56,12 @@ holding nothing but a stale managed block it logged "Removed agent rules from AG
 so Next.js writes no agent instructions into the app and removes its own blocks from an
 `apps/web/AGENTS.md` it finds there.
 
-- `apps/web/src/test/next-config.test.ts` asserts the default export's `agentRules` is `false` and
-  its `experimental.agentFeedback` is unset or `false`, and fails if `AGENTS.md` or `CLAUDE.md` in
-  `apps/web` is tracked. It reads the installed Next.js's compiled dev server, in both the CommonJS
-  and the ESM build, and fails if `router-server.js`'s `initialize` stops returning `agentRules` and
-  `agentFeedback` from the config; if any call of `syncAgentRulesForDev` in `start-server.js` stops
-  taking `<result>.agentRules !== false` on the object `getRequestHandlers` returned as its switch,
-  or any call of `syncAgentFeedbackForDev` stops having `<result>.agentFeedback === true` among the
-  terms of its switch; if either function in `app-info-log.js` stops opening with the removal when
-  switched off, or stops being where its writer is called; or if any other file under `dist` (bar the
-  vendored bundles in `dist/compiled`) calls either function or either writer. It checks that the
-  bundled `dist/docs` ships and that its `agentRules` page still documents `agentRules: false`.
+- Unit tests pin this against whichever Next.js is installed: they fail when the config stops
+  setting either value, when `AGENTS.md` or `CLAUDE.md` in `apps/web` is tracked, when the installed
+  Next.js's compiled dev server no longer shows those two values as the only switch on what it
+  writes into the app, and when its bundled docs stop documenting `agentRules: false`. What the
+  tests read in that code is under Consequences, because it changes with each release that
+  restructures it.
 - The repository's own reviewed files, the root `CLAUDE.md` and the scoped rules in
   `.claude/rules/`, stay the only instructions for this project, and the root `CLAUDE.md` keeps
   pointing agents at `apps/web/node_modules/next/dist/docs`, as under ADR 0019.
@@ -82,14 +77,29 @@ so Next.js writes no agent instructions into the app and removes its own blocks 
   until someone deletes them" holds only for `CLAUDE.md`.
 - The feedback block cannot appear without a change to `next.config.ts` that review sees, and the
   unit tests fail on that change as well.
-- Every instruction an agent reads about this repository is still in a file a person wrote and
-  reviewed.
+- Every instruction file an agent loads for this repository is still one a person wrote and
+  reviewed. The upgrade reminders `experimental.agentUpgrade` prints are console output, not a
+  file, and outside this record.
 
 ### Trade-offs
 
-- The checks still match compiled code, so the next release that restructures it fails them, as
-  16.4 did, and whoever bumps Next.js reads this record against the new code before updating the
-  patterns. Generation moving behind another option or a renamed function is still not noticed
+- The checks match compiled code. In 16.4, `apps/web/src/test/next-config.test.ts` reads both the
+  CommonJS and the ESM build of `dist/server/lib`, and fails if `router-server.js`'s `initialize`
+  stops returning `agentRules` and `agentFeedback` from the config; if any call of
+  `syncAgentRulesForDev` in `start-server.js` stops taking `<result>.agentRules !== false`, alone,
+  as its switch, on the object `getRequestHandlers` returned; if any call of
+  `syncAgentFeedbackForDev` stops having `<result>.agentFeedback === true` among the `&&` terms of
+  its switch, or either switch gains a top-level `||` or `?`; if either function in
+  `app-info-log.js` stops opening with the removal when switched off, or stops being where its
+  writer is called; or if any other file under `dist` (bar the vendored bundles in `dist/compiled`
+  and the Markdown in `dist/docs`) calls either function or either writer. It also checks that
+  `dist/docs` ships and that
+  `dist/docs/01-app/03-api-reference/05-config/01-next-config-js/agentRules.md` still documents
+  `agentRules: false`. So the next release that restructures that code fails them, as 16.4 did,
+  and whoever bumps Next.js reads this record against the new code before updating the patterns.
+  The list describes 16.4 and stays true of it: under ADR 0012 a later release's readings go in a
+  note in a later record, and this one is superseded only when the behaviour its Decision states
+  changes. Generation moving behind another option or a renamed function is still not noticed
   automatically; the behavioural check stays manual:
   `git status --porcelain --ignored -- apps/web/AGENTS.md apps/web/CLAUDE.md` prints nothing after
   an agent-run `next dev` or local e2e.
