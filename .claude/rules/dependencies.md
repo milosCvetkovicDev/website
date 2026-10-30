@@ -54,8 +54,9 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   upstream event that reopens it: `eslint` and `@eslint/js` (eslint-config-next pulls an
   eslint-plugin-react that ESLint 10 breaks — jsx-eslint/eslint-plugin-react#3977), `typescript`
   `>=7` (no classic compiler API at the root; typescript-eslint peers `<6.1.0`) and `@types/node`
-  majors (they follow `.nvmrc` by hand). One minor is held as well: `@playwright/test` `1.64.x`,
-  by the owner's ruling of 2026-10-30, until #278 is resolved. Adding one is a policy change, so read
+  majors (they follow `.nvmrc` by hand). `@playwright/test` is held as well, at every version from
+  1.64.0 up (`>=1.64.0`), by the owner's ruling of 2026-10-30, until #278 is resolved. Adding one
+  is a policy change, so read
   `docs/adr/0018-dependency-update-policy.md` first; deleting one without the trigger having fired
   puts the red pull request back. A `vite` group (`vite`, `@vitejs/*`, `vitest`, `@vitest/*`, majors
   included) brings a vite major in one pull request with the `@vitejs/plugin-react` and vitest
