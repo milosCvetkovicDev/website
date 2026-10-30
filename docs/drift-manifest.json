@@ -8687,6 +8687,16 @@
       "check": { "path": "docs/adr/0037-next-agent-files-synced-off.md" }
     },
     {
+      "id": "adr-readme-link-0038-playwright-held-below-1-64",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0038-playwright-held-below-1-64.md)",
+      "claim": "The link to 0038-playwright-held-below-1-64.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0038-playwright-held-below-1-64.md" }],
+      "check": { "path": "docs/adr/0038-playwright-held-below-1-64.md" }
+    },
+    {
       "id": "adr-index-0037-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0037 |",
@@ -8765,6 +8775,84 @@
       }
     },
     {
+      "id": "adr-index-0038-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0038's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0038-playwright-held-below-1-64.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0038-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0038 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0038 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0038-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0038's record carries the Date \"2026-10-30\".",
+      "check": {
+        "file": "docs/adr/0038-playwright-held-below-1-64.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-30"
+      }
+    },
+    {
+      "id": "adr-index-0038-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0038 gives the record's Date, \"2026-10-30\" (the date in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0038 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-30"
+      }
+    },
+    {
+      "id": "adr-index-0038-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0038's record carries the H1 title \"Hold @playwright/test below 1.64 until mobile-safari passes on it\".",
+      "check": {
+        "file": "docs/adr/0038-playwright-held-below-1-64.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Hold @playwright/test below 1.64 until mobile-safari passes on it"
+      }
+    },
+    {
+      "id": "adr-index-0038-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0038 gives the record's H1 title, \"Hold @playwright/test below 1.64 until mobile-safari passes on it\" (the title in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0038 \\| \\[(.+?)\\]\\(0038-",
+        "equals": "Hold @playwright/test below 1.64 until mobile-safari passes on it"
+      }
+    },
+    {
       "id": "adr-0037-link-0019-next-agent-rules-disabled",
       "doc": "docs/adr/0037-next-agent-files-synced-off.md",
       "anchor": "](0019-next-agent-rules-disabled.md)",
@@ -8773,6 +8861,39 @@
       "evaluation": "live",
       "covers": [{ "kind": "link", "token": "0019-next-agent-rules-disabled.md" }],
       "check": { "path": "docs/adr/0019-next-agent-rules-disabled.md" }
+    },
+    {
+      "id": "adr-0038-link-0032-e2e-chromium-single-threaded-gc",
+      "doc": "docs/adr/0038-playwright-held-below-1-64.md",
+      "anchor": "](0032-e2e-chromium-single-threaded-gc.md)",
+      "claim": "The link to 0032-e2e-chromium-single-threaded-gc.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0032-e2e-chromium-single-threaded-gc.md" }],
+      "check": { "path": "docs/adr/0032-e2e-chromium-single-threaded-gc.md" }
+    },
+    {
+      "id": "adr-0038-link-0018-dependency-update-policy",
+      "doc": "docs/adr/0038-playwright-held-below-1-64.md",
+      "anchor": "](0018-dependency-update-policy.md)",
+      "claim": "The link to 0018-dependency-update-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0018-dependency-update-policy.md" }],
+      "check": { "path": "docs/adr/0018-dependency-update-policy.md" }
+    },
+    {
+      "id": "adr-0038-dependabot-ignores",
+      "doc": "docs/adr/0038-playwright-held-below-1-64.md",
+      "anchor": "lists every `dependency-name` in `.github/dependabot.yml`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "Dependabot ignores exactly five dependencies, in this order: eslint, @eslint/js, typescript and @types/node (the majors of ADR 0018) and @playwright/test (the version hold of ADR 0038). An ignore added or removed is drift until a record says why.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "^[ \\t]*(?:- )?dependency-name:[ \\t]*['\"]?([^'\"\\n#]+?)['\"]?[ \\t]*(?:#[^\\n]*)?$",
+        "equalsAll": ["eslint", "@eslint/js", "typescript", "@types/node", "@playwright/test"]
+      }
     },
     {
       "id": "adr-0019-link-0037-next-agent-files-synced-off",

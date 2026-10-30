@@ -63,6 +63,7 @@ perform an operation.
 | 0035 | [A value only the owner can supply is a registered placeholder with a deadline the owner sets](0035-owner-placeholder-convention.md)     | Accepted                                      | 2026-09-29 |
 | 0036 | [Content dates move with served text, and a pull request check holds them together](0036-content-dates-move-with-served-text.md)         | Proposed                                      | 2026-10-08 |
 | 0037 | [Next.js keeps its agent instruction blocks out of the app, on 16.4's sync](0037-next-agent-files-synced-off.md)                         | Accepted                                      | 2026-10-20 |
+| 0038 | [Hold @playwright/test below 1.64 until mobile-safari passes on it](0038-playwright-held-below-1-64.md)                                  | Accepted                                      | 2026-10-30 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see
