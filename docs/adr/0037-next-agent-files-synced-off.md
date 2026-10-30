@@ -57,11 +57,13 @@ so Next.js writes no agent instructions into the app and removes its own blocks 
 `apps/web/AGENTS.md` it finds there.
 
 - Unit tests pin this against whichever Next.js is installed: they fail when the config stops
-  setting either value, when `AGENTS.md` or `CLAUDE.md` in `apps/web` is tracked, when the installed
-  Next.js's compiled dev server no longer shows those two values as the only switch on what it
-  writes into the app, and when its bundled docs stop documenting `agentRules: false`. What the
-  tests read in that code is under Consequences, because it changes with each release that
-  restructures it.
+  setting `agentRules: false` or stops leaving `experimental.agentFeedback` unset or `false`; when
+  `AGENTS.md` or `CLAUDE.md` in `apps/web` is tracked; when the installed Next.js's compiled dev
+  server no longer shows `agentRules` as the whole switch on the rules block it writes into the
+  app, or `agentFeedback === true` as a term the switch on the feedback block requires, a block
+  Next also leaves off in CI and without telemetry; and when its bundled docs stop documenting
+  `agentRules: false`. What the tests read in that code is under Consequences, because it changes
+  with each release that restructures it.
 - The repository's own reviewed files, the root `CLAUDE.md` and the scoped rules in
   `.claude/rules/`, stay the only instructions for this project, and the root `CLAUDE.md` keeps
   pointing agents at `apps/web/node_modules/next/dist/docs`, as under ADR 0019.
