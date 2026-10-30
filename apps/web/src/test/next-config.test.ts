@@ -683,10 +683,12 @@ describe('agent instruction files', () => {
     expect(nextConfig.agentRules).toBe(false);
   });
 
-  // A CLAUDE.md written before ADR 0019 stays behind, untracked, until someone deletes it. This check
-  // cannot stop a `git add -A` from committing it, but it fails the unit suite, and so CI, on any
-  // branch that tracks either file. Ignoring the pair instead would only hide it: Claude Code
-  // loads an ignored CLAUDE.md all the same.
+  // Either file can still be left behind, untracked, until someone deletes it: an
+  // apps/web/CLAUDE.md that 16.3 wrote before ADR 0019, which 16.4 never touches, and an
+  // apps/web/AGENTS.md holding more than Next's block, from which 16.4 strips the block and keeps
+  // the rest. This check cannot stop a `git add -A` from committing one, but it fails the unit
+  // suite, and so CI, on any branch that tracks either. Ignoring them instead would only hide
+  // them: Claude Code loads an ignored CLAUDE.md all the same.
   it('tracks neither generated file', () => {
     let tracked: string;
     try {
@@ -731,8 +733,9 @@ describe('the installed Next.js honours agentRules', () => {
   const callSites = (source: string, name: string) => [
     ...source.matchAll(new RegExp(`(?<!function\\s+)\\b${name}\\)?\\s*\\(`, 'g')),
   ];
-  // The object literal whose `{` sits at `open`, found by counting braces.
+  // The object literal whose `{` sits at `open`, found by counting braces; '' when there is none.
   const objectLiteral = (source: string, open: number) => {
+    if (source[open] !== '{') return '';
     let depth = 0;
     for (let i = open; i < source.length; i++) {
       if (source[i] === '{') depth++;
@@ -741,31 +744,31 @@ describe('the installed Next.js honours agentRules', () => {
     return '';
   };
 
+  // The object literal the router server's `initialize` returns last, read up to the next
+  // function declared at the start of a line.
+  const initializeReturns = (lib: string) => {
+    const source = readNext(`${lib}/router-server.js`);
+    const start = source.search(/\basync function initialize\(/);
+    expect(start, `${lib}: initialize`).toBeGreaterThanOrEqual(0);
+    const rest = source.slice(start + 1);
+    const end = rest.search(/\n(?:export\s+)?(?:async\s+)?function\s/);
+    const body = end < 0 ? rest : rest.slice(0, end);
+    const returned = body.lastIndexOf('return {');
+    expect(returned, `${lib}: initialize's return`).toBeGreaterThanOrEqual(0);
+    const literal = objectLiteral(body, returned + 'return '.length);
+    expect(literal, `${lib}: initialize's return`).not.toBe('');
+    return literal;
+  };
+
   it('returns agentRules from the config in the object initialize hands the dev server', () => {
     for (const lib of serverLibs) {
-      const source = readNext(`${lib}/router-server.js`);
-      const start = source.search(/\basync function initialize\(/);
-      expect(start, lib).toBeGreaterThanOrEqual(0);
-      const rest = source.slice(start + 1);
-      const end = rest.search(/\n(?:export\s+)?(?:async\s+)?function\s/);
-      const body = end < 0 ? rest : rest.slice(0, end);
-      const returned = body.lastIndexOf('return {');
-      expect(returned, lib).toBeGreaterThanOrEqual(0);
-      expect(objectLiteral(body, returned + 'return '.length), lib).toMatch(
-        /\bagentRules:\s*config\.agentRules\b/,
-      );
+      expect(initializeReturns(lib), lib).toMatch(/\bagentRules:\s*config\.agentRules\b/);
     }
   });
 
   it('returns experimental.agentFeedback from the config in the same object', () => {
     for (const lib of serverLibs) {
-      const source = readNext(`${lib}/router-server.js`);
-      const start = source.search(/\basync function initialize\(/);
-      const rest = source.slice(start + 1);
-      const end = rest.search(/\n(?:export\s+)?(?:async\s+)?function\s/);
-      const body = end < 0 ? rest : rest.slice(0, end);
-      const returned = body.lastIndexOf('return {');
-      expect(objectLiteral(body, returned + 'return '.length), lib).toMatch(
+      expect(initializeReturns(lib), lib).toMatch(
         /\bagentFeedback:\s*config\.experimental\.agentFeedback\b/,
       );
     }
@@ -781,6 +784,7 @@ describe('the installed Next.js honours agentRules', () => {
       write: 'writeAgentFiles',
       // `<result>.agentRules !== false`, and nothing else.
       switchedBy: /^([\w$]+)\.agentRules\s*!==\s*false$/,
+      only: true,
     },
     {
       name: 'syncAgentFeedbackForDev',
@@ -789,8 +793,52 @@ describe('the installed Next.js honours agentRules', () => {
       // A conjunction one of whose terms is `<result>.agentFeedback === true`, so `false` or unset
       // switches it off whatever the other terms say.
       switchedBy: /^([\w$]+)\.agentFeedback\s*===\s*true$/,
+      only: false,
     },
   ];
+
+  const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // For each call of a sync, the object its switch reads (`<result>`), or null when the switch is
+  // not one this test accepts. The second argument is read as a conjunction: its `&&` terms, each
+  // a local constant replaced by its value. The pattern stops at the first parenthesis, so all it
+  // reads is top level, and a `||` or `?` there (a disjunction, a conditional, a `??` default)
+  // would let another operand switch the sync on whatever the guard says, so it is refused. A
+  // constant's value counts as one term, as if parenthesised: `a && <value>` is false whenever `a`
+  // is, so a `?` inside one, as in 16.4's `telemetryEnabled`, is no concern.
+  const switchGuards = (source: string, { name, switchedBy, only }: (typeof syncs)[number]) =>
+    [...source.matchAll(new RegExp(`\\b${name}\\)?\\(\\s*[\\w$]+\\s*,\\s*([^()]*)\\)`, 'g'))].map(
+      (call) => {
+        const argument = call[1] ?? '';
+        if (/\|\||\?/.test(argument)) return null;
+        const before = source.slice(0, call.index);
+        const terms = argument.split('&&').map((term) => {
+          const id = term.trim();
+          if (!/^[\w$]+$/.test(id)) return id;
+          const declaration = new RegExp(`\\bconst\\s+${escapeRegExp(id)}\\s*=\\s*([^;]+);`, 'g');
+          return ([...before.matchAll(declaration)].at(-1)?.[1] ?? id).trim();
+        });
+        if (only && terms.length !== 1) return null;
+        return terms.map((term) => term.match(switchedBy)).find(Boolean)?.[1] ?? null;
+      },
+    );
+
+  it('reads a switch as a conjunction, refusing one a false guard would not turn off', () => {
+    const [rules, feedback] = syncs as [(typeof syncs)[number], (typeof syncs)[number]];
+    const read = (sync: (typeof syncs)[number], argument: string, prelude = '') =>
+      switchGuards(`${prelude}\nawait ${sync.name}(dir, ${argument});`, sync);
+    expect.soft(read(rules, 'r.agentRules !== false')).toEqual(['r']);
+    expect.soft(read(feedback, 'on && t', 'const on = r.agentFeedback === true;')).toEqual(['r']);
+    // `$` is an identifier character, and a pattern built from one must not read it as an anchor.
+    expect.soft(read(feedback, '$on && t', 'const $on = r.agentFeedback === true;')).toEqual(['r']);
+    // A top-level `||` or `?:` lets the other operand switch it on whatever the guard says.
+    expect.soft(read(rules, 'x || y && r.agentRules !== false')).toEqual([null]);
+    expect.soft(read(rules, 'c ? true : y && r.agentRules !== false')).toEqual([null]);
+    expect.soft(read(feedback, 'r.agentFeedback === true && t || x')).toEqual([null]);
+    expect.soft(read(feedback, 'c ? x : r.agentFeedback === true && t')).toEqual([null]);
+    // The rules switch is the guard alone.
+    expect.soft(read(rules, 'r.agentRules !== false && t')).toEqual([null]);
+  });
 
   it('switches each sync of the agent files on the value initialize returned', () => {
     for (const lib of serverLibs) {
@@ -799,31 +847,18 @@ describe('the installed Next.js honours agentRules', () => {
       expect(source, lib).toMatch(
         /async function getRequestHandlers\([^)]*\)\s*\{\s*return\s+(?:\(0,\s*[\w$]+\.)?initialize\)?\(/,
       );
-      for (const { name, switchedBy } of syncs) {
-        const calls = [
-          ...source.matchAll(new RegExp(`\\b${name}\\)?\\(\\s*[\\w$]+\\s*,\\s*([^()]*)\\)`, 'g')),
-        ];
-        expect(calls.length, `${lib} ${name}`).toBeGreaterThan(0);
-        for (const call of calls) {
-          // The second argument's terms, each a local constant replaced by its value.
-          const before = source.slice(0, call.index);
-          const terms = (call[1] ?? '').split('&&').map((term) => {
-            const id = term.trim();
-            if (!/^[\w$]+$/.test(id)) return id;
-            const values = [
-              ...before.matchAll(new RegExp(`\\bconst\\s+${id}\\s*=\\s*([^;]+);`, 'g')),
-            ];
-            return (values.at(-1)?.[1] ?? id).trim();
-          });
-          const guard = terms.map((term) => term.match(switchedBy)).find(Boolean);
-          expect(guard, `${lib} ${name}: ${call[0]}`).toBeTruthy();
-          expect(source, lib).toContain(`const ${guard?.[1]} = await getRequestHandlers(`);
+      for (const sync of syncs) {
+        const guards = switchGuards(source, sync);
+        expect(guards.length, `${lib} ${sync.name}`).toBeGreaterThan(0);
+        for (const guard of guards) {
+          expect(guard, `${lib} ${sync.name}`).not.toBeNull();
+          expect(source, lib).toContain(`const ${guard} = await getRequestHandlers(`);
         }
       }
     }
   });
 
-  it('removes the managed block, and writes nothing, as the first statement of a switched-off sync', () => {
+  it('opens each sync with `if (!<switch>) return <removal>(dir)`, then calls its writer', () => {
     for (const lib of serverLibs) {
       const source = readNext(`${lib}/app-info-log.js`);
       for (const { name, remove, write } of syncs) {
