@@ -55,11 +55,14 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   eslint-plugin-react that ESLint 10 breaks — jsx-eslint/eslint-plugin-react#3977), `typescript`
   `>=7` (no classic compiler API at the root; typescript-eslint peers `<6.1.0`) and `@types/node`
   majors (they follow `.nvmrc` by hand). `@playwright/test` is held as well, at every version from
-  1.64.0 up (`>=1.64.0`), by the owner's ruling of 2026-10-30, until #278 is resolved. Adding one
-  is a policy change, so read
-  `docs/adr/0018-dependency-update-policy.md` first; deleting one without the trigger having fired
-  puts the red pull request back. A `vite` group (`vite`, `@vitejs/*`, `vitest`, `@vitest/*`, majors
-  included) brings a vite major in one pull request with the `@vitejs/plugin-react` and vitest
+  1.64.0 up (`>=1.64.0`), by the owner's ruling of 2026-10-30, until #278 is resolved: a version
+  hold, not a major, recorded in `docs/adr/0038-playwright-held-below-1-64.md` beside ADR 0018.
+  Adding an ignore is a policy change, so read `docs/adr/0018-dependency-update-policy.md` (majors)
+  or ADR 0038 (a version hold) first, and write the record: the drift entry
+  `adr-0038-dependabot-ignores` lists every ignored name and fails on one added or removed.
+  Deleting one without the trigger having fired puts the red pull request back. A `vite` group
+  (`vite`, `@vitejs/*`, `vitest`, `@vitest/*`, majors included) brings a vite major in one pull
+  request with the `@vitejs/plugin-react` and vitest
   releases that peer on it. The order of the groups does not, by itself, keep a package in its own
   group (it decides only between two groups that both keep it, neither with an open pull request): a
   group with no patterns, as `minor-and-patch` is, never gives a dependency up, even to a group that

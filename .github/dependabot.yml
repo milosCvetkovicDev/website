@@ -16,7 +16,10 @@ updates:
     # Majors that cannot pass this repository's gates, so that a failing pull request does not
     # reopen every release and hold one of the five slots a security fix will need. Each entry
     # names the upstream event that reopens the question. See
-    # docs/adr/0018-dependency-update-policy.md.
+    # docs/adr/0018-dependency-update-policy.md for the majors and
+    # docs/adr/0038-playwright-held-below-1-64.md for the one version hold, @playwright/test. The
+    # adr-0038-dependabot-ignores drift entry lists every name below, so an entry added or removed
+    # here is drift until a record says why.
     ignore:
       # ESLint 10: eslint-config-next 16.3.4 depends on eslint-plugin-react ^7.37.0, and 7.37.5
       # calls the context.getFilename() that ESLint 10 removed, so `web#lint` fails with
@@ -40,7 +43,7 @@ updates:
       # animation frames on the Linux runner, and its Chromium is not the build ADR 0032's launch
       # flag was measured on. `^1.58.2` in apps/web/package.json admits 1.64, so without this entry
       # the minor-and-patch group offers it again. Every version from 1.64.0 up is held, so 1.65 and
-      # later stay out too until the cause is known. Revisit when #278 is resolved.
+      # later stay out too until the cause is known. Revisit when #278 is resolved (ADR 0038).
       - dependency-name: '@playwright/test'
         versions: ['>=1.64.0']
     # The order of the groups does not, by itself, keep a package in its own group: it decides only
