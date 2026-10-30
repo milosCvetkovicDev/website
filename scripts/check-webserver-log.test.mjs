@@ -286,6 +286,15 @@ describe('check-webserver-log', () => {
       assert.ok(!text.includes(CANARY), text);
     });
 
+    // Both problems are reported, so a broken capture is not hidden behind the finding or the
+    // other way round.
+    it('fails an unexpected line without the canary, and reports both', () => {
+      const { status, text } = checkLog(`${withoutCanary}[WebServer] Error: boom\n`);
+      assert.equal(status, 1);
+      assert.match(text, /printed 1 block of output nobody allowlisted:\n\n {2}Error: boom\n/);
+      assert.match(text, /has no canary line/);
+    });
+
     it('fails a log that has the canary twice', () => {
       const { status, text } = checkLog(`${GREEN_RUN}${CANARY_LINE}\n`);
       assert.equal(status, 1);
