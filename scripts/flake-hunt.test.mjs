@@ -831,16 +831,18 @@ describe('the nightly workflow', () => {
 
   // Measured on the 12 scheduled hunts from 2026-10-19 to 2026-10-30, 333 completed runs: one run
   // of the suite took 10.10 to 14.01 minutes (median 12.66), and the hunt step lasts the sum of
-  // its runs to within a second. The steps before it took 0.97 to 1.32 minutes, except twice in 72
-  // shards, when a stalled apt mirror held the browser install for up to 32.65 minutes; the upload
-  // after it took at most 0.10. Five runs to a shard needed up to 70 minutes against the step's
-  // 65, so on 10 of those 12 nights a shard's last run was killed by the step's timeout.
+  // its runs to within a second. Setup, from the job's start to the hunt step, took 0.97 to 7.92
+  // minutes (median 1.32) in 70 of 72 shards; in the other two a stalled apt mirror held the
+  // browser install for 31.88 and 32.03 minutes, and setup took up to 32.65. Everything after the
+  // hunt step, the upload and the post-job steps, took at most 0.10 minutes. Five runs to a shard
+  // would need up to about 70 minutes (5 x 14.01) against the step's 65, so on 10 of those 12
+  // nights a shard's last run was killed by the step's timeout.
   const SLOWEST_RUN_MINUTES = 14.01;
   const SLOWEST_SETUP_MINUTES = 32.65;
-  // The slowest run was 39% slower than the fastest, so half again the slowest covers a runner
-  // slower than any measured by more than the whole spread seen.
+  // The slowest run was 39% slower than the fastest, so at least half again the slowest covers a
+  // runner slower than any measured by more than the whole spread seen.
   const RUN_MARGIN = 1.5;
-  const UPLOAD_MINUTES = 1;
+  const AFTER_HUNT_MINUTES = 1;
 
   /** @param {string} text @param {RegExp} pattern */
   function number(text, pattern) {
@@ -966,11 +968,11 @@ describe('the nightly workflow', () => {
 
   it("gives the job the slowest setup measured on top of the step's timeout", () => {
     const { job, step } = timeouts();
-    const needed = SLOWEST_SETUP_MINUTES + step + UPLOAD_MINUTES;
+    const needed = SLOWEST_SETUP_MINUTES + step + AFTER_HUNT_MINUTES;
     assert.ok(
       needed <= job,
-      `${SLOWEST_SETUP_MINUTES} min of setup, the step's ${step} and ${UPLOAD_MINUTES} to ` +
-        `upload need ${needed.toFixed(1)} min; the job allows ${job}`,
+      `${SLOWEST_SETUP_MINUTES} min of setup, the step's ${step} and ${AFTER_HUNT_MINUTES} after ` +
+        `it need ${needed.toFixed(1)} min; the job allows ${job}`,
     );
   });
 });

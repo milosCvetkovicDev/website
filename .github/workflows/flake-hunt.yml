@@ -4,8 +4,8 @@ name: Flake hunt
 # opens one tracking issue for flaky tests no open `flake-hunt` issue tracks yet
 # (scripts/flake-hunt-issue.sh). One run of the suite takes 10 to 14 minutes on a runner in a hunt
 # (the 12 nightly hunts to 2026-10-30), so the 30 runs are ten shards of three in parallel,
-# numbered apart so their results merge into one report. Six shards of five needed up to 70
-# minutes each and lost their last run to the step's timeout most nights.
+# numbered apart so their results merge into one report. Six shards of five would need up to about
+# 70 minutes each (5 x 14.01) and lost their last run to the step's timeout most nights.
 # scripts/flake-hunt.test.mjs holds the measurements and checks the matrix and both timeouts
 # against them.
 #
@@ -33,8 +33,9 @@ jobs:
   hunt:
     name: Hunt, runs ${{ matrix.first }} to ${{ matrix.last }}
     runs-on: ubuntu-latest
-    # The step's 65 minutes on top of the slowest setup measured, 33 minutes when a stalled apt
-    # mirror held the browser install, and the upload.
+    # The step's 65 minutes on top of the slowest setup measured, 32.65 minutes from the job's
+    # start to the hunt step (32.03 of them in a browser install a stalled apt mirror held), and a
+    # minute for the upload and post-job steps, which took at most 0.10 minutes.
     timeout-minutes: 100
     strategy:
       fail-fast: false
@@ -87,8 +88,9 @@ jobs:
         # The step's timeout ends it as failed, not cancelled, so the upload below still runs; the
         # job's own timeout cancels the job, which is why that upload runs always().
         #
-        # 65 minutes is half again three of the slowest run measured, 14 minutes; the step lasts
-        # the sum of its runs. Keep the run count below equal to every shard's size in the matrix.
+        # 65 minutes is at least half again three of the slowest run measured, 14.01 minutes
+        # (63.05); the step lasts the sum of its runs. Keep the run count below equal to every
+        # shard's size in the matrix.
         timeout-minutes: 65
         env:
           PLAYWRIGHT_PORT: '3000'
