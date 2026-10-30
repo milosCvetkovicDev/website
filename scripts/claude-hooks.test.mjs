@@ -72,12 +72,27 @@ before(() => {
   sharedGit = join(stubs, 'git');
   executable(sharedGh, STUB_GH);
   executable(sharedGit, STUB_GIT);
-  const env = { ...process.env, STUB: stubs };
-  spawnSync(sharedGh, [], { env, stdio: 'ignore' });
-  spawnSync(sharedGit, ['--version'], { env, stdio: 'ignore' });
+  // 120 s for each first exec, against 21 s at the most measured under load.
+  /** @param {string} file @param {string[]} args */
+  const warm = (file, args) =>
+    spawnSync(file, args, {
+      env: { ...process.env, STUB: stubs },
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+  const gh = warm(sharedGh, []);
+  assert.equal(gh.error, undefined, `the gh stub did not run: ${gh.error}`);
+  // With no gh.json beside it, the stub answers as gh does when it is not logged in.
+  assert.deepEqual([gh.status, gh.stderr], [1, 'gh: not logged in\n']);
+  const gitVersion = warm(sharedGit, ['--version']);
+  assert.equal(gitVersion.error, undefined, `the git stub did not run: ${gitVersion.error}`);
+  assert.equal(gitVersion.status, 0, gitVersion.stderr);
 });
 
-after(() => rmSync(stubs, { recursive: true, force: true }));
+// before() may have failed before it made the directory; that failure is the one to report.
+after(() => {
+  if (stubs) rmSync(stubs, { recursive: true, force: true });
+});
 
 /** @type {string} */
 let root;
