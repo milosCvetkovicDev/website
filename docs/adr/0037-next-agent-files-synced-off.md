@@ -13,9 +13,10 @@ Accepted
 [ADR 0019](0019-next-agent-rules-disabled.md) turned off the agent instruction files Next.js 16.3
 generated (`agentRules: false` in `apps/web/next.config.ts`), and its Decision names the 16.3 code
 that `apps/web/src/test/next-config.test.ts` reads to check the option is still honoured. Next.js
-16.4 replaced that code, so the Dependabot update to 16.4.2 (#275) failed four of those checks. The
-decision still stands; the code it rests on, and some of what the record says follows from it, do
-not. Read in the installed 16.4.2, in both the CommonJS and the ESM build of `dist/server/lib`:
+16.4 replaced that code, so the Dependabot update to 16.4 (#275, at 16.4.2 first and at 16.4.3 since
+its 2026-10-26 rebase) failed four of those checks. The decision still stands; the code it rests on,
+and some of what the record says follows from it, do not. Read in the installed 16.4.3 (first read
+in 16.4.2), in both the CommonJS and the ESM build of `dist/server/lib`:
 
 - `start-server.js` no longer generates the files inside an `if (<result>.agentRules !== false)`
   block. In development it calls `syncAgentRulesForDev(dir, <result>.agentRules !== false)` on
@@ -32,7 +33,7 @@ not. Read in the installed 16.4.2, in both the CommonJS and the ESM build of `di
   `false` removes an existing managed block on `next dev`"
   (`dist/docs/01-app/03-api-reference/05-config/01-next-config-js/agentRules.md`). The guide that
   documented `agentRules: false` before, `dist/docs/01-app/02-guides/ai-agents.md`, no longer
-  mentions it.
+  documents the setting itself: it links to that page instead.
 - A second block is new: `syncAgentFeedbackForDev(dir, agentFeedbackConfigured && telemetryEnabled)`,
   called only outside CI, where `agentFeedbackConfigured` is `<result>.agentFeedback === true` and
   `initialize` passes `agentFeedback: config.experimental.agentFeedback` (default `false` in
