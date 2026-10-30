@@ -3,6 +3,8 @@
 # branch, so a checkout that switches branches keeps each branch's last snapshot. Never block the
 # stop: every failure exits 0, a SIGTERM from the hook timeout included.
 
+# From the first git call on; the trap below replaces it once there is a snapshot to clean up.
+trap 'exit 0' TERM INT HUP
 # `git status` would otherwise take index.lock and make another session's git add or commit fail.
 export GIT_OPTIONAL_LOCKS=0
 cd "${CLAUDE_PROJECT_DIR:-$PWD}" || exit 0

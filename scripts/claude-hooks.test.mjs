@@ -25,7 +25,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -47,12 +47,37 @@ done
 jq -r "$filter" "$STUB/gh.json"
 `;
 
-// Logs the GIT_OPTIONAL_LOCKS each git call sees, and makes `git status` slow on request.
+// Logs the GIT_OPTIONAL_LOCKS each git call sees. While $STUB/git.hold-<subcommand> exists, that
+// subcommand waits after logging, so a test can signal a hook in the middle of it.
 const STUB_GIT = `#!/usr/bin/env bash
 echo "\${GIT_OPTIONAL_LOCKS-unset} $1" >>"$STUB/git.log"
-if [ "$1" = status ] && [ -e "$STUB/git.slow" ]; then /bin/sleep 20; fi
+while [ -e "$STUB/git.hold-$1" ]; do /bin/sleep 0.05; done
 exec "${REAL_GIT}" "$@"
 `;
+
+// macOS assesses an executable file on its first exec (the file carries com.apple.provenance),
+// and on a busy machine that took 3 to 13 s of wall time at no CPU cost, against the hook's 8 s
+// for gh (#181). A symlink to a file already run is not assessed again, so each stub is written
+// once and run once here, outside every deadline, and each test links to it.
+/** @type {string} */
+let stubs;
+/** @type {string} */
+let sharedGh;
+/** @type {string} */
+let sharedGit;
+
+before(() => {
+  stubs = realpathSync(mkdtempSync(join(tmpdir(), 'claude-hooks-stubs-')));
+  sharedGh = join(stubs, 'gh');
+  sharedGit = join(stubs, 'git');
+  executable(sharedGh, STUB_GH);
+  executable(sharedGit, STUB_GIT);
+  const env = { ...process.env, STUB: stubs };
+  spawnSync(sharedGh, [], { env, stdio: 'ignore' });
+  spawnSync(sharedGit, ['--version'], { env, stdio: 'ignore' });
+});
+
+after(() => rmSync(stubs, { recursive: true, force: true }));
 
 /** @type {string} */
 let root;
@@ -91,8 +116,28 @@ beforeEach(() => {
   git('commit', '-q', '-m', 'init');
   stub = join(root, 'stub');
   mkdirSync(join(stub, 'bin'), { recursive: true });
-  executable(join(stub, 'bin/gh'), STUB_GH);
+  symlinkSync(sharedGh, join(stub, 'bin/gh'));
 });
+
+/** Puts the logging git stub first on PATH for this test. */
+const stubGit = () => symlinkSync(sharedGit, join(stub, 'bin/git'));
+
+/**
+ * Resolves once the git stub has logged a `subcommand` call, and rejects if the hook exits first.
+ *
+ * @param {string} subcommand
+ * @param {Promise<unknown>} exited
+ */
+async function gitCalled(subcommand, exited) {
+  let ended = false;
+  exited.then(() => (ended = true));
+  const log = join(stub, 'git.log');
+  const line = new RegExp(`^\\S+ ${subcommand}$`, 'm');
+  while (!(existsSync(log) && line.test(readFileSync(log, 'utf8')))) {
+    assert.ok(!ended, `the hook exited before it ran git ${subcommand}`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
@@ -157,7 +202,7 @@ const pr = (number, statusCheckRollup, extra = {}) => ({
 
 describe('both hooks', () => {
   it('run git without optional locks, so they never hold index.lock', () => {
-    executable(join(stub, 'bin/git'), STUB_GIT);
+    stubGit();
     assert.equal(run(STOP).status, 0);
     assert.equal(run(SESSION_START).status, 0);
     const calls = readFileSync(join(stub, 'git.log'), 'utf8').trim().split('\n');
@@ -360,25 +405,45 @@ describe('stop.sh', () => {
     );
   });
 
-  it('exits 0 and keeps the previous snapshot when the hook timeout kills it', async () => {
+  /**
+   * Starts stop.sh with the git stub holding `subcommand`, and sends SIGTERM once the stub has
+   * logged it, as the hook timeout would mid-call.
+   *
+   * @param {string} subcommand
+   */
+  async function killDuring(subcommand) {
     note('last-session-main.md', 'previous snapshot\n');
-    executable(join(stub, 'bin/git'), STUB_GIT);
-    writeFileSync(join(stub, 'git.slow'), '');
+    stubGit();
+    const hold = join(stub, `git.hold-${subcommand}`);
+    writeFileSync(hold, '');
     const child = spawn('bash', [STOP], { cwd: root, env: hookEnv({}), stdio: 'ignore' });
+    /** @type {Promise<{ code: number | null, signal: string | null }>} */
     const exited = new Promise((resolve) =>
       child.on('exit', (code, signal) => resolve({ code, signal })),
     );
-    // Late enough that the snapshot is being written: git has started its slow status.
-    for (let i = 0; i < 100 && !existsSync(join(stub, 'git.log')); i++) {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await gitCalled(subcommand, exited);
     child.kill('SIGTERM');
+    return { exited, hold };
+  }
+
+  it('exits 0 and keeps the previous snapshot when the hook timeout kills it', async () => {
+    // The snapshot is being written while git status runs, which stop.sh starts in the background
+    // and waits on, so the trap ends the hook without waiting for git.
+    const { exited } = await killDuring('status');
     const started = Date.now();
     assert.deepEqual(await exited, { code: 0, signal: null });
     assert.ok(Date.now() - started < 5000, 'exits at once rather than after git');
     assert.equal(readFileSync(state('last-session-main.md'), 'utf8'), 'previous snapshot\n');
     assert.deepEqual(snapshots(), ['last-session-main.md']);
+  });
+
+  it('exits 0 when the hook timeout kills it before the snapshot starts', async () => {
+    // git branch runs in the foreground, so bash runs the trap once that call returns.
+    const { exited, hold } = await killDuring('branch');
+    rmSync(hold);
+    assert.deepEqual(await exited, { code: 0, signal: null });
+    assert.equal(readFileSync(state('last-session-main.md'), 'utf8'), 'previous snapshot\n');
+    assert.deepEqual(readdirSync(state()), ['last-session-main.md']);
   });
 
   it('replaces a symlink at the snapshot path instead of writing through it', () => {
