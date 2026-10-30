@@ -21,9 +21,12 @@ import { basename, dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { check, collectServerBlocks, unexpectedBlocks } from './check-webserver-log.mjs';
+import { CANARY, check, collectServerBlocks, unexpectedBlocks } from './check-webserver-log.mjs';
 
 const script = join(dirname(fileURLToPath(import.meta.url)), 'check-webserver-log.mjs');
+
+/** The canary as Playwright forwards it from CI's web server command. */
+const CANARY_LINE = `[WebServer] ${CANARY}`;
 
 /** The allowlisted block as a green CI run printed it, verbatim from run 34696123296. */
 const ALLOWED_BLOCK = [
@@ -33,9 +36,11 @@ const ALLOWED_BLOCK = [
 ].join('\n');
 
 // The shape of a green CI run: the web server's stdout is not forwarded, so the only server lines
-// are ADR 0015's blocks, between the runner's own lines.
+// are the canary CI's command prints and ADR 0015's blocks, between the runner's own lines. Next
+// 16.3 printed those blocks in every run and 16.4 prints none; they stay allowed either way.
 const GREEN_RUN = [
   'Running 176 tests using 1 worker',
+  CANARY_LINE,
   '  ✓  1 [chromium] › e2e/console-clean.spec.ts:22:5 › / has a clean console (2.1s)',
   ALLOWED_BLOCK,
   '  ✓  2 [chromium] › e2e/not-found-shell.spec.ts:9:5 › an unknown slug 404s (0.9s)',
@@ -113,8 +118,8 @@ describe('check-webserver-log', () => {
     assert.match(result.stderr, /usage:/);
   });
 
-  // Every CI run prints ADR 0015's block, so a log with runner output and no server line at all is
-  // a capture that broke: stderr not forwarded, a renamed prefix, or a pnpm filter that matched no
+  // Every CI run prints the canary, so a log with runner output and no server line at all is a
+  // capture that broke: stderr not forwarded, a renamed prefix, or a pnpm filter that matched no
   // package and exited 0 without running a single test.
   it('fails a log that has runner output but no [WebServer] line', () => {
     for (const log of [
@@ -249,6 +254,71 @@ describe('check-webserver-log', () => {
     });
     assert.equal(result.status, 1);
     assert.match(result.output.join('\n'), /EACCES/);
+  });
+
+  // CI's web server command writes the canary to its stderr once, before `next start`. Since Next
+  // 16.4 a green run's server writes nothing else there, so the canary is how the check knows the
+  // capture works: required once, with Playwright's prefix, and never a finding itself, while the
+  // NoFallbackError block stays allowed without being required.
+  describe('the canary', () => {
+    const withoutCanary = GREEN_RUN.split('\n')
+      .filter((line) => line !== CANARY_LINE)
+      .join('\n');
+
+    it('fails a log whose server lines are all allowlisted but none is the canary', () => {
+      const { status, text } = checkLog(withoutCanary);
+      assert.equal(status, 1, text);
+      assert.match(text, /has no canary line/);
+    });
+
+    it('passes a log whose only server line is the canary', () => {
+      const { status, text } = checkLog(
+        `Running 176 tests using 1 worker\n${CANARY_LINE}\n  176 passed (9.5m)\n`,
+      );
+      assert.equal(status, 0, text);
+      assert.match(text, /the canary line once and no other server output/);
+    });
+
+    it('fails the canary beside an unexpected line, and reports that line, not the canary', () => {
+      const { status, text } = checkLog(`${CANARY_LINE}\n[WebServer] Error: boom\n`);
+      assert.equal(status, 1);
+      assert.match(text, /printed 1 block of output nobody allowlisted:\n\n {2}Error: boom\n/);
+      assert.ok(!text.includes(CANARY), text);
+    });
+
+    it('fails a log that has the canary twice', () => {
+      const { status, text } = checkLog(`${GREEN_RUN}${CANARY_LINE}\n`);
+      assert.equal(status, 1);
+      assert.match(text, /has the canary line 2 times/);
+    });
+
+    // A runner line that quotes it, an `echo` in the step say, is not the server's stderr.
+    it('does not count the canary without the [WebServer] prefix', () => {
+      const { status, text } = checkLog(`${withoutCanary}${CANARY}\n`);
+      assert.equal(status, 1);
+      assert.match(text, /has no canary line/);
+    });
+
+    it('reads the canary after the job, step and timestamp of a downloaded CI log', () => {
+      const prefix = 'End-to-end (Playwright)\tUNKNOWN STEP\t2026-10-30T21:00:00.0000000Z';
+      const log = `${prefix} ${CANARY_LINE}\n`;
+      assert.equal(checkLog(log).status, 0);
+    });
+
+    // The canary is one line: an open block cannot absorb it, and it absorbs nothing after it.
+    it('keeps the canary out of the blocks before and after it', () => {
+      const blocks = collectServerBlocks(
+        ['[WebServer] Error: boom', CANARY_LINE, '[WebServer]     at x (a.js:1:1)'].join('\n'),
+      );
+      assert.deepEqual(
+        blocks.map((block) => [block.message, block.lines.length, block.allowed]),
+        [
+          ['Error: boom', 1, false],
+          [CANARY, 1, true],
+          ['at x (a.js:1:1)', 1, false],
+        ],
+      );
+    });
   });
 });
 

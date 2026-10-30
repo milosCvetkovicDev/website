@@ -10030,8 +10030,8 @@
       "claim": "CI serves the production build with pnpm start.",
       "check": {
         "file": "apps/web/playwright.config.ts",
-        "regex": "^    command: (.+),$",
-        "equals": "isCI ? 'pnpm start' : 'pnpm dev'"
+        "regex": "^    command: isCI \\? [^\\n]*?(?:'|&& )(pnpm start)['`] : 'pnpm dev',$",
+        "equals": "pnpm start"
       }
     },
     {

@@ -113,7 +113,7 @@ CI runs on every pull request and every push to `main` (`.github/workflows/ci.ym
 | `pnpm build`                      | Production build of `apps/web`                                                                                                      | -                  | yes |
 | `pnpm check:build-output`         | Every route in the web build prerendered, with its body file, and no server function but `/mcp`, the allowlist's one entry          | -                  | yes |
 | `pnpm --filter web test:e2e`      | Playwright against the production build; a test that passes only on a retry fails the run                                           | -                  | yes |
-| `scripts/check-webserver-log.mjs` | Anything the web server wrote to stderr during the e2e run, beyond ADR 0015's `NoFallbackError` block                               | -                  | yes |
+| `scripts/check-webserver-log.mjs` | Anything the web server wrote to stderr during the e2e run beyond the required canary line and ADR 0015's `NoFallbackError` block   | -                  | yes |
 
 CodeQL default setup is on as well. GitHub manages it outside `.github/workflows`, and it reports on pull requests beside these checks.
 

@@ -53,6 +53,18 @@ const port = resolvePort(process.env.PLAYWRIGHT_PORT, DEFAULT_PORT);
  */
 export const MOBILE_SPECS = /[\\/]mobile[\\/]/;
 
+/**
+ * The line CI's web server command writes to its stderr once, before `next start`. Playwright
+ * forwards it as `[WebServer] <this>`, and `scripts/check-webserver-log.mjs` requires it exactly
+ * once in the e2e job's log: it shows that the server's stderr reaches the log, which since Next
+ * 16.4 a green run's server writes nothing else to. The local dev server does not print it.
+ *
+ * Exported for `src/test/playwright-config.test.ts`, which fails when this and the script's
+ * `CANARY` differ and runs the line the command prints it with.
+ */
+export const WEB_SERVER_LOG_CANARY =
+  'check-webserver-log canary: the web server stderr reaches this log';
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -109,8 +121,10 @@ export default defineConfig({
     { name: 'mobile-safari', use: { ...devices['iPhone 13'] }, testMatch: MOBILE_SPECS },
   ],
   webServer: {
-    // CI runs the production build (`pnpm build` runs first); locally the dev server.
-    command: isCI ? 'pnpm start' : 'pnpm dev',
+    // CI runs the production build (`pnpm build` runs first), after the canary; locally the dev
+    // server. Playwright runs the command through a shell, where `>&2` sends `echo` to the stderr
+    // it forwards.
+    command: isCI ? `echo '${WEB_SERVER_LOG_CANARY}' >&2 && pnpm start` : 'pnpm dev',
     // Playwright merges this over process.env rather than replacing it. `next dev` and `next start`
     // both read PORT, so the port reaches Next without depending on how pnpm forwards arguments.
     env: {
