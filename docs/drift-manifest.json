@@ -8731,7 +8731,7 @@
       "anchor": "| 0037 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0037 gives the record's Date, \"2026-10-20\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0037 gives the record's Date, \"2026-10-20\" (the date in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0037 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
@@ -8757,7 +8757,7 @@
       "anchor": "| 0037 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0037 gives the record's H1 title, \"Next.js keeps its agent instruction blocks out of the app, on 16.4's sync\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0037 gives the record's H1 title, \"Next.js keeps its agent instruction blocks out of the app, on 16.4's sync\" (the title in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0037 \\| \\[(.+?)\\]\\(0037-",

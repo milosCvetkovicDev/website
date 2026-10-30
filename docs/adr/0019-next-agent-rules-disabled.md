@@ -4,7 +4,10 @@
 
 Superseded by ADR-0037
 
-The decision stands, on the code Next.js 16.4 replaced it with: [ADR 0037](0037-next-agent-files-synced-off.md) records what `agentRules: false` does there, the checks that now hold it, and the second block that 16.4 added behind `experimental.agentFeedback`.
+No longer applies: the first Decision bullet, whose checks read the Next.js 16.3 code that 16.4
+replaced. [ADR 0037](0037-next-agent-files-synced-off.md) keeps `agentRules: false`, states what it
+does on 16.4 and the checks that hold it now, and keeps the second block 16.4 added, behind
+`experimental.agentFeedback`, off.
 
 ## Date
 
