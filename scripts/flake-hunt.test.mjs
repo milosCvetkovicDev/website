@@ -849,11 +849,24 @@ describe('the nightly workflow', () => {
     return Number(match[1]);
   }
 
+  /**
+   * The lines of the job `id` under `jobs:`, as the YAML holds it.
+   *
+   * @param {string} id
+   */
+  function jobBlock(id) {
+    const lines = readFileSync(WORKFLOW, 'utf8').split('\n');
+    const start = lines.indexOf(`  ${id}:`);
+    assert.ok(start >= 0, `no job ${id}`);
+    const end = lines.findIndex((line, i) => i > start && /^ {0,2}\S/.test(line));
+    return lines.slice(start, end < 0 ? undefined : end).join('\n');
+  }
+
+  // Each timeout is read from its own key line: the hunt job's at four spaces, its step's at eight.
   function timeouts() {
-    const step = stepBlock(HUNT_STEP).join('\n');
     return {
-      job: number(readFileSync(WORKFLOW, 'utf8'), /\n {4}timeout-minutes: (\d+)/),
-      step: number(step, /timeout-minutes: (\d+)/),
+      job: number(jobBlock('hunt'), /^ {4}timeout-minutes: (\d+)$/m),
+      step: number(stepBlock(HUNT_STEP).join('\n'), /^ {8}timeout-minutes: (\d+)$/m),
       runs: number(runScript(HUNT_STEP), /^scripts\/flake-hunt\.sh (\d+) &$/m),
     };
   }
@@ -915,14 +928,8 @@ describe('the nightly workflow', () => {
   }
 
   it("keeps the step's timeout under the job's, and uploads the runs even when cancelled", () => {
-    const text = readFileSync(WORKFLOW, 'utf8');
-    const job = Number(
-      /** @type {RegExpExecArray} */ (/\n {4}timeout-minutes: (\d+)/.exec(text))[1],
-    );
-    const step = stepBlock(HUNT_STEP).join('\n');
-    assert.ok(
-      Number(/** @type {RegExpExecArray} */ (/timeout-minutes: (\d+)/.exec(step))[1]) < job,
-    );
+    const { job, step } = timeouts();
+    assert.ok(step < job, `the step allows ${step} min, the job ${job}`);
     assert.match(stepBlock("Upload this shard's runs").join('\n'), /if: \$\{\{ always\(\) \}\}/);
   });
 
@@ -939,6 +946,12 @@ describe('the nightly workflow', () => {
       next = Number(last) + 1;
     }
     assert.equal(next - 1, expected, 'the shards do not add up to FLAKE_HUNT_EXPECTED_RUNS');
+    // The step numbers its runs from the shard's first, which is what keeps the shards apart.
+    assert.match(
+      stepBlock(HUNT_STEP).join('\n'),
+      /^ {10}FLAKE_HUNT_FIRST_RUN: \$\{\{ matrix\.first \}\}$/m,
+      "the hunt step does not number its runs from the shard's first",
+    );
   });
 
   it("fits a shard's runs in the step's timeout with half again the slowest run measured", () => {
