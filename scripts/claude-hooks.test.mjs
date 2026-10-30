@@ -48,12 +48,34 @@ jq -r "$filter" "$STUB/gh.json"
 `;
 
 // Logs the GIT_OPTIONAL_LOCKS each git call sees. While $STUB/git.hold-<subcommand> exists, that
-// subcommand waits after logging, so a test can signal a hook in the middle of it.
+// subcommand waits after logging, so a test can signal a hook in the middle of it. A held call
+// appends its pid to $STUB/git.held, and stops holding after 2,400 polls (120 s at the least), so
+// that a stub the hook left behind cannot outlive the run for long.
 const STUB_GIT = `#!/usr/bin/env bash
 echo "\${GIT_OPTIONAL_LOCKS-unset} $1" >>"$STUB/git.log"
-while [ -e "$STUB/git.hold-$1" ]; do /bin/sleep 0.05; done
+if [ -e "$STUB/git.hold-$1" ]; then
+  echo "$$" >>"$STUB/git.held"
+  i=0
+  while [ -e "$STUB/git.hold-$1" ] && [ "$i" -lt 2400 ]; do /bin/sleep 0.05; i=$((i + 1)); done
+fi
 exec "${REAL_GIT}" "$@"
 `;
+
+/** @param {number} ms */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** @param {string} text */
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** @param {number} pid */
+function isRunning(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // macOS assesses an executable file on its first exec (the file carries com.apple.provenance),
 // and on a busy machine that took 3 to 13 s of wall time at no CPU cost, against the hook's 8 s
@@ -138,23 +160,58 @@ beforeEach(() => {
 const stubGit = () => symlinkSync(sharedGit, join(stub, 'bin/git'));
 
 /**
- * Resolves once the git stub has logged a `subcommand` call, and rejects if the hook exits first.
+ * Resolves once the git stub has logged a `subcommand` call. Fails if the hook exits first, if the
+ * test is cancelled, or after 60 s, three times the slowest first exec of a fresh file measured.
  *
  * @param {string} subcommand
  * @param {Promise<unknown>} exited
+ * @param {AbortSignal} signal
  */
-async function gitCalled(subcommand, exited) {
+async function gitCalled(subcommand, exited, signal) {
   let ended = false;
   exited.then(() => (ended = true));
   const log = join(stub, 'git.log');
-  const line = new RegExp(`^\\S+ ${subcommand}$`, 'm');
+  const line = new RegExp(`^\\S+ ${escapeRegExp(subcommand)}$`, 'm');
+  const deadline = Date.now() + 60_000;
   while (!(existsSync(log) && line.test(readFileSync(log, 'utf8')))) {
     assert.ok(!ended, `the hook exited before it ran git ${subcommand}`);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.ok(!signal.aborted, `the test ended while waiting for git ${subcommand}`);
+    assert.ok(Date.now() < deadline, `the hook did not run git ${subcommand} within 60 s`);
+    await sleep(50);
   }
 }
 
-afterEach(() => rmSync(root, { recursive: true, force: true }));
+/**
+ * Hooks a test started in the background; afterEach kills any still running.
+ *
+ * @type {import('node:child_process').ChildProcess[]}
+ */
+let children = [];
+
+/** Releases every git call a test held and waits for each to end, killing one that does not. */
+async function releaseHeld() {
+  if (!existsSync(stub)) return;
+  for (const name of readdirSync(stub)) {
+    if (name.startsWith('git.hold-')) rmSync(join(stub, name));
+  }
+  const held = join(stub, 'git.held');
+  if (!existsSync(held)) return;
+  const pids = readFileSync(held, 'utf8').split('\n').map(Number);
+  // A pid of 0 or below would signal a whole process group.
+  for (const pid of pids.filter((pid) => Number.isInteger(pid) && pid > 0)) {
+    for (let i = 0; i < 100 && isRunning(pid); i++) await sleep(50);
+    if (isRunning(pid)) process.kill(pid, 'SIGKILL');
+  }
+}
+
+afterEach(async () => {
+  for (const child of children) {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+  }
+  children = [];
+  await releaseHeld();
+  rmSync(root, { recursive: true, force: true });
+});
 
 /** @param {Record<string, string>} env */
 function hookEnv(env) {
@@ -425,38 +482,56 @@ describe('stop.sh', () => {
    * logged it, as the hook timeout would mid-call.
    *
    * @param {string} subcommand
+   * @param {AbortSignal} signal
    */
-  async function killDuring(subcommand) {
+  async function killDuring(subcommand, signal) {
     note('last-session-main.md', 'previous snapshot\n');
     stubGit();
     const hold = join(stub, `git.hold-${subcommand}`);
     writeFileSync(hold, '');
     const child = spawn('bash', [STOP], { cwd: root, env: hookEnv({}), stdio: 'ignore' });
+    children.push(child);
     /** @type {Promise<{ code: number | null, signal: string | null }>} */
     const exited = new Promise((resolve) =>
-      child.on('exit', (code, signal) => resolve({ code, signal })),
+      child.on('exit', (code, sig) => resolve({ code, signal: sig })),
     );
-    await gitCalled(subcommand, exited);
+    await gitCalled(subcommand, exited, signal);
     child.kill('SIGTERM');
     return { exited, hold };
   }
 
-  it('exits 0 and keeps the previous snapshot when the hook timeout kills it', async () => {
-    // The snapshot is being written while git status runs, which stop.sh starts in the background
-    // and waits on, so the trap ends the hook without waiting for git.
-    const { exited } = await killDuring('status');
-    const started = Date.now();
-    assert.deepEqual(await exited, { code: 0, signal: null });
-    assert.ok(Date.now() - started < 5000, 'exits at once rather than after git');
-    assert.equal(readFileSync(state('last-session-main.md'), 'utf8'), 'previous snapshot\n');
-    assert.deepEqual(snapshots(), ['last-session-main.md']);
-  });
+  /**
+   * The hook's exit, or a note that it is still running after `ms`.
+   *
+   * @param {Promise<unknown>} exited
+   * @param {number} ms
+   */
+  const exitWithin = (exited, ms) =>
+    Promise.race([exited, sleep(ms).then(() => `still running ${ms / 1000} s after SIGTERM`)]);
 
-  it('exits 0 when the hook timeout kills it before the snapshot starts', async () => {
+  // Above gitCalled's 60 s and exitWithin's 10 s: a backstop, so that a wait this file does not
+  // bound fails the test instead of hanging the run.
+  const KILL_TEST = { timeout: 90_000 };
+
+  it(
+    'exits 0 and keeps the previous snapshot when the hook timeout kills it',
+    KILL_TEST,
+    async (t) => {
+      // The snapshot is being written while git status runs, which stop.sh starts in the background
+      // and waits on, so the trap ends the hook without waiting for git. The status call stays held,
+      // so a hook that waited for it would never end.
+      const { exited } = await killDuring('status', t.signal);
+      assert.deepEqual(await exitWithin(exited, 5000), { code: 0, signal: null });
+      assert.equal(readFileSync(state('last-session-main.md'), 'utf8'), 'previous snapshot\n');
+      assert.deepEqual(snapshots(), ['last-session-main.md']);
+    },
+  );
+
+  it('exits 0 when the hook timeout kills it before the snapshot starts', KILL_TEST, async (t) => {
     // git branch runs in the foreground, so bash runs the trap once that call returns.
-    const { exited, hold } = await killDuring('branch');
+    const { exited, hold } = await killDuring('branch', t.signal);
     rmSync(hold);
-    assert.deepEqual(await exited, { code: 0, signal: null });
+    assert.deepEqual(await exitWithin(exited, 10_000), { code: 0, signal: null });
     assert.equal(readFileSync(state('last-session-main.md'), 'utf8'), 'previous snapshot\n');
     assert.deepEqual(readdirSync(state()), ['last-session-main.md']);
   });
