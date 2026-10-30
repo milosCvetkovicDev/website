@@ -10250,7 +10250,7 @@
       "claim": "Dependabot ignores eslint and @eslint/js majors, typescript >=7 and @types/node majors.",
       "check": {
         "file": ".github/dependabot.yml",
-        "regex": "dependency-name: '?([^'\\n]+)'?",
+        "regex": "dependency-name: '?([^'\\n]+)'?\\n\\s+(?:update-types: \\['version-update:semver-major'\\]|versions: \\['>=\\d+'\\])",
         "equalsAll": ["eslint", "@eslint/js", "typescript", "@types/node"]
       }
     },

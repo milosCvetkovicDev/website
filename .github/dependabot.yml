@@ -35,6 +35,13 @@ updates:
       # major cannot arrive ahead of the runtime. Revisit when .nvmrc changes major.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # Not a major: @playwright/test 1.64 is held at the 1.63 the lockfile installs, by the owner's
+      # ruling of 2026-10-30 on #275. Under 1.64.1's WebKit the mobile-safari project reads too few
+      # animation frames on the Linux runner, and its Chromium is not the build ADR 0032's launch
+      # flag was measured on. `^1.58.2` in apps/web/package.json admits 1.64, so without this entry
+      # the minor-and-patch group offers it again. Revisit when #278 is resolved.
+      - dependency-name: '@playwright/test'
+        versions: ['1.64.x']
     # The order of the groups does not, by itself, keep a package in its own group: it decides only
     # between two groups that both keep a package, in a run where neither has an open pull request.
     # A group with no patterns never gives a dependency up, even to a group that names it exactly,
