@@ -902,13 +902,15 @@ describe('the installed Next.js honours agentRules', () => {
       for (const { name, remove, write } of syncs) {
         const declared = source.match(
           new RegExp(
-            `async function ${name}\\(\\s*([\\w$]+)\\s*,\\s*([\\w$]+)\\s*\\)\\s*\\{\\s*` +
-              `if\\s*\\(\\s*!\\s*\\2\\s*\\)\\s*return\\s+(?:\\(0,\\s*[\\w$]+\\.)?${remove}\\)?\\(\\s*\\1\\s*\\);` +
+            `async function ${escapeRegExp(name)}\\(\\s*([\\w$]+)\\s*,\\s*([\\w$]+)\\s*\\)\\s*\\{\\s*` +
+              `if\\s*\\(\\s*!\\s*\\2\\s*\\)\\s*return\\s+(?:\\(0,\\s*[\\w$]+\\.)?${escapeRegExp(remove)}\\)?\\(\\s*\\1\\s*\\);` +
               `([^}]*)\\}`,
           ),
         );
         expect(declared, `${lib} ${name}`).not.toBeNull();
-        expect(declared?.[3], `${lib} ${name}`).toMatch(new RegExp(`\\b${write}\\)?\\s*\\(`));
+        expect(declared?.[3], `${lib} ${name}`).toMatch(
+          new RegExp(`(?<![\\w$])${escapeRegExp(write)}\\)?\\s*\\(`),
+        );
       }
     }
   });
