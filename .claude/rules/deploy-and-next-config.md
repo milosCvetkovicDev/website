@@ -105,9 +105,9 @@ ETag of its own that the site answers with the other representation
   `mobile-safari` project.
 - `next dev` writes a managed block into `apps/web/AGENTS.md` when it detects an agent shell (Claude
   Code sets `CLAUDECODE` and `AI_AGENT`) and the file does not hold the current one, and that
-  includes the `next dev` a local e2e run boots (16.3 wrote `apps/web/CLAUDE.md` too). `agentRules:
-false` in `apps/web/next.config.ts` turns that off, and since 16.4 makes every `next dev` remove
-  the block, deleting a file left with nothing else in it. The second block 16.4 adds stays off with
+  includes the `next dev` a local e2e run boots (16.3 wrote `apps/web/CLAUDE.md` too).
+  `agentRules: false` in `apps/web/next.config.ts` turns that off, and since 16.4 makes every
+  `next dev` remove the block, deleting a file left with nothing else in it. The second block 16.4 adds stays off with
   `experimental.agentFeedback` unset (ADR 0037, `docs/adr/0037-next-agent-files-synced-off.md`,
   superseding ADR 0019). `apps/web/src/test/next-config.test.ts` pins both values, fails if either
   file is tracked, and reads the installed Next.js to check it still switches each sync on them and

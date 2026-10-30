@@ -232,8 +232,10 @@ const nextConfig: NextConfig = {
   // `next dev` writes a managed block into apps/web/AGENTS.md when it detects an agent shell and
   // the file does not hold the current one, and this repository neither commits nor ignores it:
   // an untracked, Next-controlled instruction file that Claude Code then loads as project
-  // instructions. Off, per ADR 0037, and off `next dev` removes the block instead. The docs the
-  // block pointed at are still there, version-matched, in apps/web/node_modules/next/dist/docs.
+  // instructions. Off, per ADR 0037: with this set to false, `next dev` removes the block instead
+  // of writing it. `experimental.agentFeedback`, which would add a second block to the same file,
+  // stays unset for the same reason. The docs the block pointed at are still there,
+  // version-matched, in apps/web/node_modules/next/dist/docs.
   agentRules: false,
   // Playwright's web server sets NEXT_DIST_DIR in both modes (apps/web/playwright.config.ts).
   // Locally it is `.next-e2e`, so that the `next dev` it starts never shares apps/web/.next with a
