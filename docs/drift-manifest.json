@@ -11684,7 +11684,7 @@
       "id": "checkpoint-one-system-plan-script-test-scripts",
       "doc": "docs/plans/2026-10-31-checkpoint-one-system-plan.md",
       "anchor": "`pnpm test:scripts`",
-      "claim": "`pnpm test:scripts` is a script in the root package.json.",
+      "claim": "`pnpm test:scripts` is a script in ./package.json.",
       "method": "command",
       "evaluation": "live",
       "covers": [
@@ -11702,7 +11702,7 @@
       "id": "checkpoint-one-system-plan-script-typecheck",
       "doc": "docs/plans/2026-10-31-checkpoint-one-system-plan.md",
       "anchor": "`pnpm typecheck`",
-      "claim": "`pnpm typecheck` is a script in the root package.json.",
+      "claim": "`pnpm typecheck` is a script in ./package.json.",
       "method": "command",
       "evaluation": "live",
       "covers": [

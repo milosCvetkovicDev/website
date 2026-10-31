@@ -27,18 +27,19 @@ task two checkpoints. On 2026-10-31 the owner chose to keep one checkpoint syste
 `main`, and bring the useful parts of the second to it.
 
 Four facts shape how. The lead writes its checkpoint with the Edit and Write tools, which refuse to
-overwrite a file that changed since they last read it, so a hook that wrote the same file would
-fail the lead's next edit. A hook knows only its payload; in a live probe on 2026-10-31, six
-headless runs, the payload's `session_id` equalled the `CLAUDE_CODE_SESSION_ID` of every hook
-process and, in the two runs that printed it, of the lead's shell, and stayed the same across
-`--resume`, `--continue` and `/compact`. A
-hook process inherits the `PATH` Claude Code was started with, which may hold no `node`. And the
-briefing is injected into the next session's context, so any text a child agent wrote, perhaps
-after reading a web page, would reach it as if it were instructions. Two adversarial reviews found
-the briefing reporting normal work as a problem, and children attributed to the wrong task, and
-the design was cut to what is below. The
-[design](../plans/2026-10-31-checkpoint-one-system-design.md) records the probe, what it left
-unverified (interactive sessions and teammates among it), and the rest of the reasoning.
+overwrite a file that changed since they last read it, so a hook that wrote the same file would fail
+the lead's next edit. A hook knows only its payload; in a live probe on 2026-10-31, eight headless
+runs, the payload's `session_id` equalled the `CLAUDE_CODE_SESSION_ID` of every hook process and, in
+the two runs that printed it, of the lead's shell, and stayed the same across `--resume`,
+`--continue` and `/compact`. The lead's shell had no `CLAUDE_PROJECT_DIR`, so it cannot tell which
+checkout the hooks write into. A hook process inherits the `PATH` Claude Code was started with,
+which may hold no `node` (the probe's fourth check). And the briefing is injected into the next
+session's context, so any text a child agent wrote, perhaps after reading a web page, would reach it
+as if it were instructions. Three adversarial reviews found, among other things, the briefing
+reporting normal work as a problem and children attributed to the wrong task, and the design was cut
+to what is below. The [design](../plans/2026-10-31-checkpoint-one-system-design.md) records the
+probe, what it left unverified (interactive sessions and teammates among it), and the rest of the
+reasoning.
 
 ## Decision
 
@@ -55,10 +56,13 @@ unverified (interactive sessions and teammates among it), and the rest of the re
     that a stamp created, and never read a checkpoint.
 - `scripts/agent-resume.sh` stays the one resume check, and its exit codes keep their meanings: 0
   for valid checkpoints whatever they contradict, 1 for an invalid one, 2 when it could not run.
-  Its contradictions keep the rules they had before this record, and a contradiction still means
-  the checkpoint is wrong. What changed since a task's stamp, and the child agents of the sessions
-  that stamped it, are information: they are shown only when the check runs for named tasks, never
-  in the briefing of every task at session start, and never as a contradiction.
+  Contradictions keep today's rules, except that a run for named tasks skips the 60 s tip check for
+  a branch that drift reports as advanced, rewritten or changed since its stamp. `--stamp` keeps the
+  validate step's exit codes, 0 or 1 for an invalid checkpoint, and reports a stamp it could not
+  write in the line `not stamped: <reason>`, never with exit 2. A contradiction still means the
+  checkpoint is wrong. What changed since a task's stamp, and the child agents of the sessions that
+  stamped it, are information: they are shown only when the check runs for named tasks, never in the
+  briefing of every task at session start, and never as a contradiction.
 - A child agent's text is data. It is kept in a note file that the lead reads on demand, and no
   briefing or hook output quotes it.
 
@@ -66,10 +70,14 @@ unverified (interactive sessions and teammates among it), and the rest of the re
 
 - Every checkpoint written since #97 stays valid, because the checkpoint's schema does not change;
   the records are described in a file of their own.
-- The briefing at session start stays as it was, apart from one line per stamped task in progress
-  that points to the run for that task.
+- The briefing at session start stays as it was, apart from one pointer line that names the
+  stamped tasks in progress and the run that briefs them.
 - A session's child agents are recorded only after its first stamp. A session that never stamps
   leaves no record, and the children started before the first stamp are not recorded.
+- Children are recorded in the checkout Claude Code was started in. A stamp from a linked worktree
+  says so, and the run for a stamped task always prints its child agents section, empty or not.
+- A child that stopped blocked, needing context or done with concerns stays listed for the 14 days
+  its session folder is kept; running children and finished ones are shown for 48 hours.
 - The lead's stamp is one flag on the check it already runs after each checkpoint update. A
   checkpoint updated without one is reported as not compared with the facts, never as contradicted.
 - A child's report reaches the next session as a status and a path, not as words. Reading what the
@@ -77,8 +85,10 @@ unverified (interactive sessions and teammates among it), and the rest of the re
 - Each stamp deletes the session folders idle for 14 days. Task records are deleted by hand, like
   the checkpoints, and copied out before `git worktree remove`, which deletes a worktree's
   `.agent-state` without asking.
-- This record becomes `Accepted` only after a live check against the real hooks, in an interactive
-  session as well as a headless one.
+- This record becomes `Accepted` only after the live check of the last implementation pull request:
+  a headless run by the agent, and an interactive and teammate run by the owner, who pastes its
+  output into that pull request. The accepted record says about teammates only what that output
+  shows.
 
 ## Alternatives considered
 
