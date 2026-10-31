@@ -259,6 +259,10 @@ function webServerOf(loaded: PlaywrightTestConfig) {
 
 /** CI's server command: the canary scripts/check-webserver-log.mjs requires, then the build. */
 const CI_COMMAND = `printf '%s\\n' '${WEB_SERVER_LOG_CANARY}' >&2 && pnpm start`;
+/** How long the canary's shell may run before spawnSync kills it: `printf` takes milliseconds. */
+const SH_TIMEOUT_MS = 4_000;
+/** The canary test's own timeout, above SH_TIMEOUT_MS so that the shell's kill fires first. */
+const TEST_TIMEOUT_MS = 15_000;
 
 // Every spelling of CI the config tells apart, with the server each one must get: `CI=true` and
 // `CI=1` run the production build, anything else (a stray `false` or `0` included) the dev server,
@@ -321,26 +325,36 @@ describe('playwright.config.ts webServer (ADR 0014)', () => {
   // 16.4 nothing else proves the server's stderr reached it. So the text is that of CANARY in
   // scripts/check-webserver-log.mjs, character for character, and the command's first half, run
   // through a shell as Playwright runs it, writes that line to stderr alone.
-  it('prints the canary the log check requires to stderr before the server', async () => {
-    const script = readFileSync(
-      fileURLToPath(new URL('../../../../scripts/check-webserver-log.mjs', import.meta.url)),
-      'utf8',
-    );
-    expect(script.match(/^export const CANARY =\s*'([^'\n]+)';$/m)?.[1]).toBe(
-      WEB_SERVER_LOG_CANARY,
-    );
+  it(
+    'prints the canary the log check requires to stderr before the server',
+    async () => {
+      const script = readFileSync(
+        fileURLToPath(new URL('../../../../scripts/check-webserver-log.mjs', import.meta.url)),
+        'utf8',
+      );
+      expect(script.match(/^export const CANARY =\s*'([^'\n]+)';$/m)?.[1]).toBe(
+        WEB_SERVER_LOG_CANARY,
+      );
 
-    const command = webServerOf(await loadConfig('true')).command;
-    const server = ' && pnpm start';
-    expect(command.endsWith(server), command).toBe(true);
-    // A shell that hangs fails here, with `error` naming the timeout, rather than at the test's.
-    const printed = spawnSync('sh', ['-c', command.slice(0, -server.length)], {
-      encoding: 'utf8',
-      timeout: 4000,
-    });
-    expect(printed.error).toBeUndefined();
-    expect(printed).toMatchObject({ status: 0, stdout: '', stderr: `${WEB_SERVER_LOG_CANARY}\n` });
-  });
+      const command = webServerOf(await loadConfig('true')).command;
+      const server = ' && pnpm start';
+      expect(command.endsWith(server), command).toBe(true);
+      // spawnSync kills a shell still running after SH_TIMEOUT_MS and reports it in `error`. The
+      // test's own timeout, TEST_TIMEOUT_MS, is above that, with room for loading the config on a
+      // busy machine, so a hung shell fails on the `error` assertion, with its reason.
+      const printed = spawnSync('sh', ['-c', command.slice(0, -server.length)], {
+        encoding: 'utf8',
+        timeout: SH_TIMEOUT_MS,
+      });
+      expect(printed.error).toBeUndefined();
+      expect(printed).toMatchObject({
+        status: 0,
+        stdout: '',
+        stderr: `${WEB_SERVER_LOG_CANARY}\n`,
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
 
   it('leaves the CI build step writing the directory the CI server reads', () => {
     const workflow = readFileSync(
