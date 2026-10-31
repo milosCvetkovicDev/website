@@ -51,6 +51,26 @@ VS Code, in `.vscode/mcp.json`:
 
 <!-- connector-snippets:end -->
 
+## Machine-readable surface
+
+Next to its pages the site serves the same content in forms a script or an agent can read without parsing HTML. Each is generated from the data the pages render, so no fact is written twice, and each is prerendered at build time except `/mcp`, the site's one server function.
+
+| URL                                                          | Format                  | What it holds                                                                                                                                                                              |
+| ------------------------------------------------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/index.md`, `/about/index.md`, `/work/<slug>/index.md`, ... | Markdown                | A twin of every page except the 404: the page URL plus `/index.md`, and `/index.md` alone for the home page                                                                                |
+| `/llms.txt`                                                  | Plain text, llmstxt.org | An index of the case studies, the page twins and the JSON below, with a one-line summary of each. It lists `/blog` once a post exists, and never the twins of published posts              |
+| `/case-studies.json`                                         | JSON                    | Every case study as one array: its fields, its metric as the page shows it, and the URLs of its page and its twin                                                                          |
+| `/work/<slug>/index.json`                                    | JSON                    | The same entry for one case study                                                                                                                                                          |
+| `/feed.xml`                                                  | Atom                    | The blog's published posts, newest first. It has no entries until a post is published, and pages link to it from then on                                                                   |
+| `/mcp`                                                       | MCP over HTTP           | A read-only, stateless server with three tools: `search_case_studies`, `get_case_study` and `get_tech_stack`. It answers `POST` only; setup is under [Connect an agent](#connect-an-agent) |
+| `/sitemap.xml`, `/robots.txt`                                | XML, plain text         | The pages and case studies with their content dates (no twins; `/blog` and the posts once one is published), and one `*` group that allows everything                                      |
+
+Every page carries one JSON-LD graph (a `Person` and a `WebSite` on every page, the 404 included, a `WebPage` or, on `/about`, a `ProfilePage` on every page but the 404, plus a `TechArticle` and a `BreadcrumbList` on each case study and each published post; [ADR 0031](docs/adr/0031-structured-data-graph.md)).
+
+A client finds the Markdown in three ways. A page's own URL answers with its twin when the request's `Accept` header lists `text/markdown` with a non-zero weight, even if HTML is preferred; every page's head, the 404 aside, links its twin with `rel="alternate"`; and every page's head links `/llms.txt` with `rel="describedby"`. The JSON has no negotiation: it is fetched by URL, which `/llms.txt` lists.
+
+The Markdown twins, `/llms.txt`, the JSON and `/mcp` are for developer tools and scripts; answer engines read the HTML. The sitemap, `robots.txt` and the JSON-LD are the ordinary files for search engines, and the JSON-LD's consumer is Google Search. [ADR 0017](docs/adr/0017-ai-discoverability-policy.md) records who reads which form, with sources and dates, and the mechanisms that were considered and deliberately not built. As of 2026-06-22 it records that Claude Code, Cursor, Copilot Chat, Copilot CLI, Microsoft Copilot and OpenCode send `Accept: text/markdown` and that Codex CLI follows the `rel="alternate"` link ([section 2](docs/adr/0017-ai-discoverability-policy.md#2-what-each-measure-of-this-epic-is-for)); the feed is for feed readers, and `/mcp` for an agent a person has configured. [ADR 0030](docs/adr/0030-generated-endpoints-as-static-route-handlers.md) records why the endpoints are static route handlers and [ADR 0029](docs/adr/0029-read-only-mcp-server.md) why the server is read-only. `pnpm check:build-output` fails a build that lacks the `/llms.txt`, JSON or feed handlers or has a server function other than `/mcp`, and the end-to-end suite fetches each endpoint as served.
+
 ## Stack
 
 | Layer     | Choice                                                                                                  |
