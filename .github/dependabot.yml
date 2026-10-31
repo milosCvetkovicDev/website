@@ -13,13 +13,13 @@ updates:
     # the day it is published.
     cooldown:
       default-days: 1
-    # Majors that cannot pass this repository's gates, so that a failing pull request does not
-    # reopen every release and hold one of the five slots a security fix will need. Each entry
-    # names the upstream event that reopens the question. See
-    # docs/adr/0018-dependency-update-policy.md for the majors and
-    # docs/adr/0038-playwright-held-below-1-64.md for the one version hold, @playwright/test. The
-    # adr-0038-dependabot-ignores drift entry lists every name below, so an entry added or removed
-    # here is drift until a record says why.
+    # Majors that cannot pass this repository's gates (docs/adr/0018-dependency-update-policy.md),
+    # and one version hold, @playwright/test from 1.64.0 up, every later release included
+    # (docs/adr/0038-playwright-held-below-1-64.md), so that a failing pull request does not reopen
+    # every release and hold one of the five slots a security fix will need. Each entry names the
+    # event that reopens the question. The drift entries adr-0038-dependabot-ignores and
+    # adr-0038-dependabot-ignore-rules list every name below and its one rule, so an entry added,
+    # removed or changed here is drift until a record says why.
     ignore:
       # ESLint 10: eslint-config-next 16.3.4 depends on eslint-plugin-react ^7.37.0, and 7.37.5
       # calls the context.getFilename() that ESLint 10 removed, so `web#lint` fails with

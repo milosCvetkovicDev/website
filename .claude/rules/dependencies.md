@@ -55,11 +55,13 @@ version pnpm installed for it. The measurement behind the choice is in PR 2's en
   eslint-plugin-react that ESLint 10 breaks — jsx-eslint/eslint-plugin-react#3977), `typescript`
   `>=7` (no classic compiler API at the root; typescript-eslint peers `<6.1.0`) and `@types/node`
   majors (they follow `.nvmrc` by hand). `@playwright/test` is held as well, at every version from
-  1.64.0 up (`>=1.64.0`), by the owner's ruling of 2026-10-30, until #278 is resolved: a version
-  hold, not a major, recorded in `docs/adr/0038-playwright-held-below-1-64.md` beside ADR 0018.
-  Adding an ignore is a policy change, so read `docs/adr/0018-dependency-update-policy.md` (majors)
-  or ADR 0038 (a version hold) first, and write the record: the drift entry
-  `adr-0038-dependabot-ignores` lists every ignored name and fails on one added or removed.
+  1.64.0 up (`>=1.64.0`, a 2.x major included), by the owner's ruling of 2026-10-30, until #278 is
+  resolved: a version hold, not a major, recorded in `docs/adr/0038-playwright-held-below-1-64.md`
+  beside ADR 0018. Adding an ignore is a policy change, so read
+  `docs/adr/0018-dependency-update-policy.md` (majors) or ADR 0038 (a version hold) first, and
+  write the record: the drift entries `adr-0038-dependabot-ignores` and
+  `adr-0038-dependabot-ignore-rules` list every ignored name and its one rule, and fail on an
+  ignore added, removed, repeated or changed.
   Deleting one without the trigger having fired puts the red pull request back. A `vite` group
   (`vite`, `@vitejs/*`, `vitest`, `@vitest/*`, majors included) brings a vite major in one pull
   request with the `@vitejs/plugin-react` and vitest
