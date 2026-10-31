@@ -89,38 +89,38 @@ export const unfilledOwnerFields: readonly UnfilledOwnerField[] = [
   {
     field: 'case-studies.0.metricDefinition',
     why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the self-healing agent's 73% errors resolved autonomously: facts only the owner has.",
-    expires: '2026-10-31',
+    expires: '2026-11-30',
   },
   {
     field: 'case-studies.1.metricDefinition',
     why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the enterprise B2B platform's 40% less complexity: facts only the owner has.",
-    expires: '2026-10-31',
+    expires: '2026-11-30',
   },
   {
     field: 'case-studies.2.metricDefinition',
     why: "The measurement window (from and to, as YYYY-MM-DD days) and the one-line method behind the Nx remote cache's 5× faster builds: facts only the owner has.",
-    expires: '2026-10-31',
+    expires: '2026-11-30',
   },
   {
     field: 'about.facts.1.basis#which years, and what counts as rescued',
     why: "The basis of /about's 12 production systems rescued: the years it covers and what counts as a rescue, facts only the owner has. The quick facts leave the row out until then.",
-    expires: '2026-10-31',
+    expires: '2026-11-30',
   },
   {
     field: 'about.facts.2.basis#which years',
     why: "The basis of /about's 4 teams led: the years it covers, a fact only the owner has. The quick facts leave the row out until then.",
-    expires: '2026-10-31',
+    expires: '2026-11-30',
   },
   {
     field: 'llms-txt#the blockquote, one sentence on who Milos is and what he is for',
     why: "The one sentence /llms.txt opens with, in the owner's own words: who he is and what he is for. Until it is written the file serves the home page's description in its place.",
-    expires: '2026-10-31',
+    expires: '2026-11-30',
   },
   {
     field:
       'llms-txt#the facts block, how the current role is phrased and which profile links to list',
     why: 'The ground-truth facts /llms.txt carries after its blockquote: how the owner phrases his current role and which profile links he lists, decisions only he makes. Until then the file has no facts block.',
-    expires: '2026-10-31',
+    expires: '2026-11-30',
   },
 ];
 
