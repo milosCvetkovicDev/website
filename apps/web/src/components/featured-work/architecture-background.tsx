@@ -75,7 +75,7 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
     <div
       ref={containerRef}
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 z-0 hidden overflow-hidden opacity-40 transition-opacity duration-700 md:block dark:opacity-60"
+      className="pointer-events-none absolute inset-0 z-0 hidden overflow-hidden md:block"
     >
       <svg
         viewBox={`0 0 ${VIEW_BOX.width} ${VIEW_BOX.height}`}
@@ -89,7 +89,9 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
           </filter>
         </defs>
 
-        <g>
+        {/* The faded layer: connections, packets and node shapes, no text. The labels are drawn
+            above it at full opacity in opaque tokens, because text is never dimmed (#269). */}
+        <g className="opacity-40 dark:opacity-60">
           {connections.map((connection) => {
             const dimmed = hasActive && !connection.active;
             return (
@@ -130,9 +132,7 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
               </g>
             );
           })}
-        </g>
 
-        <g>
           {NODES.map((node) => {
             const active = activeNodes.includes(node.id);
             const dimmed = hasActive && !active;
@@ -166,18 +166,31 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
                   fill="var(--tmux-pane-title)"
                   opacity={0.8}
                 />
-                <text
-                  y={38}
-                  textAnchor="middle"
-                  fontSize={10}
-                  className="font-mono"
-                  fill={active ? 'var(--tmux-bar-text-bright)' : 'var(--tmux-bar-text)'}
-                >
-                  {node.label}
-                </text>
               </g>
             );
           })}
+        </g>
+
+        {/* A hovered card fades the nodes it does not use, never their labels: an idle label keeps
+            --tmux-diagram-text and an active one brightens. */}
+        <g>
+          {NODES.map((node) => (
+            <text
+              key={node.id}
+              x={node.pos.x}
+              y={node.pos.y + 38}
+              textAnchor="middle"
+              fontSize={10}
+              className="font-mono"
+              fill={
+                activeNodes.includes(node.id)
+                  ? 'var(--tmux-bar-text-bright)'
+                  : 'var(--tmux-diagram-text)'
+              }
+            >
+              {node.label}
+            </text>
+          ))}
         </g>
       </svg>
     </div>

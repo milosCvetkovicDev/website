@@ -190,13 +190,15 @@ interface SweptSample extends Sample {
 
 /**
  * Every element inside the hero section that carries text of its own, in one round trip, less the
- * tmux background's log stream (`TMUX_LOG_STREAM`). Those lines are painted in the `--log-*`
- * colours, 0.35 to 0.55 alpha by design, and start streaming on an idle callback plus up to 2 s, so
- * whether a sweep met one depended on how fast the page settled: a dark run on 2026-09-30 listed a
- * line beside the skill tags. They are decoration behind the island, tracked as DIM5 in
- * `src/test/dimmed-text.test.ts`, and `accessibility.spec.ts` leaves the same containers out of its
- * at-rest pass. `tmuxLogStreamProblems` runs before and after, so the exclusion can cover nothing
- * but the stream, and everything else in the tmux background, its bars and pane titles, is swept.
+ * tmux background's log stream (`TMUX_LOG_STREAM`). Those lines start streaming on an idle callback
+ * plus up to 2 s, so whether a sweep met one depended on how fast the page settled: a dark run on
+ * 2026-09-30 listed a line beside the skill tags, then painted in the `--log-*` colours at 0.35 to
+ * 0.55 alpha. #269 made those colours opaque (DIM5 in `src/test/dimmed-text.test.ts`, which holds
+ * them opaque through `StaticPane`, whose colour map the streamed lines share), and the stream stays
+ * out so that what the sweep reads does not depend on the clock. They are decoration behind the
+ * island, and `accessibility.spec.ts` leaves the same containers out of its at-rest pass.
+ * `tmuxLogStreamProblems` runs before and after, so the exclusion can cover nothing but the stream,
+ * and everything else in the tmux background, its bars and pane titles, is swept.
  * Elements that are not displayed are swept too: their computed `color` is the one they would
  * paint, so the Scroll label, `display: none` below 1024 px tall, is still read.
  */

@@ -88,7 +88,7 @@ const report = (expected: (string | [string, Verdict])[]) =>
 
 describe('what the scan flags', () => {
   // A translucent custom property of the fixtures' own, so that no fixture leans on what globals.css
-  // holds: the fix for StaticPane's log lines may well make the --log-* colours opaque.
+  // holds: the fix for StaticPane's log lines made the --log-* colours opaque (#269).
   beforeAll(() => {
     vocabulary.properties.set('--fixture-translucent', ['rgba(0, 0, 0, 0.5)']);
   });
@@ -286,7 +286,7 @@ describe('what the scan flags', () => {
     ],
     [
       'a style colour or opacity the scan can resolve',
-      `const LOG_COLORS = { err: 'var(--log-err)', ok: 'var(--log-ok)' } as const;
+      `const LOG_COLORS = { err: 'var(--fixture-translucent)', ok: 'var(--fixture-translucent)' } as const;
       const DIM = { opacity: 0.5 };
       const base = { opacity: 0.6 };
       export function Log({ lines, dimmed, faint }: { lines: { level: 'err' | 'ok'; text: string }[]; dimmed: boolean; faint: boolean }) {
@@ -1477,28 +1477,11 @@ interface KnownDefect {
  * variant's two copies at `opacity-70` (critic-8), was fixed with R17 by #47's slice 47d; DIM3 and
  * DIM4, the hero skill tags and the Scroll label (hero-2), with R12 and R13 in
  * e2e/hero-contrast.spec.ts by slice 47c; DIM6, CircuitBackground's SVG labels, by slice 47l, which
- * deleted the component (hero-6). Ids are not reused.
+ * deleted the component (hero-6). DIM2, ArchitectureBackground's node labels at 40% (60% dark) and
+ * 0.3 of that under a hovered card, and DIM5, the tmux background's log lines in the --log-* colours
+ * at 0.35 to 0.55 alpha, were fixed by #269 with opaque tokens. Ids are not reused.
  */
-const KNOWN_DEFECTS: KnownDefect[] = [
-  {
-    id: 'DIM2',
-    file: 'src/components/featured-work/architecture-background.tsx',
-    component: 'ArchitectureBackground',
-    tokens: ['opacity-40', 'dark:opacity-60', 'opacity={…}'],
-    sites: 3,
-    fixedBy: 'unassigned',
-    why: 'the SVG <text> node labels of the diagram behind the featured work sit at 40% (60% dark), and at 0.3 of that under a hovered card',
-  },
-  {
-    id: 'DIM5',
-    file: 'src/components/animated-hero/tmux-background.tsx',
-    component: 'StaticPane',
-    tokens: ['style.color'],
-    sites: 1,
-    fixedBy: 'unassigned',
-    why: 'the log lines of the tmux background take the --log-* colours, 0.35 to 0.55 alpha; the animated panes set the same colours from script, which the scan cannot see',
-  },
-];
+const KNOWN_DEFECTS: KnownDefect[] = [];
 
 /**
  * Dimmed classes the text rule allows because nothing under them renders text: the sites this guard
