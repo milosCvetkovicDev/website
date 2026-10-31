@@ -11501,6 +11501,58 @@
       }
     },
     {
+      "id": "checkpoint-one-system-design-link-plan",
+      "doc": "docs/plans/2026-10-31-checkpoint-one-system-design.md",
+      "anchor": "](2026-10-31-checkpoint-one-system-plan.md)",
+      "claim": "The link to 2026-10-31-checkpoint-one-system-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-31-checkpoint-one-system-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-31-checkpoint-one-system-plan.md"
+      }
+    },
+    {
+      "id": "checkpoint-one-system-plan-link-design",
+      "doc": "docs/plans/2026-10-31-checkpoint-one-system-plan.md",
+      "anchor": "](2026-10-31-checkpoint-one-system-design.md)",
+      "claim": "The link to 2026-10-31-checkpoint-one-system-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-31-checkpoint-one-system-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-31-checkpoint-one-system-design.md"
+      }
+    },
+    {
+      "id": "checkpoint-one-system-plan-script-test-scripts",
+      "doc": "docs/plans/2026-10-31-checkpoint-one-system-plan.md",
+      "anchor": "`pnpm test:scripts`",
+      "claim": "`pnpm test:scripts` is a script in the root package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "test:scripts"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "test:scripts"
+      }
+    },
+    {
       "id": "blog-publishing-plan-link-work",
       "doc": "docs/plans/2026-10-06-blog-publishing-plan.md",
       "anchor": "](/work)",
@@ -11620,6 +11672,40 @@
       ],
       "check": {
         "path": "docs/plans/2026-10-06-blog-publishing-plan.md"
+      }
+    },
+    {
+      "id": "plans-readme-link-2026-10-31-checkpoint-one-system-design",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-10-31-checkpoint-one-system-design.md)",
+      "claim": "The link to 2026-10-31-checkpoint-one-system-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-31-checkpoint-one-system-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-31-checkpoint-one-system-design.md"
+      }
+    },
+    {
+      "id": "plans-readme-link-2026-10-31-checkpoint-one-system-plan",
+      "doc": "docs/plans/README.md",
+      "anchor": "](2026-10-31-checkpoint-one-system-plan.md)",
+      "claim": "The link to 2026-10-31-checkpoint-one-system-plan.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "2026-10-31-checkpoint-one-system-plan.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-31-checkpoint-one-system-plan.md"
       }
     }
   ]
