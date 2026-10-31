@@ -44,7 +44,7 @@ perform an operation.
 | 0016 | [Dependabot branches never deploy, and commits that change nothing the site is built from never build](0016-vercel-deployment-budget.md) | Accepted                                      | 2026-09-12 |
 | 0017 | [AI discoverability policy, and what is deliberately not built](0017-ai-discoverability-policy.md)                                       | Accepted                                      | 2026-09-12 |
 | 0018 | [Dependency update policy](0018-dependency-update-policy.md)                                                                             | Accepted (corrected 2026-10-06)               | 2026-09-12 |
-| 0019 | [Next.js does not generate agent instruction files](0019-next-agent-rules-disabled.md)                                                   | Accepted                                      | 2026-09-27 |
+| 0019 | [Next.js does not generate agent instruction files](0019-next-agent-rules-disabled.md)                                                   | Superseded by ADR-0037                        | 2026-09-27 |
 | 0020 | [`main` is protected, and the two required checks are CI job names](0020-branch-protection-on-main.md)                                   | Superseded by ADR-0021                        | 2026-09-12 |
 | 0021 | [Squash-only merges, and `main`'s three required checks are job names](0021-squash-only-merges-and-required-checks.md)                   | Accepted                                      | 2026-09-13 |
 | 0022 | [The home page renders no boot loader](0022-no-boot-loader.md)                                                                           | Superseded by ADR-0024                        | 2026-09-23 |
@@ -62,6 +62,8 @@ perform an operation.
 | 0034 | [Blog posts are drafted with Claude and approved by the owner, line by line](0034-blog-posts-drafted-with-claude.md)                     | Accepted                                      | 2026-10-06 |
 | 0035 | [A value only the owner can supply is a registered placeholder with a deadline the owner sets](0035-owner-placeholder-convention.md)     | Accepted                                      | 2026-09-29 |
 | 0036 | [Content dates move with served text, and a pull request check holds them together](0036-content-dates-move-with-served-text.md)         | Proposed                                      | 2026-10-08 |
+| 0037 | [Next.js keeps its agent instruction blocks out of the app, on 16.4's sync](0037-next-agent-files-synced-off.md)                         | Accepted                                      | 2026-10-20 |
+| 0038 | [Hold @playwright/test below 1.64 until mobile-safari passes on it](0038-playwright-held-below-1-64.md)                                  | Accepted                                      | 2026-10-30 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see

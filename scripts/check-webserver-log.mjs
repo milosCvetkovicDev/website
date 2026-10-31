@@ -3,8 +3,8 @@
 // allowlisted.
 //
 // Nothing in the suite looks at the server's own output, so a server-side error on a page that still
-// renders something passes every gate. Green CI runs carry `[WebServer] Error: Internal:
-// NoFallbackError` blocks in their logs, and every test passes beside them.
+// renders something passes every gate. Under Next 16.3, green CI runs carried `[WebServer] Error:
+// Internal: NoFallbackError` blocks in their logs, and every test passed beside them.
 //
 // Every `[WebServer]` line is a finding unless it belongs to an allowlisted block. The check does not
 // try to recognise what an error looks like, because a list of known shapes passes every shape it
@@ -14,23 +14,34 @@
 // Next and Node write errors and warnings.
 //
 // One block is allowed, and only that one: ADR 0015 fixes the case-study slugs at build time, so an
-// unknown /work/* slug reaches the router's fallback path and Next logs NoFallbackError on its way
-// to the 404. That trade-off is recorded, so the block is allowlisted by its exact message, together
-// with the `at` stack frames that follow it and nothing else.
+// unknown /work/* slug reaches the router's fallback path, where Next 16.3 logged NoFallbackError
+// on its way to the 404. That trade-off is recorded, so the block is allowlisted by its exact
+// message, together with the `at` stack frames that follow it and nothing else. Next 16.4 no
+// longer logs it on that path; it stays allowed, and is not required.
 //
 // Usage: `node scripts/check-webserver-log.mjs <log file>`. Prints whatever it did not allow and
 // exits 1, or prints what it read and exits 0.
 //
 // The rule this file shares with check-allowbuilds-drift.mjs: never exit 0 because it could not see.
-// A missing, unreadable or empty log is a failure with a message, not a skip, and so is a log with no
-// `[WebServer]` line in it: the not-found specs request an unknown slug in every run, so ADR 0015's
-// block is always there, and a log without a single server line means the capture broke.
+// A missing, unreadable or empty log is a failure with a message, not a skip, and so is a log
+// without the canary exactly once. CI's web server command writes CANARY to its stderr before
+// `next start`, so a log with it shows the capture works, and since 16.4 a green run's server writes
+// nothing else there: until 16.4 the NoFallbackError block in every run was that sign. A log
+// without the canary means the capture broke or is not from CI's e2e job, and a log with it twice
+// holds two runs. The canary is never a finding itself.
 
 import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
 
 const ADR = 'docs/adr/0015-static-case-study-params.md';
+
+/**
+ * The line CI's web server command writes to its stderr once, before `next start`
+ * (apps/web/playwright.config.ts), matched on its whole text. `src/test/playwright-config.test.ts`
+ * in apps/web fails when the command and this differ.
+ */
+export const CANARY = 'check-webserver-log canary: the web server stderr reaches this log';
 
 /** The one server error this repository has decided to accept, matched on its whole message. */
 const ALLOWED = new Set(['Error: Internal: NoFallbackError']);
@@ -80,6 +91,10 @@ export function collectServerBlocks(log) {
     }
     const text = line.slice(match[0].length).trim();
     if (text === '') {
+      open = null;
+    } else if (text === CANARY) {
+      // One line, never part of another block and never continued.
+      blocks.push({ message: text, lines: [text], allowed: true });
       open = null;
     } else if (ALLOWED.has(text)) {
       open = { message: text, lines: [text], allowed: true };
@@ -142,41 +157,60 @@ export function check(path, readLog = (file) => readFileSync(file, 'utf8')) {
       status: 1,
       output: [
         `the Playwright log (${path}) has no [WebServer] line, so this check saw no server output.`,
-        'The not-found specs request an unknown /work/* slug in every run, which prints the',
-        `NoFallbackError block ${ADR} accepts, so a log without it means the capture broke: the`,
-        "server's stderr was not forwarded, Playwright's prefix changed, or the suite never ran (a",
-        'pnpm filter that matches no package exits 0). If a Next upgrade stopped printing that block,',
-        'this check needs another sign that the capture works.',
+        "CI's web server command prints the canary line to its stderr before the server starts, so",
+        "a log without any server line means the capture broke: the server's stderr was not",
+        "forwarded, Playwright's prefix changed, or the suite never ran (a pnpm filter that",
+        'matches no package exits 0).',
       ],
     };
   }
 
+  const canaries = blocks.filter((block) => block.message === CANARY).length;
   const unexpected = unexpectedBlocks(blocks);
-  if (unexpected.length === 0) {
-    const lines = blocks.reduce((sum, block) => sum + block.lines.length, 0);
-    return {
-      status: 0,
-      output: [
-        `web server log: ${lines} lines, all in ${blocks.length} allowlisted blocks (${ADR}).`,
-      ],
-    };
+  if (unexpected.length === 0 && canaries === 1) {
+    const allowed = blocks.filter((block) => block.message !== CANARY);
+    const lines = allowed.reduce((sum, block) => sum + block.lines.length, 0);
+    const rest =
+      allowed.length === 0
+        ? 'and no other server output.'
+        : `and ${lines} lines, all in ${allowed.length} allowlisted blocks (${ADR}).`;
+    return { status: 0, output: [`web server log: the canary line once ${rest}`] };
   }
 
-  const plural = unexpected.length === 1 ? '' : 's';
-  const output = [
-    `The web server printed ${unexpected.length} block${plural} of output nobody allowlisted:`,
-    '',
-  ];
-  for (const block of unexpected) {
-    for (const line of block.lines) output.push(`  ${line}`);
-    output.push('');
+  /** @type {string[]} */
+  const output = [];
+  if (unexpected.length > 0) {
+    const plural = unexpected.length === 1 ? '' : 's';
+    output.push(
+      `The web server printed ${unexpected.length} block${plural} of output nobody allowlisted:`,
+      '',
+    );
+    for (const block of unexpected) {
+      for (const line of block.lines) output.push(`  ${line}`);
+      output.push('');
+    }
+    output.push(
+      `Only \`${[...ALLOWED].join('`, `')}\` and its stack frames are accepted, as the`,
+      `trade-off ${ADR} records. A server-side error on a page that still renders is invisible to`,
+      'every other gate, so this one fails. Fix what the server reported, or record the decision',
+      'and add its message to ALLOWED.',
+    );
   }
-  output.push(
-    `Only \`${[...ALLOWED].join('`, `')}\` and its stack frames are accepted, as the trade-off ${ADR}`,
-    'records. A server-side error on a page that still renders is invisible to every other gate, so',
-    'this one fails. Fix what the server reported, or record the decision and add its message to',
-    'ALLOWED.',
-  );
+  if (canaries === 0) {
+    if (output.length > 0) output.push('');
+    output.push(
+      `the Playwright log (${path}) has no canary line, so this check cannot tell that it saw the`,
+      "server's stderr. CI's web server command (apps/web/playwright.config.ts) prints",
+      `\`[WebServer] ${CANARY}\` once before \`next start\`; without it the`,
+      "capture broke, or the log is not from CI's e2e job: the local dev server does not print it.",
+    );
+  } else if (canaries > 1) {
+    if (output.length > 0) output.push('');
+    output.push(
+      `the Playwright log (${path}) has the canary line ${canaries} times, where one Playwright`,
+      'run starts its web server, and prints it, once: the log holds more than one run.',
+    );
+  }
   return { status: 1, output };
 }
 

@@ -2,7 +2,14 @@
 
 ## Status
 
-Accepted
+Superseded by ADR-0037
+
+Superseded in full: [ADR 0037](0037-next-agent-files-synced-off.md) holds this decision,
+`agentRules: false`, on Next.js 16.4, so read it rather than this record. Its first Decision bullet
+replaces this record's first, whose checks read the 16.3 code that 16.4 replaced; its second and
+third restate this record's second and third for 16.4, where Next removes its own block from
+`apps/web/AGENTS.md` and only a stray `CLAUDE.md` waits to be deleted by hand; and it keeps the
+block 16.4 added, behind `experimental.agentFeedback`, off.
 
 ## Date
 

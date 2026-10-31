@@ -103,17 +103,20 @@ ETag of its own that the site answers with the other representation
   Never gate on `VERCEL`: `vercel env pull` writes `VERCEL="1"` into a local `.env.local`.
   Never add `upgrade-insecure-requests`: WebKit applies it to `http://localhost`, which breaks the
   `mobile-safari` project.
-- `next dev` writes `apps/web/AGENTS.md` and `apps/web/CLAUDE.md` when it detects an agent shell
-  (Claude Code sets `CLAUDECODE` and `AI_AGENT`) and neither file holds its current managed block,
-  and that includes the `next dev` a local e2e run boots. `agentRules: false` in
-  `apps/web/next.config.ts` turns that off (ADR 0019, `docs/adr/0019-next-agent-rules-disabled.md`).
-  `apps/web/src/test/next-config.test.ts` pins the value, fails if either file is tracked, and
-  reads the installed Next.js to check it still honours the option and generates the files from
-  nowhere else; when one of those checks fails after a Next.js bump, re-read ADR 0019 against the
-  new code before updating the pattern. For Next.js documentation that matches the installed
-  version, read `apps/web/node_modules/next/dist/docs` rather than the online docs. An
-  `apps/web/AGENTS.md` or `apps/web/CLAUDE.md` written before the change is untracked leftover
-  that Claude Code still loads: delete it (never the root `CLAUDE.md`), never commit or ignore it.
+- `next dev` writes a managed block into `apps/web/AGENTS.md` when it detects an agent shell (Claude
+  Code sets `CLAUDECODE` and `AI_AGENT`) and the file does not hold the current one, and that
+  includes the `next dev` a local e2e run boots (16.3 wrote `apps/web/CLAUDE.md` too).
+  `agentRules: false` in `apps/web/next.config.ts` turns that off, and since 16.4 makes every
+  `next dev` remove the block, deleting a file left with nothing else in it. The second block 16.4 adds stays off with
+  `experimental.agentFeedback` unset (ADR 0037, `docs/adr/0037-next-agent-files-synced-off.md`,
+  superseding ADR 0019). `apps/web/src/test/next-config.test.ts` pins both values, fails if either
+  file is tracked, and reads the installed Next.js to check it still switches each sync on them and
+  writes the blocks from nowhere else; when one of those checks fails after a Next.js bump, re-read
+  ADR 0037 against the new code before updating the pattern. For Next.js documentation that matches
+  the installed version, read `apps/web/node_modules/next/dist/docs` rather than the online docs. An
+  `apps/web/CLAUDE.md` written by 16.3, or an `apps/web/AGENTS.md` holding more than Next's block,
+  is untracked leftover that Claude Code still loads: delete it (never the root `CLAUDE.md`), never
+  commit or ignore it.
 - `.next-e2e` is known to seven places, not one: both `.gitignore` files, `.prettierignore`,
   `globalIgnores` in `apps/web/eslint.config.mjs`, the `include` list in `apps/web/tsconfig.json`,
   `.vercelignore` (the Vercel CLI never reads `.gitignore`, and the directory runs to ~150 MB) and
