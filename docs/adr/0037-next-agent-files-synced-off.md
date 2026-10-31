@@ -88,16 +88,21 @@ so Next.js writes no agent instructions into the app and removes its own blocks 
 - The checks match compiled code. In 16.4, `apps/web/src/test/next-config.test.ts` reads both the
   CommonJS and the ESM build of `dist/server/lib`, and fails if `router-server.js`'s `initialize`
   stops returning `agentRules` and `agentFeedback` from the config; if `start-server.js` stops
-  calling `syncAgentRulesForDev` or `syncAgentFeedbackForDev`, or calls either anywhere in a form
-  the test cannot read, `<name>(<identifier>, <switch>)` with no parenthesis in the switch; if a
-  call of `syncAgentRulesForDev` there takes anything but `<result>.agentRules !== false`, alone,
-  as its switch, on the object `getRequestHandlers` returned; if a call of
-  `syncAgentFeedbackForDev` stops having `<result>.agentFeedback === true` among the `&&` terms of
-  its switch, on that object; if either switch gains a top-level `||`, `??`, conditional `?` or
-  comma; if either function in `app-info-log.js` stops opening with the removal when switched off,
-  or stops being where its writer is called; or if any other `.js`, `.cjs` or `.mjs` file under
-  `dist` (bar the vendored bundles in `dist/compiled`, and `dist/docs`, which holds only Markdown)
-  calls either function or either writer. It also checks that
+  calling `syncAgentRulesForDev` or `syncAgentFeedbackForDev`, or calls either in any form but
+  the two the test reads, `<name>(<identifier>, <switch>)` and the CommonJS build's
+  `(0, <module>.<name>)(<identifier>, <switch>)`, each with no parenthesis in the switch (any
+  other `<name>(`, and any `<name>?.(`, `<name>.call(`, `<name>.apply(` or `<name>.bind(`,
+  fails it); if a call of `syncAgentRulesForDev` there takes anything but
+  `<result>.agentRules !== false`, alone, as its switch, on the object `getRequestHandlers`
+  returned; if a call of `syncAgentFeedbackForDev` stops having `<result>.agentFeedback === true`
+  among the `&&` terms of its switch, on that object; if either switch gains a top-level `||`,
+  `??`, conditional `?` or comma, or its guard anything beside it, such as a `!` in front or a
+  `|` or `||` after it, written there or in a constant the switch reads; if either function in
+  `app-info-log.js` stops opening with the removal when switched off, or stops being where its
+  writer is called; or if any other `.js`, `.cjs` or `.mjs` file under `dist` (bar the vendored
+  bundles in `dist/compiled`, and `dist/docs`, which holds only Markdown) calls either function
+  or either writer in any of those forms. A call through an alias (`const f = <name>`) or
+  through a computed member (`<module>["<name>"]`) is seen by neither check. It also checks that
   `dist/docs` ships and that
   `dist/docs/01-app/03-api-reference/05-config/01-next-config-js/agentRules.md` still documents
   `agentRules: false`. So the next release that restructures that code fails them, as 16.4 did,

@@ -729,12 +729,19 @@ describe('the installed Next.js honours agentRules', () => {
   };
   const serverLibs = ['dist/server/lib', 'dist/esm/server/lib'];
   const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Every textual call site: the name, matched as text and not inside a longer identifier,
-  // followed by `(`, or by `)(` as in the CommonJS build's `(0, _mod.name)(...)`, and never the
-  // function's own declaration.
+  // Every textual call site: the name, matched as text and not inside a longer identifier and
+  // never in the function's own declaration, followed by `(`, by `)(` as in the CommonJS build's
+  // `(0, _mod.name)(...)`, by `?.(`, or by `.call(`, `.apply(` or `.bind(`. Only the first two
+  // are forms `switchGuards` reads; the others count as calls so that they fail rather than pass
+  // unseen. A call through an alias (`const f = name; f(...)`) or a computed member
+  // (`_mod["name"](...)`) is not found.
   const callSites = (source: string, name: string) => [
     ...source.matchAll(
-      new RegExp(`(?<!function\\s+)(?<![\\w$])${escapeRegExp(name)}\\)?\\s*\\(`, 'g'),
+      new RegExp(
+        `(?<!function\\s+)(?<![\\w$])${escapeRegExp(name)}` +
+          `(?:\\)?\\s*\\(|\\s*\\?\\.\\s*\\(|\\s*\\.\\s*(?:call|apply|bind)\\s*\\()`,
+        'g',
+      ),
     ),
   ];
   // The object literal whose `{` sits at `open`, found by counting braces; '' when there is none.
@@ -805,12 +812,16 @@ describe('the installed Next.js honours agentRules', () => {
   // (`<result>`), or null when the call is not one this test can read or accepts. A call is read
   // only as `<name>(<identifier>, <switch>)` with no parenthesis in the switch, so all it reads is
   // top level; any other call (a parenthesis in the switch, a first argument that is not an
-  // identifier, a single argument) is a null, never skipped. The switch is read as a conjunction:
-  // its `&&` terms, each a local constant replaced by its value. A `||`, a `??` or a conditional
-  // `?` at top level would let another operand switch the sync on whatever the guard says, and a
-  // comma makes the rest another argument, so each is refused; `?.` is optional chaining unless a
-  // digit follows it. A constant's value counts as one term, as if parenthesised: `a && <value>` is
-  // false whenever `a` is, so a `?` inside one, as in 16.4's `telemetryEnabled`, is no concern.
+  // identifier, a single argument, an optional call, a call through `call`, `apply` or `bind`) is
+  // a null, never skipped. The switch is read as a conjunction: its `&&` terms, each a local
+  // constant replaced by its value. A `||`, a `??` or a conditional `?` at top level would let
+  // another operand switch the sync on whatever the guard says, and a comma makes the rest another
+  // argument, so each is refused; `?.` is optional chaining unless a digit follows it. A
+  // constant's value counts as one term, as if parenthesised: `a && <value>` is false whenever `a`
+  // is, so a `?` inside one, as in 16.4's `telemetryEnabled`, is no concern. The guard term itself,
+  // or the constant's value it stands for, must be `switchedBy` whole, since both its patterns are
+  // anchored at each end: a guard with a `||`, `??`, `|` or `?` in it, or a leading `!`, is no
+  // guard, and the call reads as null.
   const switchGuards = (source: string, { name, switchedBy, only }: (typeof syncs)[number]) =>
     callSites(source, name).map((site) => {
       const call = source
@@ -852,6 +863,22 @@ describe('the installed Next.js honours agentRules', () => {
     // `?.` is optional chaining, not a conditional, unless a digit follows it.
     expect.soft(read(feedback, 'r.agentFeedback === true && t?.isEnabled')).toEqual(['r']);
     expect.soft(read(feedback, 'c?.5:r.agentFeedback === true')).toEqual([null]);
+    // The guard must be the whole term, after a constant is replaced by its value too: another
+    // operand beside it, a bitwise `|` or a `!` in front makes it no guard.
+    for (const value of [
+      'c || r.agentFeedback === true',
+      'c ?? r.agentFeedback === true',
+      'c ? r.agentFeedback === true : x',
+      'r.agentFeedback === true | c',
+      '!r.agentFeedback === true',
+    ]) {
+      expect.soft(read(feedback, 'on && t', `const on = ${value};`), value).toEqual([null]);
+    }
+    expect.soft(read(feedback, 'r.agentFeedback === true | c && t')).toEqual([null]);
+    expect.soft(read(feedback, '!r.agentFeedback === true && t')).toEqual([null]);
+    expect.soft(read(rules, 'r.agentRules !== false | c')).toEqual([null]);
+    expect.soft(read(rules, '!r.agentRules !== false')).toEqual([null]);
+    expect.soft(read(rules, 'on', 'const on = c || r.agentRules !== false;')).toEqual([null]);
   });
 
   it('reads every call of a sync, failing one it cannot parse instead of skipping it', () => {
@@ -873,6 +900,15 @@ describe('the installed Next.js honours agentRules', () => {
       .soft(read(rules, good, `${rules.name}(opts.dir, r.agentRules !== false)`))
       .toEqual(['r', null]);
     expect.soft(read(rules, good, `${rules.name}(r.agentRules !== false)`)).toEqual(['r', null]);
+    // An optional call, and a call through `call`, `apply` or `bind`, are calls it cannot read.
+    for (const call of [
+      `${rules.name}?.(dir, r.agentRules !== false)`,
+      `${rules.name}.call(null, dir, r.agentRules !== false)`,
+      `${rules.name}.apply(null, [dir, r.agentRules !== false])`,
+      `${rules.name}.bind(null, dir)(r.agentRules !== false)`,
+    ]) {
+      expect.soft(read(rules, good, call), call).toEqual(['r', null]);
+    }
     // A name is matched as text: `$` is an identifier character, not an anchor.
     const dollar = { ...rules, name: 'sync$Rules' };
     expect.soft(read(dollar, 'sync$Rules(dir, r.agentRules !== false)')).toEqual(['r']);
