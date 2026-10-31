@@ -4,497 +4,374 @@
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** `.agent-state/<task-id>.json` stays the only checkpoint. It gains the 10-13 parts:
-
-- child agents recorded by SubagentStart and SubagentStop hooks;
-- notes holding the children's final messages;
-- HEAD, working tree and pull request drift in the resume check.
-
-All of these sit in a directory beside the checkpoint that only scripts write. Every existing
-checkpoint stays valid and is briefed as it is today.
+**Goal:** `.agent-state/<task-id>.json` stays the only checkpoint. The resume check learns what
+changed since the lead last stamped its facts, and the lead's child agents are recorded by
+SubagentStart and SubagentStop hooks. Every existing checkpoint stays valid and is briefed as it
+is today, and SessionStart stays inside its 20 s.
 
 **Architecture:** one new dependency-free module, `scripts/agent-state.mjs`, with three
 subcommands:
 
-- `stamp`: the lead records git and pull request facts after each checkpoint update;
-- `drift`: called once by `scripts/agent-resume.sh`, it turns those facts and the child records
-  into briefing lines;
-- `hook`: called by `.claude/hooks/subagent-state.sh` on SubagentStart and SubagentStop.
+- `stamp`: the lead records git and pull request facts, and its session, after each checkpoint
+  update, into `.agent-state/<task-id>/stamp.json`;
+- `drift`: run once by `scripts/agent-resume.sh`, in the background, for the stamped tasks still in
+  progress; it prints one JSON object per briefing line;
+- `hook`: run by `.claude/hooks/subagent-state.sh` on SubagentStart and SubagentStop; it writes one
+  file per event under `.agent-state/sessions/<session-id>/` and never reads a checkpoint.
 
-The hardened helpers come from the unshipped 10-13 `scripts/checkpoint.mjs`, with their tests:
-status parsing, untrusted text, locks, atomic writes, notes and the CI rollup.
-`scripts/agent-state.schema.json` does not change.
+Every file has one writer, so nothing takes a lock. `scripts/agent-state.schema.json` does not
+change.
 
-**Tech Stack:** Node 22 (`node:test`, no dependencies, type-checked through JSDoc by the
-`scripts` package), bash 3.2 with jq and perl, Claude Code hooks.
+**Tech Stack:** Node 22 (`node:test`, no dependencies, type-checked through JSDoc by the `scripts`
+package), bash 3.2 with jq and perl, Claude Code hooks.
 
-**Design:** [the design](2026-10-31-checkpoint-one-system-design.md): decisions D1 to D10 and the
-owner's answers to its five questions.
+**Design:** [the design](2026-10-31-checkpoint-one-system-design.md), decisions D1 to D11, with the
+probe and the measured cost of today's session start. **Record:**
+[ADR 0041](../adr/0041-one-checkpoint-system-in-agent-state.md).
 
-**Branch:** this plan and its design ship on `docs/checkpoint-one-system-plan`. The work ships as
-three pull requests, one branch each, made from `main` when its slice starts:
+**Branches and pull requests:**
 
-- PR 1: `docs/adr-one-checkpoint-system`;
-- PR 2: `feat/checkpoint-stamp-drift`;
-- PR 3: `feat/checkpoint-child-agents`.
+- PR 1 is this branch, `docs/checkpoint-one-system-plan`: the design, this plan and ADR 0041,
+  merged as one pull request after the probe (done) and a second review round.
+- PR 2, `feat/checkpoint-stamp-drift`, and PR 3, `feat/checkpoint-child-agents`, are branched from
+  `main` only after PR 1 has merged, so their code cites a merged record.
 
 **Order and dependencies:**
 
-- Nothing starts before the owner has answered the design's five questions. An answer other than
-  the recommended one changes the tasks it names, in the commit that records the answer.
-- PR 2 starts after PR 1 has merged, because the code cites ADR 0041.
-- PR 3 starts after **#280 has merged**, because it edits `.claude/hooks/` and
-  `scripts/claude-hooks.test.mjs`, which #280 rewrites (the stop hook's trap and the warmed
-  stubs). It also waits for PR 2, whose module it extends.
-- PR 2 touches no hook file and no hook test, so it does not wait for #280.
+- PR 1 waits for the second review round and the owner's answers to the design's four questions.
+  An answer other than the recommended one changes the tasks it names, in the commit that records
+  the answer.
+- PR 2 waits for PR 1 and for **#280**: its tests import #280's warmed-stub helper rather than
+  copying it (Task 4).
+- PR 3 waits for PR 2, whose module it extends. Its first task prunes the SessionStart listing, so
+  the prune lands no later than the hooks.
 - `CLAUDE.md` is 16,383 bytes against its 16,384-byte budget (`scripts/claude-md-budget.test.mjs`).
   No task grows it; guidance goes into `.claude/rules/claude-code-config.md`.
 
-**Red first:** every task that changes behaviour starts with a test that fails, and its
-documentation changes in the same commit. Four tasks are verification steps instead, and their
-stop conditions are the checks themselves: the three that open pull requests (Tasks 2, 9 and 14)
-and the live probe (Task 13).
+**Red first:** every task that changes behaviour starts with tests that assert the exit code and
+the output, run against the code as it was before the task, and fail. A test that cannot fail
+against that code (one that pins today's behaviour) has `(guard)` in its title and is not counted
+as red first. Ported tests that fail only because the module does not exist yet are counted as
+ported, not as red first. Each task's stop condition gives the counts.
+
+**Hangs:** every test that runs git, gh, node or a hook has `{ timeout: 10_000 }` and sets
+`AGENT_RESUME_GIT_TIMEOUT`, `AGENT_RESUME_GH_TIMEOUT` and `AGENT_RESUME_DRIFT_TIMEOUT` to 1, which
+the stamp reads too, so a test of a hang costs at most 2 s.
 
 **Stop condition for the whole plan (all must hold):**
 
 ```bash
 pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:scripts   # exit 0
 pnpm check:adrs && pnpm check:adr-history && pnpm check:docs-drift      # exit 0
-git diff --exit-code 05abb5d1 -- scripts/agent-state.schema.json        # no output: unchanged
-bash scripts/agent-resume.sh; echo "exit $?"   # exit 0 on the main checkout; old checkpoints briefed as before
+git fetch origin && git diff --exit-code origin/main -- scripts/agent-state.schema.json
+bash scripts/agent-resume.sh; echo "exit $?"   # exit 0 on the main checkout, old ones as before
 gh pr checks <N> --watch                       # green on the head SHA, for each of PR 1, 2 and 3
 ```
 
-Task 13's live probe also records one child, with its note, against a stamped task.
+The `git diff` prints nothing: no pull request in this plan changes the checkpoint schema, so it
+is the same file on `origin/main` before PR 2 and after PR 3. Task 14's live probe also shows one
+`BLOCKED` child as an attention line with its note path and none of its text.
 
 ---
 
-## PR 1: ADR 0041 (`docs/adr-one-checkpoint-system`)
+## PR 1: the design, this plan and ADR 0041 (`docs/checkpoint-one-system-plan`)
 
-### Task 1: Record the decision in ADR 0041
+### Task 1: Run the live probe
+
+**Files:** none in the repository. The probe ran in a scratch git repository outside it, with a
+settings file passed on the command line; no settings file was read or changed.
+
+- [x] **Step 1:** Write a capture hook that appends each SessionStart, SubagentStart and
+      SubagentStop payload, with the hook's own `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PROJECT_DIR`.
+- [x] **Step 2:** Run the three headless runs in the design's probe section: two children (one
+      without a status line), a resume with a `BLOCKED` child, and a named agent.
+- [x] **Step 3:** Record the commands, the output and the answers to S5's five questions in the
+      design, and measure today's resume check and SessionStart (the design's cost table).
+
+**Stop condition:** the design's probe section answers all five questions from recorded output.
+Met on 2026-10-31.
+
+### Task 2: Record the decision in ADR 0041
 
 **Files:**
 
-- Create: `docs/adr/0041-one-checkpoint-system.md`
-- Modify: `docs/adr/README.md` (index row), `docs/drift-manifest.json` (an entry per new link),
-  `.claude/rules/claude-code-config.md` (the sentence on why `.agent-state` sits at the root cites
-  ADR 0041), this plan (tick)
+- Create: `docs/adr/0041-one-checkpoint-system-in-agent-state.md`, status `Proposed`
+- Modify: `docs/adr/README.md` (its index row), `docs/drift-manifest.json` (the index entries and
+  one per new link), `docs/plans/README.md` (this plan's and the design's rows)
 
-- [ ] **Step 1: Red.** Add only the index row for 0041 to `docs/adr/README.md`, then run:
-
-```bash
-pnpm check:adrs; echo "exit $?"
-```
-
-Expected: exit 1, reporting that the row's record does not exist.
-
-- [ ] **Step 2: Write the record.** Its sections are Status, Date, Context, Decision, Consequences
-      and Alternatives considered. The Decision covers:
-  - the location and its reason, the `.claude` protection;
-  - one checkpoint file per task;
-  - scripts and hooks writing only `.agent-state/<task-id>/` (D1);
-  - one resume check whose exit codes keep their meanings (D6).
-
-  Context says that the 2026-09-16 ruling was never recorded and that the 10-13 brief was never
-  merged, so the record supersedes nothing. It cites no local or untracked file.
-
-- [ ] **Step 3: Green.** Run:
+- [x] **Step 1:** Write the record: Status, Date, Context, Decision, Consequences and Alternatives
+      considered. Its Context cites no local or untracked file.
+- [x] **Step 2:** Add the index row and the manifest entries.
+- [x] **Step 3:** Run the gates:
 
 ```bash
-pnpm check:adrs && pnpm check:adr-history && pnpm check:docs-drift && pnpm format:check
+pnpm format:check && pnpm check:adrs && pnpm check:docs-drift
 ```
 
-Expected: exit 0 for each.
+**Stop condition:** the three commands exit 0 (output in the second draft's report).
 
-- [ ] **Step 4: Commit** `docs(adr): record one checkpoint system in .agent-state`, signed.
+### Task 3: Second review, the owner's answers, and PR 1
 
-**Stop condition:** the four commands in Step 3 exit 0, and `git show --stat HEAD` lists only the
-files above.
+**Files:** this design, this plan, ADR 0041 and its index row.
 
-### Task 2: Open PR 1
+- [ ] **Step 1:** `adversarial-reviewer` gets this branch's diff against `origin/main` and nothing
+      else. The team lead triages its findings; each is fixed, deferred with a reason or rejected
+      with a reason in the pull request's Review section.
+- [ ] **Step 2:** The owner answers the design's four questions. The answers go into the design,
+      and into any task they change, in one commit.
+- [ ] **Step 3:** When the decision stands as written, ADR 0041 becomes `Accepted` in the record,
+      its index row and its manifest entries, in one commit. After that its Decision is never
+      edited (ADR 0012).
+- [ ] **Step 4:** Write the PR 1 checkpoint, open the pull request with
+      `.claude/skills/open-pr/SKILL.md`, and watch the checks on the pushed head SHA:
+      `gh pr checks <N> --watch`, then `gh pr view <N> --json headRefOid,statusCheckRollup`.
 
-**Files:** none beyond Task 1.
-
-- [ ] **Step 1:** Write the PR 1 checkpoint, then follow `.claude/skills/open-pr/SKILL.md`. Work
-      the template's checklist with the real output pasted in. `adversarial-reviewer` gets the diff
-      only. Triage its findings in the Review section.
-- [ ] **Step 2:** Watch the checks until every one is green on the pushed head SHA:
-      `gh pr checks <N> --watch`, then
-      `gh pr view <N> --json headRefOid,statusCheckRollup`.
-
-**Stop condition:** all checks are green on the head SHA. The owner merges; the agent never does.
+**Stop condition:** every check is green on the head SHA. The owner merges; the agent never does.
 
 ---
 
 ## PR 2: stamp and drift (`feat/checkpoint-stamp-drift`)
 
-### Task 3: Warm the resume-check stubs once
+Branched from `main` after PR 1 and #280 have merged.
 
-`scripts/agent-resume.test.mjs` writes a fresh `gh` stub in every `beforeEach`. On macOS, each
-newly written executable waits for its first-exec assessment (#280 measured 3.1 to 13.3 s). PR 2
-adds tests that use stubs, so the suite adopts #280's pattern first.
+### Task 4: Share #280's warmed stubs
 
-**Files:**
-
-- Modify: `scripts/agent-resume.test.mjs`
-
-- [ ] **Step 1: Red.** Add a test asserting that each test's `bin/gh` is a symlink to one stub that
-      `before()` wrote and ran once. Run:
-
-```bash
-node --test scripts/agent-resume.test.mjs
-```
-
-Expected: that test fails, and every other test passes.
-
-- [ ] **Step 2: Green.** Write the stubs (`gh`, and `jq` where a test needs one) once in
-      `before()`, run each once with a 120 s timeout, and symlink them in `beforeEach`. The
-      per-test answer files (`gh.json`, `gh.sleep`) stay per test.
-- [ ] **Step 3:** Run the suite above, then `pnpm test:scripts`. Expected: exit 0 for both.
-- [ ] **Step 4: Commit** `test(scripts): warm the agent-resume stubs once`.
-
-**Stop condition:** both runs exit 0 with the same test count as before plus one.
-
-### Task 4: Port the pure helpers and add the records schema
+#280 writes the `gh` and `git` stubs once in `before()`, runs each once outside every deadline, and
+links each test to them, because macOS assesses a new executable on its first run (3.1 to 13.3 s,
+21 s under load). `scripts/agent-resume.test.mjs` still writes its `gh` stub in every
+`beforeEach`, and PR 2 adds tests that use stubs.
 
 **Files:**
 
-- Create: `scripts/agent-state.mjs`, `scripts/agent-state.test.mjs`,
-  `scripts/agent-state-records.schema.json`
-- Modify: `.claude/rules/claude-code-config.md` (its `paths` gain the three new files, so Claude
-  Code loads the rule while they are being written)
+- Create: `scripts/test-support/warmed-stubs.mjs`, #280's setup moved, not copied
+- Modify: `scripts/claude-hooks.test.mjs` (imports it), `scripts/agent-resume.test.mjs` (links to
+  the warmed `gh` stub), `.claude/rules/ci-and-scripts.md` (lists the helper)
 
-- [ ] **Step 1: Red.** First, add the three paths to the rule's `paths`, then run
-      `node --test scripts/claude-md-budget.test.mjs`. Expected: it fails, because the patterns
-      match no tracked file. Next, port the 10-13 test cases that still apply. Cover:
-  - `summarise`: the 1,024-byte grapheme-safe cut;
-  - `printable`: control and invisible format characters become U+FFFD, while ZWJ, ZWNJ and
-    variation selectors are kept;
-  - `flat`;
-  - `parseStatus`: status lines, an unclosed fence read both ways, the graver status winning;
-  - `rollupChecks`: CheckRun against StatusContext, the newest run of a name, STALE as pending,
-    a tie going to the graver verdict, unnamed checks kept apart;
-  - a records validator, checked against the schema the same way the existing schema-driven test
-    checks `agent-state.schema.json`.
+- [ ] **Step 1 (guard):** Move #280's stub writing and warming into the module, exported as one
+      function returning the stub paths. `scripts/claude-hooks.test.mjs` imports it. Run
+      `pnpm test:scripts` and compare the pass count with the count before the move.
+- [ ] **Step 2 (guard):** `scripts/agent-resume.test.mjs` links its `bin/gh` to the warmed stub
+      instead of writing one per test. Run the suite again.
+- [ ] **Step 3:** Copy `scripts/*.mjs`, `scripts/*.json` and `scripts/test-support/` to an isolated
+      directory without `node_modules` and run `node --test` there.
+- [ ] **Step 4:** Commit `test(scripts): share the warmed stubs between the hook and resume tests`.
 
-  Run `node --test scripts/agent-state.test.mjs`. Expected: it fails, because the module does not
-  exist.
+**Stop condition:** `pnpm test:scripts` exits 0 with the same number of tests as before, the
+isolated copy passes, and no test writes an executable after `before()`. Red first: 0 (a refactor).
 
-- [ ] **Step 2: Green.** Port the functions unchanged where the design does not change them. Write
-      the schema with `records_version` 1, the `stamp` and `child` definitions, and
-      `additionalProperties: false` at every level. Stage the new files.
-- [ ] **Step 3:** Run the suites, the typecheck and the isolation check. `scripts/` has its own
-      `node_modules`, so the copy takes only the three files:
-
-```bash
-node --test scripts/agent-state.test.mjs scripts/claude-md-budget.test.mjs && pnpm typecheck
-dir=$(mktemp -d /tmp/checkpoint-stamp-XXXX) && mkdir "$dir/scripts" &&
-  /bin/cp scripts/agent-state.mjs scripts/agent-state.test.mjs scripts/agent-state-records.schema.json "$dir/scripts/" &&
-  (cd "$dir" && node --test scripts/agent-state.test.mjs)
-```
-
-Expected: exit 0 for each, the last without any `node_modules`.
-
-- [ ] **Step 4: Commit** `feat(scripts): port the checkpoint text, status and CI helpers`.
-
-**Stop condition:** the Step 3 commands exit 0, and the PR description lists the ported test count
-next to the 10-13 count.
-
-### Task 5: Port git facts, locks and atomic writes
+### Task 5: Port the helpers that move unchanged
 
 **Files:**
 
+- Create: `scripts/agent-state.mjs`, `scripts/agent-state.test.mjs`
+
+- [ ] **Step 1 (ported):** Bring the 10-13 tests of `parseStatus`, `rollupChecks`, `printable`,
+      `ancestry`, the bounded `git` runner, `writeAtomic`, the safe JSON read and `transcriptText`.
+      Run `node --test scripts/agent-state.test.mjs`: it fails, because the module does not exist.
+- [ ] **Step 2:** Port those functions unchanged, with their JSDoc types.
+- [ ] **Step 3:** Run the test file and `pnpm typecheck`.
+- [ ] **Step 4:** Commit `feat(scripts): port the checkpoint helpers that still fit`.
+
+**Stop condition:** the test file passes, `pnpm typecheck` exits 0, and a diff of each function
+against the 10-13 code shows no change but formatting. Red first: 0; ported: the count of tests.
+
+### Task 6: The stamp
+
+**Files:**
+
+- Create: `scripts/agent-state-records.schema.json`, with the stamp's definition only
 - Modify: `scripts/agent-state.mjs`, `scripts/agent-state.test.mjs`
 
-- [ ] **Step 1: Red.** Port these tests, run in temporary repositories:
-  - `captureGit`: porcelain with `-z`, and a detached HEAD;
-  - `contentDigest`: sorted, length-prefixed, the exec bit and symlink targets, a FIFO that does
-    not block;
-  - `ancestry`: equal, N commits after, behind, not an ancestor, not in this repository;
-  - `withLock` and `breakIfStale`: a dead process id, a lock older than 60 s, a lock taken while
-    another was being broken, three attempts;
-  - `writeAtomic`: a temporary name that never ends in `.json`, and the previous version intact
-    after a kill;
-  - the safe JSON read: a symlink and a non-regular file refused, a BOM tolerated.
+- [ ] **Step 1 (red):** Add these tests, each in a temporary repository with stub `gh` and `git`,
+      each asserting the exit code, stdout, stderr and the file written:
+  - `stamp writes stamp.json with the branch, head, porcelain and session` (exit 0; the file
+    validates against the schema; `at` has milliseconds; `sessions` holds the session id);
+  - `stamp appends a new session and keeps the earlier one, at most 20`;
+  - `stamp records prs as null, prints unknown: gh and exits 0 when gh fails`;
+  - `stamp exits 0 within 2 s with prs null when gh hangs`;
+  - one table-driven test: `stamp refuses with exit 1 and writes nothing` for a bad id, a missing,
+    symlinked or non-object checkpoint, and `schema_version` 2;
+  - `stamp exits 2 when the task folder cannot be written`;
+  - `stamp writes mode 0600 files in a 0700 folder` (`umask 077`);
+  - `stamp's id pattern is agent-resume.sh's id_re`, run over valid and invalid ids and the 35 ids
+    present on 2026-10-31.
+- [ ] **Step 2:** Run the file: every new test fails (no `stamp` yet).
+- [ ] **Step 3:** Implement `stamp` as the design's six steps, with the shared gh call (D9).
+- [ ] **Step 4:** Run the file, `pnpm typecheck` and the isolated copy.
+- [ ] **Step 5:** Commit `feat(scripts): stamp a checkpoint's git and pull request facts`.
 
-  Any stub is written and warmed once. Expected: the new tests fail.
+**Stop condition:** the file passes, with 8 tests red first.
 
-- [ ] **Step 2: Green.** Port the functions. Git runs with `GIT_OPTIONAL_LOCKS=0` and is killed on
-      its timeout.
-- [ ] **Step 3:** `node --test scripts/agent-state.test.mjs && pnpm typecheck`. Expected: exit 0.
-- [ ] **Step 4: Commit** `feat(scripts): port the checkpoint git facts, locks and atomic writes`.
+### Task 7: Drift
 
-**Stop condition:** Step 3 exits 0.
+**Files:** `scripts/agent-state.mjs`, `scripts/agent-state.test.mjs`
 
-### Task 6: `stamp`
+- [ ] **Step 1 (red):** Add these tests; each runs `drift` on a stamped task and asserts the exit
+      code and the JSON lines:
+  - `commits after the stamp are a since line, not a contradiction`;
+  - `a rewritten history is a contradiction`, and `HEAD behind the stamp is a contradiction`;
+  - `a stamped head missing from the repository is a contradiction`;
+  - `a changed working tree lists 10 paths and +N more`;
+  - `a pull request's new head and pending -> passing checks are since lines`;
+  - `passing -> failing checks are one attention fact`;
+  - `a pull request unknown at stamp time and known now prints nothing`;
+  - `a stale stamp prints only "not checked"`;
+  - `a stamp without a session prints binding: unknown`;
+  - `a task's lines over 1,200 bytes are cut on a line with +N more`;
+  - `a .tmp file older than an hour is deleted and a fresh one kept`;
+  - `every line of output is one complete JSON object`.
+- [ ] **Step 2:** Run the file: every new test fails (no `drift` yet).
+- [ ] **Step 3:** Implement `drift` as the design's "What the resume check gains", without children
+      (Task 13 adds them).
+- [ ] **Step 4:** Run the file, `pnpm typecheck` and the isolated copy.
+- [ ] **Step 5:** Commit `feat(scripts): report what changed since a checkpoint's stamp`.
 
-**Files:**
+**Stop condition:** the file passes, with 13 tests red first.
 
-- Modify: `scripts/agent-state.mjs`, `scripts/agent-state.test.mjs`
-- Modify: `.claude/rules/claude-code-config.md` (the checkpoint bullet: stamp after each update,
-  never in the same parallel batch as the write; the `<task-id>/` directory; copying it out with
-  the checkpoint before `git worktree remove`)
-- Modify: `.claude/skills/open-pr/SKILL.md` (its checkpoint step adds the stamp)
-- Modify: `.claude/settings.json`, only if the owner chose 2(a): one allow rule for exactly
-  `node scripts/agent-state.mjs stamp`
+### Task 8: Drift in the resume check
 
-- [ ] **Step 1: Red.** Write end-to-end tests that run `node scripts/agent-state.mjs stamp <id>` in
-      a temporary repository with a stub `gh`. Each asserts on the written `stamp.json`, not only
-      on the output:
-  - exit 0 records `head`, `branch`, `porcelain`, `content`, `prs` with `state`, `head` and `ci`,
-    `lead_session` from `CLAUDE_CODE_SESSION_ID`, and `checkpoint_sha256`;
-  - exit 1, with nothing written, for a bad id, a missing checkpoint, a symlinked checkpoint, a
-    non-object or `schema_version` other than 1, and a lock not won after three attempts;
-  - exit 2, with the facts written as unknown, for a `gh` that fails or hangs past its timeout;
-  - a warning on stderr when `lead_session` changes;
-  - two concurrent stamps both exit 0, and the file is one of the two complete versions;
-  - with answer 2(a), `.claude/settings.json` allows the stamp command and nothing wider.
+**Files:** `scripts/agent-resume.sh`, `scripts/agent-resume.test.mjs`
 
-  Expected: the tests fail.
+- [ ] **Step 1 (red):** Add these tests, each asserting the exit code and the whole briefing:
+  - green checks after the stamp give the since line `PR #N checks: pending -> passing`, and no
+    contradiction and no attention line (the blocker of the first review);
+  - commits after the stamp skip the 60 s tip check and show `HEAD advanced`;
+  - the tip check stays, four tests: for a stale stamp; with node missing, which also prints
+    `child records: node unavailable` once; when drift times out, which also prints
+    `drift: timed out`; and when git cannot answer;
+  - a step in progress on a merged and deleted branch keeps today's contradiction and adds that
+    HEAD does not descend from the stamped head;
+  - gh is called once, with `headRefOid`;
+  - a half-written drift line is dropped and the rest briefed;
+  - a hanging drift is cut at `AGENT_RESUME_DRIFT_TIMEOUT`;
+  - 200 changed paths stay inside 1,200 bytes for the task;
+  - two guards: an unstamped checkpoint briefs byte for byte as before, and a finished task with a
+    stamp starts no drift; the existing schema-driven test stays unchanged.
+- [ ] **Step 2:** Run `node --test scripts/agent-resume.test.mjs`: the red tests fail, the guards
+      pass.
+- [ ] **Step 3:** Implement: one `jq` call per checkpoint for its three flags (in place of today's
+      two), `headRefOid` in the gh call, drift in the background after the network calls under the
+      process-group timer, the stamped tasks in progress briefed after it, only complete JSON lines
+      read, and the tip check skipped only for a task drift gave an ancestry result for.
+- [ ] **Step 4:** Run the file, `pnpm test:scripts` and the isolated copy, then time
+      `bash scripts/agent-resume.sh` three times on the main checkout against the design's baseline.
+- [ ] **Step 5:** Commit `feat(scripts): brief what changed since the stamp in the resume check`.
 
-- [ ] **Step 2: Green.** Implement `stamp` as the design describes it. Write the rule and skill
-      text. If the settings change, validate them with `jq -e . .claude/settings.json`.
-- [ ] **Step 3:** Run:
+**Stop condition:** the file passes, with 11 tests red first and 2 guards, and the three timings
+are no slower than the design's baseline by more than its run-to-run spread.
 
-```bash
-node --test scripts/agent-state.test.mjs && pnpm typecheck && pnpm format:check
-```
+### Task 9: The SessionStart bound, the rules, and PR 2
 
-Expected: exit 0.
+**Files:** `scripts/claude-hooks.test.mjs`, `.claude/rules/claude-code-config.md` (the stamp step,
+Since the stamp, retention and the copy-out folder), `.claude/rules/ci-and-scripts.md` (the new
+script and suite), `docs/plans/README.md` (this plan's row: `In progress`), this plan (ticks)
 
-- [ ] **Step 4: Commit** `feat(scripts): stamp a checkpoint with its git and pull request facts`.
+- [ ] **Step 1 (guard):** `SessionStart ends under 20 s with node, git and gh stubbed to sleep`.
+- [ ] **Step 2:** Write the rule text.
+- [ ] **Step 3:** Write the PR 2 checkpoint and open the pull request with
+      `.claude/skills/open-pr/SKILL.md`: `adversarial-reviewer` on the diff only and
+      `edge-case-hunter` on the changed scripts, with the findings triaged in the Review section.
+      Watch the checks on the pushed head SHA.
 
-**Stop condition:** Step 3 exits 0.
-
-### Task 7: `drift`
-
-**Files:**
-
-- Modify: `scripts/agent-state.mjs`, `scripts/agent-state.test.mjs`
-
-- [ ] **Step 1: Red.** Write a test for each line the design lists, and assert the JSON line's
-      section and text. The cases are:
-  - HEAD after the stamp, behind it, rewritten, or missing;
-  - the working tree changed (capped at 40 paths), and not compared on another branch;
-  - a pull request's state, head or checks changed;
-  - the checkpoint changed after its stamp, which reports "Needs attention", not contradictions;
-  - an unreadable or invalid record, reported as unknown;
-  - git timing out, reported as unknown;
-  - a gh answer file that is absent, so the pull requests are unknown.
-
-  `drift` must make no gh call; a `gh` stub that fails the test when run enforces it. Expected:
-  the tests fail.
-
-- [ ] **Step 2: Green.** Implement `drift`. It prints one JSON line per finding as it goes.
-- [ ] **Step 3:** `node --test scripts/agent-state.test.mjs && pnpm typecheck`. Expected: exit 0.
-- [ ] **Step 4: Commit** `feat(scripts): report checkpoint drift against the stamp`.
-
-**Stop condition:** Step 3 exits 0.
-
-### Task 8: Fold drift into the resume check
-
-**Files:**
-
-- Modify: `scripts/agent-resume.sh`, `scripts/agent-resume.test.mjs`
-- Modify: `.claude/rules/claude-code-config.md` (the new briefing lines; unknown is never a
-  contradiction)
-- Modify: `.claude/rules/ci-and-scripts.md` (the scripts list and its count, the command-table row
-  for `agent-state.mjs`, and `AGENT_RESUME_DRIFT_TIMEOUT` beside the existing timeouts)
-
-- [ ] **Step 1: Red.** Before changing anything, save the main checkout's briefing for the PR
-      description (`bash scripts/agent-resume.sh > <tmp>/before.txt`). Then add briefing tests:
-  - a stamped task whose branch moved one commit shows "HEAD is 1 commit after the stamp" under
-    Contradictions, the 60 s tip-date line does not appear, and the exit stays 0;
-  - a task with no `<task-id>/` directory never starts node: a `node` stub that records being run
-    stays unrun;
-  - node missing, with no usable nvm, gives an unknown line and the same exit code;
-  - a `node` stub that sleeps is cut off by `AGENT_RESUME_DRIFT_TIMEOUT=1`, which gives
-    "unknown (timed out)" within 3 s;
-  - the `gh pr list` call asks for `headRefOid`, which the stub asserts.
-
-  Expected: the new tests fail, and the existing ones, the schema-driven one included, pass.
-
-- [ ] **Step 2: Green.** After its `wait`, `agent-resume.sh` runs `drift` once for the tasks that
-      have a directory. It finds node on PATH or else through nvm, bounds the run with the same perl
-      process-group alarm as the network calls, and places the lines under the existing sections.
-      Write the rule text.
-- [ ] **Step 3:** Run:
-
-```bash
-node --test scripts/agent-resume.test.mjs && pnpm test:scripts && pnpm format:check
-git diff --exit-code main -- scripts/agent-state.schema.json
-```
-
-Expected: exit 0 for each, and no diff for the schema.
-
-- [ ] **Step 4: Commit** `feat(scripts): brief checkpoint drift in the resume check`.
-
-**Stop condition:** Step 3 holds, and for every checkpoint without records, the main checkout's
-briefing matches the saved `before.txt` apart from the "updated … ago" ages. The diff goes into
-the PR description.
-
-### Task 9: Open PR 2
-
-**Files:** none beyond Tasks 3 to 8, plus this plan's ticks.
-
-- [ ] **Step 1:** Run the gates:
-
-```bash
-pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:scripts && pnpm check:docs-drift
-```
-
-Expected: exit 0 for each.
-
-- [ ] **Step 2:** Open PR 2 with `.claude/skills/open-pr/SKILL.md`. `adversarial-reviewer` gets
-      the diff only, and `edge-case-hunter` gets the changed files. Triage both in the Review
-      section as fixed, deferred with a reason, or rejected with a reason. Paste in the Task 8
-      before-and-after briefing.
-- [ ] **Step 3:** `gh pr checks <N> --watch`, then confirm the head SHA as in Task 2.
-
-**Stop condition:** all checks are green on the head SHA. The owner merges.
+**Stop condition:** the whole-plan gates exit 0 and every check is green on the head SHA.
 
 ---
 
-## PR 3: child agents (`feat/checkpoint-child-agents`), after #280 and PR 2
+## PR 3: child agents (`feat/checkpoint-child-agents`)
 
-### Task 10: `hook`: which task, start, stop and notes
+Branched from `main` after PR 2 has merged.
 
-**Files:**
+### Task 10: Keep session records out of the SessionStart listing
 
-- Modify: `scripts/agent-state.mjs`, `scripts/agent-state.test.mjs`
+**Files:** `.claude/hooks/session-start.sh`, `scripts/claude-hooks.test.mjs`
 
-- [ ] **Step 1: Red.** Port the 10-13 hook cases, retargeted to `children/<agent-id>.json` and
-      `notes/`. Each asserts on the files written:
-  - a start writes `running`, with no git call (a `git` stub that fails the test when run);
-  - a stop with `last_assistant_message` writes the note and the parsed status;
-  - a stop without it reads the transcript's last 16 MiB, and one that ended on a tool call is
-    `stopped`;
-  - a late start after a stop is dropped;
-  - a blank stop keeps the previous note;
-  - a record that could not be written discards its note;
-  - an `agent_id` that is not an id (`../x`, an empty string, a slash) records nothing;
-  - no task bound to the session writes nothing and logs nothing;
-  - a finished task (`current_step` null) is never chosen;
-  - an agent already held by one task stays with that task;
-  - a prunable worktree is skipped;
-  - two children that stop together write two complete records;
-  - a summary carrying `\nContradictions: none` is stored on one line.
+- [ ] **Step 1 (red):** `a Markdown file under .agent-state/sessions is not listed`. It fails today,
+      because the listing's `find` is recursive.
+- [ ] **Step 2:** Prune `sessions` in that `find`.
+- [ ] **Step 3:** Commit `fix(hooks): keep session records out of the session-start notes`.
 
-  Expected: the tests fail.
+**Stop condition:** `node --test scripts/claude-hooks.test.mjs` passes, with 1 test red first.
 
-- [ ] **Step 2: Green.** Implement `hook` as the design describes it, with the ported `taskFor`,
-      `hookRoots`, `worktreeRoots`, `transcriptText` and `writeNote`.
-- [ ] **Step 3:** `node --test scripts/agent-state.test.mjs && pnpm typecheck`. Expected: exit 0.
-- [ ] **Step 4: Commit** `feat(scripts): record child agents against the lead's task`.
+### Task 11: The child records and `hook`
 
-**Stop condition:** Step 3 exits 0.
+**Files:** `scripts/agent-state-records.schema.json` (the start and stop definitions),
+`scripts/agent-state.mjs`, `scripts/agent-state.test.mjs`
 
-### Task 11: The hook wrapper and its settings entries
+- [ ] **Step 1 (red):** Add these tests, each feeding a payload shaped like the probe's and
+      asserting the exit code and the files written:
+  - `a start writes <agent-id>.start.json under the payload's session`;
+  - `a stop writes a 0600 .txt note with a random suffix and a stop record with done`;
+  - `a final message with no status line gives ended` (the probe's child B);
+  - `BLOCKED gives blocked` (the probe's child C);
+  - `a transcript that ended on a tool call gives ended`;
+  - `a blank message writes no note and a null note`;
+  - `a second stop writes a second note, and the record names the newer one`;
+  - `an invalid session or agent id writes nothing and exits 1`;
+  - `an agent type outside the pattern is recorded as unknown`;
+  - `a stop record that cannot be written leaves no note`;
+  - `the hook runs no git and opens no checkpoint` (a git stub that logs every call, and a
+    checkpoint with mode 000);
+  - `git check-ignore covers a stop record and a note (guard)`.
+- [ ] **Step 2:** Run the file: the red tests fail, the guard passes.
+- [ ] **Step 3:** Implement `hook` with the ported `parseStatus`, `transcriptText` and
+      `writeAtomic`, and the changed `writeNote` and `discardNote`.
+- [ ] **Step 4:** Commit `feat(scripts): record child agents by session`.
 
-**Files:**
+**Stop condition:** the file passes, with 11 tests red first and 1 guard.
 
-- Create: `.claude/hooks/subagent-state.sh`
-- Modify: `.claude/settings.json` (SubagentStart and SubagentStop, each running
-  `bash "$CLAUDE_PROJECT_DIR/.claude/hooks/subagent-state.sh"` with timeout 30),
-  `scripts/claude-hooks.test.mjs`, `.claude/rules/claude-code-config.md` (the hooks bullet: the
-  two events, the log, always exiting 0)
+### Task 12: The wrapper and the settings entries
 
-- [ ] **Step 1: Red.** Using #280's stubs, which are written once, warmed and symlinked, add tests
-      that the wrapper:
-  - exits 0 with empty stdout when node is missing and nvm is unusable, and logs one line;
-  - exits 0 when node fails, and logs a line of at most 2,000 bytes;
-  - halves a log that grew past 1 MiB;
-  - leaves stdout empty on success;
-  - finds its script when started from another directory.
+**Files:** create `.claude/hooks/subagent-state.sh`; modify `.claude/settings.json` (SubagentStart
+and SubagentStop, `bash` on the wrapper, 30 s), `scripts/claude-hooks.test.mjs`
 
-  Add a settings test that both entries exist with that command and timeout. Expected: the new
-  tests fail.
+- [ ] **Step 1 (red):**
+  - `settings.json runs the wrapper with bash on SubagentStart and SubagentStop`;
+  - `the wrapper exits 0 and writes nothing without CLAUDE_PROJECT_DIR`, and `without node`;
+  - `a failing hook exits 0 and logs one line to its session's hook-errors.log`;
+  - `the log is renamed to hook-errors.log.1 past 64 KiB`;
+  - `the wrapper writes under umask 077`.
+- [ ] **Step 2:** Run the file: every new test fails.
+- [ ] **Step 3:** Write the wrapper (no nvm, no `$PWD` fallback) and the two settings entries.
+- [ ] **Step 4:** Commit `feat(hooks): record child agents on SubagentStart and SubagentStop`.
 
-- [ ] **Step 2: Green.** Port `subagent-checkpoint.sh` as the wrapper, with its log at
-      `.agent-state/hook-errors.log`, and add the two settings entries. Validate the JSON with
-      `jq -e . .claude/settings.json` before committing. Write the rule text.
-- [ ] **Step 3:** `node --test scripts/claude-hooks.test.mjs && pnpm test:scripts`. Expected:
-      exit 0.
-- [ ] **Step 4: Commit** `feat(claude): run the subagent hooks into the task's records`.
+**Stop condition:** `node --test scripts/claude-hooks.test.mjs` passes, with 6 tests red first, and
+`jq -e . .claude/settings.json` exits 0.
 
-**Stop condition:** Step 3 exits 0, and `jq -e . .claude/settings.json` exits 0.
+### Task 13: The children in the briefing
 
-### Task 12: Child lines in the briefing, and the pruned note listing
+**Files:** `scripts/agent-state.mjs`, `scripts/agent-state.test.mjs`,
+`scripts/agent-resume.test.mjs`
 
-**Files:**
+- [ ] **Step 1 (red):**
+  - `a BLOCKED child is one attention line with its note path, and none of its text appears`;
+  - `done, ended and running children are counted under Since the stamp`;
+  - `a start without a stop is running in this session`, and `no stop recorded in an earlier one`
+    (counted as one test, table-driven);
+  - `a child started more than 60 s before the stamp is not counted`;
+  - `a session the stamp does not list contributes nothing`;
+  - `a non-empty hook log gives hook errors: see <path>`;
+  - `a checkout without session records says children: none recorded in this checkout`;
+  - `ten children and 200 paths stay inside 1,200 bytes for the task and 4,000 in SessionStart`.
+- [ ] **Step 2:** Run both files: every new test fails.
+- [ ] **Step 3:** Implement the merge of start and stop records and the child lines.
+- [ ] **Step 4:** Commit `feat(scripts): brief a task's child agents since its stamp`.
 
-- Modify: `scripts/agent-state.mjs` (`drift`'s child lines), `scripts/agent-resume.test.mjs`,
-  `.claude/hooks/session-start.sh`, `scripts/claude-hooks.test.mjs`
-- Modify: `.claude/rules/claude-code-config.md` (the child lines; the SessionStart listing skips a
-  task's `notes` and `children`), `README.md` (one line in the Claude Code section, beside the
-  existing settings bullet)
+**Stop condition:** both files pass, with 8 tests red first.
 
-- [ ] **Step 1: Red.** Add these tests:
-  - "Artifacts now" counts the children by status;
-  - `blocked`, `needs_context`, `done_with_concerns` and `stopped` children appear under "Needs
-    attention" with a quoted summary and the note's path;
-  - a `running` child shows "started <at>, no stop recorded";
-  - a child that stopped after `updated_at` is a contradiction;
-  - a missing or altered note is reported;
-  - the hook log's failures since `updated_at` are counted;
-  - a forged summary prints as one quoted line;
-  - in SessionStart, `.agent-state/t/notes/n.md` and `.agent-state/t/children/` are not printed,
-    while `.agent-state/x.md` and `.agent-state/sub/y.md` still are.
+### Task 14: A live probe against the real hooks, and PR 3
 
-  Expected: the new tests fail.
+**Files:** `.claude/rules/claude-code-config.md` (the hooks and the child lines),
+`docs/plans/README.md` (the design's and this plan's rows: `Shipped`), this plan (ticks)
 
-- [ ] **Step 2: Green.** Implement the lines. In `session-start.sh`, the `find` prunes
-      `.agent-state/*/notes` and `.agent-state/*/children`. Write the rule and README text without
-      growing `CLAUDE.md`.
-- [ ] **Step 3:** `pnpm test:scripts && pnpm format:check`. Expected: exit 0.
-- [ ] **Step 4: Commit** `feat(claude): brief child agents in the resume check`.
+- [ ] **Step 1:** In a scratch clone of the branch, start a headless lead with the repository's
+      own settings, stamp a task, start one child that ends on `BLOCKED` and one that ends without
+      a status line, then run `bash scripts/agent-resume.sh <task-id>`. Expected: one attention
+      line for the `BLOCKED` child with its note path, `children: 1 ended`, and no word of either
+      child's text. Paste the commands and output into the pull request.
+- [ ] **Step 2:** Write the rule text and the README rows.
+- [ ] **Step 3:** Write the PR 3 checkpoint and open the pull request as in Task 9, with
+      `edge-case-hunter` on the hook and the wrapper.
+- [ ] **Step 4:** After the owner merges PR 3, carry out the answer to owner question 3 (the 10-13
+      worktree and archive).
 
-**Stop condition:** Step 3 exits 0.
-
-### Task 13: Live probe
-
-This is the end-to-end test. It runs once the unit tests of Tasks 10 to 12 are green.
-
-**Files:** none committed. The output goes into the PR description.
-
-- [ ] **Step 1:** In the PR 3 worktree, run one headless lead (`claude -p`) with this prompt:
-  1. write a throwaway checkpoint `probe-<date>`;
-  2. stamp it;
-  3. start one `general-purpose` child that replies `DONE`;
-  4. print `CLAUDE_CODE_SESSION_ID`.
-
-  Allow only the tools the probe needs. Record the exact command in the PR description.
-
-- [ ] **Step 2:** Check the result:
-
-```bash
-jq . .agent-state/probe-<date>/stamp.json .agent-state/probe-<date>/children/*.json
-ls .agent-state/probe-<date>/notes/
-bash scripts/agent-resume.sh probe-<date>
-```
-
-Expected: a non-null `lead_session`, one child with status `done`, and one note. The briefing
-counts one child done.
-
-- [ ] **Step 3:** If the environment can start a teammate, start one and record whether
-      SubagentStart fired. Either answer goes into the design's non-goal note, in this pull request.
-- [ ] **Step 4:** Delete `.agent-state/probe-<date>.json` and `.agent-state/probe-<date>/`, naming
-      the exact paths.
-
-**Stop condition:** Step 2's expectations hold, and the output is pasted into the PR description.
-
-### Task 14: Open PR 3
-
-**Files:** this plan's ticks; this plan's and the design's rows in `docs/plans/README.md` move to
-`Shipped`.
-
-- [ ] **Step 1:** Run the Task 9 gates. Expected: exit 0 for each.
-- [ ] **Step 2:** Open PR 3 with `.claude/skills/open-pr/SKILL.md`. Reviews and triage are as in
-      Task 9, and the Task 13 output is pasted in.
-- [ ] **Step 3:** `gh pr checks <N> --watch`, then confirm the head SHA.
-- [ ] **Step 4:** After the owner merges, and only as the owner answered question 5, remove the
-      10-13 worktree and its archive by their exact paths. If git refuses the removal because of
-      the worktree's modified files, ask the owner before using `--force`.
-
-**Stop condition:** all checks are green on the head SHA, the owner has merged, and the whole-plan
-stop condition holds on `main`.
+**Stop condition:** the whole-plan stop condition holds, and the probe output matches Step 1.

@@ -62,6 +62,7 @@ perform an operation.
 | 0034 | [Blog posts are drafted with Claude and approved by the owner, line by line](0034-blog-posts-drafted-with-claude.md)                     | Accepted                                      | 2026-10-06 |
 | 0035 | [A value only the owner can supply is a registered placeholder with a deadline the owner sets](0035-owner-placeholder-convention.md)     | Accepted                                      | 2026-09-29 |
 | 0036 | [Content dates move with served text, and a pull request check holds them together](0036-content-dates-move-with-served-text.md)         | Proposed                                      | 2026-10-08 |
+| 0041 | [A task has one checkpoint in `.agent-state`, and machine-written records sit beside it](0041-one-checkpoint-system-in-agent-state.md)   | Proposed                                      | 2026-10-31 |
 
 `Accepted` means the decision stands, not that it is implemented. ADR 0005 records the hosting
 choice; it was carried out on 2026-09-09 and the site is live, see

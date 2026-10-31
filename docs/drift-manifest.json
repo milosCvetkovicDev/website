@@ -8185,6 +8185,101 @@
       }
     },
     {
+      "id": "adr-readme-link-0041-one-checkpoint-system-in-agent-state",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0041-one-checkpoint-system-in-agent-state.md)",
+      "claim": "The link to 0041-one-checkpoint-system-in-agent-state.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0041-one-checkpoint-system-in-agent-state.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0041-one-checkpoint-system-in-agent-state.md"
+      }
+    },
+    {
+      "id": "adr-index-0041-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0041 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0041's record carries the status line \"Proposed\".",
+      "check": {
+        "file": "docs/adr/0041-one-checkpoint-system-in-agent-state.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0041-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0041 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0041 gives the record's status line, \"Proposed\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0041 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Proposed"
+      }
+    },
+    {
+      "id": "adr-index-0041-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0041 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0041's record carries the Date \"2026-10-31\".",
+      "check": {
+        "file": "docs/adr/0041-one-checkpoint-system-in-agent-state.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-31"
+      }
+    },
+    {
+      "id": "adr-index-0041-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0041 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0041 gives the record's Date, \"2026-10-31\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0041 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-31"
+      }
+    },
+    {
+      "id": "adr-index-0041-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0041 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0041's record carries the H1 title \"A task has one checkpoint in `.agent-state`, and machine-written records sit beside it\".",
+      "check": {
+        "file": "docs/adr/0041-one-checkpoint-system-in-agent-state.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "A task has one checkpoint in `.agent-state`, and machine-written records sit beside it"
+      }
+    },
+    {
+      "id": "adr-index-0041-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0041 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0041 gives the record's H1 title, \"A task has one checkpoint in `.agent-state`, and machine-written records sit beside it\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0041 \\| \\[(.+?)\\]\\(0041-",
+        "equals": "A task has one checkpoint in `.agent-state`, and machine-written records sit beside it"
+      }
+    },
+    {
       "id": "adr-index-0035-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0035 |",
@@ -8602,6 +8697,23 @@
         "package": "apps/web",
         "script": "content-dates:update",
         "runs": "src/data/__tests__/content-dates.test.tsx"
+      }
+    },
+    {
+      "id": "adr-0041-link-plans-2026-10-31-checkpoint-one-system-design",
+      "doc": "docs/adr/0041-one-checkpoint-system-in-agent-state.md",
+      "anchor": "](../plans/2026-10-31-checkpoint-one-system-design.md)",
+      "claim": "The link to ../plans/2026-10-31-checkpoint-one-system-design.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../plans/2026-10-31-checkpoint-one-system-design.md"
+        }
+      ],
+      "check": {
+        "path": "docs/plans/2026-10-31-checkpoint-one-system-design.md"
       }
     },
     {
@@ -11535,6 +11647,40 @@
       }
     },
     {
+      "id": "checkpoint-one-system-design-link-adr-0041",
+      "doc": "docs/plans/2026-10-31-checkpoint-one-system-design.md",
+      "anchor": "](../adr/0041-one-checkpoint-system-in-agent-state.md)",
+      "claim": "The link to ../adr/0041-one-checkpoint-system-in-agent-state.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0041-one-checkpoint-system-in-agent-state.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0041-one-checkpoint-system-in-agent-state.md"
+      }
+    },
+    {
+      "id": "checkpoint-one-system-plan-link-adr-0041",
+      "doc": "docs/plans/2026-10-31-checkpoint-one-system-plan.md",
+      "anchor": "](../adr/0041-one-checkpoint-system-in-agent-state.md)",
+      "claim": "The link to ../adr/0041-one-checkpoint-system-in-agent-state.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "../adr/0041-one-checkpoint-system-in-agent-state.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0041-one-checkpoint-system-in-agent-state.md"
+      }
+    },
+    {
       "id": "checkpoint-one-system-plan-script-test-scripts",
       "doc": "docs/plans/2026-10-31-checkpoint-one-system-plan.md",
       "anchor": "`pnpm test:scripts`",
@@ -11550,6 +11696,24 @@
       "check": {
         "package": ".",
         "script": "test:scripts"
+      }
+    },
+    {
+      "id": "checkpoint-one-system-plan-script-typecheck",
+      "doc": "docs/plans/2026-10-31-checkpoint-one-system-plan.md",
+      "anchor": "`pnpm typecheck`",
+      "claim": "`pnpm typecheck` is a script in the root package.json.",
+      "method": "command",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "script",
+          "token": "typecheck"
+        }
+      ],
+      "check": {
+        "package": ".",
+        "script": "typecheck"
       }
     },
     {
