@@ -8246,7 +8246,7 @@
       "anchor": "| 0041 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0041 gives the record's Date, \"2026-10-31\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0041 gives the record's Date, \"2026-10-31\" (the date in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0041 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
@@ -8272,7 +8272,7 @@
       "anchor": "| 0041 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "The index row for ADR 0041 gives the record's H1 title, \"A task has one checkpoint in `.agent-state`, and machine-written records sit beside it\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0041 gives the record's H1 title, \"A task has one checkpoint in `.agent-state`, and machine-written records sit beside it\" (the title in the record and in the index must agree).",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0041 \\| \\[(.+?)\\]\\(0041-",

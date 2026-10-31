@@ -813,6 +813,12 @@ Dropped:
   stubs per test.
 - **A child that never stops.** It is `running` or `no stop recorded`, with its start date, for
   48 h, then no longer shown (N10).
+- **Automatic compaction (N25).** The only compaction observed is event 19, after a `/compact`
+  typed into a headless run; automatic compaction was not probed. If it fires SubagentStop with a
+  non-empty `agent_type`, the hook records the conversation's summary as a child's note, with the
+  status `ended` unless the summary's last line carries a status word. The note stays local, mode
+  0600, and is never quoted (D8, S6). The live check asks the owner for the type of any automatic
+  compaction it meets.
 
 ## Retention
 

@@ -543,6 +543,10 @@ plan (ticks)
        (a) a second blocked line under the same session: a teammate in the lead's process
            fires the lead's hooks;
        (b) no second line: the teammate's child was not recorded.
+  6. If Claude Code compacted the conversation on its own during steps 2 to 5, paste the
+     type and time of each stop the session recorded (N25):
+       jq -r '"\(.agent_type) \(.at)"' .agent-state/sessions/<uuid>/*.stop.json
+     A stop at the time of the compaction is the compaction's; none means it was not recorded.
   ```
 
 - [ ] **Step 4:** When the owner has pasted the output of Step 3 and Steps 1 to 3 hold, ADR 0041
