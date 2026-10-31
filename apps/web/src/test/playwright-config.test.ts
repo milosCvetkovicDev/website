@@ -4,6 +4,7 @@
  *
  * @vitest-environment node
  */
+import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, relative } from 'node:path';
@@ -12,7 +13,7 @@ import type { PlaywrightTestConfig } from '@playwright/test';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CHROMIUM_LAUNCH_ARGS } from '../../e2e/support/chromium-launch-args';
-import config, { MOBILE_SPECS, resolvePort } from '../../playwright.config';
+import config, { MOBILE_SPECS, resolvePort, WEB_SERVER_LOG_CANARY } from '../../playwright.config';
 import flakeHuntConfig from '../../playwright.flake-hunt.config';
 import liveConfig from '../../playwright.live.config';
 
@@ -256,12 +257,19 @@ function webServerOf(loaded: PlaywrightTestConfig) {
   return webServer as Exclude<typeof webServer, readonly unknown[] | undefined>;
 }
 
+/** CI's server command: the canary scripts/check-webserver-log.mjs requires, then the build. */
+const CI_COMMAND = `printf '%s\\n' '${WEB_SERVER_LOG_CANARY}' >&2 && pnpm start`;
+/** How long the canary's shell may run before spawnSync kills it: `printf` takes milliseconds. */
+const SH_TIMEOUT_MS = 4_000;
+/** The canary test's own timeout, above SH_TIMEOUT_MS so that the shell's kill fires first. */
+const TEST_TIMEOUT_MS = 15_000;
+
 // Every spelling of CI the config tells apart, with the server each one must get: `CI=true` and
 // `CI=1` run the production build, anything else (a stray `false` or `0` included) the dev server,
 // exactly as `servesProductionBuild` in e2e/support/build-mode.ts decides.
 const MODES: [ci: string | undefined, command: string, distDir: string][] = [
-  ['true', 'pnpm start', '.next'],
-  ['1', 'pnpm start', '.next'],
+  ['true', CI_COMMAND, '.next'],
+  ['1', CI_COMMAND, '.next'],
   [undefined, 'pnpm dev', '.next-e2e'],
   ['false', 'pnpm dev', '.next-e2e'],
   ['0', 'pnpm dev', '.next-e2e'],
@@ -312,6 +320,41 @@ describe('playwright.config.ts webServer (ADR 0014)', () => {
     expect(webServerOf(loaded).env?.PORT).toBe(String(port));
     expect(loaded.use?.baseURL).toBe(`http://localhost:${port}`);
   });
+
+  // CI's e2e job fails unless its log holds `[WebServer] <canary>` exactly once, and since Next
+  // 16.4 nothing else proves the server's stderr reached it. So the text is that of CANARY in
+  // scripts/check-webserver-log.mjs, character for character, and the command's first half, run
+  // through a shell as Playwright runs it, writes that line to stderr alone.
+  it(
+    'prints the canary the log check requires to stderr before the server',
+    async () => {
+      const script = readFileSync(
+        fileURLToPath(new URL('../../../../scripts/check-webserver-log.mjs', import.meta.url)),
+        'utf8',
+      );
+      expect(script.match(/^export const CANARY =\s*'([^'\n]+)';$/m)?.[1]).toBe(
+        WEB_SERVER_LOG_CANARY,
+      );
+
+      const command = webServerOf(await loadConfig('true')).command;
+      const server = ' && pnpm start';
+      expect(command.endsWith(server), command).toBe(true);
+      // spawnSync kills a shell still running after SH_TIMEOUT_MS and reports it in `error`. The
+      // test's own timeout, TEST_TIMEOUT_MS, is above that, with room for loading the config on a
+      // busy machine, so a hung shell fails on the `error` assertion, with its reason.
+      const printed = spawnSync('sh', ['-c', command.slice(0, -server.length)], {
+        encoding: 'utf8',
+        timeout: SH_TIMEOUT_MS,
+      });
+      expect(printed.error).toBeUndefined();
+      expect(printed).toMatchObject({
+        status: 0,
+        stdout: '',
+        stderr: `${WEB_SERVER_LOG_CANARY}\n`,
+      });
+    },
+    TEST_TIMEOUT_MS,
+  );
 
   it('leaves the CI build step writing the directory the CI server reads', () => {
     const workflow = readFileSync(

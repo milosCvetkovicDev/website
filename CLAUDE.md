@@ -220,7 +220,7 @@ Always finish with `pnpm lint`.
   entry in `pnpm-workspace.yaml`.
 - If `pnpm typecheck` disagrees with CI about a route another branch added, renamed or removed,
   `apps/web/.next-e2e` is stale: `pnpm --filter web clean`.
-- `next dev` writes no agent files (`agentRules: false`, ADR 0019): delete a stray
+- `next dev` writes no agent files (`agentRules: false`, ADR 0037): delete a stray
   `apps/web/AGENTS.md` or `apps/web/CLAUDE.md` (never the root `CLAUDE.md`), never commit it.
   Version-matched Next.js docs are in `apps/web/node_modules/next/dist/docs`.
 - `gh` intermittently fails on writes while reads keep working: `gh pr create` and `gh pr edit`

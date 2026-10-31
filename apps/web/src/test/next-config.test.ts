@@ -676,17 +676,19 @@ describe('env', () => {
 });
 
 describe('agent instruction files', () => {
-  // `next dev` writes apps/web/AGENTS.md and apps/web/CLAUDE.md when @vercel/detect-agent finds
-  // an agent shell, and Claude Code then loads the nested CLAUDE.md as project instructions.
-  // Generation is off (ADR 0019).
+  // `next dev` writes its managed block into apps/web/AGENTS.md when @vercel/detect-agent finds
+  // an agent shell (16.3 wrote apps/web/CLAUDE.md as well), and Claude Code then loads it as
+  // project instructions. Generation is off, and 16.4 removes the block instead (ADR 0037).
   it('disables the agent instruction files Next would write in dev', () => {
     expect(nextConfig.agentRules).toBe(false);
   });
 
-  // A pair written before ADR 0019 stays behind, untracked, until someone deletes it. This check
-  // cannot stop a `git add -A` from committing it, but it fails the unit suite, and so CI, on any
-  // branch that tracks either file. Ignoring the pair instead would only hide it: Claude Code
-  // loads an ignored CLAUDE.md all the same.
+  // Either file can still be left behind, untracked, until someone deletes it: an
+  // apps/web/CLAUDE.md that 16.3 wrote before ADR 0019, which 16.4 never touches, and an
+  // apps/web/AGENTS.md holding more than Next's block, from which 16.4 strips the block and keeps
+  // the rest. This check cannot stop a `git add -A` from committing one, but it fails the unit
+  // suite, and so CI, on any branch that tracks either. Ignoring them instead would only hide
+  // them: Claude Code loads an ignored CLAUDE.md all the same.
   it('tracks neither generated file', () => {
     let tracked: string;
     try {
@@ -712,7 +714,7 @@ describe('agent instruction files', () => {
 // the option and stopped passing it to the dev server, or stopped checking it, would not, and
 // generation would resume unnoticed. These read the compiled dev server, in both module formats
 // Next.js ships, to catch that. When one fails after a Next.js bump, find where the new version
-// decides to write the files, check ADR 0019 against it, and then update the patterns.
+// decides to write the files, check ADR 0037 against it, and then update the patterns.
 describe('the installed Next.js honours agentRules', () => {
   const nextDir = path.dirname(createRequire(import.meta.url).resolve('next/package.json'));
   const readNext = (file: string) => {
@@ -720,19 +722,31 @@ describe('the installed Next.js honours agentRules', () => {
       return readFileSync(path.join(nextDir, file), 'utf8');
     } catch (error) {
       throw new Error(
-        `next/${file} could not be read: find where this Next.js writes AGENTS.md and CLAUDE.md and check ADR 0019 against it`,
+        `next/${file} could not be read: find where this Next.js writes AGENTS.md and check ADR 0037 against it`,
         { cause: error },
       );
     }
   };
   const serverLibs = ['dist/server/lib', 'dist/esm/server/lib'];
-  // Call sites only: the name followed by `(`, or by `)(` as in the CommonJS build's
-  // `(0, _mod.name)(...)`, and never the function's own declaration.
+  const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Every textual call site: the name, matched as text and not inside a longer identifier and
+  // never in the function's own declaration, followed by `(`, by `)(` as in the CommonJS build's
+  // `(0, _mod.name)(...)`, by `?.(`, or by `.call(`, `.apply(` or `.bind(`. Only the first two
+  // are forms `switchGuards` reads; the others count as calls so that they fail rather than pass
+  // unseen. A call through an alias (`const f = name; f(...)`) or a computed member
+  // (`_mod["name"](...)`) is not found.
   const callSites = (source: string, name: string) => [
-    ...source.matchAll(new RegExp(`(?<!function\\s+)\\b${name}\\)?\\s*\\(`, 'g')),
+    ...source.matchAll(
+      new RegExp(
+        `(?<!function\\s+)(?<![\\w$])${escapeRegExp(name)}` +
+          `(?:\\)?\\s*\\(|\\s*\\?\\.\\s*\\(|\\s*\\.\\s*(?:call|apply|bind)\\s*\\()`,
+        'g',
+      ),
+    ),
   ];
-  // The object literal whose `{` sits at `open`, found by counting braces.
+  // The object literal whose `{` sits at `open`, found by counting braces; '' when there is none.
   const objectLiteral = (source: string, open: number) => {
+    if (source[open] !== '{') return '';
     let depth = 0;
     for (let i = open; i < source.length; i++) {
       if (source[i] === '{') depth++;
@@ -741,56 +755,210 @@ describe('the installed Next.js honours agentRules', () => {
     return '';
   };
 
+  // The object literal the router server's `initialize` returns last, read up to the next
+  // function declared at the start of a line.
+  const initializeReturns = (lib: string) => {
+    const source = readNext(`${lib}/router-server.js`);
+    const start = source.search(/\basync function initialize\(/);
+    expect(start, `${lib}: initialize`).toBeGreaterThanOrEqual(0);
+    const rest = source.slice(start + 1);
+    const end = rest.search(/\n(?:export\s+)?(?:async\s+)?function\s/);
+    const body = end < 0 ? rest : rest.slice(0, end);
+    const returned = body.lastIndexOf('return {');
+    expect(returned, `${lib}: initialize's return`).toBeGreaterThanOrEqual(0);
+    const literal = objectLiteral(body, returned + 'return '.length);
+    expect(literal, `${lib}: initialize's return`).not.toBe('');
+    return literal;
+  };
+
   it('returns agentRules from the config in the object initialize hands the dev server', () => {
     for (const lib of serverLibs) {
-      const source = readNext(`${lib}/router-server.js`);
-      const start = source.search(/\basync function initialize\(/);
-      expect(start, lib).toBeGreaterThanOrEqual(0);
-      const rest = source.slice(start + 1);
-      const end = rest.search(/\n(?:export\s+)?(?:async\s+)?function\s/);
-      const body = end < 0 ? rest : rest.slice(0, end);
-      const returned = body.lastIndexOf('return {');
-      expect(returned, lib).toBeGreaterThanOrEqual(0);
-      expect(objectLiteral(body, returned + 'return '.length), lib).toMatch(
-        /\bagentRules:\s*config\.agentRules\b/,
+      expect(initializeReturns(lib), lib).toMatch(/\bagentRules:\s*config\.agentRules\b/);
+    }
+  });
+
+  it('returns experimental.agentFeedback from the config in the same object', () => {
+    for (const lib of serverLibs) {
+      expect(initializeReturns(lib), lib).toMatch(
+        /\bagentFeedback:\s*config\.experimental\.agentFeedback\b/,
       );
     }
   });
 
-  it('generates the agent files only as the first statement of an agentRules !== false block', () => {
+  // Since 16.4 the dev server syncs the files on every start rather than generating them behind an
+  // `if`: the switch is the second argument, and a sync that is switched off removes Next's managed
+  // block instead of writing it (ADR 0037).
+  const syncs = [
+    {
+      name: 'syncAgentRulesForDev',
+      remove: 'removeAgentRulesFiles',
+      write: 'writeAgentFiles',
+      // `<result>.agentRules !== false`, and nothing else.
+      switchedBy: /^([\w$]+)\.agentRules\s*!==\s*false$/,
+      only: true,
+    },
+    {
+      name: 'syncAgentFeedbackForDev',
+      remove: 'removeAgentFeedbackFiles',
+      write: 'writeAgentFeedbackFiles',
+      // A conjunction one of whose terms is `<result>.agentFeedback === true`, so `false` or unset
+      // switches it off whatever the other terms say.
+      switchedBy: /^([\w$]+)\.agentFeedback\s*===\s*true$/,
+      only: false,
+    },
+  ];
+
+  // One entry for every call site of a sync, as `callSites` finds them: the object its switch reads
+  // (`<result>`), or null when the call is not one this test can read or accepts. A call is read
+  // only as `<name>(<identifier>, <switch>)` with no parenthesis in the switch, so all it reads is
+  // top level; any other call (a parenthesis in the switch, a first argument that is not an
+  // identifier, a single argument, an optional call, a call through `call`, `apply` or `bind`) is
+  // a null, never skipped. The switch is read as a conjunction: its `&&` terms, each a local
+  // constant replaced by its value. A `||`, a `??` or a conditional `?` at top level would let
+  // another operand switch the sync on whatever the guard says, and a comma makes the rest another
+  // argument, so each is refused; `?.` is optional chaining unless a digit follows it. A
+  // constant's value counts as one term, as if parenthesised: `a && <value>` is false whenever `a`
+  // is, so a `?` inside one, as in 16.4's `telemetryEnabled`, is no concern. The guard term itself,
+  // or the constant's value it stands for, must be `switchedBy` whole, since both its patterns are
+  // anchored at each end: a guard with a `||`, `??`, `|` or `?` in it, or a leading `!`, is no
+  // guard, and the call reads as null.
+  const switchGuards = (source: string, { name, switchedBy, only }: (typeof syncs)[number]) =>
+    callSites(source, name).map((site) => {
+      const call = source
+        .slice(site.index)
+        .match(new RegExp(`^${escapeRegExp(name)}\\)?\\s*\\(\\s*[\\w$]+\\s*,\\s*([^()]*)\\)`));
+      if (!call) return null;
+      const argument = call[1] ?? '';
+      if (/\|\||,|\?(?!\.(?!\d))/.test(argument)) return null;
+      const before = source.slice(0, site.index);
+      const terms = argument.split('&&').map((term) => {
+        const id = term.trim();
+        if (!/^[\w$]+$/.test(id)) return id;
+        const declaration = new RegExp(`\\bconst\\s+${escapeRegExp(id)}\\s*=\\s*([^;]+);`, 'g');
+        return ([...before.matchAll(declaration)].at(-1)?.[1] ?? id).trim();
+      });
+      if (only && terms.length !== 1) return null;
+      return terms.map((term) => term.match(switchedBy)).find(Boolean)?.[1] ?? null;
+    });
+
+  it('reads a switch as a conjunction, refusing one a false guard would not turn off', () => {
+    const [rules, feedback] = syncs as [(typeof syncs)[number], (typeof syncs)[number]];
+    const read = (sync: (typeof syncs)[number], argument: string, prelude = '') =>
+      switchGuards(`${prelude}\nawait ${sync.name}(dir, ${argument});`, sync);
+    expect.soft(read(rules, 'r.agentRules !== false')).toEqual(['r']);
+    expect.soft(read(feedback, 'on && t', 'const on = r.agentFeedback === true;')).toEqual(['r']);
+    // `$` is an identifier character, and a pattern built from one must not read it as an anchor.
+    expect.soft(read(feedback, '$on && t', 'const $on = r.agentFeedback === true;')).toEqual(['r']);
+    // A top-level `||` or `?:` lets the other operand switch it on whatever the guard says.
+    expect.soft(read(rules, 'x || y && r.agentRules !== false')).toEqual([null]);
+    expect.soft(read(rules, 'c ? true : y && r.agentRules !== false')).toEqual([null]);
+    expect.soft(read(feedback, 'r.agentFeedback === true && t || x')).toEqual([null]);
+    expect.soft(read(feedback, 'c ? x : r.agentFeedback === true && t')).toEqual([null]);
+    // The rules switch is the guard alone.
+    expect.soft(read(rules, 'r.agentRules !== false && t')).toEqual([null]);
+    // So is a `??` default, and a comma, which makes the rest of the switch another argument.
+    expect.soft(read(rules, 'x ?? r.agentRules !== false')).toEqual([null]);
+    const on = 'const on = r.agentFeedback === true;';
+    expect.soft(read(feedback, 'on && t, true', on)).toEqual([null]);
+    // `?.` is optional chaining, not a conditional, unless a digit follows it.
+    expect.soft(read(feedback, 'r.agentFeedback === true && t?.isEnabled')).toEqual(['r']);
+    expect.soft(read(feedback, 'c?.5:r.agentFeedback === true')).toEqual([null]);
+    // The guard must be the whole term, after a constant is replaced by its value too: another
+    // operand beside it, a bitwise `|` or a `!` in front makes it no guard.
+    for (const value of [
+      'c || r.agentFeedback === true',
+      'c ?? r.agentFeedback === true',
+      'c ? r.agentFeedback === true : x',
+      'r.agentFeedback === true | c',
+      '!r.agentFeedback === true',
+    ]) {
+      expect.soft(read(feedback, 'on && t', `const on = ${value};`), value).toEqual([null]);
+    }
+    expect.soft(read(feedback, 'r.agentFeedback === true | c && t')).toEqual([null]);
+    expect.soft(read(feedback, '!r.agentFeedback === true && t')).toEqual([null]);
+    expect.soft(read(rules, 'r.agentRules !== false | c')).toEqual([null]);
+    expect.soft(read(rules, '!r.agentRules !== false')).toEqual([null]);
+    expect.soft(read(rules, 'on', 'const on = c || r.agentRules !== false;')).toEqual([null]);
+  });
+
+  it('reads every call of a sync, failing one it cannot parse instead of skipping it', () => {
+    const [rules] = syncs as [(typeof syncs)[number]];
+    const read = (sync: (typeof syncs)[number], ...calls: string[]) =>
+      switchGuards(
+        [`async function ${sync.name}(dir, enabled) {}`, ...calls.map((c) => `await ${c};`)].join(
+          '\n',
+        ),
+        sync,
+      );
+    const good = `${rules.name}(dir, r.agentRules !== false)`;
+    // The declaration is not a call, and the CommonJS build calls through `(0, _mod.name)(...)`.
+    expect.soft(read(rules, good)).toEqual(['r']);
+    expect.soft(read(rules, `(0, _m.${rules.name})(dir, r.agentRules !== false)`)).toEqual(['r']);
+    // A parenthesis in the switch, a first argument that is not an identifier, a single argument.
+    expect.soft(read(rules, good, `${rules.name}(dir, force() || r.x)`)).toEqual(['r', null]);
+    expect
+      .soft(read(rules, good, `${rules.name}(opts.dir, r.agentRules !== false)`))
+      .toEqual(['r', null]);
+    expect.soft(read(rules, good, `${rules.name}(r.agentRules !== false)`)).toEqual(['r', null]);
+    // An optional call, and a call through `call`, `apply` or `bind`, are calls it cannot read.
+    for (const call of [
+      `${rules.name}?.(dir, r.agentRules !== false)`,
+      `${rules.name}.call(null, dir, r.agentRules !== false)`,
+      `${rules.name}.apply(null, [dir, r.agentRules !== false])`,
+      `${rules.name}.bind(null, dir)(r.agentRules !== false)`,
+    ]) {
+      expect.soft(read(rules, good, call), call).toEqual(['r', null]);
+    }
+    // A name is matched as text: `$` is an identifier character, not an anchor.
+    const dollar = { ...rules, name: 'sync$Rules' };
+    expect.soft(read(dollar, 'sync$Rules(dir, r.agentRules !== false)')).toEqual(['r']);
+  });
+
+  it('switches each sync of the agent files on the value initialize returned', () => {
     for (const lib of serverLibs) {
       const source = readNext(`${lib}/start-server.js`);
       // getRequestHandlers hands back what the router server's initialize returns.
       expect(source, lib).toMatch(
         /async function getRequestHandlers\([^)]*\)\s*\{\s*return\s+(?:\(0,\s*[\w$]+\.)?initialize\)?\(/,
       );
-      const calls = callSites(source, 'ensureAgentRulesForDev');
-      expect(calls.length, lib).toBeGreaterThan(0);
-      for (const call of calls) {
-        const guard = source
-          .slice(0, call.index)
-          .match(
-            /if\s*\(\s*([\w$]+)\.agentRules\s*!==\s*false\s*\)\s*\{\s*(?:(?:const|let|var)\s+[\w$]+\s*=\s*)?(?:await\s+)?(?:\(0,\s*[\w$]+\.)?$/,
-          );
-        expect(guard, lib).not.toBeNull();
-        expect(source, lib).toContain(`const ${guard?.[1]} = await getRequestHandlers(`);
+      for (const sync of syncs) {
+        const guards = switchGuards(source, sync);
+        expect(guards.length, `${lib} ${sync.name}`).toBeGreaterThan(0);
+        for (const guard of guards) {
+          expect(guard, `${lib} ${sync.name}`).not.toBeNull();
+          expect(source, lib).toContain(`const ${guard} = await getRequestHandlers(`);
+        }
       }
     }
   });
 
-  it('writes the files only from ensureAgentRulesForDev', () => {
+  it('opens each sync with `if (!<switch>) return <removal>(dir)`, then calls its writer', () => {
     for (const lib of serverLibs) {
-      expect(readNext(`${lib}/app-info-log.js`), lib).toMatch(
-        /async function ensureAgentRulesForDev\([^)]*\)\s*\{[^}]*\bwriteAgentFiles\)?\s*\(/,
-      );
+      const source = readNext(`${lib}/app-info-log.js`);
+      for (const { name, remove, write } of syncs) {
+        const declared = source.match(
+          new RegExp(
+            `async function ${escapeRegExp(name)}\\(\\s*([\\w$]+)\\s*,\\s*([\\w$]+)\\s*\\)\\s*\\{\\s*` +
+              `if\\s*\\(\\s*!\\s*\\2\\s*\\)\\s*return\\s+(?:\\(0,\\s*[\\w$]+\\.)?${escapeRegExp(remove)}\\)?\\(\\s*\\1\\s*\\);` +
+              `([^}]*)\\}`,
+          ),
+        );
+        expect(declared, `${lib} ${name}`).not.toBeNull();
+        expect(declared?.[3], `${lib} ${name}`).toMatch(
+          new RegExp(`(?<![\\w$])${escapeRegExp(write)}\\)?\\s*\\(`),
+        );
+      }
     }
   });
 
-  // A second caller anywhere else in Next.js would bypass the gate above. dist/compiled holds
-  // vendored, minified third-party bundles and dist/docs holds Markdown, so neither is read. The
-  // walk reads about 2,700 files, just under a second at a load average of 90, so it takes a
-  // longer timeout than the 5s default rather than failing on a busy machine.
-  it('calls the generator from nowhere else in Next.js', () => {
+  // A second caller anywhere else in Next.js would bypass the switches above. The walk reads every
+  // `.js`, `.cjs` and `.mjs` file under dist but two directories: dist/compiled, which holds
+  // vendored, minified third-party bundles, and dist/docs, which holds only Markdown (474 files in
+  // 16.4.3) that the extension filter would pass over anyway. It reads about 2,700 files, just
+  // under a second at a load average of 90, so it takes a longer timeout than the 5s default
+  // rather than failing on a busy machine.
+  it('calls the syncs and the writers from nowhere else in Next.js', () => {
+    const names = syncs.flatMap(({ name, write }) => [name, write]);
     const found: Record<string, number> = {};
     const walk = (dir: string) => {
       for (const entry of readdirSync(path.join(nextDir, dir), { withFileTypes: true })) {
@@ -799,7 +967,7 @@ describe('the installed Next.js honours agentRules', () => {
           if (file !== 'dist/compiled' && file !== 'dist/docs') walk(file);
         } else if (/\.[cm]?js$/.test(entry.name)) {
           const source = readNext(file);
-          for (const name of ['ensureAgentRulesForDev', 'writeAgentFiles']) {
+          for (const name of names) {
             const count = source.includes(name) ? callSites(source, name).length : 0;
             if (count > 0) found[`${file} ${name}`] = count;
           }
@@ -807,18 +975,28 @@ describe('the installed Next.js honours agentRules', () => {
       }
     };
     walk('dist');
-    expect(found).toEqual({
-      'dist/esm/server/lib/app-info-log.js writeAgentFiles': 1,
-      'dist/esm/server/lib/start-server.js ensureAgentRulesForDev': 1,
-      'dist/server/lib/app-info-log.js writeAgentFiles': 1,
-      'dist/server/lib/start-server.js ensureAgentRulesForDev': 1,
-    });
+    expect(found).toEqual(
+      Object.fromEntries(
+        ['dist/esm/server/lib', 'dist/server/lib'].flatMap((lib) =>
+          syncs.flatMap(({ name, write }) => [
+            [`${lib}/app-info-log.js ${write}`, 1],
+            [`${lib}/start-server.js ${name}`, 1],
+          ]),
+        ),
+      ),
+    );
   }, 20_000);
+
+  it('leaves experimental.agentFeedback off', () => {
+    expect(nextConfig.experimental?.agentFeedback ?? false).toBe(false);
+  });
 
   // The root CLAUDE.md points agents at these docs in place of the generated AGENTS.md.
   it('ships the version-matched docs the root CLAUDE.md points agents at', () => {
     expect(statSync(path.join(nextDir, 'dist/docs')).isDirectory()).toBe(true);
-    expect(readNext('dist/docs/01-app/02-guides/ai-agents.md')).toMatch(/\bagentRules: false\b/);
+    expect(
+      readNext('dist/docs/01-app/03-api-reference/05-config/01-next-config-js/agentRules.md'),
+    ).toMatch(/\bagentRules: false\b/);
   });
 });
 
