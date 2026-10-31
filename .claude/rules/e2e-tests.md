@@ -35,17 +35,24 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   background one with `kill -TERM <pid>`, which exits 143 and still writes the report.
 - The web server's output is gated. The `e2e` job tees the Playwright run into a log under
   `shell: bash`, whose `pipefail` keeps a failing run failing through the pipe, and
-  `scripts/check-webserver-log.mjs` then fails the job on any `[WebServer]` line outside ADR 0015's
-  `Error: Internal: NoFallbackError` block (that message and its `at` frames), the accepted signal
-  that sends an unknown `/work/*` slug to the 404. It does not try to recognise error shapes: only
-  the server's stderr reaches the log, because `webServer.stdout` stays at Playwright's default,
-  `'ignore'`, so every other server line is a finding, warnings included. A missing or empty log
-  fails too, and so does a log with no `[WebServer]` line, which means the capture broke, since
-  every run prints the allowlisted block. That block comes from the not-found specs, which only the
-  `chromium` project runs, so the check means something only on a run that includes `chromium`: a
-  run of `mobile-chrome` or `mobile-safari` alone always fails it with the capture message, which
-  is not a server problem. The check runs whenever the suite ran, passed or failed, and not after
-  an earlier step failed, when there is no log to read. Its tests run in `pnpm test:scripts`.
+  `scripts/check-webserver-log.mjs` then fails the job on any `[WebServer]` line other than the
+  canary and ADR 0015's `Error: Internal: NoFallbackError` block (that message and its `at`
+  frames), which Next 16.3 printed on its way to the 404 for an unknown `/work/*` slug and 16.4 no
+  longer prints; it stays allowed and is not required. It does not try to recognise error shapes:
+  only the server's stderr reaches the log, because `webServer.stdout` stays at Playwright's
+  default, `'ignore'`, so every other server line is a finding, warnings included. The canary is
+  how the check knows the capture works, since a green 16.4 run's server writes nothing else to
+  stderr: under CI, `webServer.command` in `apps/web/playwright.config.ts` prints
+  `WEB_SERVER_LOG_CANARY` to stderr with `printf '%s\n'` before `pnpm start`, and the log must
+  hold `[WebServer] <canary>` exactly once. Its text is `CANARY` in the script, and
+  `src/test/playwright-config.test.ts` fails when the two differ. A missing or empty log fails,
+  and so does a log without the canary, which means the capture broke, or with it twice, which
+  holds two runs. The local dev server prints no canary, so a log from a local run fails the check.
+  The canary proves the capture, not that errors reach it: that rests on Next, whose 16.4.3
+  `next start` logs a request or render error with `console.error` (the route module's
+  `onRequestError`), and no test makes the server throw to show it.
+  The check runs whenever the suite ran, passed or failed, and not after an earlier step failed,
+  when there is no log to read. Its tests run in `pnpm test:scripts`.
 - Every route must load with a clean browser console, in both colour schemes.
   `apps/web/e2e/console-clean.spec.ts` fails on any console error, console warning or page error,
   React hydration mismatches included, so a stray `console.warn` fails the `e2e` job. Its routes come
@@ -244,15 +251,17 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
   branch, the copy in `.next-e2e` is stale: `pnpm --filter web exec rm -rf .next-e2e`, or
   `pnpm --filter web clean`. Two local suites in the _same_ checkout on different ports also share
   it, so do not overlap them; two different checkouts are fine, they have their own.
-- The CI e2e log prints a three-line `[WebServer] Error: Internal: NoFallbackError` stack once for
-  every request of an unknown `/work/*` or `/blog/*` slug, so several times per run, and still
-  passes. It is the internal signal that routes such a slug to the site-level 404, and
+- Under Next 16.3 the CI e2e log printed a three-line `[WebServer] Error: Internal: NoFallbackError`
+  stack once for every request of an unknown `/work/*` or `/blog/*` slug, so several times per run,
+  and still passed; 16.4 prints none, so a green run's log holds the canary and no other server
+  line. It was the internal signal that routes such a slug to the site-level 404, and
   `not-found-shell`, `not-found`, `console-clean` and `hydration-marker` all request
   `/work/does-not-exist` and `/blog/does-not-exist`; the response is a correct 404 and no browser
-  console entry results. Do not chase it: `scripts/check-webserver-log.mjs` allowlists exactly that
-  message with its stack frames and fails the job on any other `[WebServer]` line. The Vercel
-  production log carries no such line, because the platform answers an unknown path from the cached
-  static 404 without invoking the route (`docs/adr/0015-static-case-study-params.md`).
+  console entry results. Should it come back, do not chase it: `scripts/check-webserver-log.mjs`
+  still allowlists exactly that message with its stack frames and fails the job on any other
+  `[WebServer]` line but the canary. The Vercel production log carries no such line, because the
+  platform answers an unknown path from the cached static 404 without invoking the route
+  (`docs/adr/0015-static-case-study-params.md`).
 - Claude Code's in-app Browser pane logs React error #418 (hydration mismatch) on every page of the
   deployed site, while an unmodified headless Chromium (Playwright from `apps/web`) reports none
   across schemes, viewports and reduced motion. Judge console cleanliness with Playwright, not the

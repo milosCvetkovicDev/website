@@ -6190,24 +6190,24 @@
       "anchor": "| 0019 |",
       "method": "config-value",
       "evaluation": "live",
-      "claim": "ADR 0019's record carries the status line \"Accepted\".",
+      "claim": "ADR 0019's record carries the status line \"Superseded by ADR-0037\".",
       "check": {
         "file": "docs/adr/0019-next-agent-rules-disabled.md",
         "regex": "^## Status\\n\\n([^\\n]+)",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0037"
       }
     },
     {
       "id": "adr-index-0019-cell-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0019 |",
-      "claim": "The index row for ADR 0019 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "claim": "The index row for ADR 0019 gives the record's status line, \"Superseded by ADR-0037\" (ADR 0012: the status in the record and in the index must agree).",
       "method": "config-value",
       "evaluation": "live",
       "check": {
         "file": "docs/adr/README.md",
         "regex": "^\\| 0019 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
-        "equals": "Accepted"
+        "equals": "Superseded by ADR-0037"
       }
     },
     {
@@ -8789,6 +8789,254 @@
       }
     },
     {
+      "id": "adr-readme-link-0037-next-agent-files-synced-off",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0037-next-agent-files-synced-off.md)",
+      "claim": "The link to 0037-next-agent-files-synced-off.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0037-next-agent-files-synced-off.md" }],
+      "check": { "path": "docs/adr/0037-next-agent-files-synced-off.md" }
+    },
+    {
+      "id": "adr-readme-link-0038-playwright-held-below-1-64",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0038-playwright-held-below-1-64.md)",
+      "claim": "The link to 0038-playwright-held-below-1-64.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0038-playwright-held-below-1-64.md" }],
+      "check": { "path": "docs/adr/0038-playwright-held-below-1-64.md" }
+    },
+    {
+      "id": "adr-index-0037-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0037's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0037-next-agent-files-synced-off.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0037-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0037 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0037 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0037-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0037's record carries the Date \"2026-10-20\".",
+      "check": {
+        "file": "docs/adr/0037-next-agent-files-synced-off.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-20"
+      }
+    },
+    {
+      "id": "adr-index-0037-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0037 gives the record's Date, \"2026-10-20\" (the date in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0037 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-20"
+      }
+    },
+    {
+      "id": "adr-index-0037-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0037's record carries the H1 title \"Next.js keeps its agent instruction blocks out of the app, on 16.4's sync\".",
+      "check": {
+        "file": "docs/adr/0037-next-agent-files-synced-off.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Next.js keeps its agent instruction blocks out of the app, on 16.4's sync"
+      }
+    },
+    {
+      "id": "adr-index-0037-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0037 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0037 gives the record's H1 title, \"Next.js keeps its agent instruction blocks out of the app, on 16.4's sync\" (the title in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0037 \\| \\[(.+?)\\]\\(0037-",
+        "equals": "Next.js keeps its agent instruction blocks out of the app, on 16.4's sync"
+      }
+    },
+    {
+      "id": "adr-index-0038-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0038's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0038-playwright-held-below-1-64.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0038-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0038 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0038 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0038-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0038's record carries the Date \"2026-10-30\".",
+      "check": {
+        "file": "docs/adr/0038-playwright-held-below-1-64.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-30"
+      }
+    },
+    {
+      "id": "adr-index-0038-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0038 gives the record's Date, \"2026-10-30\" (the date in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0038 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-30"
+      }
+    },
+    {
+      "id": "adr-index-0038-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0038's record carries the H1 title \"Hold @playwright/test below 1.64 until mobile-safari passes on it\".",
+      "check": {
+        "file": "docs/adr/0038-playwright-held-below-1-64.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Hold @playwright/test below 1.64 until mobile-safari passes on it"
+      }
+    },
+    {
+      "id": "adr-index-0038-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0038 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0038 gives the record's H1 title, \"Hold @playwright/test below 1.64 until mobile-safari passes on it\" (the title in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0038 \\| \\[(.+?)\\]\\(0038-",
+        "equals": "Hold @playwright/test below 1.64 until mobile-safari passes on it"
+      }
+    },
+    {
+      "id": "adr-0037-link-0019-next-agent-rules-disabled",
+      "doc": "docs/adr/0037-next-agent-files-synced-off.md",
+      "anchor": "](0019-next-agent-rules-disabled.md)",
+      "claim": "The link to 0019-next-agent-rules-disabled.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0019-next-agent-rules-disabled.md" }],
+      "check": { "path": "docs/adr/0019-next-agent-rules-disabled.md" }
+    },
+    {
+      "id": "adr-0038-link-0032-e2e-chromium-single-threaded-gc",
+      "doc": "docs/adr/0038-playwright-held-below-1-64.md",
+      "anchor": "](0032-e2e-chromium-single-threaded-gc.md)",
+      "claim": "The link to 0032-e2e-chromium-single-threaded-gc.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0032-e2e-chromium-single-threaded-gc.md" }],
+      "check": { "path": "docs/adr/0032-e2e-chromium-single-threaded-gc.md" }
+    },
+    {
+      "id": "adr-0038-link-0018-dependency-update-policy",
+      "doc": "docs/adr/0038-playwright-held-below-1-64.md",
+      "anchor": "](0018-dependency-update-policy.md)",
+      "claim": "The link to 0018-dependency-update-policy.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0018-dependency-update-policy.md" }],
+      "check": { "path": "docs/adr/0018-dependency-update-policy.md" }
+    },
+    {
+      "id": "adr-0038-dependabot-ignores",
+      "doc": "docs/adr/0038-playwright-held-below-1-64.md",
+      "anchor": "lists every `dependency-name` in `.github/dependabot.yml`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "Dependabot ignores exactly five dependencies, in this order: eslint, @eslint/js, typescript and @types/node (the majors of ADR 0018) and @playwright/test (the version hold of ADR 0038). An ignore added or removed is drift until a record says why.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "^[ \\t]*(?:- )?dependency-name:[ \\t]*['\"]?([^'\"\\n#]+?)['\"]?[ \\t]*(?:#[^\\n]*)?$",
+        "equalsAll": ["eslint", "@eslint/js", "typescript", "@types/node", "@playwright/test"]
+      }
+    },
+    {
+      "id": "adr-0038-dependabot-ignore-rules",
+      "doc": "docs/adr/0038-playwright-held-below-1-64.md",
+      "anchor": "with `versions: ['>=1.64.0']`",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "Each of Dependabot's five ignore entries carries exactly one rule, in the order adr-0038-dependabot-ignores lists their names: semver-major for eslint and @eslint/js, >=7 for typescript, semver-major for @types/node and >=1.64.0 for @playwright/test. A rule widened, narrowed, added or dropped is drift.",
+      "check": {
+        "file": ".github/dependabot.yml",
+        "regex": "^[ \\t]*- dependency-name: [^\\n]+\\n[ \\t]+((?:versions|update-types): [^\\n]+)$(?!\\n[ \\t]+(?:versions|update-types):)",
+        "equalsAll": [
+          "update-types: ['version-update:semver-major']",
+          "update-types: ['version-update:semver-major']",
+          "versions: ['>=7']",
+          "update-types: ['version-update:semver-major']",
+          "versions: ['>=1.64.0']"
+        ]
+      }
+    },
+    {
+      "id": "adr-0019-link-0037-next-agent-files-synced-off",
+      "doc": "docs/adr/0019-next-agent-rules-disabled.md",
+      "anchor": "](0037-next-agent-files-synced-off.md)",
+      "claim": "The link to 0037-next-agent-files-synced-off.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [{ "kind": "link", "token": "0037-next-agent-files-synced-off.md" }],
+      "check": { "path": "docs/adr/0037-next-agent-files-synced-off.md" }
+    },
+    {
       "id": "adr-0035-link-rules-app-router-and-content",
       "doc": "docs/adr/0035-owner-placeholder-convention.md",
       "anchor": "](../../.claude/rules/app-router-and-content.md)",
@@ -10034,8 +10282,8 @@
       "claim": "CI serves the production build with pnpm start.",
       "check": {
         "file": "apps/web/playwright.config.ts",
-        "regex": "^    command: (.+),$",
-        "equals": "isCI ? 'pnpm start' : 'pnpm dev'"
+        "regex": "^    command: isCI \\? (?:'(?=pnpm start')|`printf '%s\\\\\\\\n' '\\$\\{WEB_SERVER_LOG_CANARY\\}' >&2 && (?=pnpm start`))(pnpm start)['`] : 'pnpm dev',$",
+        "equals": "pnpm start"
       }
     },
     {
@@ -10254,7 +10502,7 @@
       "claim": "Dependabot ignores eslint and @eslint/js majors, typescript >=7 and @types/node majors.",
       "check": {
         "file": ".github/dependabot.yml",
-        "regex": "dependency-name: '?([^'\\n]+)'?",
+        "regex": "dependency-name: '?([^'\\n]+)'?\\n\\s+(?:update-types: \\['version-update:semver-major'\\]|versions: \\['>=\\d+'\\])",
         "equalsAll": ["eslint", "@eslint/js", "typescript", "@types/node"]
       }
     },
