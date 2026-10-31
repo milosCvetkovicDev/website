@@ -19,9 +19,11 @@ file matching `paths`; `CLAUDE.md` keeps the summary and the index of rules.
 ## Quality gates
 
 - `.github/workflows/flake-hunt.yml` hunts flaky e2e tests every night at 02:17 UTC and on manual
-  dispatch, never on a pull request, and none of its jobs is a required check. Six shards each run
-  the whole suite five times against the production build with `scripts/flake-hunt.sh`; a report
-  job merges the 30 runs into `flake-report.json` (an artifact, with each failure's trace and
+  dispatch, never on a pull request, and none of its jobs is a required check. Ten shards each run
+  the whole suite three times against the production build with `scripts/flake-hunt.sh` (a run
+  takes 10 to 14 minutes there, so five to a shard overran the step's 65-minute timeout; the matrix
+  and both timeouts are checked against the measured durations in `scripts/flake-hunt.test.mjs`); a
+  report job merges the 30 runs into `flake-report.json` (an artifact, with each failure's trace and
   screenshot in the shard artifacts), counts a run no shard uploaded as an infrastructure error,
   and `scripts/flake-hunt-issue.sh` opens one issue labelled `flake-hunt` for the failing tests of
   every spec that failed in more than 5% of the completed runs it ran in, unless an open

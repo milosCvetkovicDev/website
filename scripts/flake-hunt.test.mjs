@@ -827,6 +827,51 @@ describe('interruptions', () => {
 
 describe('the nightly workflow', () => {
   const WORKFLOW = join(dirname(SCRIPT), '../.github/workflows/flake-hunt.yml');
+  const HUNT_STEP = "Run this shard's runs";
+
+  // Measured on the 12 scheduled hunts from 2026-10-19 to 2026-10-30, 333 completed runs: one run
+  // of the suite took 10.10 to 14.01 minutes (median 12.66), and the hunt step lasts the sum of
+  // its runs to within a second. Setup, from the job's start to the hunt step, took 0.97 to 7.92
+  // minutes (median 1.32) in 70 of 72 shards; in the other two a stalled apt mirror held the
+  // browser install for 31.88 and 32.03 minutes, and setup took up to 32.65. Everything after the
+  // hunt step, the upload and the post-job steps, took at most 0.10 minutes. Five runs to a shard
+  // would need up to about 70 minutes (5 x 14.01) against the step's 65, so on 10 of those 12
+  // nights a shard's last run was killed by the step's timeout.
+  const SLOWEST_RUN_MINUTES = 14.01;
+  const SLOWEST_SETUP_MINUTES = 32.65;
+  // The slowest run was 39% slower than the fastest, so at least half again the slowest covers a
+  // runner slower than any measured by more than the whole spread seen.
+  const RUN_MARGIN = 1.5;
+  const AFTER_HUNT_MINUTES = 1;
+
+  /** @param {string} text @param {RegExp} pattern */
+  function number(text, pattern) {
+    const match = pattern.exec(text);
+    assert.ok(match, `${pattern} matches nothing`);
+    return Number(match[1]);
+  }
+
+  /**
+   * The lines of the job `id` under `jobs:`, as the YAML holds it.
+   *
+   * @param {string} id
+   */
+  function jobBlock(id) {
+    const lines = readFileSync(WORKFLOW, 'utf8').split('\n');
+    const start = lines.indexOf(`  ${id}:`);
+    assert.ok(start >= 0, `no job ${id}`);
+    const end = lines.findIndex((line, i) => i > start && /^ {0,2}\S/.test(line));
+    return lines.slice(start, end < 0 ? undefined : end).join('\n');
+  }
+
+  // Each timeout is read from its own key line: the hunt job's at four spaces, its step's at eight.
+  function timeouts() {
+    return {
+      job: number(jobBlock('hunt'), /^ {4}timeout-minutes: (\d+)$/m),
+      step: number(stepBlock(HUNT_STEP).join('\n'), /^ {8}timeout-minutes: (\d+)$/m),
+      runs: number(runScript(HUNT_STEP), /^scripts\/flake-hunt\.sh (\d+) &$/m),
+    };
+  }
 
   /** The indented block of the step named `name` under the key `key`, as the YAML holds it. */
   /** @param {string} name */
@@ -856,7 +901,7 @@ describe('the nightly workflow', () => {
   // The runner signals the step's shell alone: SIGINT, then SIGTERM 7.5 s later.
   for (const signal of /** @type {NodeJS.Signals[]} */ (['SIGINT', 'SIGTERM'])) {
     it(`stops the hunt cleanly when a cancelled shard's shell gets ${signal}`, async () => {
-      writeFileSync(join(root, 'repo/step.sh'), runScript('Run the suite five times'));
+      writeFileSync(join(root, 'repo/step.sh'), runScript(HUNT_STEP));
       plan(1, passing());
       writeFileSync(join(stub, 'run-2.hang'), '');
       const step = spawn('bash', ['--noprofile', '--norc', '-eo', 'pipefail', 'step.sh'], {
@@ -885,15 +930,50 @@ describe('the nightly workflow', () => {
   }
 
   it("keeps the step's timeout under the job's, and uploads the runs even when cancelled", () => {
-    const text = readFileSync(WORKFLOW, 'utf8');
-    const job = Number(
-      /** @type {RegExpExecArray} */ (/\n {4}timeout-minutes: (\d+)/.exec(text))[1],
-    );
-    const step = stepBlock('Run the suite five times').join('\n');
-    assert.ok(
-      Number(/** @type {RegExpExecArray} */ (/timeout-minutes: (\d+)/.exec(step))[1]) < job,
-    );
+    const { job, step } = timeouts();
+    assert.ok(step < job, `the step allows ${step} min, the job ${job}`);
     assert.match(stepBlock("Upload this shard's runs").join('\n'), /if: \$\{\{ always\(\) \}\}/);
+  });
+
+  it("numbers the shards apart up to the expected runs, each the step's run count", () => {
+    const text = readFileSync(WORKFLOW, 'utf8');
+    const expected = number(text, /FLAKE_HUNT_EXPECTED_RUNS: '(\d+)'/);
+    const { runs } = timeouts();
+    const shards = [...text.matchAll(/^ {10}- \{ first: (\d+), last: (\d+) \}$/gm)];
+    assert.ok(shards.length > 0, 'no { first, last } shard in the matrix');
+    let next = 1;
+    for (const [, first, last] of shards) {
+      assert.equal(Number(first), next, `a shard starts at ${first}, not at ${next}`);
+      assert.equal(Number(last) - Number(first) + 1, runs, `shard ${first} to ${last}`);
+      next = Number(last) + 1;
+    }
+    assert.equal(next - 1, expected, 'the shards do not add up to FLAKE_HUNT_EXPECTED_RUNS');
+    // The step numbers its runs from the shard's first, which is what keeps the shards apart.
+    assert.match(
+      stepBlock(HUNT_STEP).join('\n'),
+      /^ {10}FLAKE_HUNT_FIRST_RUN: \$\{\{ matrix\.first \}\}$/m,
+      "the hunt step does not number its runs from the shard's first",
+    );
+  });
+
+  it("fits a shard's runs in the step's timeout with half again the slowest run measured", () => {
+    const { runs, step } = timeouts();
+    const needed = runs * SLOWEST_RUN_MINUTES * RUN_MARGIN;
+    assert.ok(
+      needed <= step,
+      `${runs} runs of ${SLOWEST_RUN_MINUTES} min with a ${RUN_MARGIN}x margin need ` +
+        `${needed.toFixed(1)} min; the step allows ${step}`,
+    );
+  });
+
+  it("gives the job the slowest setup measured on top of the step's timeout", () => {
+    const { job, step } = timeouts();
+    const needed = SLOWEST_SETUP_MINUTES + step + AFTER_HUNT_MINUTES;
+    assert.ok(
+      needed <= job,
+      `${SLOWEST_SETUP_MINUTES} min of setup, the step's ${step} and ${AFTER_HUNT_MINUTES} after ` +
+        `it need ${needed.toFixed(1)} min; the job allows ${job}`,
+    );
   });
 });
 
