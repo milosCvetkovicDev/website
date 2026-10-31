@@ -33,6 +33,10 @@ bytes that production serves.
 | 6e0a87a3 (the budget's baseline, next 16.3.4) | `/about` | 178,589 bytes | 178,582 bytes (#52)  | +7 bytes   |
 | eb5acc42 (`main`, next 16.3.8)                | `/about` | 182,909 bytes | 182,987 bytes (#268) | -78 bytes  |
 
+The second row compares a local build of eb5acc42 with production at 8e5d329, three commits apart.
+Two of them touch application source, f70070dd (#205) and 6e16c3ac (#196), so the -78 bytes mixes
+the measurement error with their effect; it is not a clean error bound.
+
 All nine non-home routes measure the same, because their first load is the shared chunks. `/` is far
 inside its budget at 205,889 bytes (201 KiB) on `main`.
 
@@ -63,13 +67,16 @@ module inside the commit holds it is not.
 | #178, the mobile menu as a modal dialog                                            | +591   |
 | #232, an 11-update dependency group (next 16.3.6 to 16.3.8 among them)             | +94    |
 | Window: the 31 commits between #232 and `main` at eb5acc42                         | -13    |
-| **Growth #268 reports, baseline to `main`** (the 14 rows above)                    | +4,320 |
+| **Baseline to `main` at eb5acc42** (the 14 rows above; local builds)               | +4,320 |
 | #275, Next 16.3.8 to 16.4.3 and React 19.3.0 to 19.3.1                             | +459   |
 | **Baseline to #275's head, bd666525**                                              | +4,779 |
 
-#275 changed no application source, only tests, so its 459 bytes are framework code: the vendored
+#268's own figure, +4,405 bytes, is production at 8e5d329 against the recorded baseline; the +4,320
+above is the local build of eb5acc42 against the local baseline, and the 85 bytes between them are the
+two validation differences (+7 and -78). #275 changed nothing under `apps/web/src` but tests (the tree
+of its head bd666525 is identical to the squash 0a56661f), so its 459 bytes are framework code: the vendored
 React canary moved from 20260731 to 20261002, the runtime chunk grew by 86 bytes and the framework
-chunks were re-partitioned. It is not the cause of #268; it adds to it. The rows that name a feature
+chunks were re-partitioned. It is not the cause of #268; it adds to it. (`next.config.ts` has a comment-only hunk in #275 too.) The rows that name a feature
 commit (#87, #116, #118, #135, #138, #178) are 4,260 of the 4,779 bytes.
 
 ## Decision
@@ -91,18 +98,20 @@ Each part of the growth is accepted for the reason it exists:
   by loading GSAP on demand. The shared loader and the extra chunk boundary are what the other routes
   pay for it. Removing them would put the 42.7 KB back on `/`.
 - **#138, the global error page (+1,118 bytes).** It lets a crash in the root layout still show the
-  site shell and mount analytics instead of Next's bare default. The page is in the first load of every
+  document shell (html, body, styles, theme, a retry and a home link, no navigation or footer) and mount analytics instead of Next's bare default. The page is in the first load of every
   route.
-- **#135, Vercel Web Analytics (+1,283 bytes).** ADR 0026 records the decision; the bytes are inside
-  the 2,250-byte bound #135's review set.
+- **#135, Vercel Web Analytics (+1,283 bytes).** ADR 0026 records the decision. #135's pull request estimated the package's Next entry at 2,250
+  bytes gzipped unminified, an upper bound it did not measure; the +1,283 measured here is under it.
 - **#178, the mobile menu as a modal dialog (+591 bytes).** It is the accessibility fix for the menu
   (focus handling, the current page marked).
 - **#118, the brand mark (+204 bytes), #87, the hydration marker (+68 bytes).** The marker is what
-  the e2e specs wait on (ADR 0006), and its design record predicted root-chunk growth.
+  the e2e specs wait on, and its design record
+  (`docs/plans/2026-09-13-route-hydration-marker-design.md`) predicted root-chunk growth; ADR 0006
+  records `useIsHydrated`, which it reads.
 - **#275 (+459 bytes).** The upgrade carries the fixes for the critical advisories on Next 16.3.8.
   Staying on 16.3.8 is not an option.
-- **#71, #125, the dependency groups (#146, #232) and the four windows (+60 bytes net).** None is
-  above 94 bytes in either direction, within the noise of a chunk re-partition. #125 is a gain. The
+- **#71, #125, the dependency groups (#146, #232) and the four windows.** Together they net +60
+  bytes (the four windows alone net +2). None is above 94 bytes in either direction, within the noise of a chunk re-partition. #125 is a gain. The
   windows are residuals, not decisions, and are accepted as such.
 
 ## Consequences
@@ -114,10 +123,13 @@ Each part of the growth is accepted for the reason it exists:
   4,169 over the old 179,199-byte line; dropping Analytics, the global error page and the mobile menu
   together would leave it 1,177 over. Only all of #116, #118, #135, #138 and #178 reaches it, and
   reverting #116 costs `/` 42.7 KB.
-- #52's acceptance criterion 26, in the issue and in the tracked copies of the epic, still says 174
+- #52's acceptance criterion 26, in the issue and in the tracked file
+  `.claude/epics/audit-remediation-2026-09/52.md`, still says 174
   KiB. Those texts are the owner's to edit; this record does not rewrite them.
 - The budget is the figure measured on production after #275 deployed, 183,408 bytes, so it holds 911
   bytes of room before the next whole KiB. Any growth that crosses 184,319 bytes fails it.
+- The nine routes are the nine that exist while no post is published. The first published
+  `/blog/<slug>` is a non-home route, and it must be measured against 179 KiB when it ships.
 - The figure moves with the framework: a Next or React bump can shift it by a few hundred bytes in
   either direction, as #275 did (+459) and the #232 bumps did (+94). Such a bump re-measures
   against the budget and, when it crosses it, records the new figure the way this record does.
@@ -130,7 +142,7 @@ Each part of the growth is accepted for the reason it exists:
 - **Raise the budget without a record.** #268 says this is not a fix: the next reader of the budget
   would not know what the number holds or why.
 - **Set the budget to the production figure of 2026-10-13 (182,987 bytes).** It does not include
-  #275, which deploys next, so the gate would fail on that deploy.
+  #275, which had not yet deployed, so the gate would have failed on that deploy.
 - **Add a CI gate for the figure.** Not decided here. The loop is manual, #52's close-out run is its
   only user, and a gate needs a production build with the Vercel flag and a pinned method; that is a
   separate record.
