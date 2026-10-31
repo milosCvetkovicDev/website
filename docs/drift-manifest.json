@@ -8185,6 +8185,101 @@
       }
     },
     {
+      "id": "adr-readme-link-0040-non-home-first-load-js-budget",
+      "doc": "docs/adr/README.md",
+      "anchor": "](0040-non-home-first-load-js-budget.md)",
+      "claim": "The link to 0040-non-home-first-load-js-budget.md resolves to a file in the repository.",
+      "method": "file-line",
+      "evaluation": "live",
+      "covers": [
+        {
+          "kind": "link",
+          "token": "0040-non-home-first-load-js-budget.md"
+        }
+      ],
+      "check": {
+        "path": "docs/adr/0040-non-home-first-load-js-budget.md"
+      }
+    },
+    {
+      "id": "adr-index-0040-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0040 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0040's record carries the status line \"Accepted\".",
+      "check": {
+        "file": "docs/adr/0040-non-home-first-load-js-budget.md",
+        "regex": "^## Status\\n\\n([^\\n]+)",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0040-cell-status",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0040 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0040 gives the record's status line, \"Accepted\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0040 \\|[^\\n]*?\\| ([^|\\n]+?)\\s*\\| \\d{4}-\\d\\d-\\d\\d \\|$",
+        "equals": "Accepted"
+      }
+    },
+    {
+      "id": "adr-index-0040-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0040 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0040's record carries the Date \"2026-10-31\".",
+      "check": {
+        "file": "docs/adr/0040-non-home-first-load-js-budget.md",
+        "regex": "^## Date\\n\\n(\\d{4}-\\d\\d-\\d\\d)",
+        "equals": "2026-10-31"
+      }
+    },
+    {
+      "id": "adr-index-0040-cell-date",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0040 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0040 gives the record's Date, \"2026-10-31\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0040 \\|[^\\n]*\\| (\\d{4}-\\d\\d-\\d\\d) \\|$",
+        "equals": "2026-10-31"
+      }
+    },
+    {
+      "id": "adr-index-0040-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0040 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "ADR 0040's record carries the H1 title \"Non-home routes get a new first-load JavaScript budget, and the growth behind it is recorded\".",
+      "check": {
+        "file": "docs/adr/0040-non-home-first-load-js-budget.md",
+        "regex": "^# \\d{4}\\. (.+)$",
+        "equals": "Non-home routes get a new first-load JavaScript budget, and the growth behind it is recorded"
+      }
+    },
+    {
+      "id": "adr-index-0040-cell-title",
+      "doc": "docs/adr/README.md",
+      "anchor": "| 0040 |",
+      "method": "config-value",
+      "evaluation": "live",
+      "claim": "The index row for ADR 0040 gives the record's H1 title, \"Non-home routes get a new first-load JavaScript budget, and the growth behind it is recorded\" (ADR 0012: the status in the record and in the index must agree).",
+      "check": {
+        "file": "docs/adr/README.md",
+        "regex": "^\\| 0040 \\| \\[(.+?)\\]\\(0040-",
+        "equals": "Non-home routes get a new first-load JavaScript budget, and the growth behind it is recorded"
+      }
+    },
+    {
       "id": "adr-index-0035-status",
       "doc": "docs/adr/README.md",
       "anchor": "| 0035 |",
