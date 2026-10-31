@@ -45,6 +45,19 @@
  *   red-400), so dark text is unchanged; the light values (green-800, amber-800, red-700) are the
  *   first shades that reach 4.5:1 on the HUD panels and on their own /10 tints. Never dim status
  *   text with an opacity modifier: even green-800 at /70 is 3.2:1 on its tint.
+ * - --log-* colour the tmux background's log lines and --tmux-diagram-text the idle labels of the
+ *   featured-work diagram (#269). Both are decoration drawn as text, so both are opaque. Each log
+ *   colour clears 4.5:1 under the peak of the hero's violet glow (#f3f1fa light, #151524 dark) and
+ *   4.8:1 on the bare pane (--tmux-bg, #fafafa and #0d1017). In light, --log-err, --log-dbg and
+ *   --log-agt are red-700, gray-600 and violet-600 mixed into the pane at the lowest strength that
+ *   does so; --log-wrn, --log-inf and --log-ok are amber-700, blue-600 and green-700 as they are.
+ *   In dark, each is its old hue mixed into the pane the same way, a lighter shade of it for
+ *   --log-dbg (#a9b1d6) and --log-agt (#a78bfa). What no token can reach is the hero's vignette, an
+ *   overlay above the panes (hero-section.tsx), which still takes the lines at the panes' outer
+ *   edges down to about 2.1:1 light and 1.7:1 dark: a follow-up noted on #269. The label colour is
+ *   --tmux-bar-text mixed into --background until it clears 4.6:1 on the label plate and on the
+ *   line that runs under one. At 0.35 to 0.55 alpha the log lines had been 1.5 to 3.4:1; the
+ *   labels, at 40% opacity (60% dark), 1.9:1 light, and 1.2 to 1.4:1 under a hovered card.
  */
 :root {
   /* Native UI (scrollbars, form controls, the canvas) follows the theme, not the OS. */
@@ -75,12 +88,13 @@
   --tmux-status-accent: #6366f1;
   --tmux-status-alerts: #b45309;
   --tmux-status-uptime: #2563eb;
-  --log-err: rgba(220, 38, 38, 0.45);
-  --log-wrn: rgba(180, 120, 20, 0.45);
-  --log-inf: rgba(37, 99, 235, 0.35);
-  --log-ok: rgba(22, 163, 74, 0.45);
-  --log-dbg: rgba(107, 114, 128, 0.35);
-  --log-agt: rgba(124, 58, 237, 0.45);
+  --tmux-diagram-text: #6b6b78;
+  --log-err: #c34040;
+  --log-wrn: #b45309;
+  --log-inf: #2563eb;
+  --log-ok: #15803d;
+  --log-dbg: #676f7b;
+  --log-agt: #8446ee;
 }
 
 .dark {
@@ -112,12 +126,13 @@
   --tmux-status-accent: #a8e4ff;
   --tmux-status-alerts: #f0c97a;
   --tmux-status-uptime: #a8e4ff;
-  --log-err: rgba(247, 118, 142, 0.55);
-  --log-wrn: rgba(224, 175, 104, 0.48);
-  --log-inf: rgba(122, 162, 247, 0.38);
-  --log-ok: rgba(158, 206, 106, 0.5);
-  --log-dbg: rgba(86, 95, 137, 0.45);
-  --log-agt: rgba(139, 92, 246, 0.55);
+  --tmux-diagram-text: #858b9d;
+  --log-err: #c66175;
+  --log-wrn: #9a7b4d;
+  --log-inf: #607fc1;
+  --log-ok: #6a8a4c;
+  --log-dbg: #797f9b;
+  --log-agt: #8872cd;
 }
 
 @theme inline {
