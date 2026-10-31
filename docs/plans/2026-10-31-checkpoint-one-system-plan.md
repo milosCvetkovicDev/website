@@ -320,7 +320,10 @@ v26, and on CI (N4).
     an upper-case UUID, and `../x`, each with `session none` and no folder;
   - `--stamp that cannot write the stamp prints not stamped with its reason and exits 0` (N5),
     table-driven: node unavailable (the session folder is still created), the timer fired
-    (`AGENT_RESUME_DRIFT_TIMEOUT=1`, a hang test), and a `stamps` folder it cannot write;
+    (`AGENT_RESUME_DRIFT_TIMEOUT=1`, a hang test), and a `stamps` folder it cannot write. The
+    node-unavailable row sets `AGENT_RESUME_NODE_DIRS` empty and `NVM_DIR` to a stub folder and
+    runs with a `PATH` of linked tools without `node`, as Task 7's tests do, so Homebrew's node
+    in `/usr/local/bin` cannot answer on the owner's machine (N4);
   - `--stamp in a linked worktree adds the warning line` (N2), and in the main checkout
     does not;
   - `--stamp deletes session folders idle for 14 days and keeps the rest`, table-driven: a folder
@@ -443,7 +446,11 @@ Branched from `main` after PR 2 has merged.
   - `an invalid payload writes no record and exits 0`, table-driven, an upper-case session id
     among the rows; its error file exists only when its session is known, and holds no payload
     text;
-  - `a PATH without jq still finds /usr/bin/jq`;
+  - `a PATH without jq finds jq through AGENT_STATE_HOOK_DIRS` (N22): the real wrapper, with a
+    `PATH` of links to its tools without `jq` and `AGENT_STATE_HOOK_DIRS` set to a temporary
+    folder whose `jq` is a stub that logs its call and runs the `jq` the suite already needs;
+    the record is written, the stub's log shows the call, and the wrapper's default for the
+    variable is `/usr/bin:/bin`. No test assumes `/usr/bin/jq` exists;
   - `with no jq at all, jq-not-found is written to the folder of CLAUDE_CODE_SESSION_ID` (N22): the
     real wrapper, with `AGENT_STATE_HOOK_DIRS` empty and a `PATH` of one folder of links to the
     tools it runs, without `jq`;

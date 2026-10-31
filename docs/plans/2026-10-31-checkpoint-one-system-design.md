@@ -50,11 +50,12 @@ the owner chose option A: keep `.agent-state/<task-id>.json` as the only checkpo
 10-13 parts to it.
 
 Three adversarial reviews shaped this draft. The first (36 findings, on commit 697bdc16) gave the
-rulings S1 to S6: contradictions stay definite, drift runs only for tasks in progress, one writer
-per file and no locks, children bind to the session, the live probe runs first, and the briefing
-never quotes a child's text. The second (22 findings, on commit c0d07b94) found, twice in the same
-area, the briefing reporting normal work as a problem and children attributed to the wrong task.
-Its rulings cut scope rather than patch:
+rulings S1 to S6: contradictions stay definite, drift runs only for tasks in progress (superseded by
+T2 and N17 below: drift runs only in a run for named tasks, for every task it names), one writer per
+file and no locks, children bind to the session, the live probe runs first, and the briefing never
+quotes a child's text. The second (22 findings, on commit c0d07b94) found, twice in the same area,
+the briefing reporting normal work as a problem and children attributed to the wrong task. Its
+rulings cut scope rather than patch:
 
 - **T1.** No new contradiction: what the stamp makes visible is information.
 - **T2.** Drift and children only in a run for named tasks, never in the sweep.
@@ -582,8 +583,10 @@ bash 3.2 and jq, with its jq programs inside it:
 
 - It sets `umask 077` and appends `AGENT_STATE_HOOK_DIRS`, by default `/usr/bin:/bin`, to the
   inherited `PATH`, so the basic tools and `/usr/bin/jq` resolve under a bare `PATH` (probe 4, run
-  4b). The variable exists for the test of a missing `jq`, which sets it empty and runs the real
-  wrapper with a `PATH` of linked tools and no `jq`, on any machine (N22).
+  4b). The variable exists for the tests, which run the real wrapper with a `PATH` of linked tools
+  and no `jq`: the test of a missing `jq` sets it empty, and the test of the fallback sets it to
+  a temporary folder whose stub `jq` runs the suite's own, so no test assumes `/usr/bin/jq`
+  exists and both behave the same on any machine (N22).
 - It reads its whole standard input before anything else, keeping at most 64 MiB and discarding the
   rest, so no early exit leaves Claude Code writing into a closed pipe, and it writes nothing to
   standard output (N26).
