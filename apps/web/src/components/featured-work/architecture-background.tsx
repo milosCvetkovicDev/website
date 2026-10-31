@@ -91,7 +91,7 @@ export function ArchitectureBackground({ activeNodes = [] }: ArchitectureBackgro
 
         {/* The faded layer: connections, packets and node shapes, no text. The labels are drawn
             above it at full opacity in opaque tokens, because text is never dimmed (#269). */}
-        <g className="opacity-40 dark:opacity-60">
+        <g className="opacity-40 transition-opacity duration-700 dark:opacity-60">
           {connections.map((connection) => {
             const dimmed = hasActive && !connection.active;
             return (

@@ -88,12 +88,20 @@ const report = (expected: (string | [string, Verdict])[]) =>
 
 describe('what the scan flags', () => {
   // A translucent custom property of the fixtures' own, so that no fixture leans on what globals.css
-  // holds: the fix for StaticPane's log lines made the --log-* colours opaque (#269).
+  // holds: the fix for StaticPane's log lines made the --log-* colours opaque (#269). The second is
+  // shaped as the vocabulary reads a token globals.css declares in :root and again in .dark, opaque
+  // in the first and translucent in the second, as a dark-theme tweak to --log-* or
+  // --tmux-diagram-text could leave one.
   beforeAll(() => {
     vocabulary.properties.set('--fixture-translucent', ['rgba(0, 0, 0, 0.5)']);
+    vocabulary.properties.set('--fixture-dark-translucent', [
+      '#6b6b78',
+      'rgba(133, 139, 157, 0.6)',
+    ]);
   });
   afterAll(() => {
     vocabulary.properties.delete('--fixture-translucent');
+    vocabulary.properties.delete('--fixture-dark-translucent');
   });
 
   it.each<[string, string, (string | [string, Verdict])[]]>([
@@ -317,6 +325,26 @@ describe('what the scan flags', () => {
         'style.animation',
         'style.color',
       ],
+    ],
+    [
+      'a colour opaque in :root but translucent in .dark, as a label fill, a style colour and a class',
+      `const LOG_COLORS = { dbg: 'var(--fixture-dark-translucent)' } as const;
+      export function Diagram({ active, lines }: { active: boolean; lines: { level: 'dbg'; text: string }[] }) {
+        return (
+          <div>
+            <svg viewBox="0 0 10 10">
+              <text fill={active ? 'var(--tmux-bar-text-bright)' : 'var(--fixture-dark-translucent)'}>Core</text>
+            </svg>
+            {lines.map((line) => (
+              <div key={line.text} style={{ color: LOG_COLORS[line.level] }}>
+                {line.text}
+              </div>
+            ))}
+            <span className="text-[var(--fixture-dark-translucent)]">idle</span>
+          </div>
+        );
+      }`,
+      ['fill={…}', 'style.color', 'text-[var(--fixture-dark-translucent)]'],
     ],
     [
       'a pulse on text, as the highlighted stat had until #111',
@@ -1486,11 +1514,33 @@ const KNOWN_DEFECTS: KnownDefect[] = [];
 /**
  * Dimmed classes the text rule allows because nothing under them renders text: the sites this guard
  * was written to leave alone, less the hex badge's polygons, which went with the component (#47,
- * slice 47l). Pinned with their counts to show the scan reaching and judging them rather than
- * missing them. A <text> added under one turns it into a finding, and the change that deletes one
- * of these components deletes its row.
+ * slice 47l), plus DIM2's three, which #269 kept on ArchitectureBackground's connections and node
+ * shapes after moving the labels out from under them. Pinned with their counts to show the scan
+ * reaching and judging them rather than missing them. A <text> added under one turns it into a
+ * finding, and the change that deletes one of these components deletes its row.
  */
 const DECORATIVE = [
+  {
+    file: 'src/components/featured-work/architecture-background.tsx',
+    component: 'ArchitectureBackground',
+    element: 'g',
+    token: 'opacity-40',
+    count: 1,
+  },
+  {
+    file: 'src/components/featured-work/architecture-background.tsx',
+    component: 'ArchitectureBackground',
+    element: 'g',
+    token: 'dark:opacity-60',
+    count: 1,
+  },
+  {
+    file: 'src/components/featured-work/architecture-background.tsx',
+    component: 'ArchitectureBackground',
+    element: 'g',
+    token: 'opacity={…}',
+    count: 1,
+  },
   {
     file: 'src/components/animated-hero/section-progress.tsx',
     component: 'SectionProgress',

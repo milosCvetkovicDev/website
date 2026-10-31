@@ -3,8 +3,9 @@ import type { Page } from '@playwright/test';
 /**
  * The tmux background's log stream on `/`: the slot container in each of its five panes
  * (`AnimatedPane` in `tmux-background.tsx`). Its lines are decoration painted in the opaque `--log-*`
- * colours (at 0.35 to 0.55 alpha until #269), and they stream on a clock for as long as the page is
- * open, so two checks leave the containers out: the at-rest axe pass on `/`
+ * colours (at 0.35 to 0.55 alpha until #269; `decorative-text-opacity.spec.ts` holds them opaque at
+ * runtime), and they stream on a clock for as long as the page is open, so two checks leave the
+ * containers out: the at-rest axe pass on `/`
  * (`auditExcludingTmuxLogStream` in `accessibility.spec.ts`, which gives the reasons) and the
  * partial-alpha sweep of the hero in `hero-contrast.spec.ts`. They share this one constant, so a
  * renamed attribute breaks both at once rather than turning one exclusion into a silent no-op, and

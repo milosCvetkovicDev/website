@@ -681,8 +681,9 @@ function AnimatedPane({
       received++;
       paint();
       const newest = slots.lastElementChild;
-      // A rise without a fade: a pane adds a line every 400-850 ms, so a fade from 0 would hold its
-      // newest line part-transparent for much of the time, and text is never dimmed (#269).
+      // A rise without a fade: a pane adds a line every `config.speed` ms, give or take 15% (`tick`),
+      // not much longer than LINE_APPEAR_MS, so a fade from 0 would hold its newest line
+      // part-transparent for much of the time, and text is never dimmed (#269).
       if (newest instanceof HTMLElement && typeof newest.animate === 'function') {
         newest.animate([{ transform: 'translateY(3px)' }, { transform: 'none' }], {
           duration: LINE_APPEAR_MS,
