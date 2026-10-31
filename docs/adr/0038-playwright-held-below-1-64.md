@@ -28,17 +28,19 @@ admits 1.64, and only `pnpm-lock.yaml` records 1.63.0, so the next minor-and-pat
 [ADR 0018](0018-dependency-update-policy.md) ignores in `.github/dependabot.yml` the majors this
 repository cannot take, each with the event that reopens the question, under the rule that "an
 ignore rule is a deferral with a named trigger, never a permanent opinion". Its Decision is about
-majors. A minor version held for a defect in one release follows the same rule but is not one of
-those majors, so it gets a record of its own.
+majors. This hold is of another kind: it keeps out 1.64 and every release after it, a 2.x major
+included, for a defect first seen in 1.64.1 whose cause is not yet known. It follows the same rule
+but is not one of those majors, so it gets a record of its own.
 
 ## Decision
 
 **`@playwright/test` is held at the 1.63 line the lockfile installs, by an `ignore` entry in
 `.github/dependabot.yml` with `versions: ['>=1.64.0']`, until #278 is resolved by a Playwright
-release under which the `mobile-safari` project passes on CI.** It is a version hold: a deferral
-with a named trigger, under ADR 0018's rule. It sits beside ADR 0018 and changes nothing in that
-record's Decision, which stays about majors. The pull request that resolves #278 deletes the entry
-and moves the lockfile.
+release under which the `mobile-safari` project passes on CI.** `>=1.64.0` holds 1.64 and every
+later release, a 2.x major included, so the trigger ends the hold, not a version number. It is a
+version hold: a deferral with a named trigger, under ADR 0018's rule. It sits beside ADR 0018
+and changes nothing in that record's Decision, which stays about majors. The pull request that
+resolves #278 deletes the entry and moves the lockfile.
 
 ## Consequences
 
@@ -49,8 +51,9 @@ and moves the lockfile.
 - `playwright` and `playwright-core` need no entry: `@playwright/test` 1.63.0 depends on
   `playwright` 1.63.0 exactly, and that on `playwright-core` 1.63.0.
 - Every ignore entry now has a record: the majors in ADR 0018, this hold here. The drift manifest's
-  `adr-0038-dependabot-ignores` entry lists every `dependency-name` in `.github/dependabot.yml`, so
-  an ignore added or removed without a record shows up as drift.
+  `adr-0038-dependabot-ignores` entry lists every `dependency-name` in `.github/dependabot.yml`, in
+  order and with any repeat, and `adr-0038-dependabot-ignore-rules` the one rule each of them
+  carries, so an ignore added, removed, repeated or widened without a record shows up as drift.
 
 ### Trade-offs
 
@@ -69,7 +72,7 @@ and moves the lockfile.
 - **`versions: ['1.64.x']`.** The first form #275 wrote. 1.65 passes it, and would be offered
   before anyone knows whether it fixes the starvation.
 - **Amend ADR 0018.** Its Decision is accepted and is never edited (ADR 0012), and superseding it
-  to add one row would restate the whole update policy for one held minor.
+  to add one row would restate the whole update policy for one hold.
 - **Leave Playwright in the group and drop it from each group pull request by hand.** Every run
   would bring it back, red, inside a pull request that also carries the updates the repository
   wants, as #275 did.
